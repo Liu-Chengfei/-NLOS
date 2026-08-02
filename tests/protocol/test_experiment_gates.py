@@ -921,3 +921,42 @@ def test_assert_anchor_3d_declaration_no_raise_when_disabled():
     assert r['passed'] is False
     assert r['is_3d'] is True
     assert 'min_anchor_count_3d' in str(r['reasons'])
+
+
+# ========== §8.2.1 L1405 L_z vertical span (inside assert_anchor_3d_declaration) ==========
+
+def test_assert_anchor_3d_declaration_3d_lz_in_range_passes():
+    """§8.2.1 L1405: 3D anchor L_z ≤ 5m → pass."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    layout = {
+        'anchor_positions': [[0, 0, 0], [1, 0, 0], [0.5, 0.866, 0], [0.5, 0.2, 4.0]],
+        'min_anchor_count_3d': 4,
+        'vertical_distribution': {'z_span': 4.0},
+    }
+    r = assert_anchor_3d_declaration(layout)
+    assert r['passed'] is True
+    assert r['l_z_in_range'] is True
+    assert r['n_anchors_with_z'] == 4
+
+
+def test_assert_anchor_3d_declaration_3d_lz_exceeds_5m_raises():
+    """§8.2.1 L1405: 3D anchor L_z > 5m → raise."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    import pytest
+    layout = {
+        'anchor_positions': [[0, 0, 0], [1, 0, 0], [0.5, 0.866, 0], [0.5, 0.2, 8.0]],
+        'min_anchor_count_3d': 4,
+        'vertical_distribution': {'z_span': 8.0},
+    }
+    with pytest.raises(ValueError, match='L1405'):
+        assert_anchor_3d_declaration(layout)
+
+
+def test_assert_anchor_3d_declaration_2d_auto_passes_lz():
+    """§8.2.1 L1405: 2D layout (no z) → auto pass, l_z_in_range True."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    layout = {'anchor_positions': [[0, 0], [1, 0], [0.5, 0.866]]}
+    r = assert_anchor_3d_declaration(layout)
+    assert r['passed'] is True
+    assert r['l_z_in_range'] is True
+    assert r['is_3d'] is False

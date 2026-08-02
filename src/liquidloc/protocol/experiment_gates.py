@@ -2661,7 +2661,20 @@ def assert_anchor_3d_declaration(
     if z_values:
         z_extent = (min(z_values), max(z_values))
 
-    passed = not is_3d or declared
+    # §8.2.1 L1405 (table row 2): 3D 题竖直跨度 L_z ≤ 5m（同层为主）。
+    # 超过 5m 视为多层大高差 → 出域；与 L1361 vertical_distribution 合并审计。
+    L_Z_MAX_3D = 5.0
+    l_z_in_range = True
+    if is_3d and z_values:
+        l_z_span = max(z_values) - min(z_values)
+        l_z_in_range = l_z_span <= L_Z_MAX_3D
+        if not l_z_in_range:
+            reasons.append(
+                f"anchor_3d_declaration §8.2.1 L1405: anchor L_z={l_z_span:.3f}m > "
+                f"{L_Z_MAX_3D}m; 3D 题仅支持同层小高差，多层未建模 → 出域"
+            )
+
+    passed = (not is_3d or declared) and l_z_in_range
     report = {
         "is_3d": is_3d,
         "declared": declared,
@@ -2669,13 +2682,14 @@ def assert_anchor_3d_declaration(
         "vertical_distribution_present": vertical_distribution_present,
         "n_anchors_with_z": n_with_z,
         "z_extent": z_extent,
+        "l_z_in_range": l_z_in_range,
         "reasons": reasons,
         "passed": passed,
     }
     if not passed and raise_on_violation:
         raise ValueError(
-            "§8.1 L1361 anchor_3d_declaration violation: 3D 测距须显式声明 "
-            "min_anchor_count_3d (≥4) 与 vertical_distribution; "
+            "§8.1 L1361 / §8.2.1 L1405 anchor_3d_declaration violation: 3D 测距须显式声明 "
+            "min_anchor_count_3d (≥4)、vertical_distribution，且 L_z ≤ 5m; "
             f"reasons={reasons}; is_3d={is_3d}; n_with_z={n_with_z}"
         )
     return report
