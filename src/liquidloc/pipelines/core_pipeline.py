@@ -97,6 +97,9 @@ def _run_section8_deep_audit(scene_tasks, cfg):
      11. §8.2 强周期主导门禁:
          (periodicity_max_ratio check inside compute_trajectory_envelope)
          ensures dominant_periodicity_ratio < 0.7 (no strong-period single-track).
+     12. §8.1 L1361 三维测距另声明:
+         (assert_anchor_3d_declaration; fired on cfg['method_anchor_layouts'] first layout)
+         ensures 3D layouts declare min_anchor_count_3d (≥4) and vertical_distribution.
 
     Failure mode: raise by default; cfg['section8_deep_audit_soft']=True for log-only.
     Required cfg keys (any missing → that gate silently skips):
@@ -118,6 +121,7 @@ def _run_section8_deep_audit(scene_tasks, cfg):
         assert_moving_anchor_truth_equality,
         assert_seed_required,
         assert_seed_decoupling,
+        assert_anchor_3d_declaration,
     )
     soft_mode = bool((cfg or {}).get('section8_deep_audit_soft', False))
     raise_kw = not soft_mode
@@ -191,6 +195,14 @@ def _run_section8_deep_audit(scene_tasks, cfg):
     if method_anchor_layouts:
         aur = assert_anchor_uniform_source(method_anchor_layouts, raise_on_violation=raise_kw)
         _log_section8_audit('anchor_uniform_source', aur, soft_mode)
+
+    # §8.1 L1361 三维测距另声明门禁：3D 布局须显式声明 min_anchor_count_3d (≥4)
+    # 与 vertical_distribution；2D 布局自动通过。
+    if method_anchor_layouts:
+        ad = assert_anchor_3d_declaration(
+            next(iter(method_anchor_layouts.values())),
+            raise_on_violation=raise_kw)
+        _log_section8_audit('anchor_3d_declaration', ad, soft_mode)
 
     # §8.1 G 锚点切换规则可知：若存在锚点切换，切换时刻必须规则可知。
     # 需 cfg['anchor_layout'] 含显式 anchor_switch 字段；由 _build_section8_cfg_payload 透传。

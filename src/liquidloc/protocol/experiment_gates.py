@@ -2556,3 +2556,126 @@ def assert_seed_decoupling(
             "contributions to motion vs NLOS vs async per spec L1389"
         )
     return report
+
+
+def assert_anchor_3d_declaration(
+    anchor_layout: Mapping[str, Any],
+    *,
+    raise_on_violation: bool = True,
+) -> dict[str, Any]:
+    """§8.1 L1361 三维测距另声明门禁：3D 锚点布局必须显式声明最小锚数与垂直分布。
+
+    §8.1 L1361（spec）："...三维测距须另声明最小锚数与垂直分布。"
+
+    平面题（默认 2D）锚点坐标仅 (x, y)，本门禁自动通过。
+    若任一锚点含 z 坐标（len(coords) == 3），视为 3D 布局，须同时满足：
+      1. anchor_layout 含 'min_anchor_count_3d' 字段且 ≥ 4（3D 测距至少 4 锚）。
+      2. anchor_layout 含 'vertical_distribution' 字段（dict 或 list）描述 z 方向分布
+         （如 {"z_min": ..., "z_max": ..., "z_span": ...}），禁止空白/缺失。
+
+    参数:
+        anchor_layout: 锚点布局字典，含 'anchor_positions'（list of (x[,y[,z]])）。
+        raise_on_violation: True 时若 3D 但缺字段则 raise。
+
+    返回:
+        dict 含 is_3d (bool)、declared (bool)、min_anchor_count (int|None)、
+              vertical_distribution_present (bool)、n_anchors_with_z (int)、z_extent (tuple|None)、
+              reasons (list[str])、passed (bool)。
+    """
+    if not isinstance(anchor_layout, Mapping):
+        raise TypeError(f"anchor_layout must be a Mapping, got {type(anchor_layout).__name__}")
+
+    positions = list(anchor_layout.get("anchor_positions") or [])
+    n_with_z = 0
+    z_values: list[float] = []
+    for p in positions:
+        if not isinstance(p, (list, tuple)):
+            continue
+        if len(p) >= 3:
+            n_with_z += 1
+            try:
+                z_values.append(float(p[2]))
+            except (TypeError, ValueError):
+                pass
+
+    is_3d = n_with_z > 0
+    declared = True
+    min_anchor_count: int | None = None
+    vertical_distribution_present = False
+    reasons: list[str] = []
+
+    if is_3d:
+        # 1. min_anchor_count_3d 字段
+        mac_raw = anchor_layout.get("min_anchor_count_3d")
+        if mac_raw is None:
+            declared = False
+            reasons.append(
+                "anchor_3d_declaration: 3D 布局缺失 'min_anchor_count_3d' 字段"
+            )
+        else:
+            try:
+                mac = int(mac_raw)
+                min_anchor_count = mac
+                if mac < 4:
+                    declared = False
+                    reasons.append(
+                        f"anchor_3d_declaration: min_anchor_count_3d={mac} < 4 "
+                        "(3D 测距至少需要 4 锚)"
+                    )
+            except (TypeError, ValueError):
+                declared = False
+                reasons.append(
+                    f"anchor_3d_declaration: min_anchor_count_3d 非整数: {mac_raw!r}"
+                )
+
+        # 2. vertical_distribution 字段
+        vd = anchor_layout.get("vertical_distribution")
+        if vd is None:
+            declared = False
+            reasons.append(
+                "anchor_3d_declaration: 3D 布局缺失 'vertical_distribution' 字段"
+            )
+        elif isinstance(vd, Mapping):
+            if len(vd) == 0:
+                declared = False
+                reasons.append(
+                    "anchor_3d_declaration: 'vertical_distribution' 为空字典"
+                )
+            else:
+                vertical_distribution_present = True
+        elif isinstance(vd, (list, tuple)):
+            if len(vd) == 0:
+                declared = False
+                reasons.append(
+                    "anchor_3d_declaration: 'vertical_distribution' 为空列表"
+                )
+            else:
+                vertical_distribution_present = True
+        else:
+            declared = False
+            reasons.append(
+                f"anchor_3d_declaration: 'vertical_distribution' 类型不支持: {type(vd).__name__}"
+            )
+
+    z_extent: tuple[float, float] | None = None
+    if z_values:
+        z_extent = (min(z_values), max(z_values))
+
+    passed = not is_3d or declared
+    report = {
+        "is_3d": is_3d,
+        "declared": declared,
+        "min_anchor_count": min_anchor_count,
+        "vertical_distribution_present": vertical_distribution_present,
+        "n_anchors_with_z": n_with_z,
+        "z_extent": z_extent,
+        "reasons": reasons,
+        "passed": passed,
+    }
+    if not passed and raise_on_violation:
+        raise ValueError(
+            "§8.1 L1361 anchor_3d_declaration violation: 3D 测距须显式声明 "
+            "min_anchor_count_3d (≥4) 与 vertical_distribution; "
+            f"reasons={reasons}; is_3d={is_3d}; n_with_z={n_with_z}"
+        )
+    return report

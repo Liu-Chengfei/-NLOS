@@ -850,3 +850,74 @@ def test_assert_seed_decoupling_string_seeds_passes():
     report = assert_seed_decoupling('42', '7', '13')
     assert report['decoupled'] is True
     assert report['seeds']['trajectory'] == 42.0
+
+
+# ========== §8.1 L1361 assert_anchor_3d_declaration ==========
+
+def test_assert_anchor_3d_declaration_2d_passes():
+    """§8.1 L1361: 2D 布局（无 z 坐标）自动通过."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    layout = {'anchor_positions': [[0, 0], [1, 0], [0.5, 0.866]]}
+    r = assert_anchor_3d_declaration(layout)
+    assert r['passed'] is True
+    assert r['is_3d'] is False
+    assert r['n_anchors_with_z'] == 0
+
+
+def test_assert_anchor_3d_declaration_3d_no_decl_raises():
+    """§8.1 L1361: 3D 布局缺 min_anchor_count_3d + vertical_distribution → raise."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    import pytest
+    layout = {'anchor_positions': [[0, 0, 0], [1, 0, 0], [0.5, 0.866, 0], [0.5, 0.2, 2.0]]}
+    with pytest.raises(ValueError, match='anchor_3d_declaration violation'):
+        assert_anchor_3d_declaration(layout)
+
+
+def test_assert_anchor_3d_declaration_3d_with_decl_passes():
+    """§8.1 L1361: 3D 布局含 min_anchor_count_3d=4 + vertical_distribution → pass."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    layout = {
+        'anchor_positions': [[0, 0, 0], [1, 0, 0], [0.5, 0.866, 0], [0.5, 0.2, 2.0]],
+        'min_anchor_count_3d': 4,
+        'vertical_distribution': {'z_min': 0.0, 'z_max': 2.0, 'z_span': 2.0},
+    }
+    r = assert_anchor_3d_declaration(layout)
+    assert r['passed'] is True
+    assert r['is_3d'] is True
+    assert r['n_anchors_with_z'] == 4
+
+
+def test_assert_anchor_3d_declaration_3d_min_count_lt_4_raises():
+    """§8.1 L1361: 3D min_anchor_count_3d < 4 → raise."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    import pytest
+    layout = {
+        'anchor_positions': [[0, 0, 0], [1, 0, 0], [0.5, 0.866, 0], [0.5, 0.2, 2.0]],
+        'min_anchor_count_3d': 3,
+        'vertical_distribution': {'z_span': 2.0},
+    }
+    with pytest.raises(ValueError, match='min_anchor_count_3d=3 < 4'):
+        assert_anchor_3d_declaration(layout)
+
+
+def test_assert_anchor_3d_declaration_3d_empty_vd_raises():
+    """§8.1 L1361: 3D vertical_distribution 为空字典 → raise."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    import pytest
+    layout = {
+        'anchor_positions': [[0, 0, 0], [1, 0, 0], [0.5, 0.866, 0], [0.5, 0.2, 2.0]],
+        'min_anchor_count_3d': 4,
+        'vertical_distribution': {},
+    }
+    with pytest.raises(ValueError, match="vertical_distribution' 为空字典"):
+        assert_anchor_3d_declaration(layout)
+
+
+def test_assert_anchor_3d_declaration_no_raise_when_disabled():
+    """§8.1 L1361: raise_on_violation=False 时只返回 report 不抛."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    layout = {'anchor_positions': [[0, 0, 0], [1, 0, 0], [0.5, 0.866, 0], [0.5, 0.2, 2.0]]}
+    r = assert_anchor_3d_declaration(layout, raise_on_violation=False)
+    assert r['passed'] is False
+    assert r['is_3d'] is True
+    assert 'min_anchor_count_3d' in str(r['reasons'])
