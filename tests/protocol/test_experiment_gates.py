@@ -826,11 +826,24 @@ def test_assert_seed_decoupling_fully_coupled_raises():
         assert_seed_decoupling(42, 42, 42)
 
 
-def test_assert_seed_decoupling_partial_collision_passes():
-    """§8.2.0 政策6: 部分碰撞（两同）但非完全耦合 → pass + collisions 标记."""
+def test_assert_seed_decoupling_partial_collision_raises():
+    """§8.2.0 政策6: 部分碰撞（两同但非三者皆同）→ 必须 raise（修订自原 silent-pass 标准）。
+
+    修订理由：§8.2.0 L1389 "便于诊断名次来自运动还是来自 NLOS/时间"。
+    部分耦合 trajectory==nlos 会耦合运动轴与 NLOS 轴，使名次来源诊断失效。
+    因此门禁对任一两两 collision 都须 raise，而非仅 fully_coupled。
+    """
     from liquidloc.protocol.experiment_gates import assert_seed_decoupling
-    report = assert_seed_decoupling(42, 42, 13)
-    assert report['decoupled'] is True
+    with pytest.raises(ValueError) as excinfo:
+        assert_seed_decoupling(42, 42, 13)
+    msg = str(excinfo.value)
+    assert "trajectory==nlos(42.0)" in msg, (
+        "§8.2.0 L1389 partial collision 必须在 raise message 中显式列出 collision"
+    )
+
+    # raise_on_violation=False 时仍只返回 report 不抛，便于审计观察。
+    report = assert_seed_decoupling(42, 42, 13, raise_on_violation=False)
+    assert report['decoupled'] is False
     assert report['fully_coupled'] is False
     assert len(report['collisions']) >= 1
     assert 'trajectory==nlos(42.0)' in report['collisions']

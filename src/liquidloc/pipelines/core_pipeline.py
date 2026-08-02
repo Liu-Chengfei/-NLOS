@@ -326,7 +326,15 @@ def _build_section8_cfg_payload(scene_tasks, cfg, experiment_cfg):
         except ValueError:
             raise  # propagate envelope violations
         except Exception:
-            payload['trajectory_envelope'] = None
+            # 非 ValueError 异常属计算 bug；原实现吞掉并把 trajectory_envelope 设 None，
+            # 导致 dispatcher `if envelope:` 静默 skip——掩盖 envelope 计算真 bug。
+            # 现改：重新 raise（附带上下文），让真 bug 显形而非 silent-pass。
+            import logging as _logging
+            _logging.getLogger(__name__).exception(
+                "compute_trajectory_envelope raised non-ValueError; "
+                "cannot silently mask — propagating to caller."
+            )
+            raise
 
     # weak_geometry_mask: §8.1 L1364 病态观测占比门禁数据源。
     # 早期实现使用 G 轴 proxy 派生（G2→100%、G1→5%、G0→0%），随机分布；
@@ -431,8 +439,22 @@ def _build_section8_cfg_payload(scene_tasks, cfg, experiment_cfg):
             _protocol_cfg = load_scene_axis_protocol()
             _g_cfg = _protocol_cfg.get('axes', {}).get('G', {})
             _anchor_layout, _ = build_anchor_layout(anchor_count, g_level, _g_cfg)
-        except Exception:
+        except ValueError:
+            # build_anchor_layout 用 ValueError 表达"G/K 级不存在或参数越界"
+            # ——这是实验 cfg 不含 §8 完整 G/K 坐标的合法信号（如非 §8 风格的 pipeline test），
+            # silent-skip 该门禁可接受：§8 审计是 best-effort，不强制全部 cfg 必须提供 §8 维度。
             _anchor_layout = None
+        except Exception:
+            # 非 ValueError 属 build_anchor_layout 内部 bug；原实现吞掉并把
+            # _anchor_layout 设 None，导致 dispatcher `if method_anchor_layouts:` 与
+            # `if anchor_layout:` 静默 skip——掩盖锚点布局真 bug。现改重新 raise，
+            # 让真 bug 显形而非 silent-pass；§8.1 偷懒路径若存在则应在更高层显形。
+            import logging as _logging
+            _logging.getLogger(__name__).exception(
+                "build_anchor_layout raised non-ValueError; "
+                "cannot silently mask — propagating to caller."
+            )
+            raise
     if _anchor_layout is not None and methods:
         # Static layout (no moving anchors in this default build).
         _layout_payload: dict[str, Any] = dict(_anchor_layout) if isinstance(_anchor_layout, Mapping) else {}

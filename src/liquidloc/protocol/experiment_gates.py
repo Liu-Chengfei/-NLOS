@@ -1749,39 +1749,6 @@ def check_experiment_segment_coverage(
     return report
 
 
-def get_cold_start_offset_s(
-    protocol_cfg: dict[str, Any] | None = None,
-    *,
-    strict: bool = True,
-) -> float:
-    """读取冻结协议 scene_scale.cold_start_offset_s, 用于评估接口冷启动统一划除.
-
-    返回 ≥0 的浮点秒数. 评估接口 (eval_pipeline / metric_runner) 应在
-    每轨前 cold_start_offset_s 秒做统一划除 (§9.1) 后再核对剩余段长是否仍
-    ≥ t_eff_min_s. cold_start_global_enforced 为 False 时调用方须明确声明
-    不参与统一划除并自行审计.
-
-    参数:
-        protocol_cfg: 可选外部协议配置字典.
-        strict: True 时调用 _resolve_protocol_cfg 校验冻结合同, 拒绝部分 cfg;
-            False 时宽容处理: protocol_cfg 非空且含 scene_scale.cold_start_offset_s
-            时直接读取, 否则回退到默认协议. metric_runner 在传 partial cfg
-            (仅含 evaluation.gdop_occupancy_min_ratio 等) 时使用 strict=False.
-
-    返回:
-        float: 冷启动统一划除秒数.
-    """
-    if not strict and protocol_cfg is not None:
-        scene_scale_partial = protocol_cfg.get('scene_scale') if isinstance(protocol_cfg, Mapping) else None
-        if isinstance(scene_scale_partial, Mapping) and 'cold_start_offset_s' in scene_scale_partial:
-            return float(scene_scale_partial['cold_start_offset_s'])
-        # partial cfg 缺 scene_scale 字段时, 加载默认协议但跳过 frozen 校验
-        default_proto = load_experiment_protocol()
-        return float(default_proto['scene_scale']['cold_start_offset_s'])
-    scene_scale = get_scene_scale(protocol_cfg)
-    return float(scene_scale['cold_start_offset_s'])
-
-
 def assert_anchor_uniform_source(
     method_anchor_layouts: Mapping[str, Mapping[str, Any]],
     *,
@@ -2488,15 +2455,18 @@ def assert_seed_decoupling(
     §8.2.0 L1389："轨迹随机与 NLOS/异步随机**宜解耦种子**（可复述）：
     便于诊断名次来自运动还是来自 NLOS/时间。"
 
-    解耦定义：三个种子值（轨迹、NLOS、异步）必须彼此**不同**。
-    若三者完全相同，意味着同一 PRNG 流被复用，扰动相互耦合，
-    无法独立诊断"运动/NLOS/异步"任一来源的名次贡献。
+    解耦定义（修订自原 fully-coupled-only 标准）：
+    - 完全耦合：三者都不为 None 且数值完全相同；
+    - 部分耦合：任意两者都不为 None 且数值相同（如 trajectory==nlos 且 async 不同）。
+    §8.2.0 L1389 明确要求"便于诊断名次来自运动还是来自 NLOS/时间"——
+    任一两两耦合（含 trajectory==nlos 这种部分耦合）都会污染对应诊断轴，
+    因此门禁须对**任一两两碰撞**触发 raise，而非仅三者完全相同。
 
     参数:
         trajectory_seed: 轨迹种子（数值或可数值化字符串）。
         nlos_seed: NLOS 扰动种子。
         async_seed: 异步扰动种子。
-        raise_on_violation: True 时若三者完全相同（耦合）则 raise。
+        raise_on_violation: True 时若有任一两两 collision 则 raise。
 
     返回:
         dict 含 decoupled (bool)、n_unique_seeds (int)、
@@ -2522,7 +2492,7 @@ def assert_seed_decoupling(
     a_seed = _coerce_seed(async_seed)
 
     seeds = {"trajectory": t_seed, "nlos": n_seed, "async": a_seed}
-    # 缺失种子视为 None；若三者均 None 则视为完全耦合（同无种子）。
+    # 缺失种子视为 None；若三者均 None 则视为解耦（无种子无法耦合）。
     present = [v for v in seeds.values() if v is not None]
     unique_present = set(present)
     n_unique_seeds = len(unique_present)
@@ -2532,7 +2502,7 @@ def assert_seed_decoupling(
         t_seed is not None and n_seed is not None and a_seed is not None
         and t_seed == n_seed == a_seed
     )
-    # 部分耦合：任意两者完全相同但不是全部相同。
+    # 部分耦合：任意两者都不为 None 且数值相同。
     pairs = [("trajectory", "nlos", t_seed, n_seed),
              ("trajectory", "async", t_seed, a_seed),
              ("nlos", "async", n_seed, a_seed)]
@@ -2540,7 +2510,10 @@ def assert_seed_decoupling(
     for name_a, name_b, va, vb in pairs:
         if va is not None and vb is not None and va == vb:
             collisions.append(f"{name_a}=={name_b}({va})")
-    decoupled = not fully_coupled
+    # 解耦条件：无任何两两碰撞。
+    # §8.2.0 L1389 要求"诊断名次来自运动还是 NLOS/时间"——
+    # 任一 collision 都使对应诊断轴失效，故门禁对任一 collision raise。
+    decoupled = (len(collisions) == 0)
 
     report = {
         "decoupled": decoupled,
@@ -2550,10 +2523,12 @@ def assert_seed_decoupling(
         "fully_coupled": fully_coupled,
     }
     if not decoupled and raise_on_violation:
+        # 报告 collisions（含部分/完全耦合特征），便于诊断定位。
         raise ValueError(
-            "§8.2.0 R8.2.0-P6 seed_decoupling violation: trajectory/NLOS/async seeds are fully "
-            f"coupled (all equal to {t_seed}); cannot independently attribute ranking "
-            "contributions to motion vs NLOS vs async per spec L1389"
+            "§8.2.0 R8.2.0-P6 seed_decoupling violation: trajectory/NLOS/async seeds have "
+            f"collision(s) {collisions}; cannot independently attribute ranking "
+            "contributions to motion vs NLOS vs async per spec L1389 "
+            "(partial coupling also contaminates the corresponding diagnostic axis)"
         )
     return report
 
