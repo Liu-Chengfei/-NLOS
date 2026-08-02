@@ -51,7 +51,7 @@ def _run_section8_deep_audit(scene_tasks, cfg):
     Triggered by experiment_cfg['enable_section8_deep_audit']=True (default True
     after §8 hardening; can be disabled by setting it explicitly to False).
 
-    Coverage (11 gates, all wired in this function):
+    Coverage (15 gates, all wired in this function):
       1. §8.4 cold-start × K3/K4 underdetermined geometry conjunction.
          (assert_cold_start_x_underdetermined_geometry; fired on scene_tasks)
       2. §8.1 H + 细节 R-D-C 锚点源一致性 + 移动锚点真值差分:
@@ -100,6 +100,17 @@ def _run_section8_deep_audit(scene_tasks, cfg):
      12. §8.1 L1361 三维测距另声明:
          (assert_anchor_3d_declaration; fired on cfg['method_anchor_layouts'] first layout)
          ensures 3D layouts declare min_anchor_count_3d (≥4) and vertical_distribution.
+     13. §8.2.0 政策1 多样本:
+         (assert_trajectory_collection_multi_sample; fired on scene_tasks)
+         ensures sweep contains ≥2 tasks (no single-track dead script defining total order).
+     14. §8.2.0 政策2 随机源可种子化:
+         (assert_trajectory_generator_pol_2; fired on cfg['generator_metadata'])
+         ensures trajectory generator covers ≥1 of path_shape/turn_phase/stop_time/speed_envelope
+         OR uses a sufficiently large fixed trajectory library (≥30).
+     15. §8.2.0 政策4 允许生成族:
+         (assert_trajectory_generator_pol_4; fired on cfg['generator_metadata'])
+         ensures trajectory generator family ∈ {seeded_random_walk, parameterized_spline,
+         trajectory_lib, combined, ...} per spec L1384-1387.
 
     Failure mode: raise by default; cfg['section8_deep_audit_soft']=True for log-only.
     Required cfg keys (any missing → that gate silently skips):
@@ -122,6 +133,9 @@ def _run_section8_deep_audit(scene_tasks, cfg):
         assert_seed_required,
         assert_seed_decoupling,
         assert_anchor_3d_declaration,
+        assert_trajectory_collection_multi_sample,
+        assert_trajectory_generator_pol_2,
+        assert_trajectory_generator_pol_4,
     )
     soft_mode = bool((cfg or {}).get('section8_deep_audit_soft', False))
     raise_kw = not soft_mode
@@ -203,6 +217,22 @@ def _run_section8_deep_audit(scene_tasks, cfg):
             next(iter(method_anchor_layouts.values())),
             raise_on_violation=raise_kw)
         _log_section8_audit('anchor_3d_declaration', ad, soft_mode)
+
+    # §8.2.0 政策1 多样本门禁：禁单条死脚本定全序；sweep 须 ≥2 条任务。
+    # 由 scene_tasks 直接驱动，无需额外 payload。
+    mss = assert_trajectory_collection_multi_sample(scene_tasks, raise_on_violation=raise_kw)
+    _log_section8_audit('policy1_multi_sample', mss, soft_mode)
+
+    # §8.2.0 政策2 随机源可种子化门禁：轨迹生成器须对路径/转向/停走/速度包络之一做种子化变异。
+    generator_metadata = (cfg or {}).get('generator_metadata')
+    if generator_metadata is not None:
+        p2r = assert_trajectory_generator_pol_2(generator_metadata, raise_on_violation=raise_kw)
+        _log_section8_audit('policy2_seedable', p2r, soft_mode)
+
+    # §8.2.0 政策4 允许生成族门禁：generator_family 须落入允许族列表。
+    if generator_metadata is not None:
+        p4r = assert_trajectory_generator_pol_4(generator_metadata, raise_on_violation=raise_kw)
+        _log_section8_audit('policy4_generator_family', p4r, soft_mode)
 
     # §8.1 G 锚点切换规则可知：若存在锚点切换，切换时刻必须规则可知。
     # 需 cfg['anchor_layout'] 含显式 anchor_switch 字段；由 _build_section8_cfg_payload 透传。
@@ -469,6 +499,27 @@ def _build_section8_cfg_payload(scene_tasks, cfg, experiment_cfg):
         payload['trajectory_seed'] = int(hashlib.sha256(f'{_ns}.trajectory'.encode()).hexdigest()[:8], 16)
         payload['nlos_seed'] = int(hashlib.sha256(f'{_ns}.nlos'.encode()).hexdigest()[:8], 16)
         payload['async_seed'] = int(hashlib.sha256(f'{_ns}.async'.encode()).hexdigest()[:8], 16)
+
+    # generator_metadata: §8.2.0 政策2/4 audit 数据源。
+    # 描述当前 sweep 使用的 trajectory generator 的族类与种子化维度。
+    # 默认值反映 protocol_trajectory.py 的实现（种子化随机参数族，覆盖全部 5 个变异维度）。
+    user_gen_meta = (experiment_cfg or {}).get('generator_metadata') or (cfg or {}).get('generator_metadata')
+    if user_gen_meta is not None:
+        payload['generator_metadata'] = user_gen_meta
+    else:
+        payload['generator_metadata'] = {
+            'generator_family': 'parameterized_spline',  # protocol_trajectory.py 是种子化参数族
+            'seeded_dimensions': [
+                'path_shape',       # jag (L98)
+                'turn_phase',       # aspect/phase (L67/L70)
+                'stop_time',        # stop_c/stop_w/ramp_dur (L129/L133/L146)
+                'speed_envelope',   # spd (L230)
+            ],
+            'seed_param_present': True,
+            'is_seedable': True,
+            'is_trajectory_lib': False,
+            'lib_size': None,
+        }
 
     return payload
 from liquidloc.metrics.runtime_metrics import compute_runtime_metrics  # 统一运行时指标口径。

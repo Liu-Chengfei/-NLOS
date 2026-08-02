@@ -2679,3 +2679,216 @@ def assert_anchor_3d_declaration(
             f"reasons={reasons}; is_3d={is_3d}; n_with_z={n_with_z}"
         )
     return report
+
+
+def assert_trajectory_collection_multi_sample(
+    scene_tasks: Sequence[Mapping[str, Any]] | None,
+    *,
+    min_samples: int = 2,
+    raise_on_violation: bool = True,
+) -> dict[str, Any]:
+    """§8.2.0 政策1 多样本门禁：禁单条死脚本定全序；sweep 须含 ≥ min_samples 条轨迹。
+
+    §8.2.0 L1381 政策1："**多样本、可复现的轨迹集合**，而不是单条死脚本定全序。"
+
+    §8.2.0 L1394 放松则伤："单轨死脚本 → 可检验性与 5、6"。
+
+    参数:
+        scene_tasks: 任务序列（每个任务代表一条轨迹/一个场景）。
+        min_samples: 最少任务数；默认 2（≥2 才算"多样本"）。
+        raise_on_violation: True 时若 sweep 任务数 < min_samples 则 raise。
+
+    返回:
+        dict 含 multi_sample (bool)、n_tasks (int)、min_samples (int)。
+    """
+    if not isinstance(scene_tasks, Sequence) or isinstance(scene_tasks, (str, bytes)):
+        raise TypeError(f"scene_tasks must be a Sequence, got {type(scene_tasks).__name__}")
+    n_tasks = len(scene_tasks) if scene_tasks is not None else 0
+    multi_sample = bool(n_tasks >= min_samples)
+    report = {
+        "multi_sample": multi_sample,
+        "n_tasks": n_tasks,
+        "min_samples": int(min_samples),
+    }
+    if not multi_sample and raise_on_violation:
+        raise ValueError(
+            f"§8.2.0 政策1 multi_sample violation: sweep 含 {n_tasks} 个任务 < "
+            f"min_samples={min_samples}; 单条死脚本定全序禁用（spec L1381）"
+        )
+    return report
+
+
+def assert_trajectory_generator_pol_2(
+    generator_metadata: Mapping[str, Any] | None,
+    *,
+    raise_on_violation: bool = True,
+) -> dict[str, Any]:
+    """§8.2.0 政策2 随机源可种子化门禁：轨迹生成器须对路径/转向/停走/速度包络之一做种子化变异。
+
+    §8.2.0 L1382 政策2："**随机源须存在且可种子化**（§27.1）：至少对路径形状、转向相位、
+    停走时刻、速度包络之一做种子化变异；或等价地使用足够大的固定轨迹库 + 固定划分。"
+
+    generator_metadata 形式：
+        {
+            "seeded_dimensions": ["path_shape", "turn_phase", "stop_time", "speed_envelope"],
+            "is_trajectory_lib": False,
+            "lib_size": None,
+            "seed_param_present": True,
+        }
+
+    通过条件 (满足任一)：
+        A. seed_param_present=True AND seeded_dimensions 与
+           {"path_shape","turn_phase","stop_time","speed_envelope"} 的交集非空
+        B. is_trajectory_lib=True AND lib_size >= min_lib_size (默认 30)
+
+    参数:
+        generator_metadata: 描述轨迹生成器种子化维度的元数据字典。
+        raise_on_violation: True 时若既不满足 A 也不满足 B 则 raise。
+
+    返回:
+        dict 含 pol_2_satisfied (bool)、seeded_dims_present (bool)、
+              n_seeded_dims (int)、is_lib_pool (bool)、lib_size (int|None)、reasons (list[str])。
+    """
+    if not isinstance(generator_metadata, Mapping):
+        if generator_metadata is None:
+            report = {
+                "pol_2_satisfied": False,
+                "seeded_dims_present": False,
+                "n_seeded_dims": 0,
+                "is_lib_pool": False,
+                "lib_size": None,
+                "reasons": ["generator_metadata 为 None；无法判定"],
+            }
+            if raise_on_violation:
+                raise ValueError(
+                    "§8.2.0 政策2 seed_pol_2 violation: generator_metadata 缺失"
+                )
+            return report
+        raise TypeError(
+            f"generator_metadata must be a Mapping, got {type(generator_metadata).__name__}"
+        )
+
+    required_dims = {"path_shape", "turn_phase", "stop_time", "speed_envelope"}
+    seeded_dims = set(generator_metadata.get("seeded_dimensions") or [])
+    n_seeded = len(seeded_dims & required_dims)
+    seeded_dims_present = n_seeded >= 1
+    seed_param_present = bool(generator_metadata.get("seed_param_present", False))
+
+    is_lib_pool = bool(generator_metadata.get("is_trajectory_lib", False))
+    lib_size_raw = generator_metadata.get("lib_size")
+    lib_size = int(lib_size_raw) if isinstance(lib_size_raw, (int, float)) else None
+    min_lib_size = 30  # "足够大的固定轨迹库"
+    lib_size_ok = is_lib_pool and lib_size is not None and lib_size >= min_lib_size
+
+    pol_2_satisfied = (
+        (seed_param_present and seeded_dims_present) or lib_size_ok
+    )
+    reasons: list[str] = []
+    if not pol_2_satisfied:
+        if not seed_param_present:
+            reasons.append("generator_metadata.seed_param_present=False")
+        if not seeded_dims_present:
+            reasons.append(
+                f"未对路径形状/转向相位/停走时刻/速度包络任何一项做种子化变异 "
+                f"(seeded_dimensions={list(seeded_dims)}; required≥1 of {sorted(required_dims)})"
+            )
+        if not lib_size_ok:
+            reasons.append(
+                f"非固定轨迹库路径或库大小不足 (is_trajectory_lib={is_lib_pool}, "
+                f"lib_size={lib_size}, min={min_lib_size})"
+            )
+
+    report = {
+        "pol_2_satisfied": pol_2_satisfied,
+        "seeded_dims_present": seeded_dims_present,
+        "n_seeded_dims": n_seeded,
+        "seeded_dims": sorted(seeded_dims & required_dims),
+        "is_lib_pool": is_lib_pool,
+        "lib_size": lib_size,
+        "reasons": reasons,
+    }
+    if not pol_2_satisfied and raise_on_violation:
+        raise ValueError(
+            "§8.2.0 政策2 seed_pol_2 violation: 轨迹生成器随机源不可种子化或未覆盖任一变异维度: "
+            f"reasons={reasons}"
+        )
+    return report
+
+
+def assert_trajectory_generator_pol_4(
+    generator_metadata: Mapping[str, Any] | None,
+    *,
+    raise_on_violation: bool = True,
+) -> dict[str, Any]:
+    """§8.2.0 政策4 允许的生成族门禁：trajectory_generator 须落入政策4 列举的允许族之一。
+
+    §8.2.0 L1384-1387 政策4："**允许**的生成族（协议写死一种或组合）：
+       - 种子化随机游走 / 随机路点 + 光滑连接；
+       - 参数化样条族，**系数或控制点由种子抽样**；
+       - 有限轨迹库随机抽取（训练/测试划分防泄漏，§9.2）。"
+
+    generator_metadata 形式：
+        {
+            "generator_family": "seeded_random_walk" | "parameterized_spline" | "trajectory_lib" | ...,
+            "is_seedable": True,
+            "trajectory_lib_split_protocol": "train_test_holdout",
+        }
+
+    参数:
+        generator_metadata: 描述轨迹生成器族类的元数据字典。
+        raise_on_violation: True 时若 generator_family 不在允许族列表则 raise。
+
+    返回:
+        dict 含 pol_4_satisfied (bool)、generator_family (str|None)、
+              allowed_families (list[str])、reasons (list[str])。
+    """
+    if not isinstance(generator_metadata, Mapping):
+        if generator_metadata is None:
+            report = {
+                "pol_4_satisfied": False,
+                "generator_family": None,
+                "allowed_families": [],
+                "reasons": ["generator_metadata 为 None；无法判定"],
+            }
+            if raise_on_violation:
+                raise ValueError(
+                    "§8.2.0 政策4 generator_family violation: generator_metadata 缺失"
+                )
+            return report
+        raise TypeError(
+            f"generator_metadata must be a Mapping, got {type(generator_metadata).__name__}"
+        )
+
+    allowed_families = [
+        "seeded_random_walk",
+        "random_waypoint_smoothed",
+        "parameterized_spline",
+        "trajectory_lib",
+        "combined",
+    ]
+    fam = generator_metadata.get("generator_family")
+    fam_str = str(fam) if fam is not None else None
+    pol_4_satisfied = fam_str in allowed_families
+    is_seedable = bool(generator_metadata.get("is_seedable", True))
+    reasons: list[str] = []
+    if not pol_4_satisfied:
+        reasons.append(
+            f"generator_family={fam_str!r} 不在 §8.2.0 政策4 允许族列表 "
+            f"{allowed_families}"
+        )
+    if not is_seedable:
+        reasons.append("generator_family claims 不可种子化 (is_seedable=False)")
+
+    report = {
+        "pol_4_satisfied": pol_4_satisfied and is_seedable,
+        "generator_family": fam_str,
+        "allowed_families": list(allowed_families),
+        "is_seedable": is_seedable,
+        "reasons": reasons,
+    }
+    if not (pol_4_satisfied and is_seedable) and raise_on_violation:
+        raise ValueError(
+            "§8.2.0 政策4 generator_family violation: "
+            f"trajectory generator 不属于允许的生成族: reasons={reasons}"
+        )
+    return report
