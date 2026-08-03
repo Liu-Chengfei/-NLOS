@@ -1789,23 +1789,59 @@ def assert_anchor_uniform_source(
             pts.append((round(float(coords[0]), 6), round(float(coords[1]), 6)))
         return tuple(sorted(pts))
 
+    def _switch_fingerprint(layout: Mapping[str, Any]) -> tuple:
+        """锚点切换规则指纹（spec L1460 "锚点布局切换/增减锚: 规则可知且全员同一"）。
+
+        原 fingerprint 仅比对 anchor_positions，不比对 anchor_switch 字段——
+        若两 method 位置同但 switch 规则不同（一个含 switch_times，一个无切换），
+        silent pass 通过 uniform_source 门禁，违背 spec L1460"切换规则全员同一"。
+        现补 anchor_switch 字段指纹：序列化为 (has_switch, switch_times, reason)
+        三元组的可哈希表示，纳入 uniform 比对。
+        """
+        sw = layout.get("anchor_switch") if isinstance(layout, Mapping) else None
+        if sw is None:
+            return (False, (), None)
+        if not isinstance(sw, Mapping):
+            # 不规则 anchor_switch 由 assert_anchor_switch_ruleknown 单独审计；
+            # 此处用 sentinel 保留信号以触发 uniform 比对差异。
+            return (True, (), "<non-mapping>")
+        switch_times = sw.get("switch_times")
+        reason = sw.get("reason")
+        try:
+            times_tuple = tuple(round(float(t), 6) for t in (switch_times or []))
+        except (TypeError, ValueError):
+            times_tuple = ()  # 非数值由 ruleknown 门单独审计；此处只做统一性比对
+        return (True, times_tuple, str(reason) if reason is not None else None)
+
     fingerprints: dict[str, tuple[tuple[float, float], ...]] = {}
+    switch_fingerprints: dict[str, tuple] = {}
     na_counts: dict[str, int] = {}
     for method_name, layout in method_anchor_layouts.items():
         if not isinstance(layout, Mapping):
             raise TypeError(f"anchor_layout for method '{method_name}' must be a Mapping")
         fingerprints[method_name] = _layout_fingerprint(layout)
+        switch_fingerprints[method_name] = _switch_fingerprint(layout)
         na_counts[method_name] = len(fingerprints[method_name])
 
-    unique_fingerprints = set(fingerprints.values())
-    uniform = len(unique_fingerprints) == 1
+    # §8.1 L1360 + 细节 R-D-F "锚点布局切换/增减锚: 规则已知且全员同一":
+    # 布局位置一致 AND 切换规则一致才算 uniform；仅位置同但 switch 规则不同
+    # 仍视为不一致（违反 L1460"切换规则全员同一"）。
+    layout_uniform = len(set(fingerprints.values())) == 1
+    switch_uniform = len(set(switch_fingerprints.values())) == 1
+    uniform = layout_uniform and switch_uniform
     mismatches: list[str] = []
-    if not uniform:
+    if not layout_uniform:
         reference_method = next(iter(fingerprints))
         reference_fp = fingerprints[reference_method]
         for m, fp in fingerprints.items():
             if fp != reference_fp:
-                mismatches.append(m)
+                mismatches.append(f"{m}: anchor_positions mismatch")
+    if not switch_uniform:
+        reference_method = next(iter(switch_fingerprints))
+        reference_sw = switch_fingerprints[reference_method]
+        for m, sw in switch_fingerprints.items():
+            if sw != reference_sw:
+                mismatches.append(f"{m}: anchor_switch mismatch")
 
     # §8.1 L1360 锚点数 Na ∈ {3, 4, 5} 校验（禁 Na≥8 高冗余）。
     # 所有方法的锚点数应一致（否则 uniform 已 flag），取任一方法的 na 值即可。
@@ -1815,17 +1851,22 @@ def assert_anchor_uniform_source(
 
     report = {
         "uniform": uniform,
+        "layout_uniform": layout_uniform,
+        "switch_uniform": switch_uniform,
         "na_in_range": na_in_range,
         "na_count": na_count,
-        "unique_layouts_count": len(unique_fingerprints),
+        "unique_layouts_count": len(set(fingerprints.values())),
+        "unique_switches_count": len(set(switch_fingerprints.values())),
         "method_count": len(method_anchor_layouts),
         "mismatches": mismatches,
     }
     reasons: list[str] = []
     if not uniform:
         reasons.append(
-            f"anchor_uniform: methods using different anchor layouts; "
-            f"mismatches={mismatches}; unique_layouts_count={len(unique_fingerprints)}"
+            f"anchor_uniform: methods using different anchor layouts/switch rules; "
+            f"mismatches={mismatches}; "
+            f"unique_layouts_count={len(set(fingerprints.values()))}; "
+            f"unique_switches_count={len(set(switch_fingerprints.values()))}"
         )
     if not na_in_range:
         reasons.append(
