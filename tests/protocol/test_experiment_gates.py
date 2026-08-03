@@ -1030,3 +1030,71 @@ def test_assert_anchor_3d_declaration_2d_auto_passes_lz():
     assert r['passed'] is True
     assert r['l_z_in_range'] is True
     assert r['is_3d'] is False
+
+
+def test_assert_anchor_uniform_source_3d_anchors_counted_in_na():
+    """§8.1 L1360 Na 修复验证：3D 锚点 (x,y,z) 须计入 Na，不能因 _layout_fingerprint
+    只取 (x,y) 维度漏计 3D 锚点，导致 Na=0 误报"欠定压力不足"。
+
+    修复前：3D layout Na4 → fingerprint 跳过 len(coords)!=2 → na_count=0 → 误 RAISE
+    修复后：3D layout Na4 → na_count=4（直接读 anchor_positions 长度）→ PASS
+    """
+    layout_3d_na4 = {
+        'anchor_positions': [[0, 0, 0], [3, 0, 0], [0, 4, 0], [3, 4, 0.5]]
+    }
+    r = assert_anchor_uniform_source({'ekf': layout_3d_na4, 'lstm': layout_3d_na4})
+    assert r['passed'] is True
+    assert r['na_count'] == 4
+    assert r['na_in_range'] is True
+
+
+def test_assert_anchor_uniform_source_3d_na_in_range_passes():
+    """3D Na=3 与 Na=5 边界值 PASS（spec §8.1 推荐默认 Na∈{3,4,5}）。"""
+    layout_3d_na3 = {
+        'anchor_positions': [[0, 0, 0], [3, 0, 0], [0, 4, 3]]
+    }
+    r = assert_anchor_uniform_source({'ekf': layout_3d_na3, 'lstm': layout_3d_na3})
+    assert r['na_count'] == 3
+    assert r['na_in_range'] is True
+    assert r['passed'] is True
+
+    layout_3d_na5 = {
+        'anchor_positions': [[0, 0, 0], [3, 0, 0], [0, 4, 0], [3, 4, 0.5], [1, 2, 3]]
+    }
+    r2 = assert_anchor_uniform_source({'ekf': layout_3d_na5, 'lstm': layout_3d_na5})
+    assert r2['na_count'] == 5
+    assert r2['na_in_range'] is True
+    assert r2['passed'] is True
+
+
+def test_assert_anchor_uniform_source_3d_na_8_raises():
+    """§8.1 L1360 3D 高冗余 Na≥8 禁止；3D 锚点不能因 fingerprint 漏掉而 silent-pass。"""
+    layout_3d_na8 = {
+        'anchor_positions': [[float(i) * 0.1, 0.0, 0.0] for i in range(8)]
+    }
+    with pytest.raises(ValueError, match='Na=8 not in {3,4,5}'):
+        assert_anchor_uniform_source({'ekf': layout_3d_na8, 'lstm': layout_3d_na8})
+
+
+def test_assert_anchor_uniform_source_3d_mismatch_count_raises():
+    """3D method A (Na=3) vs 3D method B (Na=4) 须因 Na count 不同而被 top-level uniform
+    校验拦截，不能 fingerprint-only 致 silent-pass。"""
+    layout_3d_na3 = {'anchor_positions': [[0, 0, 0], [3, 0, 0], [0, 4, 0]]}
+    layout_3d_na4 = {'anchor_positions': [[0, 0, 0], [3, 0, 0], [0, 4, 0], [3, 4, 0.5]]}
+    with pytest.raises(ValueError, match='anchor_uniform: methods using different anchor layouts'):
+        assert_anchor_uniform_source({'ekf': layout_3d_na3, 'lstm': layout_3d_na4})
+
+
+def test_assert_anchor_uniform_source_3d_no_raise_when_disabled():
+    """3D Na=8 + raise_on_violation=False 须返回 report['na_in_range']=False, reasons 非空。"""
+    layout_3d_na8 = {
+        'anchor_positions': [[float(i) * 0.1, 0.0, 0.0] for i in range(8)]
+    }
+    r = assert_anchor_uniform_source(
+        {'ekf': layout_3d_na8, 'lstm': layout_3d_na8}, raise_on_violation=False
+    )
+    assert r['na_count'] == 8
+    assert r['na_in_range'] is False
+    assert r['passed'] is False
+    assert len(r['reasons']) >= 1
+    assert any('Na=8 not in {3,4,5}' in rsn for rsn in r['reasons'])

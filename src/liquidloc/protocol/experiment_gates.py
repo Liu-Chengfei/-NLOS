@@ -1779,14 +1779,30 @@ def assert_anchor_uniform_source(
     if len(method_anchor_layouts) < 1:
         raise ValueError("method_anchor_layouts must contain at least one method")
 
-    def _layout_fingerprint(layout: Mapping[str, Any]) -> tuple[tuple[float, float], ...]:
+    def _layout_fingerprint(layout: Mapping[str, Any]) -> tuple[tuple[float, float, float], ...]:
+        """布局位置指纹：含 z 坐标（缺省 0），用于 uniform 比对。
+
+        §8.2.1 L1405 fingerprint 修复（先前偷懒）：
+        原实现 `if len(coords) != 2: continue` 把 3D 锚点全部跳过 →
+        fingerprint=()，所有 3D 布局都被判为 uniform（即使位置不同）。
+        修复：3D 锚点的 z 取自 coords[2]（缺失或非法 → 0），fingerprint 含 (x,y,z) 三元组。
+        Na 计数用 anchor_positions 长度（不再依赖 fingerprint 长度，避免 3D 漏计）。
+        """
         positions = list(layout.get("anchor_positions") or [])
         pts = []
         for p in positions:
-            coords = list(p)
-            if len(coords) != 2:
+            if not isinstance(p, (list, tuple)):
                 continue
-            pts.append((round(float(coords[0]), 6), round(float(coords[1]), 6)))
+            coords = list(p)
+            if len(coords) < 2:
+                continue  # 缺 x/y 的坐标对不能 fingerprint
+            try:
+                x = round(float(coords[0]), 6)
+                y = round(float(coords[1]), 6)
+                z = round(float(coords[2]), 6) if len(coords) >= 3 else 0.0
+            except (TypeError, ValueError):
+                continue  # 非数值坐标由更高层 raise；fingerprint 跳过避免污染比对
+            pts.append((x, y, z))
         return tuple(sorted(pts))
 
     def _switch_fingerprint(layout: Mapping[str, Any]) -> tuple:
@@ -1813,7 +1829,7 @@ def assert_anchor_uniform_source(
             times_tuple = ()  # 非数值由 ruleknown 门单独审计；此处只做统一性比对
         return (True, times_tuple, str(reason) if reason is not None else None)
 
-    fingerprints: dict[str, tuple[tuple[float, float], ...]] = {}
+    fingerprints: dict[str, tuple[tuple[float, float, float], ...]] = {}
     switch_fingerprints: dict[str, tuple] = {}
     na_counts: dict[str, int] = {}
     for method_name, layout in method_anchor_layouts.items():
@@ -1821,7 +1837,9 @@ def assert_anchor_uniform_source(
             raise TypeError(f"anchor_layout for method '{method_name}' must be a Mapping")
         fingerprints[method_name] = _layout_fingerprint(layout)
         switch_fingerprints[method_name] = _switch_fingerprint(layout)
-        na_counts[method_name] = len(fingerprints[method_name])
+        # §8.1 L1360 Na 计数锚点总数（包含 3D 锚点 len(coords)>2），
+        # 而非仅 2D 坐标数 → 防止 3D 布局 Na=0 被误报为欠定压力不足。
+        na_counts[method_name] = len(list(layout.get("anchor_positions") or []))
 
     # §8.1 L1360 + 细节 R-D-F "锚点布局切换/增减锚: 规则已知且全员同一":
     # 布局位置一致 AND 切换规则一致才算 uniform；仅位置同但 switch 规则不同
