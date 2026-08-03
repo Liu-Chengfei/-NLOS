@@ -763,6 +763,23 @@ def test_assert_anchor_uniform_source_no_raise_when_disabled():
     assert report['uniform'] is True
     assert report['na_in_range'] is False
     assert report['na_count'] == 8
+    assert report['passed'] is False
+    assert len(report['reasons']) == 1
+    assert 'Na=8 not in {3,4,5}' in report['reasons'][0]
+
+
+def test_log_section8_audit_na_ge_8_soft_mode_shows_violation(caplog):
+    """§8 偷懒修补：soft mode 下 Na≥8 必须显示 VIOLATION 而非 PASS。"""
+    import logging
+    from liquidloc.pipelines.core_pipeline import _log_section8_audit
+    report = {
+        'uniform': True, 'na_in_range': False, 'na_count': 8,
+        'reasons': ['§8.1 L1360 anchor_count violation: Na=8 not in {3,4,5}'],
+        'passed': False,
+    }
+    with caplog.at_level(logging.WARNING, logger='liquidloc.section8_audit'):
+        _log_section8_audit('anchor_uniform_source', report, soft_mode=True)
+    assert any('VIOLATION (soft mode)' in r.message for r in caplog.records)
 
 
 # ========== §8.2.0 政策5/6 assert_seed_required / assert_seed_decoupling ==========
