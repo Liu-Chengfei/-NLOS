@@ -1873,6 +1873,8 @@ def assert_anchor_uniform_source(
             f"§8.1 L1360 anchor_count violation: Na={na_count} not in {{3,4,5}}; "
             "Na≥8 高冗余优 GDOP 禁止；Na<3 欠定压力不足"
         )
+    report["reasons"] = reasons
+    report["passed"] = (uniform and na_in_range)
     if reasons and raise_on_violation:
         raise ValueError(
             "§8.1 anchor_uniform_source violation: " + "; ".join(reasons)

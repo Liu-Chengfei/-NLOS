@@ -27,7 +27,7 @@ from liquidloc.common.paths import resolve_output_root  # 解析项目标准目�
 from liquidloc.common.types import ModelIntermediate  # 模型中间输出结构。
 from liquidloc.common.types import StateEstimate  # 估计器状态估计摘要，用于 _TimedEstimatorProxy.step 返回类型注解。
 from liquidloc.common.types import StageResult  # 流水线阶段结果结构。
-from liquidloc.common.validation import coerce_finite_scalar, is_numeric, is_real, is_string_like, validate_path_component  # 统一判断数值类型和路径校验。
+from liquidloc.common.validation import coerce_finite_scalar, is_integer, is_numeric, is_real, is_string_like, validate_path_component  # 统一判断数值类型和路径校验。
 from liquidloc.factories.estimator_factory import create_estimator  # 构建估计器实例。
 from liquidloc.factories.model_factory import create_model  # 构建模型实例。
 from liquidloc.fusion.fusion_runner import run_fusion  # 执行融合和估计更新。
@@ -259,14 +259,32 @@ def _run_section8_deep_audit(scene_tasks, cfg):
 
 
 def _log_section8_audit(gate_name, report, soft_mode):
-    """Unified audit log: raise in hard mode; logger.warning in soft mode."""
+    """Unified audit log: raise in hard mode; logger.warning in soft mode.
+
+    §8 偷懒修补（soft mode 误判）：原 ok 判定优先取 uniform/sufficient/covered
+    等单一字段，导致 gate 报告了 reasons（违规）但 uniform=True 时仍判 ok=True，
+    soft mode 下显示 PASS 掩盖违规。本修复以 report['passed'] 或 'violated'
+    字段为权威判据；若 gate 报告含非空 reasons 列表也视为未通过。
+    """
     import logging
     log = logging.getLogger('liquidloc.section8_audit')
-    ok = bool(report.get('observable',
-            report.get('anti_smoothed',
-            report.get('uniform',
-            report.get('sufficient',
-            report.get('covered', True))))))
+    # 权威判据：优先用 gate 报告的 passed/violated 字段；
+    # 其次用 reasons 非空判定违规；最后 fallback 到原逻辑。
+    passed = report.get('passed')
+    violated = report.get('violated')
+    reasons = report.get('reasons')
+    if passed is not None:
+        ok = bool(passed)
+    elif violated is not None:
+        ok = not bool(violated)
+    elif isinstance(reasons, list) and reasons:
+        ok = False
+    else:
+        ok = bool(report.get('observable',
+                report.get('anti_smoothed',
+                report.get('uniform',
+                report.get('sufficient',
+                report.get('covered', True))))))
     if soft_mode and not ok:
         log.warning('[section8_audit] %s VIOLATION (soft mode): %s', gate_name, report)
     else:
@@ -1322,7 +1340,17 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
         raise ValueError('model_cfg.feature_order must be non-empty for neural methods')  # 没有特征顺序就无法构窗。
 
     window_cfg = dict(model_cfg.get('window') or {})  # 读取滑窗配置。
-    window_size = int(window_cfg.get('size', 1))  # 滑窗长度，默认 1。D7：移除未使用的 step_size（window_cfg.get('step') 全程未被消费，属死代码；当前 trailing window 实现不依赖步长，仅取尾部 window_size 条事件）。
+    if 'size' not in window_cfg:  # §10.4 训推对等守卫续补：缺 size 时 raise 注入守卫，禁止默认值兜底静默破坏对等。
+        raise KeyError(
+            f"§10.4 NN 截断对等 watchdog: model_cfg.window.size 必须显式声明, "
+            f"禁止默认值兜底（spec §10.4 记忆深度对等前提, 训推同侧）."
+        )
+    _window_size_raw = window_cfg['size']
+    if not is_integer(_window_size_raw):
+        raise TypeError(f"window.size must be an integer, got {type(_window_size_raw).__name__}")
+    if int(_window_size_raw) <= 0:
+        raise ValueError(f"window.size must be a positive integer, got {_window_size_raw!r}")
+    window_size = int(_window_size_raw)  # 滑窗长度。D7：移除未使用的 step_size（window_cfg.get('step') 全程未被消费，属死代码；当前 trailing window 实现不依赖步长，仅取尾部 window_size 条事件）。
     anchor_lookup = dict(getattr(estimator, '_anchor_lookup', {}) or {})  # 优先用估计器自己已有的锚点查找表。
     if not anchor_lookup:  # 优先用估计器自带的查找表，没有才尝试从配置构造。
         anchor_layout = getattr(estimator, 'cfg', {}).get('anchor_layout') if hasattr(estimator, 'cfg') else None  # 若估计器配置里带布局，就临时构造查找表。
