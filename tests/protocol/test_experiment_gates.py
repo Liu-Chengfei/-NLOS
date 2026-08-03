@@ -1098,3 +1098,190 @@ def test_assert_anchor_uniform_source_3d_no_raise_when_disabled():
     assert r['passed'] is False
     assert len(r['reasons']) >= 1
     assert any('Na=8 not in {3,4,5}' in rsn for rsn in r['reasons'])
+
+
+def test_section10_3_cross_config_t_eff_assumed_mismatch_audit_flag():
+    """§10.3 诚实边界守卫（B2 v6 续补）：fgo.yaml tau_filt_assumed_t_eff_min_s < 协议层 t_eff_min_s
+    时 _validate_scene_scale_section 须在 normalized_section 打 _section10_3_t_eff_assumed_mismatch 审计标记。
+
+    fgo.yaml tau_filt_assumed_t_eff_min_s=25.0 隐含 τ_filt 上界 min(5,0.2×25)=5；
+    但协议层 t_eff_min_s=20 → 实际 τ_filt 上界 min(5,0.2×20)=4；
+    fgo.yaml 给 τ=5 > 4，违反 spec §10.3 选项 1。
+    本测试验证 cross-config sentinel 在此不一致时打审计标记（不阻断）。
+    """
+    from liquidloc.protocol.experiment_gates import _validate_scene_scale_section
+    section = {
+        'scene_scale': {
+            't_eff_min_s': 20.0,
+            'cold_start_offset_s': 5.0,
+            'cold_start_global_enforced': True,
+            'n_pulse_min': 30,
+            'n_async_min': 20,
+            'layout_family_min': 3,
+            'n_seed_min': 10,
+            'n_seed_recommended': 30,
+            'n_traj_te_min': 20,
+            'train_test_ratio_max': 0.1,
+        }
+    }
+    normalized = _validate_scene_scale_section(section)
+    assert normalized.get('_section10_3_t_eff_assumed_mismatch') is True
+
+
+def test_section10_3_cross_config_t_eff_assumed_consistent_no_flag():
+    """§10.3 诚实边界守卫续补：fgo.yaml tau_filt_assumed_t_eff_min_s ≥ 协议层 t_eff_min_s 时不触发审计标记。"""
+    from liquidloc.protocol.experiment_gates import _validate_scene_scale_section
+    section = {
+        'scene_scale': {
+            't_eff_min_s': 25.0,  # 与 fgo.yaml assumed=25 一致
+            'cold_start_offset_s': 5.0,
+            'cold_start_global_enforced': True,
+            'n_pulse_min': 30,
+            'n_async_min': 20,
+            'layout_family_min': 3,
+            'n_seed_min': 10,
+            'n_seed_recommended': 30,
+            'n_traj_te_min': 20,
+            'train_test_ratio_max': 0.1,
+        }
+    }
+    normalized = _validate_scene_scale_section(section)
+    assert '_section10_3_t_eff_assumed_mismatch' not in normalized
+
+
+# ===== §8 gate soft-mode passed=False 验证（anti-silent-pass 回归测试）=====
+
+def test_check_seed_count_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 n_seed < n_seed_min 应返回 passed=False，不 raise。"""
+    from liquidloc.protocol.experiment_gates import check_seed_count
+    r = check_seed_count(0, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('violated') is True
+
+
+def test_check_train_test_ratio_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 ratio 严重失衡应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import check_train_test_ratio
+    r = check_train_test_ratio(n_traj_train=100, n_traj_test=1, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('violated') is True
+
+
+def test_check_layout_family_count_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 layout_family=0 应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import check_layout_family_count
+    r = check_layout_family_count(0, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('violated') is True
+
+
+def test_check_per_trajectory_pulse_async_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 pulse=0/async=0 应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import check_per_trajectory_pulse_async
+    r = check_per_trajectory_pulse_async(n_pulse=0, n_async=0, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('cmp1_cmp5_at_risk') is True
+
+
+def test_assert_anchor_switch_ruleknown_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 rule_unknown 应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_anchor_switch_ruleknown
+    r = assert_anchor_switch_ruleknown({'anchor_switch': {'switch_times': [], 'reason': None}}, raise_on_violation=False)
+    assert r.get('passed') is False
+
+
+def test_assert_imu_bias_observability_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 bias 不可观测应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_imu_bias_observability
+    r = assert_imu_bias_observability({'bias_observable': False}, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('observable') is False
+
+
+def test_assert_cold_start_x_underdetermined_geometry_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 cold_start+underdet 缺失应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_cold_start_x_underdetermined_geometry
+    r = assert_cold_start_x_underdetermined_geometry(
+        [{'axes': {'V': 'V0', 'X': 'X0', 'G': 'G0'}, 'cold_start': True}],
+        raise_on_violation=False)
+    assert r.get('passed') is False
+
+
+def test_assert_cross_method_plane_z_equality_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 z/motion 不一致应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_cross_method_plane_z_equality
+    mm = {'ekf': {'plane_constraint': 'enforced', 'z_constraint': 'fixed', 'motion_constraint': 'zupt'},
+          'lstm': {'plane_constraint': 'none', 'z_constraint': 'modeled', 'motion_constraint': 'none'}}
+    r = assert_cross_method_plane_z_equality(mm, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('uniform') is False
+
+
+def test_assert_anchor_switch_anti_smoothing_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 switch 无 pulse 应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_anchor_switch_anti_smoothing
+    r = assert_anchor_switch_anti_smoothing(
+        [{'t': 1.0, 'layout': 'A'}, {'t': 5.0, 'layout': 'B'}],
+        [{'has_pulse': False, 'max_spike_m': 0.0}],
+        raise_on_violation=False)
+    assert r.get('passed') is False
+
+
+def test_assert_underdetermined_observation_ratio_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 ratio < min_ratio 应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_underdetermined_observation_ratio
+    r = assert_underdetermined_observation_ratio([0, 0, 0, 0, 0], min_ratio=0.5, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('sufficient') is False
+
+
+def test_assert_moving_anchor_truth_equality_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下移动锚点真值不一致应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_moving_anchor_truth_equality
+    bad = {'ekf': [{'t': 1.0, 'anchor_id': 'A1', 'px': 1.0, 'py': 0.0}],
+           'lstm': [{'t': 1.0, 'anchor_id': 'A1', 'px': 999.0, 'py': 0.0}]}
+    r = assert_moving_anchor_truth_equality(bad, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('uniform') is False
+
+
+def test_assert_seed_required_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 seed 为 None 应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_seed_required
+    r = assert_seed_required([None, None, None], raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('all_seeded') is False
+
+
+def test_assert_seed_decoupling_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下完全耦合应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_seed_decoupling
+    r = assert_seed_decoupling(42, 42, 42, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('decoupled') is False
+
+
+def test_assert_trajectory_collection_multi_sample_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下单样本 sweep 应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_trajectory_collection_multi_sample
+    r = assert_trajectory_collection_multi_sample([{'seq_id': 'x'}], min_samples=2, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('multi_sample') is False
+
+
+def test_assert_trajectory_generator_pol_2_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 pol_2 不满足应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_trajectory_generator_pol_2
+    r = assert_trajectory_generator_pol_2(
+        {'seed_param_present': False, 'seeded_dimensions': [], 'is_trajectory_lib': False, 'lib_size': None},
+        raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('pol_2_satisfied') is False
+
+
+def test_assert_trajectory_generator_pol_4_soft_mode_returns_passed_false():
+    """§8 回归：soft mode 下 pol_4 为 None 应返回 passed=False。"""
+    from liquidloc.protocol.experiment_gates import assert_trajectory_generator_pol_4
+    r = assert_trajectory_generator_pol_4(None, raise_on_violation=False)
+    assert r.get('passed') is False
+    assert r.get('pol_4_satisfied') is False

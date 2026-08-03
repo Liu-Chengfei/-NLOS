@@ -1296,6 +1296,21 @@ def _validate_scene_scale_section(cfg: Mapping[str, Any]) -> dict[str, Any]:
         # 不强制 raise, 但记录在 normalized_section 额外字段供审计.
         normalized_section['_cold_start_global_enforced_explicit_off'] = True
 
+    # §10.3 诚实边界守卫（B2 v6 续补）：fgo.yaml 的 tau_filt_s 必须 ≤
+    # min(5, 0.2 × 协议层 t_eff_min_s)，否则 fgo.yaml 给的 τ 超出 spec §10.3 选项 1
+    # 的 τ=min(5, 0.2·T_eff) 上界（在协议层 t_eff_min_s 下限处 T_eff=t_eff_min_s
+    # 时 τ 上界应是 min(5, 0.2×t_eff_min_s)，fgo.yaml 写 τ > 此上界即违例）。
+    _fgo_cfg = load_yaml_config(
+        find_project_root() / 'configs' / 'models' / 'fgo.yaml'
+    )
+    _fgo_tau = _fgo_cfg.get('tau_filt_s')
+    if _fgo_tau is not None:
+        _fgo_tau = float(_fgo_tau)
+        _proto_t_eff = float(normalized_section['t_eff_min_s'])
+        _proto_tau_upper = min(5.0, 0.2 * _proto_t_eff)
+        if _fgo_tau > _proto_tau_upper + 1e-9:  # 容差吸收浮点误差。
+            normalized_section['_section10_3_t_eff_assumed_mismatch'] = True  # 审计标记。
+
     return normalized_section
 
 
@@ -1467,6 +1482,7 @@ def check_seed_count(
         "violated_recommended": bool(violated_recommended),
         "single_seed_no_conclusion_allowed": single_seed_no,
         "message": message,
+        "passed": not violated,
     }
 
 
@@ -1537,6 +1553,7 @@ def check_train_test_ratio(
         "violated": bool(violated),
         "violated_traj_te_min": bool(violated_traj),
         "message": message,
+        "passed": not violated,
     }
 
 
@@ -1593,6 +1610,7 @@ def check_layout_family_count(
         "min_required": min_required,
         "violated": bool(violated),
         "message": message,
+        "passed": not violated,
     }
 
 
@@ -1660,6 +1678,7 @@ def check_per_trajectory_pulse_async(
         "async_violated": bool(async_violated),
         "cmp1_cmp5_at_risk": bool(pulse_violated or async_violated),
         "message": message,
+        "passed": not (pulse_violated or async_violated),
     }
 
 
@@ -1951,6 +1970,7 @@ def assert_anchor_switch_ruleknown(
         "rule_known": rule_known,
         "switch_count": switch_count,
         "reason": reason,
+        "passed": rule_known,
     }
     if not rule_known and raise_on_violation and has_switch:
         raise ValueError(
@@ -2015,6 +2035,7 @@ def assert_imu_bias_observability(
         "yaw_excited": yaw_excited,
         "sub_thresholds": sub_thresholds,
         "envelope_subset": envelope_subset,
+        "passed": observable,
     }
     if not observable and raise_on_violation:
         failed = {
@@ -2087,6 +2108,7 @@ def assert_cold_start_x_underdetermined_geometry(
         "tasks_with_cold_start": tasks_with_cold_start,
         "tasks_with_underdet_geom": tasks_with_underdet_geom,
         "total_tasks": len(scene_tasks),
+        "passed": covered,
     }
     if not covered and raise_on_violation:
         raise ValueError(
@@ -2156,6 +2178,7 @@ def assert_cross_method_plane_z_equality(
         "z_uniform": z_uniform,
         "motion_uniform": motion_uniform,
         "mismatches": mismatches,
+        "passed": uniform,
     }
     if not uniform and raise_on_violation:
         raise ValueError(
@@ -2251,6 +2274,7 @@ def assert_anchor_switch_anti_smoothing(
         "switch_count": switch_count,
         "switches_with_pulse": switches_with_pulse,
         "details": details,
+        "passed": anti_smoothed,
     }
     if not anti_smoothed and raise_on_violation and switch_count > 0:
         no_pulse = [d for d in details if not d["has_pulse"]]
@@ -2300,6 +2324,7 @@ def assert_underdetermined_observation_ratio(
         "n_samples": n,
         "n_weak": n_weak,
         "min_ratio_required": float(min_ratio),
+        "passed": sufficient,
     }
     if not sufficient and raise_on_violation:
         raise ValueError(
@@ -2365,6 +2390,7 @@ def assert_moving_anchor_truth_equality(
             "has_moving": False,
             "method_count": len(method_moving_anchor_truth),
             "mismatches": [],
+            "passed": True,
         }
     # 若有些方法有移动锚点真值，有些没有 → 不公平门禁违反。
     no_moving = [m for m in method_moving_anchor_truth if m not in has_moving]
@@ -2374,6 +2400,7 @@ def assert_moving_anchor_truth_equality(
             "has_moving": True,
             "method_count": len(method_moving_anchor_truth),
             "mismatches": no_moving,
+            "passed": False,
         }
         if raise_on_violation:
             raise ValueError(
@@ -2396,6 +2423,7 @@ def assert_moving_anchor_truth_equality(
         "has_moving": True,
         "method_count": len(method_moving_anchor_truth),
         "mismatches": mismatches,
+        "passed": uniform,
     }
     if not uniform and raise_on_violation:
         raise ValueError(
@@ -2434,6 +2462,7 @@ def assert_seed_required(
             "n_unseeded": 0,
             "unseeded_seq_ids": ["<ROOT>"],
             "seed_types": {},
+            "passed": False,
         }
         if raise_on_violation:
             raise ValueError(
@@ -2458,6 +2487,7 @@ def assert_seed_required(
             "n_unseeded": 0,
             "unseeded_seq_ids": ["<ROOT>"],
             "seed_types": {},
+            "passed": False,
         }
         if raise_on_violation:
             raise ValueError(
@@ -2495,6 +2525,7 @@ def assert_seed_required(
         "n_unseeded": len(unseeded_seq_ids),
         "unseeded_seq_ids": unseeded_seq_ids,
         "seed_types": seed_types,
+        "passed": all_seeded,
     }
     if not all_seeded and raise_on_violation:
         raise ValueError(
@@ -2582,6 +2613,7 @@ def assert_seed_decoupling(
         "seeds": seeds,
         "collisions": collisions,
         "fully_coupled": fully_coupled,
+        "passed": decoupled,
     }
     if not decoupled and raise_on_violation:
         # 报告 collisions（含部分/完全耦合特征），便于诊断定位。
@@ -2774,6 +2806,7 @@ def assert_trajectory_collection_multi_sample(
         "multi_sample": multi_sample,
         "n_tasks": n_tasks,
         "min_samples": int(min_samples),
+        "passed": multi_sample,
     }
     if not multi_sample and raise_on_violation:
         raise ValueError(
@@ -2823,6 +2856,7 @@ def assert_trajectory_generator_pol_2(
                 "is_lib_pool": False,
                 "lib_size": None,
                 "reasons": ["generator_metadata 为 None；无法判定"],
+                "passed": False,
             }
             if raise_on_violation:
                 raise ValueError(
@@ -2871,6 +2905,7 @@ def assert_trajectory_generator_pol_2(
         "is_lib_pool": is_lib_pool,
         "lib_size": lib_size,
         "reasons": reasons,
+        "passed": pol_2_satisfied,
     }
     if not pol_2_satisfied and raise_on_violation:
         raise ValueError(
@@ -2914,6 +2949,7 @@ def assert_trajectory_generator_pol_4(
                 "generator_family": None,
                 "allowed_families": [],
                 "reasons": ["generator_metadata 为 None；无法判定"],
+                "passed": False,
             }
             if raise_on_violation:
                 raise ValueError(
@@ -2950,6 +2986,7 @@ def assert_trajectory_generator_pol_4(
         "allowed_families": list(allowed_families),
         "is_seedable": is_seedable,
         "reasons": reasons,
+        "passed": bool(pol_4_satisfied and is_seedable),
     }
     if not (pol_4_satisfied and is_seedable) and raise_on_violation:
         raise ValueError(
