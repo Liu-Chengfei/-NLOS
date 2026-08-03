@@ -303,6 +303,29 @@ def _build_section8_cfg_payload(scene_tasks, cfg, experiment_cfg):
     if target_task is not None:
         # Try direct injection first (used in tests and synthetic cfg), then fall back to resolver.
         gt_rows = target_task.get('gt_rows') or _resolve_ground_truth_rows_for_task(target_task, cfg)
+    # §8.2 envelope silent-skip 偷懒保护：原实现 `if gt_rows:` 仅在能解析到 GT 时
+    # 调用 compute_trajectory_envelope。当 scene_tasks 非空但 _resolve_ground_truth_rows_for_task
+    # 全部回退路径都 None（cfg 既无 ground_truth_by_seq_id 也无 by_scene_id 也无 ground_truth_root
+    # 或对应文件不存在）时，§8.2 envelope 全套硬门禁（周期主导 / a95 / v95 / near_zero /
+    # turn / path_length / l_xy / t_eff）整段静默跳过——主表 audit 路径下这是真偷懒。
+    # 修复：soft mode 保留原 silent-skip（log-only mode 不应中断流程）；
+    # hard mode（soft_mode=False）下若 target_task 存在但 gt_rows 解析失败 → 显式 raise，
+    # 让"声称主表 audit 却没提供 GT"的口径显形，而非 silent pass。
+    soft_mode_env = bool((cfg or {}).get('section8_deep_audit_soft', False))
+    if (
+        gt_rows is None
+        and target_task is not None
+        and not soft_mode_env
+    ):
+        raise ValueError(
+            "§8.2 envelope hard gate cannot run: target_task has no resolvable gt_rows "
+            f"(seq_id={target_task.get('seq_id')!r}, scene_id={target_task.get('scene_id')!r}). "
+            "无法计算 §8.2 envelope 全套硬门禁（周期主导 / a95 / v95 / near_zero / turn / "
+            "path_length / l_xy / t_eff）。主表 audit 需 cfg 提供 ground_truth_by_seq_id / "
+            "ground_truth_by_scene_id / ground_truth_root 之一且能解析到 GT 行；或在 task"
+            "['gt_rows'] 直接注入。若需 §8.2 envelope 该序列跳过，请显式设 "
+            "cfg['section8_deep_audit_soft']=True 进入 soft 模式。"
+        )
     if gt_rows:
         # compute_trajectory_envelope itself enforces ALL §8.2 envelope hard gates
         # (incl. periodicity_not_dominant) by raising on `checks["passed"] == False`.
