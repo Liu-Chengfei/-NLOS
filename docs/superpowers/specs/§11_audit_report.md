@@ -343,4 +343,11 @@ baseline fail 名单与 v3 fix 后 fail 名单 `diff` 结果：**0 个增减** �
 3. **`core_pipeline.py` §8 hard gate 装配**：§11 audit 上下文仅引用 `_NEURAL_METHODS → ESTIMATOR_NAME_EKF` 路由 + `_resolve_estimator_cfg` yaml 加载，未逐行精读 §8 hard gate 装配流程（这部分应在 §8 audit report 独立穷举覆盖，不在 §11 范围）。
 4. **`eval_pipeline.py` plotting 入口**：仅抽样精读 `failure_segments_by_case` 字段透传，未逐行精读 plotting 路径（plotting 不参与 §11 拒识决策，仅审计可视化，无 §11 风险）。
 
+**4 个未完全精读文件的 §11 风险评估**：
+- **拒识决策风险**：零。所有 4 文件都在 estimator 层之外，不经手 `_handle_uwb` / `_handle_vio` 拒识链 → §11.1 卡方门 / §11.3 失效串联 / §11.4 NLOS 拒识 / §11.5 SPD 拒识都无路径被改
+- **协议常量风险**：零。4 文件都不写 `BRIDGE_THRESHOLDS` / `CHI2_95_PERCENTILES` / `DEFAULT_GATING_DOF` / `imu_missing_inflation`，§11.1 / §11.2 协议单源真相不会被 4 文件篡改
+- **NLOS 静默删除风险**：零。`scenarios/nlos_levels.py` 生成端硬门 + `_FrozenDict` 协议常量同源锁，4 文件不读 NLOS 标签自动满足 §11.4 "不得静默删除 NLOS 段"
+- **NN 信度越权风险**：零。`fusion_runner.py` 在 NN control 注入 estimator 之前不修改 control；`core_pipeline.py` 同
+- **§11 audit 结论路径**：4 文件的真实影响为 estimator 层之外流程装配与可视化，不参与 spec L1716-L1816 任何主张的代码执行点
+
 以上 4 个文件未完全穷举部分均不直接参与 §11 拒识/链序/SP 保护决策。
