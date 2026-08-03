@@ -926,6 +926,46 @@ def test_assert_anchor_3d_declaration_3d_empty_vd_raises():
         assert_anchor_3d_declaration(layout)
 
 
+def test_assert_anchor_3d_declaration_3d_z_non_numeric_raises():
+    """§8.2.1 L1403 修复（偷懒补丁）：3D 锚点含 z 但 z 非数值 → declared=False → raise."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    import pytest
+    layout = {
+        'anchor_positions': [[0.0, 0.0, 'invalid'], [4.0, 0.0, 'invalid'], [0.0, 4.0, 'invalid'], [4.0, 4.0, 'invalid']],
+        'min_anchor_count_3d': 4,
+        'vertical_distribution': {'z_min': 0.0, 'z_max': 3.0, 'z_span': 3.0},
+    }
+    with pytest.raises(ValueError, match='z 坐标非数值'):
+        assert_anchor_3d_declaration(layout)
+
+
+def test_assert_anchor_3d_declaration_3d_mixed_z_raises():
+    """§8.2.1 L1403 修复：3D 锚点部分 z 非数值 → declared=False → raise."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    import pytest
+    layout = {
+        'anchor_positions': [[0.0, 0.0, 100.0], [4.0, 0.0, 'invalid'], [0.0, 4.0, 'invalid'], [4.0, 4.0, 'invalid']],
+        'min_anchor_count_3d': 4,
+        'vertical_distribution': {'z_min': 0.0, 'z_max': 100.0, 'z_span': 100.0},
+    }
+    with pytest.raises(ValueError, match='z 坐标非数值'):
+        assert_anchor_3d_declaration(layout)
+
+
+def test_assert_anchor_3d_declaration_3d_same_height_passes():
+    """§8.2.1 L1403：3D 锚点全同层（z 均相同，Lz=0）→ pass."""
+    from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration
+    layout = {
+        'anchor_positions': [[0.0, 0.0, 100.0], [4.0, 0.0, 100.0], [0.0, 4.0, 100.0], [4.0, 4.0, 100.0]],
+        'min_anchor_count_3d': 4,
+        'vertical_distribution': {'z_min': 100.0, 'z_max': 100.0, 'z_span': 0.0},
+    }
+    r = assert_anchor_3d_declaration(layout)
+    assert r['passed'] is True
+    assert r['is_3d'] is True
+    assert r['l_z_in_range'] is True
+
+
 def test_assert_anchor_3d_declaration_no_raise_when_disabled():
     """§8.1 L1361: raise_on_violation=False 时只返回 report 不抛."""
     from liquidloc.protocol.experiment_gates import assert_anchor_3d_declaration

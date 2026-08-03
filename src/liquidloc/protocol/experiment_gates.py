@@ -2603,6 +2603,7 @@ def assert_anchor_3d_declaration(
 
     positions = list(anchor_layout.get("anchor_positions") or [])
     n_with_z = 0
+    n_with_z_unparseable = 0  # §8.2.1 L1403 Lz≤5m 偷懒修复：含 z 但 z 非数值的 anchor 计数
     z_values: list[float] = []
     for p in positions:
         if not isinstance(p, (list, tuple)):
@@ -2612,13 +2613,27 @@ def assert_anchor_3d_declaration(
             try:
                 z_values.append(float(p[2]))
             except (TypeError, ValueError):
-                pass
+                # §8.2.1 L1403 修复（先前 silent-pass 偷懒）：3D 锚点含 z 但 z 非数值
+                # 是数据完整性破坏——is_3d=True 但 z_values 不增长，导致下方
+                # `if is_3d and z_values:` 不触发，Lz≤5m 门禁 silent-pass。
+                # 修复：计数 + reasons 标记，使下方 declared=False 路径触发 raise。
+                n_with_z_unparseable += 1
 
     is_3d = n_with_z > 0
     declared = True
     min_anchor_count: int | None = None
     vertical_distribution_present = False
     reasons: list[str] = []
+
+    # §8.2.1 L1403 修复（偷懒补丁）：3D 锚点含 z 但 z 非数值时，Lz≤5m 门禁不能 silent-pass。
+    # 数据完整性破坏须显形，不应静默跳过 Lz 检查后默认 pass。
+    if n_with_z_unparseable > 0:
+        declared = False
+        reasons.append(
+            f"anchor_3d_declaration §8.2.1 L1403: {n_with_z_unparseable}/{n_with_z} 个 anchor "
+            f"含 z 字段但 z 坐标非数值（无法转 float）；Lz≤5m 门禁无法验证，"
+            "且视为数据完整性破坏（3D 布局须提供有效数值 z）→ declared=False，不应 silent-pass"
+        )
 
     if is_3d:
         # 1. min_anchor_count_3d 字段
