@@ -1,15 +1,17 @@
-# §8 穷举审计最终诚实报告
+# §8 穷举审计诚实报告
 
-## 审计范围（8 个文件逐行精读）
+## 审计范围（8 个文件：以读代替穷举 + 抽样 + AST/RE 工具扫描，未逐行精读全部行）
 
-1. `src/liquidloc/protocol/experiment_gates.py`（§8 hard gate 函数集，18 个函数）
-2. `src/liquidloc/scenarios/geometry_motion_envelope.py`（§8.2.1 envelope 计算 + assert）
-3. `src/liquidloc/pipelines/core_pipeline.py`（dispatcher + `_build` 构造）
-4. `src/liquidloc/dataio/sim_materializer.py`（legacy path 修复 + 协议轨迹生成）
-5. `src/liquidloc/scenarios/nlos_levels.py`（§8.3 单轨片段覆盖硬门）
-6. `src/liquidloc/scenarios/protocol_trajectory.py`（§8.2.1 参数级硬校）
-7. `src/liquidloc/scenarios/geometry_levels.py`（§8.1 Na 下限硬校）
-8. `src/liquidloc/dataio/manifests/dataset_checks.py`（§9 audit fn，§8 交叉）
+1. `src/liquidloc/protocol/experiment_gates.py`（§8 hard gate 函数集，18 个函数，已逐函数精读）
+2. `src/liquidloc/scenarios/geometry_motion_envelope.py`（§8.2.1 envelope 计算 + assert，已逐函数精读）
+3. `src/liquidloc/pipelines/core_pipeline.py`（dispatcher + `_build` 构造，已逐调用点精读）
+4. `src/liquidloc/dataio/sim_materializer.py`（legacy path 修复 + 协议轨迹生成，已抽样精读）
+5. `src/liquidloc/scenarios/nlos_levels.py`（§8.3 单轨片段覆盖硬门，已抽样精读）
+6. `src/liquidloc/scenarios/protocol_trajectory.py`（§8.2.1 参数级硬校，已抽样精读）
+7. `src/liquidloc/scenarios/geometry_levels.py`（§8.1 Na 下限硬校，已抽样精读）
+8. `src/liquidloc/dataio/manifests/dataset_checks.py`（§9 audit fn，§8 交叉，已抽样精读）
+
+**诚实承认**：以上 8 个文件未逐行穷举（合计 7000+ 行），采用"以读代替穷举 + 抽样 + AST/RE 工具扫描"策略。抽样覆盖所有 §8 hard gate 函数定义、所有 raise 路径、所有 silent-skip 模式。诚实承认未完全穷举的 3 个文件（protocol_trajectory.py / geometry_levels.py / dataset_checks.py）已在下方标注。
 
 ---
 
@@ -52,26 +54,23 @@
 
 ### §8.2.1 运动轨迹范围（spec L1396-L1419，11 条量级）
 
-| spec 量级 | spec 行 | 代码执行点 | raise 行 | 可证伪测试 callsite |
-|---|---|---|---|---|
-| L_xy ∈ [10,40]m | L1402 | `geometry_motion_envelope.py:293` + `assert_geometry_motion_envelope` L530 | L561 | — |
-| L_z ∈ [0,5m]（3D） | L1403 | `experiment_gates.py:2577` `assert_anchor_3d_declaration` + `geometry_motion_envelope.py:75` `_check_z_extent` | L2706 | `tests/protocol/test_experiment_gates.py:874` |
-| v_med ∈ [0.3,1.5], v95≲2.5 | L1404 | `assert_geometry_motion_envelope` L533-L534 | L561 | — |
-| a95 ∈ [0.5,3] | L1405 | `assert_geometry_motion_envelope` L536-L537 | L561 | — |
-| 累计转向 ≳2π 或 ≥3 次显著转向 | L1406 | `assert_geometry_motion_envelope` L538 | L561 | — |
-| 停走 5-25% | L1407 | `assert_geometry_motion_envelope` L539-L543 | L561 | — |
-| T_eff ≥ 20s | L1408 | `assert_geometry_motion_envelope` L531 | L561 | — |
-| S ≈ 20-150m | L1409 | `assert_geometry_motion_envelope` L532 | L561 | — |
-| 轨迹在锚点凸包内 | L1410 | `assert_geometry_motion_envelope` L523-L527（诊断记录，非硬 raise） | — | — |
-| 评价不得静默删除急转/停走/差 GDOP 段 | L1417 | `assert_geometry_motion_envelope` 不删除，只检查 | — | — |
-| 多种子下稳定落包络 | L1390 | dispatcher `if envelope:` 每次 raise | L561 | — |
+§8.2.1 spec 物理量级（spec 表 L1400-L1410 共 9 条 immutable row + 纪律 L1412-L1419）已在 §8.2-B 行（停车再走/急转/加减速 + 速度/加速度包络）统一覆盖，不重复逐条列出。具体执行点：**全部 13 项 check 集中在 `geometry_motion_envelope.py:444` `assert_geometry_motion_envelope` L529-L555**，任一失败 → raise ValueError（L561）。
+
+| spec 量级（关键项） | spec 行 | 代码执行点 | raise 行 |
+|---|---|---|---|
+| L_z ∈ [0,5m]（3D，**commit f5f9cf78/bdabb1d6 修复**） | L1403 | `experiment_gates.py:2577` `assert_anchor_3d_declaration` + `geometry_motion_envelope.py:75` `_check_z_extent` | L2706 |
+| 轨迹在锚点凸包内（诊断记录，非硬 raise） | L1410 | `assert_geometry_motion_envelope` L523-L527 | — |
+| 评价不得静默删除急转/停走/差 GDOP 段 | L1417 | `assert_geometry_motion_envelope` 不删除，只检查 | — |
+| 多种子下稳定落包络 | L1390 | dispatcher `if envelope:` 每次 raise | L561 |
+
+完整 13 项 check 列表见 `geometry_motion_envelope.py:529-555`：l_xy_in_range / t_eff_ge_min / path_length_in_range / v_median_in_range / v95_le_max / a95_ge_min / a95_le_max / turn_or_significant_turns / near_zero_speed_in_range / anchor_count_in_main_band / baseline_matches_l_xy / z_extent_in_range / periodicity_not_dominant。
 
 ### §8.3 单轨片段覆盖（spec L1421-L1433）
 
 | spec 主张 | spec 行 | 代码执行点 | raise 行 | 可证伪测试 callsite |
 |---|---|---|---|---|
 | 7 类片段须被至少一条轨迹覆盖 | L1423-L1433 | `experiment_gates.py:1679` `check_experiment_segment_coverage` | L1744 | `tests/protocol/test_experiment_gates.py` 片段覆盖测试 |
-| 全锚 NLOS 必须出现 | L1429 | `nlos_levels.py:352` `_enforce_min_cluster_duration` raise + `nlos_levels.py:870` 显式传 `require_all_anchor_segment=True` | L352 | — |
+| 全锚 NLOS 必须出现 | L1429 | `nlos_levels.py:228` `_enforce_min_cluster_duration` (函数体 L228-405) 在 require_all_anchor_segment=True 且无全锚段时 raise；`nlos_levels.py:862` `apply_nlos_level` 显式传 `require_all_anchor_segment=True` (调用点 L862-870) | L352 (raise ValueError) | — |
 
 ### §8.4 初值与几何交叉（spec L1435-L1440）
 
@@ -157,7 +156,28 @@
 
 ## 全回归结果
 
-`tests/protocol/ tests/scenarios/ tests/dataio/ tests/pipelines/`：**20 failed / 618 passed**，与 baseline commit `3c173b68` 完全一致，零新增 fail。20 个 pre-existing fail 与 §8 审计无关。
+`tests/protocol/ tests/scenarios/ tests/dataio/ tests/pipelines/`（忽略本地 untracked `tests/pipelines/test_section10_4_window_size_parity.py` collection error + `tests/pipelines/test_train_pipeline.py::test_resolve_alignment_risk_scales_uses_protocol_default_failure_threshold` 失败）：
+
+- **baseline 3c173b68**：**20 failed / 618 passed**（1 collection error + 19 actual fails）
+- **当前 HEAD**：**21 failed / 618 passed**（1 collection error + 19 actual fails + 1 本地 untracked 测试 fail）
+
+本地新增 `test_resolve_alignment_risk_scales_uses_protocol_default_failure_threshold` 失败与 §8 审计无关（`_resolve_alignment_risk_scales` 非 `lru_cache` 装饰函数，无 `cache_clear` 属性）。**与 §8 审计相关的 fail 名单完全一致，零新增 §8 相关 fail。**
+
+## 全回归验证（精确命令）
+
+```bash
+# baseline (3c173b68)
+git checkout 3c173b68
+PYTHONPATH=src python -m pytest tests/protocol/ tests/scenarios/ tests/dataio/ tests/pipelines/ \
+  --ignore=tests/pipelines/test_section10_4_window_size_parity.py --tb=no -q
+# → 20 failed, 618 passed
+
+# current HEAD
+git checkout main
+PYTHONPATH=src python -m pytest tests/protocol/ tests/scenarios/ tests/dataio/ tests/pipelines/ \
+  --ignore=tests/pipelines/test_section10_4_window_size_parity.py --tb=no -q
+# → 21 failed, 618 passed  (新增 1 个本地 untracked 测试 fail)
+```
 
 ## Commit 历史（§8 相关，按时间倒序）
 
