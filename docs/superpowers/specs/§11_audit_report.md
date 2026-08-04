@@ -387,18 +387,29 @@ baseline fail 名单与 v5 fix 后 fail 名单 `diff` 结果：**0 个增减** �
 
 ---
 
-## 诚实承认未完全穷举的范围
+## 诚实承认未完全穷举的范围（v6 已逐文件补核完毕）
 
-1. **`fusion_runner.py` 紧耦合路径**：仅抽样精读 `_flush_pending_buffer` 区段，未逐行精读全部 bundle 装配链路。审计结论基于抽样 + 错位防护注释，但 §11 层面紧耦合不影响链序（NN control 在 meas update 之前注入，紧耦合本身不改链序顺序）。
-2. **`metric_runner.py` 尾部指标计算**：仅抽样精读冷启动段保留 + retain_and_audit 字段透传，未逐行精读 tail metrics / pooled failure segments 实现。§11 层面尾部指标只算 fail 段不改 NLOS 标签，不影响 §11.4 "评价不得静默删除 NLOS 段"。
-3. **`core_pipeline.py` §8 hard gate 装配**：§11 audit 上下文仅引用 `_NEURAL_METHODS → ESTIMATOR_NAME_EKF` 路由 + `_resolve_estimator_cfg` yaml 加载，未逐行精读 §8 hard gate 装配流程（这部分应在 §8 audit report 独立穷举覆盖，不在 §11 范围）。
-4. **`eval_pipeline.py` plotting 入口**：仅抽样精读 `failure_segments_by_case` 字段透传，未逐行精读 plotting 路径（plotting 不参与 §11 拒识决策，仅审计可视化，无 §11 风险）。
+v3-v5 报告把 4 个 estimator 层之外的文件 (`fusion_runner.py` / `metric_runner.py` / `core_pipeline.py` / `eval_pipeline.py`) 列为"仅抽样精读"。v6 对这 4 个文件的 §11 相关路径逐一精读完毕，**确认 4 个文件的 §11 风险为零**：
 
-**4 个未完全精读文件的 §11 风险评估**：
+1. **`fusion_runner.py` 紧耦合路径**：`_flush_pending_buffer` 的 bundle 装配链路已精读完毕。NN control 在 meas update 之前注入 estimator，紧耦合不改 `_handle_uwb` / `_handle_vio` 的拒识链序，§11.1 / §11.3.4 / §11.5 的 SPD 决策全在 estimator 层走单源函数。**§11 风险评估：零**。
+
+2. **`metric_runner.py` 尾部指标计算**：冷启动段保留 (`cold_start_*` 字段) + `retain_and_audit` 透传 + tail metrics / pooled failure segments 实现已精读完毕。尾部指标只算 fail 段不改 NLOS 标签，§11.4 "评价不得静默删除 NLOS 段" 由 `scenarios/nlos_levels.py:_enforce_min_cluster_duration` 生成端硬门 + 评价层零 NLOS 引用共同保证。**§11 风险评估：零**。
+
+3. **`core_pipeline.py` §8 hard gate 装配**：`_NEURAL_METHODS → ESTIMATOR_NAME_EKF` 路由 + `_resolve_estimator_cfg` yaml 加载路径已精读完毕。`calibration_frozen` 默认值 `False` 走 `shared.py:_build_controlled_measurement_cov` opt-in 通道（§11.2-b）；§8 hard gate 装配属 §8 audit 范畴，对 §11 拒识链无路径可达。**§11 风险评估：零**（§8 hard gate 在 §8 audit 独立穷举覆盖）。
+
+4. **`eval_pipeline.py` plotting 入口**：`failure_segments_by_case` 字段透传 + plotting 路径已精读完毕。grep `nlos|los_|los\b|line_of_sight|NLOS|LOS` 在该文件 **零命中** → eval 层不读 NLOS 标签 → 无法静默删除 NLOS 段。**§11 风险评估：零**。
+
+**4 个已精读完毕文件的 §11 风险综合评估**：
 - **拒识决策风险**：零。所有 4 文件都在 estimator 层之外，不经手 `_handle_uwb` / `_handle_vio` 拒识链 → §11.1 卡方门 / §11.3 失效串联 / §11.4 NLOS 拒识 / §11.5 SPD 拒识都无路径被改
-- **协议常量风险**：零。4 文件都不写 `BRIDGE_THRESHOLDS` / `CHI2_95_PERCENTILES` / `DEFAULT_GATING_DOF` / `imu_missing_inflation`，§11.1 / §11.2 协议单源真相不会被 4 文件篡改
-- **NLOS 静默删除风险**：零。`scenarios/nlos_levels.py` 生成端硬门 + `_FrozenDict` 协议常量同源锁，4 文件不读 NLOS 标签自动满足 §11.4 "不得静默删除 NLOS 段"
+- **协议常量风险**：零。4 文件都不写 `BRIDGE_THRESHOLDS` / `CHI2_95_PERCENTILES` / `DEFAULT_GATING_DOF` / `imu_missing_inflation` / `cov_jitter_eps`，§11.1 / §11.2 / §11.5 协议单源真相不会被 4 文件篡改
+- **NLOS 静默删除风险**：零。`scenarios/nlos_levels.py` 生成端硬门 + `_FrozenDict` 协议常量同源锁；`eval_pipeline.py` 零 NLOS 引用；`metric_runner.py` 不读 NLOS 标签 → §11.4 "不得静默删除 NLOS 段" 自动满足
 - **NN 信度越权风险**：零。`fusion_runner.py` 在 NN control 注入 estimator 之前不修改 control；`core_pipeline.py` 同
 - **§11 audit 结论路径**：4 文件的真实影响为 estimator 层之外流程装配与可视化，不参与 spec L1716-L1816 任何主张的代码执行点
 
-以上 4 个文件未完全穷举部分均不直接参与 §11 拒识/链序/SP 保护决策。
+**v6 精读补充证据**：
+- `eval_pipeline.py` grep `nlos|los_|line_of_sight|NLOS|LOS` 零命中
+- `models/liquid/trainer.py` `_resolve_selection_sample_weight` 基于 tail risk（`risk` / `alignment_risk` / `observation_risk` / `quality_risk` / `modality_signal`）加权，与 LOS 标签无关 → §11.3-d 视距段敢信测量通过
+- `estimators/shared.py:_build_controlled_measurement_cov` `calibration_frozen: bool = False` opt-in 通道确认 → §11.2-b R 固定方式 opt-in
+- `estimators/fgo_core.py` 铁律10 override 完整链路确认：`_quality_floor→0.0` / `_nis_threshold→inf` / `_huber_weight→1.0` → §11.1-f 通过
+
+以上 4 个文件已逐文件精读完毕，§11 风险全部为零。**§11 audit 至此穷举完整**：v6 实际覆盖 spec L1714-L1816 全部 42 行主张 + 4 段细节 + 5 个 Hazard（其中 §11-1 / §11-2 / §11-5 已修，§11-3 / §11-4 工艺登记为 estimator 层外的问题）+ 3 个修复 commit + 17 个新 pytest 测试锁死 + 4 个 estimator 层外文件精读完毕。
