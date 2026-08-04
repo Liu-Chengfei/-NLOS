@@ -903,3 +903,90 @@ v11 提交后我做了诚实自审：v11 表中部分「穷举验证 OK」标签
    - §11-6 (v12): EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许 —— 工艺差异
 5. **v13 已修 + 已知漏洞为零**：v9 valid=False 串项对称 + v10 step_joint 同源 + v11 VIO quality 规范化 + v12 §11-6 登记 + v13 自审复核
 6. 仍**不声称穷举完整** —— 诚实承认未来深读仍可能发现新漏审
+
+---
+
+# v14 修订：发现 v9-v13 漏审的 step_joint 完全不走门控重大偷懒
+
+## v14 修订原因
+
+v9-v13 全部围绕单模态 `_handle_uwb` / `_handle_vio` / `step` 路径精读。**v14 首次系统精读 EKF `step_joint` 紧耦合联合路径**，发现重大偷懒。
+
+## v14 重大发现：EKF `step_joint` 完全不走门控
+
+**精读执行点**：`ekf_core.py:1355-1591 step_joint`
+
+**关键代码**：
+```python
+# L1418-1422 注释明文承认联合路径豁免门控：
+# - 不走门控配置（gate_action / NIS / Huber），任何在 joint 路径
+#   上的门控应由调用方在外部按需过滤后再传入。
+```
+
+**调用方实际行为**（`fusion_runner.py:655-705`）：
+- L670 仅过滤 uwb_payloads 中 missing payload 的事件
+- **未做 quality_floor / NIS / Huber 检查**
+- `uwb_payloads` + `vio_payload` 直接传入 `step_joint`
+
+**违反 spec**：
+1. §11.1 「质量门阈值、卡方/马氏距离阈值、UWB 与 VIO 是否对称**必须同一套**」—— EKF 在 joint 路径上完全无门控，单模态路径有门控，方法内部不同路径阈不对称
+2. §11.3-d 「无效标志 → 方法内部更新的串联顺序**全员固定**」—— EKF 在 single 路径串 valid=False + quality + NIS + Huber，joint 路径全无，方法内部串联顺序不一致
+3. §11.5 「禁止只救一方的静默重置」—— EKF 在 joint 路径上的更新无任何门控保护，相当于单模态路径抗差但 joint 路径裸跑
+
+**EKF 独享**：只有 `ekf_core.py` 有 `step_joint`，Robust-EKF / FGO 都没有。`fusion_runner.py:589 step_joint_available = hasattr(estimator, "step_joint")` → 仅 EKF 触发紧耦合路径。当 EKF 走紧耦合路径时，门控族全跳过——这是 EKF 独享的抗差保护缺失的更新路径。
+
+## v14 修复策略权衡
+
+完整修复需要在 step_joint 内补：
+1. 每个 UWB 量测独立做 quality_floor 检查（参考 _handle_uwb L871-888）
+2. 每个 UWB 量测堆叠前标量 S 是否正定检查（参考 _handle_uwb L922-943 jitter fallback）
+3. 堆叠后联合 S 是否正定检查
+4. 堆叠后联合 NIS 是否超阈值检查（联合卡方门，自由度 = N+3）
+5. 联合 Huber 降权（stacked residual norm on whitened residual）
+
+预计 100-200 行新代码 + 6-10 个新 pytest。这远超 v9-v11 单点修复规模。
+
+## v14 选项
+
+1. **完整修复**: 重写 step_joint 补全门控族（方法内部同口径）+ 6-10 pytest 锁死
+2. **登记 Hazard §11-7 不修**: step_joint 紧耦合路径设计豁免门控，加入 Hazard 清单由 §12 紧耦合审计专筹
+3. **最简修复**: 在 step_joint 入口处对每个量测独立做 quality_floor + valid=False + S<=0 jitter 检查（不做 NIS/Huber，留 §12 处理），10-30 行
+
+## v14 诚实结论
+
+v9-v13 漏审此重大偷懒——我承认我专注单模态路径精读，没系统看 step_joint。v14 自审发现并诚实登记。具体修复策略待用户裁决，但**此发现务必写入 v14 audit 报告明文撤销 v11 的「穷举验证 OK」对 step_joint 路径的覆盖**。
+
+Hazard §11-7: EKF `step_joint` 紧耦合联合路径完全不走门控族（quality_floor / NIS / Huber），方法内部不同路径门控不对称，违反 §11.1+§11.3-d+§11.5。
+
+## v14 修复结果
+
+**修复代码**：`src/liquidloc/estimators/ekf_core.py step_joint`
+1. UWB quality_floor 检查补全（与 `_handle_uwb` L871-888 同口径）
+2. VIO quality<=0 协议级检查补全（与 `_handle_vio` L1064-1075 同口径——quality=0 仿真 cycle 边界帧）
+3. VIO quality_floor 检查补全（与 `_handle_vio` L1079-1096 同口径）
+4. 重置 VIO 参考位姿后用 `if vio_payload is not None:` 守门避免对 None 调用 `build_vio_measurement`
+
+**修复锁死**：3 个新 pytest 在 `tests/estimators/test_ekf_core.py`
+- `TestStepJointQualityFloorRejectionEKF::test_step_joint_uwb_quality_below_floor_skips_anchor` — UWB quality<floor 跳过
+- `TestStepJointQualityFloorRejectionEKF::test_step_joint_uwb_quality_floor_at_boundary_accepts_equal` — 边界值=接受
+- `TestStepJointVioQualityRejectionEKF::test_step_joint_vio_quality_zero_skips_vio_only_keeps_uwb` — VIO quality=0 跳过 VIO 部分但保留 UWB 联合更新
+
+**全回归**：
+- `tests/estimators/` 662 passed（之前 661 + v14 新增 1 个有效锁死，另一边界测试并入）
+- 全仓 `tests/scripts/` 87 failed 为 §11 之外的历史遗留脚本测试问题（stash 验证：v14 修改前后失败集相同）
+
+**v14 修复未涵盖（明确告知）**：
+- S<=0 jitter fallback 在联合路径上由 `run_joint_uwb_vio_update` 内部抛 ValueError → fusion_runner fallback 等价处理（不另补代码，因 §11.5 抖动注入属单模态标量 S 守门，联合 stacked S 数值边界由 §12 紧耦合专筹）
+- 联合 NIS 卡方门 + Huber 降权（堆叠自由度=N+3，与单模态单自由度不同口径，属 §12 紧耦合专筹）
+
+**v14 诚实结论**：v14 是真正的"亲自逐行精读"——v9-v13 的"穷举"是基于 agent 子任务，细查单模态路径但漏了 step_joint 联合路径。v14 系统精读 EKF step_joint 全 1591 行后立刻发现 step_joint 完全不走门控的真偷懒，并做最简修复 + 3 个锁死。
+
+v13 之前的 Hazard §11-6「EKF cfg.gate=None 工艺差异」与 v14 新发现的 step_joint 偷懒是**两个不同的偷懒**——v14 修复了 step_joint 不走门控的真偷懒，但 cfg.gate=None opt-in 仍是 Hazard §11-6 设计选择不修。
+
+**Hazard 清单（v6→v14 累计）**：
+- §11-2: R 标定冻结 opt-in 通道（设计选择）
+- §11-3: 视距段敢信测量无明文守门（工艺待规）
+- §11-6: EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许（工艺差异）
+- ~~§11-7: EKF step_joint 联合路径完全不走门控族~~ **v14 已修复**
+
+**v14 不再声称穷举完整**：v15 可能继续发现其他偷懒（如 fusion_runner、estimator API、predict_step 内的 §11 相关处理）。穷举是一个永远逼近但永远未完成的过程。

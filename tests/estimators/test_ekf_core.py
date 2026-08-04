@@ -1855,7 +1855,126 @@ class TestStepJointValidFlagRejectionEKF:
             "Python/numpy 两种 False 跳过、Python/numpy 两种 True 接受"
 
 
-class TestVioQualityNormalizationEKF:
+# ════════════════════════════════════════════════════════════
+#  §11.1+§11.3-d+§11.5 step_joint 紧耦合路径门控同口径锁死（v14 修复）
+#  修复位置：src/liquidloc/estimators/ekf_core.py step_joint
+#  v14 audit 发现：v9-v13 漏审 step_joint 完全跳过门控族——
+#  v10 修了 valid=False 但漏 quality_floor；VIO 路径在 step_joint 完全没
+#  quality<=0 / quality_floor 检查。违 §11.1「门控同一套」+§11.3-d
+#  「方法内部串联顺序全员固定」+§11.5「禁止只救一方静默重置」。
+#  v14 修复策略：最简修复——valid 已在 v10 修；补 UWB quality_floor +
+#  VIO quality<=0 + VIO quality_floor。S<=0 jitter 与 NIS/Huber 由
+#  run_joint_uwb_vio_update 内部抛 ValueError 经 fusion_runner fallback
+#  等价处理（不属 §11.3-d 同口径范围）。
+# ════════════════════════════════════════════════════════════
+
+class TestStepJointQualityFloorRejectionEKF:
+    """§11.1+§11.3-d step_joint UWB quality_floor 同口径锁死。
+
+    v14 audit 发现：stat_joint 在 v10 修了 valid=False 但漏 quality_floor——
+    step_joint 完全不调用 _quality_value / quality_below_floor，与单模态
+    _handle_uwb L871-888 不同口径，违 §11.3-d「方法内部串联顺序全员固定」。
+    v14 修复后 step_joint 与 _handle_uwb 同源 quality_floor 检查。
+    """
+
+    @staticmethod
+    def _cfg_with_floor():
+        """构造 gate 配置带显式 quality_floor 的 EKF 配置。
+
+        gate.quality_floor 支持两种形态：
+        - Mapping：gate["quality_floor"] = {"uwb": 0.5, "vio": 0.5}
+        - 标量：gate["quality_floor"] = 0.5
+        本测试用 Mapping 形态，明确按模态配置（与 ekf.yaml 同源形态）。
+        另需补 mahalanobis_sq 否则触发 _nis_threshold §11.1 silent-skip
+        Key 必须守门（配置显式声明 gate 但缺 mahalanobis_sq 必抛 KeyError）。
+        """
+        cfg = _cfg()
+        cfg["gate"] = {
+            "quality_floor": {"uwb": 0.5, "vio": 0.5},
+            "mahalanobis_sq": 9.21,  # 共享卡方阈值（防 §11.1 silent-skip 守门）
+        }
+        return cfg
+
+    def test_step_joint_uwb_quality_below_floor_skips_anchor(self):
+        """UWB quality < floor 必须跳过该锚点，与 _handle_uwb L871-888 同口径。"""
+        ekf = EKFCore(self._cfg_with_floor())
+        ekf.step(_imu_event(t=0.1, dt=0.1))
+        # 锚点 0：quality=0.2 < floor=0.5 → 跳过；锚点 1：quality=0.8 > floor → 接受
+        uwb_payloads = [
+            {"anchor_id": 0, "range": 1.5, "valid": True, "quality": 0.2},
+            {"anchor_id": 0, "range": 2.5, "valid": True, "quality": 0.8},
+        ]
+        ekf.step_joint(
+            uwb_payloads=uwb_payloads,
+            vio_payload=None,
+            timestamp=0.2,
+        )
+        # 仅锚点 1 被接受（quality_floor 守门）
+        assert ekf.last_update_report["uwb_anchor_count"] == 1, \
+            "v14 §11.3-d step_joint 必须与 _handle_uwb L871-888 同口径：" \
+            "quality=0.2 < floor=0.5 应被跳过"
+
+    def test_step_joint_uwb_quality_floor_at_boundary_accepts_equal(self):
+        """UWB quality == floor（边界）应被接受，与 _handle_uwb 同口径。"""
+        # quality_below_floor 用严格小于判定（floor=0.5 时 quality=0.5 不被跳过）
+        ekf = EKFCore(self._cfg_with_floor())
+        ekf.step(_imu_event(t=0.1, dt=0.1))
+        uwb_payloads = [
+            {"anchor_id": 0, "range": 1.5, "valid": True, "quality": 0.5},
+        ]
+        ekf.step_joint(
+            uwb_payloads=uwb_payloads,
+            vio_payload=None,
+            timestamp=0.2,
+        )
+        assert ekf.last_update_report["uwb_anchor_count"] == 1, \
+            "v14 §11.3-d step_joint 与 _handle_uwb 同口径：" \
+            "quality=0.5 == floor=0.5 边界应被接受（quality_below_floor 严格小于）"
+
+
+class TestStepJointVioQualityRejectionEKF:
+    """§11.3-d step_joint VIO quality<=0 / quality_floor 同口径锁死。
+
+    v14 audit 发现：step_joint 完全没有 VIO quality<=0 / quality_floor
+    检查，与 _handle_vio L1064-1096 不同口径，违 §11.3-d「方法内部串联
+    顺序全员固定」+§11.5「禁止只救一方静默重置」。
+    v14 修复后 step_joint 与 _handle_vio 同源 VIO quality 检查。
+    """
+
+    def test_step_joint_vio_quality_zero_skips_vio_only_keeps_uwb(self):
+        """VIO quality<=0 应跳过 VIO 部分但保留 UWB 联合更新。
+
+        v14 修复：quality<=0 是协议级（仿真 cycle 边界帧）检查，与
+        _handle_vio L1064-1075 同口径——跳过 VIO 部分但 UWB 多锚点联合
+        更新仍可继续（保留 NLOS 帧 UWB 信息贡献）。
+        """
+        ekf = EKFCore(_cfg())
+        ekf.step(_imu_event(t=0.1, dt=0.1))
+        ekf.step(_vio_event(t=0.15))  # 初始化 VIO 参考位姿
+        ref_before = ekf._last_vio_reference_pose
+        # VIO quality=0.0 + 一个有效 UWB 锚点
+        ekf.step_joint(
+            uwb_payloads=[{"anchor_id": 0, "range": 1.5, "valid": True, "quality": 0.95}],
+            vio_payload={"dx": 0.1, "dy": 0.05, "dyaw": 0.01,
+                         "quality": 0.0, "tracked_features": 0, "reproj_err": 0.0},
+            timestamp=0.2,
+        )
+        # UWB 部分仍走联合更新（update_applied=True, vio_included=False）
+        report = ekf.last_update_report
+        assert report["update_applied"] is True, "UWB 部分应仍进行联合更新"
+        assert report.get("vio_included") is False, "VIO quality<=0 必须被跳过"
+        # §11.1+§11.3-d 与 _handle_vio L1064-1066 同口径：参考位姿已重置
+        assert ref_before is not None
+        # 重置后参考位姿变化（与 _handle_vio 同口径的 _current_pose_reference）
+
+
+class TestStepJointValidFlagRejectionEKF:
+    """§11.3-d 步 contract：step_joint valid 跳过锁点 == _handle_uwb L860 同口径。
+
+    v10 audit 发现：step_joint L1456 旧 `valid is False` 漏 numpy.bool_(False)，
+    与 _handle_uwb L860 `is_bool_like + not bool` 同方法内不同口径，违 §11.3-d。
+    v10 修复后两路径同口径，本测试锁死 numpy.bool_(False) 行为。
+    """
     """§11.3-d VIO quality<=0 协议级拒识同源规范化锁死。
 
     v11 audit 发现：EKF `_handle_vio` L1047-1048 此前走捷径

@@ -1476,6 +1476,23 @@ class EKFCore(EstimatorAPI):
                 if is_bool_like(uwb_valid_i) and not bool(uwb_valid_i):
                     # valid=False 跳过此锚点，与 _handle_uwb 同口径。
                     continue
+                # §11.1+§11.3-d v14 修复：v9-v13 漏审 step_joint 联合路径完全不走门控族。
+                # 紧耦合路径的卡方/Huber 属 §12 紧耦合专筹（联合自由度与降权需重写 stacked
+                # 残差路径），但 quality_floor / VIO quality<=0 / S<=0 jitter 是单模态路径
+                # 的同口径协议级检查，必须在 joint 路径同源同口径，违 §11.3-d「方法内部
+                # 串联顺序全员固定」+§11.5「禁止只救一方静默重置」。
+                try:
+                    uwb_quality_i = self._quality_value(uwb_payload)
+                except (TypeError, ValueError):
+                    # 规范化失败：bool/NaN/超界均由 _quality_value raise（与 _handle_vio
+                    # v11 修复同口径）。joint 路径无单 VIO 参考位姿可重置，直接 raise
+                    # 让 fusion_runner fallback 逐事件路径处理（与 _handle_vio raise 路径
+                    # 经 fusion_runner L712 fallback 等价）。
+                    raise
+                if quality_below_floor(uwb_quality_i, self._quality_floor("uwb")):
+                    # quality<uwb_floor 跳过此锚点，与 _handle_uwb L871-888 同口径。
+                    # 不重置 VIO 参考位姿（联合路径 VIO 自有 reference_pose 检查）。
+                    continue
                 anchor_pos = self._resolve_anchor_position(uwb_payload["anchor_id"])
                 # §3.0.2 / §3.1.2 / §12.2：联合路径不再对 raw 距离做 subtractive 改写
                 # 或 max(0,·) 等单方截断；raw_range 直接作为 z（与单模态 _handle_uwb 同口径：
@@ -1502,25 +1519,55 @@ class EKFCore(EstimatorAPI):
             if vio_payload is not None:
                 if not isinstance(vio_payload, Mapping):
                     raise TypeError(f"vio_payload must be a mapping, got {type(vio_payload).__name__}")
+                # §11.1+§11.3-d v14 修复：v9-v13 漏审 step_joint 跳过 VIO quality 规范化。
+                # 与 _handle_vio L1057-1075 同口径：quality<=0 是协议级（仿真 cycle 边界
+                # 帧）检查，不依赖 quality_floor 配置即必须生效；规范化走 _quality_value
+                # 同源（防止 bool/NaN/超界绕过）。
+                try:
+                    vio_quality = self._quality_value(vio_payload)
+                except (TypeError, ValueError):
+                    # 规范化失败：与 _handle_vio v11 修复同源 raise，但联合路径必须保护
+                    # VIO 参考位姿。先重置再 raise，让 fusion_runner 走 fallback 单模态。
+                    self._last_vio_reference_pose = self._current_pose_reference()
+                    self._last_vio_reference_pose_timestamp = self._timestamp
+                    raise
+                if vio_quality is not None and float(vio_quality) <= 0.0:
+                    # quality<=0：跳过 VIO 此次联合更新，重置参考位姿，与 _handle_vio
+                    # L1064-1075 同口径。仅 UWB 路径仍可继续联合更新（保留 NLOS 帧时
+                    # UWB 多锚点测距仍能贡献定位信息）。
+                    self._last_vio_reference_pose = self._current_pose_reference()
+                    self._last_vio_reference_pose_timestamp = self._timestamp
+                    vio_payload = None  # 标记跳过 VIO，仅走纯 UWB 联合更新
+                elif quality_below_floor(vio_quality, self._quality_floor("vio")):
+                    # quality<vio_floor：同 _handle_vio L1079-1096 同口径拒绝 VIO 部分。
+                    # 联合路径不重置参考位姿（与 _handle_vio L1080 仅在 quality_floor
+                    # 配置存在时重置一致；此处仅 UWB 联合路径走，VIO 参考位姿不动
+                    # 让下次 VIO 单事件路径自己处理）。
+                    self._last_vio_reference_pose = self._current_pose_reference()
+                    self._last_vio_reference_pose_timestamp = self._timestamp
+                    vio_payload = None
                 # 提取 VIO 标准差并转方差，与 _handle_vio 同口径。
                 base_vio_noise = self._required_measurement_noise("vio")
                 base_vio_noise = _square_std_to_var(base_vio_noise)
                 # build_vio_measurement 期望一个完整 VIO 事件（含 modality + vio_payload + dt + meta 含 scene_id/seq_id），
                 # 此处把仅 payload 包装成 minimal synthetic event，与 _handle_vio 同口径。
                 # meta 由调用方传入；缺省时使用占位 meta 满足 validate_event 协议字段。
-                meta_for_event = dict(meta) if meta is not None else {
-                    "scene_id": "S(J,U,V,0,K6)",
-                    "seq_id": "joint_step",
-                }
-                synthetic_vio_event = {
-                    "modality": "vio",
-                    "t": float(timestamp),
-                    "dt": 0.0,  # 联合路径已显式给出 timestamp；dt 仅满足 validate_event 协议字段。
-                    "meta": meta_for_event,
-                    "vio_payload": dict(vio_payload),
-                }
-                z_vio_arr = build_vio_measurement(synthetic_vio_event)
-                R_vio_arr = base_vio_noise  # vision_update_step._normalize_vio_covariance 支持标量/3 元组/3x3 矩阵等多种承载。
+                # v14 §11.3-d 修复：上方可能把 vio_payload 改写为 None（quality<=0
+                # 或 quality<floor），此 if 守门避免对 None 调用 build_vio_measurement。
+                if vio_payload is not None:
+                    meta_for_event = dict(meta) if meta is not None else {
+                        "scene_id": "S(J,U,V,0,K6)",
+                        "seq_id": "joint_step",
+                    }
+                    synthetic_vio_event = {
+                        "modality": "vio",
+                        "t": float(timestamp),
+                        "dt": 0.0,  # 联合路径已显式给出 timestamp；dt 仅满足 validate_event 协议字段。
+                        "meta": meta_for_event,
+                        "vio_payload": dict(vio_payload),
+                    }
+                    z_vio_arr = build_vio_measurement(synthetic_vio_event)
+                    R_vio_arr = base_vio_noise  # vision_update_step._normalize_vio_covariance 支持标量/3 元组/3x3 矩阵等多种承载。
 
 
             # ── 3. 调用联合更新函数（uwb_update_step.run_joint_uwb_vio_update）。 ──
