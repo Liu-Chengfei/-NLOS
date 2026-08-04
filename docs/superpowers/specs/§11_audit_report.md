@@ -814,3 +814,28 @@ if vio_quality is not None and float(vio_quality) <= 0.0:
 - pytest: `tests/estimators/test_robust_ekf_core.py` 新增 `TestVioQualityNormalizationRobustEKF`（2 个）
 - pytest: `tests/estimators/test_fgo_core.py` 新增 `TestVioQualityNormalizationFGO`（2 个）
 - audit report: 本段 v11 修订
+
+---
+
+# v12 修订：登记 EKF 条件守门 vs Robust-EKF 无条件守门工艺差异
+
+## v12 修订原因
+
+v11 穷举验证表登记了 §11.1-1「质量门阈值同一套」已通过。但精读中发现一个**代码形态差异**需要诚实记录：
+
+> **EKF `_handle_uwb` L871 + `_handle_vio` L1077**：`if self.cfg.get("gate") is not None:` — 条件守门，仅 cfg.gate 存在时启用 quality_floor 检查
+> **Robust-EKF `_handle_uwb` L347 + `_handle_vio` L551**：无条件 `if _quality_below_floor(quality, self._quality_floor(...)):` — 无条件守门
+> **FGO `_handle_uwb` L1890 + `_handle_vio` L2128**：无条件守门，但 `_quality_floor()` 恒返 0.0（铁律10 裸跑），所以质量门控永不触发
+
+## 判定：工艺差异，不构成 §11.1-1 违反
+
+1. **cfg.gate 为 None 在实际运行中仅出现在 FGO**（`fgo.yaml` 无 `gate:` 段）。EKF `ekf.yaml` L59 和 Robust-EKF `robust_ekf.yaml` L61 均含 `gate:` 段，所以 EKF 条件守门在实际配置下恒为 True，与 Robust-EKF 无条件守门功能等价。
+2. **EKF 条件守门是防御性编程**：允许用户通过删掉 cfg.gate 来禁用质量门控。Robust-EKF 不提供这种禁用选项。
+3. **spec §11.1-1 要求的是阈值同一套**（"质量门阈值、卡方/马氏距离阈值、UWB 与 VIO 是否对称必须同一套"），不是门控启用/禁用策略同一套。阈值来源：EKF `_quality_floor()` 在 cfg.gate 为 None 时回退到 `BRIDGE_THRESHOLDS[f"{modality}_hard_skip_quality_floor"]` 协议单源，与 Robust-EKF 同源。
+4. **FGO 铁律10 override 是协议级设计同意的不对称**（FGO 与 EKF/Robust-EKF 之间），FGO 内 VIO/UWB 双松对称，不违 §11.4-a。
+
+## v12 结论
+
+- EKF 条件守门 vs Robust-EKF 无条件守门：**工艺差异，不修**。
+- 登记为 Hazard §11-6：「EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许」，属于配置灵活性差异，非比较公平违规。
+- v11 已修 + 已知漏洞为零 + 工艺差异已登记。
