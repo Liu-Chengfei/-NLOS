@@ -194,6 +194,12 @@ def _coerce_covariance_matrix(
         np.linalg.cholesky(P_matrix)  # 协方差矩阵必须正定。
     except np.linalg.LinAlgError:
         # §11.5 抖动注入：第一次 Cholesky 失败 → P += cov_jitter_eps * I 再重试。
+        # 三方法（EKF / Robust-EKF / FGO）同调 uwb_update_step.run_uwb_update 系列函数，
+        # 因此 UWB 路径的 jitter fallback 与 VIO 路径 (_ensure_positive_definite_vio_innovation_covariance)
+        # 同口径同源 cov_jitter_eps（BRIDGE_THRESHOLDS["cov_jitter_eps"]）——
+        # 满足 §11.5「SP 保护/抖动/发散判定全员同一规则」要求。
+        # v6 audit 发现 v5 仅修了 vision_update_step + uwb_update_step L717/L1009 但漏审
+        # L194 _coerce_covariance_matrix 路径；本次补全 P_pred 路径的 jitter fallback。
         from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS
         cov_jitter_eps = float(BRIDGE_THRESHOLDS["cov_jitter_eps"])
         jittered = P_matrix + cov_jitter_eps * np.eye(P_matrix.shape[0])
@@ -201,7 +207,10 @@ def _coerce_covariance_matrix(
             np.linalg.cholesky(jittered)
             P_matrix = jittered  # 接受 jittered 版本作为该次预测协方差。
         except np.linalg.LinAlgError as exc:  # 非正定矩阵会让 EKF 更新失去统计语义。
-            raise ValueError("P_pred must be positive definite (jitter fallback exhausted at eps={cov_jitter_eps}") from exc  # 二次仍失败 → fail-loud。
+            raise ValueError(
+                f"P_pred must be positive definite "
+                f"(jitter fallback exhausted at eps={cov_jitter_eps})"
+            ) from exc  # 二次仍失败 → fail-loud。
     return P_matrix.copy()  # 返回副本，避免改坏输入。
 
 

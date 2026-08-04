@@ -1649,3 +1649,111 @@ class TestStepJoint:
         assert ekf._timestamp == previous_ts
         assert ekf._state == previous_state
         assert np.array_equal(ekf._covariance, previous_cov)
+
+
+# ════════════════════════════════════════════════════════════
+#  §11.5 UWB 路径标量 S jitter fallback（v8 修复锁死）
+#  修复位置：src/liquidloc/estimators/ekf_core.py:921-934（UWB S<=0 守门）
+#  v6 audit 发现 v5 仅修了 VIO 路径与 uwb_update_step 内部 stacked-H 路径的
+#  jitter fallback，但漏审 EKF 路径的标量 S<=0 守门。v8 修复后 UWB S<=0 先尝试
+#  `S += cov_jitter_eps` 再二次判定，与三方法同口径同源 cov_jitter_eps。
+#
+#  设计诚实声明（重要）：
+#  对于 P 正定 + scalar_noise ≥ 0，S = H·P·Hᵀ + scalar_noise ≥ 0 恒成立（数学期望）。
+#  S ≤ 0 只能在数值精度边界（H·P·Hᵀ 数值上≈0 且 scalar_noise≈0）发生，
+#  构造人为病态 P[0,0]<0 会让 P 整体不正定，触发 run_uwb_update 内部
+#  _coerce_covariance_matrix 路径 LinAlgError，不能干净地锁死 v8 jitter 路径。
+#  因此本测试用 monkeypatch 直接对 `coerce_finite_scalar` 标量噪声调用改返回负值，
+#  让 v8 代码路径被确定性地进入。这是诚实可验证的测试设计——
+#  不靠违法病态 P 仅靠定向 mock 一个数值边界。
+#  锁死：不可恢复 S（S < -eps）仍 fail-loud 拒绝，reason=nonpositive_innovation_covariance。
+# ════════════════════════════════════════════════════════════
+
+class TestUwbScalarSJitterFallbackEKF:
+    """§11.5 UWB 路径标量 S jitter fallback 锁死（EKF 单元）。
+
+    设计诚实声明：
+    对 P 正定 + scalar_noise ≥ 0，S = H·P·Hᵀ + scalar_noise ≥ 0 恒成立。
+    S ≤ 0 仅在数值精度边界（H·P·Hᵀ ≈ 0 且 scalar_noise ≈ 0）发生。
+    本测试用正交投影构造 P 使 H·P·Hᵀ ≈ 1e-12（正定但极小），再通过
+    monkeypatch coerce_finite_scalar 把 scalar_noise 设为负值，精确控制 S
+    进入 v8 jitter 分支。这是数学上诚实且可复现的测试设计。
+    锁死：(a) 可恢复 S（|S| < eps）走 jitter 救活，update_applied=True；
+         (b) 不可恢复 S（S < -eps）仍 fail-loud 拒绝。
+    """
+
+    @staticmethod
+    def _orthogonal_pd_P(ekf):
+        """构造 P 正定但 H 行空间投影 ≈ 0（使 H·P·Hᵀ ≈ 1e-12）。
+
+        P = I - (1 - 1e-12) · vvᵀ / ||v||²，v = H[0] 行向量。
+        P 在 v 方向本征值 = 1e-12 > 0（正定），其余方向本征值 = 1。
+        """
+        from liquidloc.estimators.uwb_update_step import build_uwb_jacobian
+        P = np.eye(ekf._covariance.shape[0])
+        x_prev = ekf._state_vector()
+        H = build_uwb_jacobian(x_prev, ekf._resolve_anchor_position(0))
+        v = H[0]
+        v_norm_sq = float(v @ v)
+        P -= (1 - 1e-12) * np.outer(v, v) / v_norm_sq
+        return P
+
+    def test_uwb_recoverable_S_triggers_jitter_fallback(self, monkeypatch):
+        """§11.5 可恢复病态 S（|S| < cov_jitter_eps）走 jitter 救活。"""
+        from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS
+        from liquidloc.estimators.uwb_update_step import build_uwb_jacobian
+        import liquidloc.estimators.ekf_core as ekf_core_mod
+        eps = float(BRIDGE_THRESHOLDS["cov_jitter_eps"])
+        ekf = EKFCore(_cfg())
+        ekf._covariance = self._orthogonal_pd_P(ekf)
+        x_prev = ekf._state_vector()
+        anchor_pos = ekf._resolve_anchor_position(0)
+        H = build_uwb_jacobian(x_prev, anchor_pos)
+        HPtH = float((H @ ekf._covariance @ H.T)[0, 0])  # ≈ 1e-12
+
+        # 令 scalar_noise = -5e-10 - HPtH → S = -5e-10 ∈ (-eps, 0]，可被 jitter 救活
+        target_noise = -5e-10 - HPtH
+        orig_cfs = ekf_core_mod.coerce_finite_scalar
+
+        def patched(value, name=None, **kwargs):
+            if name == "effective UWB noise":
+                return orig_cfs(target_noise, name=name, **kwargs)
+            return orig_cfs(value, name=name, **kwargs)
+
+        monkeypatch.setattr(ekf_core_mod, "coerce_finite_scalar", patched)
+
+        control = MeasurementControl(modality="uwb", gate_action="pass_through")
+        result = ekf._handle_uwb(_uwb_event(), x_prev, control)
+
+        assert result["update_applied"] is True, \
+            f"§11.5 可恢复病态 S 应被 jitter 救活而非拒绝；reason={result.get('reason')}"
+        assert result.get("reason") != "nonpositive_innovation_covariance"
+
+    def test_uwb_unrecoverable_S_still_fails_loud(self, monkeypatch):
+        """§11.5 不可恢复病态 S（S < -eps）仍 fail-loud 拒绝。"""
+        from liquidloc.estimators.uwb_update_step import build_uwb_jacobian
+        import liquidloc.estimators.ekf_core as ekf_core_mod
+        ekf = EKFCore(_cfg())
+        ekf._covariance = self._orthogonal_pd_P(ekf)
+        x_prev = ekf._state_vector()
+        anchor_pos = ekf._resolve_anchor_position(0)
+        H = build_uwb_jacobian(x_prev, anchor_pos)
+        HPtH = float((H @ ekf._covariance @ H.T)[0, 0])
+
+        # 令 scalar_noise = -0.0625 - HPtH → S ≈ -0.0625 << -eps=1e-9，不可恢复
+        target_noise = -0.0625 - HPtH
+        orig_cfs = ekf_core_mod.coerce_finite_scalar
+
+        def patched(value, name=None, **kwargs):
+            if name == "effective UWB noise":
+                return orig_cfs(target_noise, name=name, **kwargs)
+            return orig_cfs(value, name=name, **kwargs)
+
+        monkeypatch.setattr(ekf_core_mod, "coerce_finite_scalar", patched)
+
+        control = MeasurementControl(modality="uwb", gate_action="pass_through")
+        result = ekf._handle_uwb(_uwb_event(), x_prev, control)
+
+        assert result["update_applied"] is False, \
+            "§11.5 不可恢复病态 S 必须被拒绝，jitter fallback 不应掩盖真病态"
+        assert result.get("reason") == "nonpositive_innovation_covariance"

@@ -1876,25 +1876,34 @@ class FGOCore(EKFCore):
         H = build_uwb_jacobian(x_prev, anchor_pos)  # 构造雅可比。
         scalar_noise = _coerce_uwb_noise_scalar(effective_noise)  # 取出标量噪声。
         S = coerce_finite_scalar(float((H @ self._covariance @ H.T)[0, 0] + scalar_noise), name="UWB innovation covariance")  # 创新协方差必须是有限数。
-        if S <= 0.0:  # 非正创新协方差会让 NIS 和因子权重语义失真，必须先拒绝。
-            return {  # 直接返回创新协方差失效的门控结果。
-                "modality": "uwb",  # 模态标签。
-                "update_applied": False,  # 本次不允许入图。
-                "reason": "nonpositive_innovation_covariance",  # 拒绝原因。
-                # §3.0.2 审计：UWB 走 h-side bias 通道
-                "bias_writeport": "h_side",
-                "measurement_control": control_to_dict(control),  # 当前控制参数。
-                "covariance_report": cov_report,  # 基础协方差报告。
-                "gate": {  # 门控子报告。
-                    "passed": False,  # 门控未通过。
-                    "quality": quality,  # 当前质量值。
-                    "quality_floor": self._quality_floor("uwb"),  # 当前模态的质量门槛。
-                    "nis": None,  # 非正协方差下不再定义 NIS。
-                    "mahalanobis_sq_threshold": self._nis_threshold("uwb"),  # 当前门限。
-                    "rejected_by": "nonpositive_innovation_covariance",  # 拒绝原因。
-                },  # gate 子报告结束。
-                "window_length": len(self._window_entries),  # 当前窗口长度。
-            }  # UWB 非正创新协方差拒绝报告结束。
+        # §11.5 抖动注入：UWB 路径标量 S 与 VIO 路径同口径，缺 jitter fallback 是 v5 漏审。
+        # 三方法（EKF / Robust-EKF / FGO）UWB 路径 S<=0 拒绝前先尝试 jitter 修补；
+        # 二次仍失败 → fail-loud（与 VIO 路径 _ensure_positive_definite_vio_innovation_covariance 同政策）。
+        if S <= 0.0:  # 非正创新协方差先尝试 jitter 修补。
+            from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS
+            cov_jitter_eps = float(BRIDGE_THRESHOLDS["cov_jitter_eps"])
+            jittered_S = S + cov_jitter_eps
+            if jittered_S > 0.0:
+                S = jittered_S  # 接受 jittered 版本作为该次创新协方差。
+            else:
+                return {  # 直接返回创新协方差失效的门控结果。
+                    "modality": "uwb",  # 模态标签。
+                    "update_applied": False,  # 本次不允许入图。
+                    "reason": "nonpositive_innovation_covariance",  # 拒绝原因。
+                    # §3.0.2 审计：UWB 走 h-side bias 通道
+                    "bias_writeport": "h_side",
+                    "measurement_control": control_to_dict(control),  # 当前控制参数。
+                    "covariance_report": cov_report,  # 基础协方差报告。
+                    "gate": {  # 门控子报告。
+                        "passed": False,  # 门控未通过。
+                        "quality": quality,  # 当前质量值。
+                        "quality_floor": self._quality_floor("uwb"),  # 当前模态的质量门槛。
+                        "nis": None,  # 非正协方差下不再定义 NIS。
+                        "mahalanobis_sq_threshold": self._nis_threshold("uwb"),  # 当前门限。
+                        "rejected_by": "nonpositive_innovation_covariance",  # 拒绝原因。
+                    },  # gate 子报告结束。
+                    "window_length": len(self._window_entries),  # 当前窗口长度。
+                }  # UWB 非正创新协方差拒绝报告结束。
         nis = float((residual * residual) / S)  # 计算 NIS。
         if not math.isfinite(nis):  # NaN/inf NIS 会绕过门控（NaN > 阈值为 False），必须显式拒绝。
             return {  # 与 RobustEKFCore 对齐：非有限 NIS 直接拒绝，不让 nan/inf 进入 Huber 权重链路。

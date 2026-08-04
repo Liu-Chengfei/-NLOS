@@ -920,18 +920,27 @@ class EKFCore(EstimatorAPI):
         residual = raw_range - z_pred  # 残差定义在原始 z 上（§3.0.2）。
         H = build_uwb_jacobian(x_prev, anchor_pos)
         S = coerce_finite_scalar((H @ self._covariance @ H.T)[0, 0] + scalar_noise, name="UWB innovation covariance")
+        # §11.5 抖动注入：UWB 路径标量 S 与 VIO 路径同口径，缺 jitter fallback 是 v5 漏审。
+        # 三方法（EKF / Robust-EKF / FGO）UWB 路径 S<=0 拒绝前先尝试 jitter 修补；
+        # 二次仍失败 → fail-loud（与 VIO 路径 _ensure_positive_definite_vio_innovation_covariance 同政策）。
         if S <= 0.0:
-            return {
-                "modality": "uwb", "update_applied": False, "reason": "nonpositive_innovation_covariance",
-                # §3.0.2 审计：UWB reject 路径声明 h_side（与成功路径同口径）。
-                "bias_writeport": "h_side",
-                "measurement_control": control_to_dict(control),
-                "covariance_report": cov_report, "robust_covariance_report": None,
-                "gate": {"passed": False, "rejected_by": "nonpositive_innovation_covariance",
-                         "quality": quality_gate if quality_gate is not None else uwb_payload.get("quality", 1.0),
-                         "nis": None, "mahalanobis_sq_threshold": self._nis_threshold("uwb")},
-                "robust": None,
-            }
+            from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS
+            cov_jitter_eps = float(BRIDGE_THRESHOLDS["cov_jitter_eps"])
+            jittered_S = S + cov_jitter_eps
+            if jittered_S > 0.0:
+                S = jittered_S  # 接受 jittered 版本作为该次创新协方差。
+            else:
+                return {
+                    "modality": "uwb", "update_applied": False, "reason": "nonpositive_innovation_covariance",
+                    # §3.0.2 审计：UWB reject 路径声明 h_side（与成功路径同口径）。
+                    "bias_writeport": "h_side",
+                    "measurement_control": control_to_dict(control),
+                    "covariance_report": cov_report, "robust_covariance_report": None,
+                    "gate": {"passed": False, "rejected_by": "nonpositive_innovation_covariance",
+                             "quality": quality_gate if quality_gate is not None else uwb_payload.get("quality", 1.0),
+                             "nis": None, "mahalanobis_sq_threshold": self._nis_threshold("uwb")},
+                    "robust": None,
+                }
 
         robust_weight_applied = 1.0  # 默认不降权（无 gate 配置时）
         if self.cfg.get("gate") is not None:
@@ -1448,9 +1457,12 @@ class EKFCore(EstimatorAPI):
                     # 与 _handle_uwb 同口径：valid=False 跳过此锚点。
                     continue
                 anchor_pos = self._resolve_anchor_position(uwb_payload["anchor_id"])
-                # §3.0.2 / §3.1.2：联合路径不再对 raw 距离做 subtractive 改写；
-                # raw_range 直接作为 z，bias 进 h(·)（与 _handle_uwb 同口径）。
-                raw_range_i = max(0.0, float(uwb_payload["range"]))
+                # §3.0.2 / §3.1.2 / §12.2：联合路径不再对 raw 距离做 subtractive 改写
+                # 或 max(0,·) 等单方截断；raw_range 直接作为 z（与单模态 _handle_uwb 同口径：
+                # ekf_core.py:915 / robust_ekf_core.py:358 / fgo_core.py:1872），
+                # bias 进 h(·)。负值/非有限值由下游 run_uwb_update 的 coerce_finite_scalar
+                # 协议级数据校验拒绝（raise），不在联合路径单方 clamp 改写 raw 距离。
+                raw_range_i = float(uwb_payload["range"])
                 bias_h_i = float(uwb_extra_biases[i]) if uwb_extra_biases is not None else 0.0
                 ax, ay = anchor_pos
 

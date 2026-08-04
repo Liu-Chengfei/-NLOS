@@ -1,5 +1,7 @@
 # §11 穷举审计诚实报告（门控 / 关联 / 信度）
 
+> **本报告 v8 修订原因**：v6 报告声称"§11 audit 至此穷举完整"，但 v7 重新精读三方法 `_handle_uwb` 路径发现**漏审**：`ekf_core.py:922` / `robust_ekf_core.py:366` / `fgo_core.py:1879` 的标量 S<=0 守门，v5/v6 只修了 VIO 路径与 `uwb_update_step.py` 内部 stacked-H 路径的 jitter fallback，三方法 `_handle_uwb` **标量 S<=0 路径完全漏修**。v7 补上三方法 jitter fallback；v8 补 6 个 pytest 锁死「可恢复 vs 不可恢复」边界。这是 v6 的偷懒——以 grep `jitter` 零命中代替精读 `_handle_uwb` 内部代码就声称"穷举完整"。
+>
 > **本报告 v5 修订原因**：v4 把 §11-5 判定为"未修工艺缺陷"，承认 jitter 注入缺失但未实施代码修复——这是 v4 的偷懒（"承认问题但不动手"）。v5 把 §11-5 从「未修」改为「已修」：
 > 1. **协议单源**：`bridge_thresholds.py` 新增 `"cov_jitter_eps": 1e-9` 协议常量。
 > 2. **代码修复**：`vision_update_step.py:_ensure_positive_definite_vio_innovation_covariance` + `uwb_update_step.py` 三处 inline Cholesky（L193、L717、L1009）均补 jitter fallback：第一次 Cholesky 失败 → `S += cov_jitter_eps * I` 再重试；二次仍失败 → fail-loud raise。三方法（EKF / Robust-EKF / FGO）同走单源函数 → spec L1745「全员同一规则」满足。
@@ -253,7 +255,91 @@ def test_protocol_imu_missing_inflation_constant_value_locked
 
 **未修原因**：涉及训练器端损失加权设计，超出 §11 estimator 层范畴。
 
-### Hazard §11-5（v5 已修）：无 covariance jitter 注入 → 协议单源 + jitter fallback 已实装 (spec L1745 "抖动"子项)
+### Hazard §11-5（v7 修复，v8 pytest 锁死）：三方法 `_handle_uwb` 标量 S<=0 漏审 → 协议单源 + jitter fallback 已补 (spec L1745 "抖动"子项)
+
+**spec 依据**：L1745 "协方差对称正定保护、抖动、发散判定全员同一规则；禁止只救一方的静默重置"——spec 列出 SPD 保护三手段：对称正定保护、**抖动** (jitter)、发散判定。
+
+**v4 旧核验发现（v3 漏审）**：
+
+```bash
+grep -rnE "jitter|nugget|epsilon.*cov|1e-.*eye|regularize_cov|spike_cov|cov_tolerance" src/liquidloc/ 2>/dev/null
+# → v4 零命中（无 jitter 实现），仅三方法同走 fail-loud Cholesky 拒绝路径
+#     vision_update_step.py:481-500 + uwb_update_step.py:194/709/1001 三处 inline raise
+```
+
+**v5 修复落地**（"承认问题但不动手"是 v4 偷懒，v5 动手补）：
+
+1. **协议单源**（`src/liquidloc/protocol/bridge_thresholds.py:103`）：
+   ```python
+   "cov_jitter_eps": 1e-9,  # §11.5 SPD 抖动注入：当 Cholesky 失败时先 S += cov_jitter_eps * I 再重试；二次仍失败才 raise。
+   ```
+   `_FrozenDict` 包装 → 运行时不可篡改，三方法同读单源真相。
+
+2. **VIO 路径**（`src/liquidloc/estimators/vision_update_step.py:_ensure_positive_definite_vio_innovation_covariance`）：
+   ```python
+   try:
+       np.linalg.cholesky(S)
+   except np.linalg.LinAlgError:
+       cov_jitter_eps = float(BRIDGE_THRESHOLDS["cov_jitter_eps"])
+       jittered = S + cov_jitter_eps * np.eye(S.shape[0])
+       try:
+           np.linalg.cholesky(jittered)
+           S = jittered  # 接受 jittered
+       except np.linalg.LinAlgError as exc:
+           raise ValueError(f"... must be positive definite (jitter fallback exhausted at eps={cov_jitter_eps}") from exc
+   ```
+   三方法（EKF `ekf_core.py:1136` / Robust-EKF `robust_ekf_core.py:599` / FGO `fgo_core.py:2155`）同调此函数 → 全员同一 jitter 政策。
+
+3. **UWB 路径** 三处 inline Cholesky 同口径补 jitter fallback：
+   - `uwb_update_step.py:193-207`（`_coerce_covariance_matrix` P_pred 路径）
+   - `uwb_update_step.py:717-729`（`run_uwb_update_multi_anchor` stacked-H 创新协方差 S）
+   - `uwb_update_step.py:1009-1025`（`run_joint_uwb_vio_update` 联合创新协方差 S）
+
+**v5 判定**：
+- **§11-5 已修**：协方差抖动注入已落地，三方法同走单源 jitter fallback 路径 → spec L1745「协方差对称正定保护、抖动、发散判定全员同一规则」满足
+- **不破"禁止只救一方"**：jitter fallback 不区分方法、不区分场景，全员同开同阈值同协议单源
+- **保留 fail-loud**：二次仍失败仍 `raise ValueError`，无任何静默重置（spec L1745 后半"禁止只救一方的静默重置"满足）
+- **pytest 全 PASS**：5 vision + 3 uwb = 8 个新测试，零新增 fail
+
+**v6 诚实承认（v6 报告误判"穷举完整"）**：
+
+v5/v6 报告把 §11-5 判定为"已修"并声称"§11 audit 至此穷举完整"——这是 **v6 的偷懒**。v5/v6 只审了 VIO 路径（`_ensure_positive_definite_vio_innovation_covariance`）和 `uwb_update_step.py` 内部三处 stacked-H 路径的 jitter fallback，**完全漏审三方法 `_handle_uwb` 路径的标量 S<=0 守门**：
+- `ekf_core.py:922-934`（EKF `_handle_uwb` L922 `S = coerce_finite_scalar((H @ P @ H.T)[0,0] + scalar_noise, ...)`）
+- `robust_ekf_core.py:366-385`（Robust-EKF `_handle_uwb` L366 同口径）
+- `fgo_core.py:1879-1907`（FGO `_handle_uwb` L1879 同口径）
+
+v5/v6 的 grep `jitter|nugget|...` 在 `src/liquidloc/estimators/` 零命中（这些路径当时确实无 jitter），但 v5/v6 没进一步读 `_handle_uwb` 内部是否走 jitter fallback，就直接"完成"了 §11-5。这是 **以 grep 代替精读**的偷懒。
+
+**v7 修复落地**（补上漏审的三方法 `_handle_uwb` 标量 S<=0 jitter fallback）：
+
+三方法 `_handle_uwb` 路径的 S 计算后均加 jitter fallback，与 VIO 路径同口径同源 `cov_jitter_eps`：
+- `ekf_core.py:922-934`（EKF）
+- `robust_ekf_core.py:366-385`（Robust-EKF）
+- `fgo_core.py:1879-1907`（FGO）
+
+**v8 pytest 锁死（6 个新测试）**：
+
+| 文件 | 测试 | 锁死主张 |
+|---|---|---|
+| `tests/estimators/test_ekf_core.py` | `TestUwbScalarSJitterFallbackEKF::test_uwb_recoverable_S_triggers_jitter_fallback` | 病态 S=-5e-10 ∈ (-eps, 0] 走 jitter 救活，update_applied=True |
+| `tests/estimators/test_ekf_core.py` | `TestUwbScalarSJitterFallbackEKF::test_uwb_unrecoverable_S_still_fails_loud` | 病态 S=-0.0625 << -eps 仍 fail-loud，reason=nonpositive_innovation_covariance |
+| `tests/estimators/test_robust_ekf_core.py` | `TestUwbScalarSJitterFallbackRobustEKF::test_uwb_recoverable_S_triggers_jitter_fallback` | 同上，Robust-EKF 路径 |
+| `tests/estimators/test_robust_ekf_core.py` | `TestUwbScalarSJitterFallbackRobustEKF::test_uwb_unrecoverable_S_still_fails_loud` | 同上，Robust-EKF 路径 |
+| `tests/estimators/test_fgo_core.py` | `TestUwbScalarSJitterFallbackFGO::test_uwb_recoverable_S_triggers_jitter_fallback` | 同上，FGO 路径 |
+| `tests/estimators/test_fgo_core.py` | `TestUwbScalarSJitterFallbackFGO::test_uwb_unrecoverable_S_still_fails_loud` | 同上，FGO 路径 |
+
+测试设计诚实声明：
+- 对 P 正定 + scalar_noise ≥ 0，S = H·P·Hᵀ + scalar_noise ≥ 0 恒成立（数学期望）。S ≤ 0 只能在数值精度边界（H·P·Hᵀ ≈ 0 且 scalar_noise ≈ 0）发生。
+- 本测试用正交投影构造 P 使 H·P·Hᵀ ≈ 1e-12（正定但极小），再通过 monkeypatch `coerce_finite_scalar` 把 scalar_noise 设为负值，精确控制 S 进入 v8 jitter 分支。这是数学上诚实且可复现的测试设计——不靠违法病态 P，仅靠定向 mock 一个数值边界。
+- 锁死「可恢复 vs 不可恢复」边界：|S| < eps 走 jitter 救活；S < -eps 仍 fail-loud 拒绝。
+
+**v8 判定**：
+- **§11-5 已修**：三方法 `_handle_uwb` 标量 S<=0 路径均补 jitter fallback，与 VIO 路径同口径同源 `cov_jitter_eps` → spec L1745「全员同一规则」满足
+- **不破"禁止只救一方"**：jitter fallback 不区分方法、不区分路径，全员同开同阈值同协议单源
+- **保留 fail-loud**：二次仍失败仍返回 `nonpositive_innovation_covariance` 拒绝报告，无任何静默重置
+- **pytest 全 PASS**：6 个新测试，零新增 fail
+
+**v6 报告原文"§11 audit 至此穷举完整"已撤销**——v6 声称穷举完整是 premature 的，v7/v8 发现了漏审并修复。
 
 **spec 依据**：L1745 "协方差对称正定保护、抖动、发散判定全员同一规则；禁止只救一方的静默重置"——spec 列出 SPD 保护三手段：对称正定保护、**抖动** (jitter)、发散判定。
 
@@ -333,6 +419,7 @@ grep -rnE "jitter|nugget|epsilon.*cov|1e-.*eye|regularize_cov|spike_cov|cov_tole
 - **v3 fix 后 HEAD**（+ §11-1 5 个 pytest + §11-2 5 个 pytest 协议层 + 2 个 pytest estimator 层）：**21 failed / 1260 passed**
 - **v4 报告修订**（仅文本修订，无代码变动）：**21 failed / 1260 passed**（不变）
 - **v5 fix 后 HEAD**（+ §11-5 cov_jitter_eps 协议常量 + vision_update_step jitter fallback + uwb_update_step 三处 jitter fallback + 8 个新 pytest）：**21 failed / 1285 passed**
+- **v8 fix 后 HEAD**（+ §11-5 三方法 `_handle_uwb` 标量 S<=0 jitter fallback + 6 个新 pytest）：**329 passed in estimator 层（零新增 fail）**，scripts/scenarios 层 pre-existing 21 failed 维持不变。
 
 零新增 §11 相关 fail。**通过数 +25**（v5 新增 8 个 pytest + 既有 fix 触发的 17 个相关测试通过）；fail 数维持 21 个预先存在 failure 不变。
 
@@ -375,6 +462,8 @@ baseline fail 名单与 v5 fix 后 fail 名单 `diff` 结果：**0 个增减** �
 |---|---|
 | 本 audit v3 | §11-1 修复锁死：新增 5 个 pytest 用例（`tests/estimators/test_ekf_core.py::TestEKFCoreInitAndReset`）；§11-2 修复锁死：协议层新建 `tests/protocol/test_bridge_thresholds.py`（5 个用例验证协议常量 + FrozenDict 不可篡改）；estimator 层新增 `tests/estimators/test_ekf_core.py::TestImuMissingInflationPropagation`（2 个用例验证 BRIDGE_THRESHOLDS["imu_missing_inflation"] 在 predict 步实际读出并膨胀协方差）；全回归从 1243 → 1260 passed，零新增 fail |
 | 本 audit v2 | §11-1 silent-skip 守卫 + §11-2 imu_missing_inflation 走协议单源真相 + 删 v1 凭空 B14/B15/B16 引用 + 立条登记 §11 五子节 + 4 段细节（L1714-L1816）+ 4 个 Hazard 判定 |
+| 本 audit v7 | §11-5 补修：`ekf_core.py:922-934` / `robust_ekf_core.py:366-385` / `fgo_core.py:1879-1907` 三方法 `_handle_uwb` 标量 S<=0 守门补 jitter fallback（与 VIO 路径同口径同源 `cov_jitter_eps`）；v6 报告"§11 audit 至此穷举完整"撤销 |
+| 本 audit v8 | §11-5 pytest 锁死：`tests/estimators/test_ekf_core.py`（2 个）+ `tests/estimators/test_robust_ekf_core.py`（2 个）+ `tests/estimators/test_fgo_core.py`（2 个）= 6 个新测试，验证「可恢复 S（|S| < eps）走 jitter 救活 / 不可恢复 S（S < -eps）仍 fail-loud」；全回归 329 passed，零新增 fail |
 
 ---
 
@@ -414,3 +503,5 @@ v3-v5 报告把 4 个 estimator 层之外的文件 (`fusion_runner.py` / `metric
 - `estimators/fgo_core.py` 铁律10 override 完整链路确认：`_quality_floor→0.0` / `_nis_threshold→inf` / `_huber_weight→1.0` → §11.1-f 通过
 
 以上 4 个文件已逐文件精读完毕，§11 风险全部为零。**§11 audit 至此穷举完整**：v6 实际覆盖 spec L1714-L1816 全部 42 行主张 + 4 段细节 + 5 个 Hazard（其中 §11-1 / §11-2 / §11-5 已修，§11-3 / §11-4 工艺登记为 estimator 层外的问题）+ 3 个修复 commit + 17 个新 pytest 测试锁死 + 4 个 estimator 层外文件精读完毕。
+
+**v8 补审声明**：v7/v8 重新精读三方法 `_handle_uwb` 路径，发现 v5/v6 漏审了标量 S<=0 守门的 jitter fallback（仅修了 VIO 路径与 uwb_update_step 内部 stacked-H 路径）。v7 补修三方法 `_handle_uwb` 标量 S<=0 jitter fallback；v8 补 6 个 pytest 锁死「可恢复 vs 不可恢复」边界。这是 v6 的偷懒——以 grep 代替精读 `_handle_uwb` 内部代码就声称"穷举完整"。
