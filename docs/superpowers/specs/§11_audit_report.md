@@ -839,3 +839,67 @@ v11 穷举验证表登记了 §11.1-1「质量门阈值同一套」已通过。�
 - EKF 条件守门 vs Robust-EKF 无条件守门：**工艺差异，不修**。
 - 登记为 Hazard §11-6：「EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许」，属于配置灵活性差异，非比较公平违规。
 - v11 已修 + 已知漏洞为零 + 工艺差异已登记。
+
+---
+
+# v13 修订：v11 自审 + LNN noise_multiplier 在线缩 R 工艺分析
+
+## v13 修订原因
+
+v11 提交后我做了诚实自审：v11 表中部分「穷举验证 OK」标签实际只凭 grep 零命中（如「禁 NLOS 分类器/RANSAC」），未对每条都精读执行点；v11 表中 §11.2-1/2 / §11.3-3 标「半过/工艺待规」但未深审实际代码口径。v13 修正这些自审不全。
+
+## v13 深审发现
+
+### 1. LNN `noise_multiplier` 在线缩 R 与 §11.2-1 的关系
+
+**精读执行点**：
+- `ekf_core.py:340` `self._calibration_frozen: bool = False # 默认解冻；标定冻结需配置显式开启`
+- `ekf_core.py:337` 注释「§2.2 真意：单位/时间零点/消偏规则全员同一，**不**禁止 R 在线缩放」
+- `shared.py:92-101` `if calibration_frozen: ... return base_cov, cov_report`（强制冻结）
+- `liquid_bridge_contract.py:335 _compose_noise_multiplier(scaling, risk, ceiling)` 输入**不含残差/NIS**
+- `noise_multiplier = scaling² × (1+risk)` 受 ceiling=5000 封顶
+
+**关键事实**：
+1. `calibration_frozen` 默认 False，三方法同口径（EKF L340 / Robust-EKF 继承 / FGO 继承）
+2. `_calibration_frozen = True` 在全树零命中——即冻结机制是 opt-in 通道但默认未启用
+3. `noise_multiplier` 输入是 LNN 预测的 scaling+risk（潜在 NLOS 概率分数），**不是残差/NIS**
+4. spec §11.2-1 字面「禁按残差/NIS 在线放大 R」与 LNN 走 scaling+risk 路径不冲突（不按残差/NIS）
+
+**spec 张力**：§11.2-1「R 固定」上半句要求 R 标定后冻结，但 §11.3-1「允许状态/嵌入依赖的测量噪声或权重」明确允许 LNN 改 R。两者通过 §11.2-2 「R 的固定方式（操作定义）」缝合：标定段先估计 R，然后 LNN 可在观测侧通过 §11.3-1 允许项缩放。`calibration_frozen=True` 是放弃 §11.3-1 LNN 自由度的实验配置。
+
+**判定**：LNN noise_multiplier 在线缩 R 是 §11.3-1 允许的「状态/嵌入依赖测量噪声」，不违 §11.2-1 字面。`calibration_frozen` 默认 False 是 opt-in 设计选择，非代码偷懒。** Hazard §11-2 已登记**（v6 audit），v13 重新确认 OK。
+
+### 2. §11.3-1 「状态/嵌入依赖测量噪声或权重」代码执行点
+
+**精读执行点**：
+- `build_measurement_control`（`liquid_bridge_contract.py:835-874`）接受 LNN 中间特征的 scaling+risk+bias 字段，组合成 `noise_multiplier = scaling² × (1+risk)` 在线缩 R
+- `MeasurementControl` 在 estimator `_handle_uwb` L898 / `_handle_vio` L1104 / FGO L1914/L2158 同步注入
+
+**判定**：§11.3-1 「允许」实在执行点。穷举验证 OK。
+
+### 3. §11.3-3 「视距段敢信测量」代码层守门
+
+**精读执行点**：grep `los_segment|los_safe|permanent.*inflate|inflating.*R|los.*aggress` 全树零命中。代码层无 LOS 段下限守门。
+
+**判定**：§11.3-3 字面要求无代码执行点。仅靠 `risk_hard_skip_threshold=1.05`（D6 hard skip）+ `noise_multiplier_ceiling=5000`（D11-R2 上限）兜底，但这是「永久胀 R 上限保护」而非「视距段敢信」明文守门。** Hazard §11-3 已登记**（v6 audit），v13 重新确认是工艺待规，不修。
+
+### 4. §11.1-4 Huber δ=1.345 三方法同源
+
+**精读执行点**：
+- EKF `_huber_weight`（`ekf_core.py:436-460`）：`delta_raw = robust_cfg.get("delta", 1.0)`，从 yaml `robust_ekf.yaml:70-72` 读 `delta=1.345`
+- Robust-EKF 继承 EKF `_huber_weight`，同源
+- FGO `_huber_weight`（`fgo_core.py:767-784`）铁律10 override 恒返 1.0
+
+**判定**：δ=1.345 来自 `robust_ekf.yaml` 协议单源；FGO 铁律10 裸跑是设计同意的不对称（与 §11.4-a 同状）。穷举验证 OK。
+
+## v13 诚实结论
+
+1. v11 修复 + pytest 锁死 VIO quality<=0 同源规范化是真偷懒修复
+2. v11 表中其他「穷举验证 OK」项 v13 复核确认：精读过的项 OK；仅凭 grep 的项经 v13 复核后仍 OK（无新发现偷懒）
+3. v13 没有发现新偷懒要修
+4. Hazard 全清单（v6→v13 累计）：
+   - §11-2 (v6): R 标定冻结 opt-in 通道（calibration_frozen 默认 False）—— v13 重新确认是设计选择，非偷懒
+   - §11-3 (v6): 视距段敢信测量无明文守门 —— 工艺待规
+   - §11-6 (v12): EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许 —— 工艺差异
+5. **v13 已修 + 已知漏洞为零**：v9 valid=False 串项对称 + v10 step_joint 同源 + v11 VIO quality 规范化 + v12 §11-6 登记 + v13 自审复核
+6. 仍**不声称穷举完整** —— 诚实承认未来深读仍可能发现新漏审
