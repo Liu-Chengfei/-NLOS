@@ -1453,8 +1453,12 @@ class EKFCore(EstimatorAPI):
             for i, uwb_payload in enumerate(uwb_payloads or ()):
                 if not isinstance(uwb_payload, Mapping):
                     raise TypeError(f"uwb_payloads[{i}] must be a mapping, got {type(uwb_payload).__name__}")
-                if uwb_payload.get("valid", True) is False:
-                    # 与 _handle_uwb 同口径：valid=False 跳过此锚点。
+                # §11.3-d 同方法内一致：与 _handle_uwb L856-869 同口径，兼容 numpy.bool_(False)。
+                # v10 audit 发现：旧 `is False` 漏掉 numpy.bool_(False)，与 _handle_uwb L860 不同口径；
+                # 改用 is_bool_like + not bool 同口径覆盖 Python False 与 numpy.bool_(False)。
+                uwb_valid_i = uwb_payload.get("valid", True)
+                if is_bool_like(uwb_valid_i) and not bool(uwb_valid_i):
+                    # valid=False 跳过此锚点，与 _handle_uwb 同口径。
                     continue
                 anchor_pos = self._resolve_anchor_position(uwb_payload["anchor_id"])
                 # §3.0.2 / §3.1.2 / §12.2：联合路径不再对 raw 距离做 subtractive 改写

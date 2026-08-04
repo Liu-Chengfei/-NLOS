@@ -643,3 +643,62 @@ if is_bool_like(uwb_valid) and not bool(uwb_valid):
 - audit report: 本段 v9 修订
 
 **v9 全回归**：tests/estimators/ **652 passed in 3.11s**，零新增 fail。
+
+---
+
+# v10 修订：同方法内口径一致性 — step_joint `valid` 跳过与 `_handle_uwb` 同源
+
+## v10 修订原因
+
+v9 报告承认"未来仍可能发现新漏洞"。v10 启动同方法内口径一致性深审，发现 §11.3-d 在 EKF 单方法内仍有**同方法不同口径**的问题：
+
+> **§11.3-d 同方法内口径不一致**：EKF 单方法内两条路径的 `valid=False` 跳过判断不同：
+> - `_handle_uwb` L860：`is_bool_like(uwb_valid) and not bool(uwb_valid)`（兼容 Python `False` + numpy `np.bool_(False)`）
+> - `step_joint` L1456（旧）：`uwb_payload.get("valid", True) is False`（仅识别 Python `False`，漏 `np.bool_(False)`）
+>
+> 这是同方法内同一条 spec 主张的两种实现口径不一致。v10 修复后同口径。
+
+## v10 修复落地
+
+### 1. `ekf_core.py` step_joint L1456 修复
+
+旧代码：
+```python
+if uwb_payload.get("valid", True) is False:
+    # 与 _handle_uwb 同口径：valid=False 跳过此锚点。
+    continue
+```
+
+新代码：
+```python
+# §11.3-d 同方法内一致：与 _handle_uwb L860 同口径，兼容 numpy.bool_(False)。
+# v10 audit 发现：旧 `is False` 漏掉 numpy.bool_(False)，与 _handle_uwb L860 不同口径；
+# 改用 is_bool_like + not bool 同口径覆盖 Python False 与 numpy.bool_(False)。
+uwb_valid_i = uwb_payload.get("valid", True)
+if is_bool_like(uwb_valid_i) and not bool(uwb_valid_i):
+    # valid=False 跳过此锚点，与 _handle_uwb 同口径。
+    continue
+```
+
+### 2. pytest 锁死（2 个新测试）
+
+| 文件 | 测试类 | 测试 | 锁死主张 |
+|---|---|---|---|
+| `tests/estimators/test_ekf_core.py` | `TestStepJointValidFlagRejectionEKF` | `test_step_joint_skips_numpy_bool_false_anchor` | numpy.bool_(False) 必须被 step_joint 跳过，与 Python False 同口径 |
+| `tests/estimators/test_ekf_core.py` | `TestStepJointValidFlagRejectionEKF` | `test_step_joint_valid_flag_consistent_with_handle_uwb` | step_joint Python/numpy 两种 False 跳过、Python/numpy 两种 True 接受，与 _handle_uwb 同口径 |
+
+### v10 全回归
+
+`PYTHONPATH=src python -m pytest tests/estimators/ -q`：**654 passed**（含 v9 的 652 + v10 的 2 个新测试）。零新增 fail。
+
+## v10 诚实结论
+
+1. **v9 报告 §11.3-d 三方法拒识串项不对称**：v9 已修复，结论通过
+2. **v10 发现同方法内口径不一致**：EKF 单方法内 `_handle_uwb` 与 `step_joint` 的 `valid` 跳过判断不同口径（`is_bool_like+not bool` vs `is False`）。v10 修复后同口径
+3. **v10 不再声称"穷举完整"**：诚实结论「v10 已修 + 已知漏洞为零」
+
+## v10 commit 内容
+
+- code fix: `src/liquidloc/estimators/ekf_core.py` step_joint L1456 `valid` 跳过改用 `is_bool_like+not bool` 与 `_handle_uwb` L860 同口径
+- pytest: `tests/estimators/test_ekf_core.py` 新增 `TestStepJointValidFlagRejectionEKF`（2 个）
+- audit report: 本段 v10 修订

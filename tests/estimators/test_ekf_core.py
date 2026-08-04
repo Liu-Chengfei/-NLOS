@@ -1801,3 +1801,55 @@ class TestUwbValidFlagRejectionEKF:
         assert result["update_applied"] is False
         assert result.get("reason") == "uwb_invalid_measurement", \
             "valid=False 必须先于 quality_floor 触发，不可被 quality_floor 覆盖"
+
+
+class TestStepJointValidFlagRejectionEKF:
+    """§11.3-d 步 contract：step_joint valid 跳过锁点 == _handle_uwb L860 同口径。
+
+    v10 audit 发现：step_joint L1456 旧 `valid is False` 漏 numpy.bool_(False)，
+    与 _handle_uwb L860 `is_bool_like + not bool` 同方法内不同口径，违 §11.3-d。
+    v10 修复后两路径同口径，本测试锁死 numpy.bool_(False) 行为。
+    """
+
+    def test_step_joint_skips_numpy_bool_false_anchor(self):
+        """numpy.bool_(False) 也必须被 step_joint 跳过，与 Python False 同口径。"""
+        import numpy as np
+
+        ekf = EKFCore(_cfg())
+        ekf.step(_imu_event(t=0.1, dt=0.1))
+        uwb_payloads = [
+            {"anchor_id": 0, "range": 1.5, "valid": np.bool_(False), "quality": 0.95},  # numpy bool False
+            {"anchor_id": 1, "range": 2.5, "valid": True, "quality": 0.95},
+        ]
+        ekf.step_joint(
+            uwb_payloads=uwb_payloads,
+            vio_payload=None,
+            timestamp=0.2,
+        )
+        # 锚点 0 是 numpy.bool_(False) 必须被跳过，只锚点 1 应被接受
+        assert ekf.last_update_report["uwb_anchor_count"] == 1, \
+            "§11.3-d step_joint 必须与 _handle_uwb L860 同口径，numpy.bool_(False) 应被跳过"
+
+    def test_step_joint_valid_flag_consistent_with_handle_uwb(self):
+        """step_joint valid 拒识口径 == _handle_uwb L856-869 同方法同源。"""
+        import numpy as np
+
+        ekf = EKFCore(_cfg())
+        ekf.step(_imu_event(t=0.1, dt=0.1))
+        # 构造同帧混合：Python False, numpy.bool_(False), Python True, numpy.bool_(True)
+        # 只用 anchor_id=0（cfg 中唯一存在的锚点），避免 anchor_lookup 报错。
+        uwb_payloads = [
+            {"anchor_id": 0, "range": 1.5, "valid": False, "quality": 0.95},
+            {"anchor_id": 0, "range": 2.5, "valid": np.bool_(False), "quality": 0.95},
+            {"anchor_id": 0, "range": 3.5, "valid": True, "quality": 0.95},
+            {"anchor_id": 0, "range": 4.5, "valid": np.bool_(True), "quality": 0.95},
+        ]
+        ekf.step_joint(
+            uwb_payloads=uwb_payloads,
+            vio_payload=None,
+            timestamp=0.2,
+        )
+        # 锚点 2、3 必须被接受（valid=True 与 numpy.bool_(True)）
+        assert ekf.last_update_report["uwb_anchor_count"] == 2, \
+            "§11.3-d step_joint 必须与 _handle_uwb L860 同口径：" \
+            "Python/numpy 两种 False 跳过、Python/numpy 两种 True 接受"
