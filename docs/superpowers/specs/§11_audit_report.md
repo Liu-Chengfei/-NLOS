@@ -86,6 +86,7 @@
 |---|---|---|---|
 | 默认：距离已带 anchor_id，关联问题弱化 | L1751 | `pipelines/core_pipeline.py` 全程 `uwb_payload["anchor_id"]` 直接定位锚点（`ekf_core.py:899` `self._resolve_anchor_position(uwb_payload["anchor_id"])`），无最近邻/JPDA 搜索 | 通过 |
 | 若存在模糊关联：全体同一算法与门限，或全体关闭 | L1752-L1754 | grep 无任何 nearest_neighbor/JPDA/MHT 实现 | 全体关闭 |
+| 禁止只给 Robust/FGO/某 NN 更好的关联器 | L1755 | grep `nearest_neighbor\|JPDA\|MHT\|joint_probabilistic\|multi.*hypothesis\|data_association\|gating.*association\|association.*gate` 在 `src/liquidloc/` 全树零命中 → 三方法（EKF / Robust-EKF / FGO）都关闭关联器，仅 `core_pipeline.py:1193` `target_anchor_id = new_anchor_ids[anchor_hash % len(new_anchor_ids)]` 做确定性哈希轮转分配（基于原始 anchor_id 而非事件序号，三方法同享同一分配规则）→ 关联器全员同一 = 关闭 → 满足"禁止独享更好关联器"（既然全员关闭则不可能有独享更好） | 通过 |
 | 双阈值/椭球门与卡方门关系写清且共享 | L1756 | 卡方门已实装双模态（uwb 1-DoF / vio 3-DoF）；双阈值/椭球门 grep `dual_threshold\|ellipsoid.*gate\|two.*threshold` 无命中 → 默认关闭 | 通过 |
 
 ---
