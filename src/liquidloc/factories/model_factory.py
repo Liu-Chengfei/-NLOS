@@ -230,10 +230,13 @@ def apply_liquid_modality_output_contract(
     """
     modality_name = coerce_supported_modality(modality, name="modality")  # 统一模态合同，禁止未知模态静默穿透。
     constrained = dict(normalized_outputs)  # 浅拷贝输出字典。
-    scaling_floor = _SCALING_NEUTRAL_FLOOR  # 单源下界 BRIDGE_THRESHOLDS["scaling_min"] (=0.5)。
+    scaling_floor = _SCALING_NEUTRAL_FLOOR  # 单源下界 BRIDGE_THRESHOLDS["scaling_min"]（v3：回退到 1.0；v2 曾放宽到 0.5 因 e9 场景不当降权被废弃，详见 bridge_thresholds.py:85）
     # v3 改造：放宽非当前模态 scaling 上界从 1.0 → 2.5，让 4 头在 NLOS 场景下可以
     # 把非当前模态的 R 矩阵放大（noise_multiplier = scaling^2*(1+risk)），允许 EKF
     # 对非当前模态观测做更强降权。仍受 bridge_thresholds.scaling_max=50 顶层封顶。
+    # 第十五轮穷举自审注释同步：scaling_ceiling=2.5 当前是单点硬编码常量（apply_liquid_modality_output_contract
+    # 是唯一执行 clamp 的写入口，符合 §12.3-C2a 三网同一写入口精神）。未来若 LSTM/Transformer
+    # 真实现本体并各自写 scaling clamp，必须改为 BRIDGE_THRESHOLDS["non_current_scaling_ceiling"] 单源。
     scaling_ceiling = 2.5
     if modality_name == MODALITY_UWB:  # 当前是 UWB 模态。
         # D5+D10：clamp 保留到 vio_scaling_head 的梯度连接（grad not None），
