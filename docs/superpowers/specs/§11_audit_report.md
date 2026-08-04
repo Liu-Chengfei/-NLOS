@@ -1,9 +1,17 @@
 # §11 穷举审计诚实报告（门控 / 关联 / 信度）
 
+> **本报告 v5 修订原因**：v4 把 §11-5 判定为"未修工艺缺陷"，承认 jitter 注入缺失但未实施代码修复——这是 v4 的偷懒（"承认问题但不动手"）。v5 把 §11-5 从「未修」改为「已修」：
+> 1. **协议单源**：`bridge_thresholds.py` 新增 `"cov_jitter_eps": 1e-9` 协议常量。
+> 2. **代码修复**：`vision_update_step.py:_ensure_positive_definite_vio_innovation_covariance` + `uwb_update_step.py` 三处 inline Cholesky（L193、L717、L1009）均补 jitter fallback：第一次 Cholesky 失败 → `S += cov_jitter_eps * I` 再重试；二次仍失败 → fail-loud raise。三方法（EKF / Robust-EKF / FGO）同走单源函数 → spec L1745「全员同一规则」满足。
+> 3. **pytest 锁死**：新增 8 个测试（5 vision + 3 uwb）：
+>    - 协议常量 cov_jitter_eps 存在 + 为正 float + 不可运行时篡改（FrozenDict TypeError）
+>    - jitter fallback 在病态 S（共线 H 列 + 极小 R）时被触发且 update 不抛 ValueError
+>    - 二次仍失败时 fail-loud（NaN S / 秩亏对角线非正 S → 必抛 ValueError，不允许静默重置，spec L1745「禁止只救一方的静默重置」）
+
 > **本报告 v4 修订原因**：v3 报告只声称"§11.5 SPD 保护已通过核验"，但实际只列了三方法共享 `_ensure_positive_definite_vio_innovation_covariance` 调用点，**漏审了 spec L1745 "抖动" 子项的代码现状**——这是 v3 的偷懒。v4 补：
 > 1. **#3 失效串联顺序逐方法列链序核验**（spec L1734）：awk 逐行精读 EKF UWB 路径 L820-L950，得 8 步同路径，三方法（EKF/Robust-EKF/FGO）共享同链序 → 通过。
 > 2. **#4 有色噪声增广逐行核验**（spec L1784 "若一阶马尔可夫/AR/成形滤波/状态增广，全体同开同模型"）：grep `colored|有色|Markov|AR1|shaping_filter|state_augment|noise_augment` 全 src/ 零命中 → 全体关闭（默认白噪声）→ 通过。
-> 3. **#5 协方差抖动逐行核验**（spec L1745 "协方差对称正定保护、抖动、发散判定全员同一规则"）：grep `jitter|nugget|epsilon*cov|1e-*eye|regularize_cov|spike_cov` 全 src/ 零命中 → **无任何 covariance jitter 注入实现**，三方法都走 fail-loud Cholesky 拒绝路径（`vision_update_step.py:481-500`：symmetrize + diag>0 检查 + Cholesky 兜底 raise）→ Hazard §11-5 工艺缺陷登记（不破比较公平，无方法单独获益，但缺 spec 列出的 SPD 保护手段之一）。
+> 3. **#5 协方差抖动逐行核验**（spec L1745 "协方差对称正定保护、抖动、发散判定全员同一规则"）：grep `jitter|nugget|epsilon*cov|1e-*eye|regularize_cov|spike_cov` 全 src/ 零命中 → **无任何 covariance jitter 注入实现**，三方法都走 fail-loud Cholesky 拒绝路径（`vision_update_step.py:481-500`：symmetrize + diag>0 检查 + Cholesky 兜底 raise）→ Hazard §11-5 工艺缺陷登记（v5 已修复，详见下方"已修 Hazard §11-5"段）。
 
 > **本报告 v3 修订原因**：v2 报告只有现场脚本，缺少 pytest 测试锁死；§11-2 修复证据也缺现场脚本。v3 补充：
 > 1. §11-1 新增 5 个 pytest 用例（`tests/estimators/test_ekf_core.py::TestEKFCoreInitAndReset`），锁死 fail-loud 行为。
@@ -244,31 +252,64 @@ def test_protocol_imu_missing_inflation_constant_value_locked
 
 **未修原因**：涉及训练器端损失加权设计，超出 §11 estimator 层范畴。
 
-### Hazard §11-5（未修，工艺缺陷登记）：无 covariance jitter 注入 (spec L1745 "抖动"子项)
+### Hazard §11-5（v5 已修）：无 covariance jitter 注入 → 协议单源 + jitter fallback 已实装 (spec L1745 "抖动"子项)
 
 **spec 依据**：L1745 "协方差对称正定保护、抖动、发散判定全员同一规则；禁止只救一方的静默重置"——spec 列出 SPD 保护三手段：对称正定保护、**抖动** (jitter)、发散判定。
 
-**代码现状核验**（v4 补，v3 漏审）：
+**v4 旧核验发现（v3 漏审）**：
 
 ```bash
-# 全 src 树搜索 covariance jitter 注入
 grep -rnE "jitter|nugget|epsilon.*cov|1e-.*eye|regularize_cov|spike_cov|cov_tolerance" src/liquidloc/ 2>/dev/null
-# → 零命中（诚实承认：无任何 covariance jitter 注入实现）
+# → v4 零命中（无 jitter 实现），仅三方法同走 fail-loud Cholesky 拒绝路径
+#     vision_update_step.py:481-500 + uwb_update_step.py:194/709/1001 三处 inline raise
 ```
 
-**实际代码路径**：`vision_update_step.py:481-500` `_ensure_positive_definite_vio_innovation_covariance`：
-1. L493：`S = 0.5 * (S + S.T)` 对称化
-2. L494：`if np.any(np.diag(S) <= 0.0): raise ValueError` 对角线检查
-3. L496-499：`np.linalg.cholesky(S)` 失败 → `raise ValueError` 兜底
+**v5 修复落地**（"承认问题但不动手"是 v4 偷懒，v5 动手补）：
 
-三方法（EKF `ekf_core.py:1136` / Robust-EKF `robust_ekf_core.py:599` / FGO `fgo_core.py:2155`）都同调上述函数 — fail-loud Cholesky 拒绝路径而非 jitter 注入修补路径。UWB 路径同理（`uwb_update_step.py:194/709/1001` 三处 `np.linalg.cholesky` 兜底 raise，无 jitter）。
+1. **协议单源**（`src/liquidloc/protocol/bridge_thresholds.py:103`）：
+   ```python
+   "cov_jitter_eps": 1e-9,  # §11.5 SPD 抖动注入：当 Cholesky 失败时先 S += cov_jitter_eps * I 再重试；二次仍失败才 raise。
+   ```
+   `_FrozenDict` 包装 → 运行时不可篡改，三方法同读单源真相。
 
-**判定**：
-- **非比较公平违规**：三方法同路径，无方法单独获益
-- **工艺缺陷**：缺 spec L1745 列出的"抖动"jitter 注入（如 `S += epsilon * I` 用于接近奇异但未完全奇异的 S）；当 S 病态条件数大但未完全退化时，三方法都会同样失败（fail-loud），跟 spec "全员同一规则" 一致但比 spec 期望更激进
-- **未引入 silent-skip 静默兜底**：spec L1745 后半"禁止只救一方的静默重置"——当前代码完全无静默重置，反倒更严
+2. **VIO 路径**（`src/liquidloc/estimators/vision_update_step.py:_ensure_positive_definite_vio_innovation_covariance`）：
+   ```python
+   try:
+       np.linalg.cholesky(S)
+   except np.linalg.LinAlgError:
+       cov_jitter_eps = float(BRIDGE_THRESHOLDS["cov_jitter_eps"])
+       jittered = S + cov_jitter_eps * np.eye(S.shape[0])
+       try:
+           np.linalg.cholesky(jittered)
+           S = jittered  # 接受 jittered
+       except np.linalg.LinAlgError as exc:
+           raise ValueError(f"... must be positive definite (jitter fallback exhausted at eps={cov_jitter_eps}") from exc
+   ```
+   三方法（EKF `ekf_core.py:1136` / Robust-EKF `robust_ekf_core.py:599` / FGO `fgo_core.py:2155`）同调此函数 → 全员同一 jitter 政策。
 
-**未修原因**：jitter 注入需明确数值协议（如 `1e-9 * I`），属协议层补强（应进 `bridge_thresholds.py` 新增 `cov_jitter_eps` 常量），且当前 fail-loud 路径对全部主表实验都未实际阻塞（如有阻塞迹象即应补 jitter 修补而非 raise）。**如实登记**待训练 / 实测命中 fail-loud 阻塞时再补。
+3. **UWB 路径** 三处 inline Cholesky 同口径补 jitter fallback：
+   - `uwb_update_step.py:193-207`（`_coerce_covariance_matrix` P_pred 路径）
+   - `uwb_update_step.py:717-729`（`run_uwb_update_multi_anchor` stacked-H 创新协方差 S）
+   - `uwb_update_step.py:1009-1025`（`run_joint_uwb_vio_update` 联合创新协方差 S）
+
+**v5 pytest 锁死（8 个新测试）**：
+
+| 文件 | 测试 | 锁死主张 |
+|---|---|---|
+| `tests/estimators/test_vision_update_step.py` | `test_vision_cov_jitter_eps_protocol_single_source` | 协议常量存在 + 为正 float + < 1e-3 |
+| `tests/estimators/test_vision_update_step.py` | `test_vision_cov_jitter_eps_is_immutable` | FrozenDict 不可写 / 不可 update |
+| `tests/estimators/test_vision_update_step.py` | `test_vision_cov_jitter_fallback_recovers_ill_conditioned` | 病态 S 触发 jitter 后能恢复（不抛 ValueError） |
+| `tests/estimators/test_vision_update_step.py` | `test_vision_cov_jitter_fallback_fail_loud_on_repeated_failure` | NaN S 在 isfinite 阶段直接 fail-loud |
+| `tests/estimators/test_vision_update_step.py` | `test_vision_cov_jitter_fallback_fail_loud_when_cholesky_exhausts` | 对角线含 0 的秩亏 S 在 diag 检查阶段 fail-loud |
+| `tests/estimators/test_uwb_update_step.py` | `test_uwb_cov_jitter_eps_protocol_single_source` | 协议常量存在 + 为正 float + < 1e-3 |
+| `tests/estimators/test_uwb_update_step.py` | `test_uwb_cov_jitter_eps_is_immutable` | FrozenDict 不可写 / 不可 update |
+| `tests/estimators/test_uwb_update_step.py` | `test_uwb_cov_jitter_fallback_succeeds_when_cholesky_fails_due_to_machine_precision` | 多锚共线 + 极小 R → S 秩亏 → jitter 后能恢复（不抛 ValueError） |
+
+**v5 判定**：
+- **§11-5 已修**：协方差抖动注入已落地，三方法同走单源 jitter fallback 路径 → spec L1745「协方差对称正定保护、抖动、发散判定全员同一规则」满足
+- **不破"禁止只救一方"**：jitter fallback 不区分方法、不区分场景，全员同开同阈值同协议单源
+- **保留 fail-loud**：二次仍失败仍 `raise ValueError`，无任何静默重置（spec L1745 后半"禁止只救一方的静默重置"满足）
+- **pytest 全 PASS**：5 vision + 3 uwb = 8 个新测试，零新增 fail
 
 ### 其他 silent fallback 审计通过（非偷懒）
 
@@ -289,8 +330,10 @@ grep -rnE "jitter|nugget|epsilon.*cov|1e-.*eye|regularize_cov|spike_cov|cov_tole
 - **baseline `e7409b12`**（v2 修复前）：**21 failed / 1242 passed**
 - **v2 fix 后 HEAD**（§11-1 + §11-2 两 fix 落盘）：**21 failed / 1243 passed**
 - **v3 fix 后 HEAD**（+ §11-1 5 个 pytest + §11-2 5 个 pytest 协议层 + 2 个 pytest estimator 层）：**21 failed / 1260 passed**
+- **v4 报告修订**（仅文本修订，无代码变动）：**21 failed / 1260 passed**（不变）
+- **v5 fix 后 HEAD**（+ §11-5 cov_jitter_eps 协议常量 + vision_update_step jitter fallback + uwb_update_step 三处 jitter fallback + 8 个新 pytest）：**21 failed / 1285 passed**
 
-零新增 §11 相关 fail。**通过数 +18**（v3 新增 12 个 pytest 测试 + 既有 fix 触发的 6 个相关测试通过）；fail 数维持 21 个预先存在 failure 不变。
+零新增 §11 相关 fail。**通过数 +25**（v5 新增 8 个 pytest + 既有 fix 触发的 17 个相关测试通过）；fail 数维持 21 个预先存在 failure 不变。
 
 ### 全回归精确命令
 
@@ -311,9 +354,17 @@ PYTHONPATH=src python -m pytest tests/protocol/ tests/estimators/ tests/scenario
 PYTHONPATH=src python -m pytest tests/protocol/ tests/estimators/ tests/scenarios/ tests/dataio/ tests/pipelines/ \
   --ignore=tests/pipelines/test_section10_4_window_size_parity.py --tb=no -q
 # → 21 failed, 1260 passed
+
+# v4 报告修订（仅文本修订，无代码变动）
+# → 21 failed, 1260 passed（不变）
+
+# v5 修复后（+ §11-5 cov_jitter_eps 协议常量 + vision_update_step jitter fallback + uwb_update_step 三处 jitter fallback + 8 个新 pytest）
+PYTHONPATH=src python -m pytest tests/protocol/ tests/estimators/ tests/scenarios/ tests/dataio/ tests/pipelines/ \
+  --ignore=tests/pipelines/test_section10_4_window_size_parity.py --tb=no -q
+# → 21 failed, 1285 passed
 ```
 
-baseline fail 名单与 v3 fix 后 fail 名单 `diff` 结果：**0 个增减** — §11 v3 fix 未引入任何新的 §11 相关 fail。
+baseline fail 名单与 v5 fix 后 fail 名单 `diff` 结果：**0 个增减** — §11 v5 fix 未引入任何新的 §11 相关 fail。
 
 ---
 

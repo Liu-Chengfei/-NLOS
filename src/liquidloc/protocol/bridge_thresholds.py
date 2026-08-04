@@ -100,6 +100,7 @@ _BRIDGE_THRESHOLDS_DATA = {  # 桥接层/融合层业务阈值表（原始可变
     "vio_dyaw_max": 6.283185307179586,  # VIO 航向变化上界（rad），约 +2π。
     "flow_missing_dyaw_quality_penalty": 0.5,  # flow 缺少 dyaw 时的质量惩罚值，将 quality 下调至此值以标记旋转信息不可靠。
     "imu_missing_inflation": 10.0,  # IMU 字段缺失时 process_noise 膨胀系数（§11.2 Q 固定：协议写死，非 estimator 私调）。
+    "cov_jitter_eps": 1e-9,  # §11.5 SPD 抖动注入：当 Cholesky 失败时先 S += cov_jitter_eps * I 再重试；二次仍失败才 raise。
 }  # 阈值表结束。
 
 BRIDGE_THRESHOLDS = _FrozenDict(_BRIDGE_THRESHOLDS_DATA)  # D11-M2：包装为只读 _FrozenDict，禁止运行时篡改阈值。
