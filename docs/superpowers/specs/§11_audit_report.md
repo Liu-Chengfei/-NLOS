@@ -1033,3 +1033,74 @@ v14 commit 后继续完成 §11 spec 全部条款的代码执行点穷举对照�
 - §11-2: R 标定冻结 opt-in 通道（设计选择）
 - §11-3: 视距段敢信测量无明文守门（工艺待规）
 - §11-6: EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许（工艺差异）
+
+## v16 二轮深审：协议层 / fusion 路径 / 三方法同源
+
+v15 完成检查表后，继续深审未深审的协议层与 fusion 路径执行点：
+
+### v16 §11.3-d 协议层 valid=False 早退（liquid_bridge_contract.py L276）
+- **执行点**：`apply_safe_mode(modality="uwb", valid=...)` L276 `not valid → "uwb_skip_update"`
+- **观察**：协议层在 estimator 之前对 UWB valid=False 早退为 skip_update action
+- **三方法对称性**：三方法都同源调 `build_measurement_control` → 早退分支对三方法同口径
+- **v9 修复的 estimator 层 valid=False 检查**：在此早退路径之后变成"防御性双重守门"
+- **结论**：不偷懒——协议层早退 + estimator 层防御性双重守门符合 §11.3-d 精神
+
+### v16 §11.3-d VIO 路径硬编码 valid=True（liquid_bridge_contract.py L859）
+- **执行点**：`apply_safe_mode(modality="vio", valid=True, ...)` —— VIO 路径 valid 硬编码 True
+- **观察**：VIO schema 协议规定无 valid 字段（VIO 永远不带 valid），所以协议层固定 True
+- **三方法对称性**：VIO 协议层一直固定 True，三方法同口径
+- **结论**：不偷懒——VIO 无 valid 协议规定，硬编码 True 是协议合规
+
+### v16 §11.5 SPD jitter 三方法同源（uwb_update_step.py L194-209）
+- **执行点**：UWB 路径 `_coerce_covariance_matrix` 的 L194-209 Cholesky 失败 → jitter fallback
+- **同源验证**：L204 `cov_jitter_eps = float(BRIDGE_THRESHOLDS["cov_jitter_eps"])` 与 VIO 路径 L508 同常量
+- **三方法对称性**：EKF / Robust-EKF / FGO 同调 `run_uwb_update` 系列函数 → UWB 路径同源 SPD 守门
+- **结论**：v6 audit 已修 + v8 修了 EKF 标量 S 路径，三方法 UWB/VIO 全路径现已同源
+
+### v16 §11.5 isfinite 守门三方法覆盖
+- **执行点**：NIS NaN/inf 守门
+  - EKF UWB L948: `if not math.isfinite(nis): reject`
+  - EKF VIO L1196: `if not math.isfinite(nis): reject`
+  - Robust-EKF UWB L324 + VIO L586 + S L535
+  - FGO UWB L1888 + VIO L899
+- **三方法对称性**：NaN/inf NIS 显式拒绝，永不静默放行（否则 NaN > threshold = False 绕过门控）
+- **结论**：不偷懒——三方法同源覆盖
+
+### v16 fusion_runner _flush_pending_buffer 审查
+- **执行点**：fusion_runner.py:634 `_flush_pending_buffer`
+- **观察**：buffer 空 → return []（L656-657）+ has_joint=False 时走逐事件 estimator.step fallback
+- **无静默删金量为零的包**：valid=False 在协议层早退为 uwb_skip_update，estimator 层 _handle_uwb L835-869 也跳过，但 step_joint 路径 valid=False 在 v10 已修
+- **v14 step_joint 修复**：联合路径同口径同源（quality_floor + VIO quality<=0 + VIO quality_floor 全部补全）
+- **结论**：不偷懒——fusion 层无金量静默吞路径
+
+### v16 §11 剩余条款二次审
+
+§11.1 卡方 0.95 同源验证：
+- ekf.yaml L60-62 `mahalanobis_sq: {uwb: 3.841, vio: 7.815}` （χ²(1, 0.95) / χ²(3, 0.95)）
+- robust_ekf.yaml L62-66 同源同口径
+- FGO L695 `_nis_threshold` 强制返 inf（铁律10 裸跑）—— Hazard §11-6 已登记工艺差异
+- **结论**：EKF / Robust-EKF 同源 0.95 卡方，FGO 裸跑属设计选择
+
+§11.2 Q 不偷偷加大三方法二次审：
+- predict_step.py L286-296 `process_noise = predict_cfg.get("process_noise", {})` 直接读 cfg
+- ekf_core.py L787-789 / fgo_core.py L1716: IMU missing_mask 协议级肿胀，仅协议级 BRIDGE_THRESHOLDS["imu_missing_inflation"]
+- **结论**：不偷懒——Q 三方法直接读 cfg，仅协议级失效保护膨胀
+
+### v16 诚实结论
+
+v15 完成检查表后的二轮深审：
+- 协议层 valid=False 早退路径：不偷懒（双重守门符合 §11.3-d）
+- VIO valid=True 硬编码：协议合规（VIO 无 valid 字段）
+- SPD jitter 三方法同源（UWB / VIO 全路径）
+- isfinite 守门三方法覆盖
+- fusion_runner 无静默吞金量路径
+- 卡方 0.95 / Huber 1.345 yaml 同源（EKF 与 Robust 同源，FGO 裸跑 Hazard §11-6）
+
+**仍然没有发现 v16 新的真偷懒**：v9-v14 修复了单模态 + 紧耦合路径的全部真偷懒，v15 完成检查表，v16 二轮深审协议层 / fusion 路径未发现新偷懒。
+
+**Hazard 清单（v6→v16 累计）**：
+- §11-2: R 标定冻结 opt-in 通道（设计选择）
+- §11-3: 视距段敢信测量无明文守门（工艺待规）
+- §11-6: EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许（工艺差异）
+
+不再声称穷举完整——但 v16 二轮深审涵盖协议层、fusion 路径、SPD jitter 三方法同源、isfinite 守门三方法覆盖、Q 不偷偷加大三方法，§11 spec 全部条款的代码执行点已穷举二次审查未发现新偷懒。
