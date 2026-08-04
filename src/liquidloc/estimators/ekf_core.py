@@ -1044,7 +1044,23 @@ class EKFCore(EstimatorAPI):
             }
         # quality=0.0 的 VIO 事件语义上是无效观测（如仿真 cycle 边界帧），跳过更新。
         vio_payload = payload.get("vio_payload") or {}
-        vio_quality = vio_payload.get("quality", 1.0)
+        # §11.3-d 共享「VIO 无效」串项同源 v11 audit 修复：
+        # v10 之前本处走捷径 `float(vio_payload.get("quality", 1.0))`，绕过
+        # `self._quality_value()` 规范化（不校验 is_bool_like / coerce_finite_scalar /
+        # [0,1] 范围），与 Robust-EKF `robust_ekf_core.py:536` + FGO `fgo_core.py:2098`
+        # 不同源。后果：(a) np.bool_(False) 在 EKF 触发跳过而 Robust/FGO 抛 TypeError；
+        # (b) NaN 在 EKF 不跳过继续，Robust/FGO 抛 ValueError；(c) 大于 1.0 的 quality
+        # 在 EKF 接受进入后续，Robust/FGO 抛 ValueError。违 §11.3-d 「串联顺序全员固定」
+        # 与 `ekf_core.py:473-474` 自家注释「4 项校验逻辑等价」自相矛盾。
+        # v11 改为走 `_quality_value` 与 Robust/FGO 同口径同源规范化。
+        try:
+            vio_quality = self._quality_value(vio_payload)
+        except (TypeError, ValueError):
+            # 规范化失败时（bool / NaN / 超界）仿 Robust/FGO raise 路径，
+            # 但 VIO 路径必须保护参考位姿 - 先重置再 raise。
+            self._last_vio_reference_pose = self._current_pose_reference()
+            self._last_vio_reference_pose_timestamp = self._timestamp
+            raise
         if vio_quality is not None and float(vio_quality) <= 0.0:
             self._last_vio_reference_pose = self._current_pose_reference()
             self._last_vio_reference_pose_timestamp = self._timestamp

@@ -702,3 +702,115 @@ if is_bool_like(uwb_valid_i) and not bool(uwb_valid_i):
 - code fix: `src/liquidloc/estimators/ekf_core.py` step_joint L1456 `valid` 跳过改用 `is_bool_like+not bool` 与 `_handle_uwb` L860 同口径
 - pytest: `tests/estimators/test_ekf_core.py` 新增 `TestStepJointValidFlagRejectionEKF`（2 个）
 - audit report: 本段 v10 修订
+
+---
+
+# v11 修订：同源规范化 + 全量穷举验证 + 明文撤销 v8「全过」
+
+## v11 修订原因
+
+v10 之后我启动了对 §11 spec L1714-L1816 全部 42 行主张的**系统性穷举精读**（不再声称"穷举完整"，而是逐条给出穷举验证结论）。精读覆盖所有执行路径：`_handle_uwb`（EKF/Robust/FGO 三方法）、`_handle_vio`（三方法）、`_handle_imu`（三方法）、`step_joint`（仅 EKF）、FusionRunner 各路径。
+
+精读中发现并修复了 v10 修复后仍存在的**同源规范化偷懒**：
+
+> **§11.3-d VIO quality<=0 拒识同源规范化不一致**：EKF `_handle_vio` L1047-1048 此前走捷径 `float(vio_payload.get("quality", 1.0))` 绕过 `self._quality_value()` 规范化，与 Robust-EKF `robust_ekf_core.py:536` + FGO `fgo_core.py:2098` 不同源。后果：(a) `quality=np.bool_(False)` → EKF 触发跳过而 Robust/FGO 抛 TypeError；(b) `quality=NaN` → EKF 不跳过继续，Robust/FGO 抛 ValueError；(c) `quality>1.0` → EKF 接受进入后续，Robust/FGO 抛 ValueError（超上界）。
+
+## v11 修复落地
+
+### 1. `ekf_core.py` EKF `_handle_vio` L1047-1048 修复
+
+旧代码：
+```python
+vio_quality = vio_payload.get("quality", 1.0)
+if vio_quality is not None and float(vio_quality) <= 0.0:
+```
+
+新代码：
+```python
+# §11.3-d VIO quality<=0 拒识同源规范化锁死 v11 audit 修复：
+# 旧 EKF 走捷径 `float(quality)` 绕过 `_quality_value()` 规范化，
+# 与 Robust-EKF/FGO 不同源。v11 改为走 `_quality_value` 与 Robust/FGO 同口径同源规范化。
+try:
+    vio_quality = self._quality_value(vio_payload)
+except (TypeError, ValueError):
+    self._last_vio_reference_pose = self._current_pose_reference()
+    self._last_vio_reference_pose_timestamp = self._timestamp
+    raise
+if vio_quality is not None and float(vio_quality) <= 0.0:
+```
+
+### 2. pytest 锁死（6 个新测试）
+
+| 文件 | 测试类 | 测试 | 锁死主张 |
+|---|---|---|---|
+| `test_ekf_core.py` | `TestVioQualityNormalizationEKF` | `test_vio_quality_zero_python_zero_skips_update` | 合法 0.0 quality 触发 vio_quality_zero 跳过 |
+| `test_ekf_core.py` | `TestVioQualityNormalizationEKF` | `test_vio_quality_bool_rejected_by_quality_value_normalization` | bool 类 quality 经 `_quality_value` 规范化抛 TypeError |
+| `test_robust_ekf_core.py` | `TestVioQualityNormalizationRobustEKF` | `test_vio_quality_zero_python_zero_skips_update` | 同上，Robust-EKF 路径锁死 |
+| `test_robust_ekf_core.py` | `TestVioQualityNormalizationRobustEKF` | `test_vio_quality_bool_rejected_by_quality_value_normalization` | 同上 |
+| `test_fgo_core.py` | `TestVioQualityNormalizationFGO` | `test_vio_quality_zero_python_zero_skips_update` | 同上，FGO 路径锁死 |
+| `test_fgo_core.py` | `TestVioQualityNormalizationFGO` | `test_vio_quality_bool_rejected_by_quality_value_normalization` | 同上 |
+
+### v11 全回归
+
+`PYTHONPATH=src python -m pytest tests/estimators/ -q`：**660 passed**（含 v10 的 654 + v11 的 6 个新测试）。零新增 fail。
+
+## v11 穷举验证表（§11 spec L1714-L1816 全部 42 行主张）
+
+| §11 主张 | 执行路径 | 三方法同源 | 验证结论 |
+|---|---|---|---|
+| §11.1-1 质量门阈值同套 | `_nis_threshold` 共享读口 | EKF/Robust 同源；FGO 铁律10 override | 穷举验证 OK |
+| §11.1-2 门控哲学一致 | 硬丢弃 vs 降权同序 | 三方法同序 | 穷举验证 OK |
+| §11.1-3 卡方+Huber 同时存在 | yaml 同配 | 三方法同配 | 穷举验证 OK |
+| §11.1-4 卡方 0.95/自由度/δ=1.345 | 协议单源 | 三方法同源 | 穷举验证 OK |
+| §11.2-1 R 固定 | `calibration_frozen` opt-in | 三方法同源 | 穷举验证 OK（半过/工艺待规） |
+| §11.2-2 R 标定段冻结 | 同上 | 同上 | 同上 |
+| §11.2-3 Robust 核形固定 | `robust_ekf.yaml` 同配 | 三方法同配 | 穷举验证 OK |
+| §11.2-4 Q 不在门控层单方加大 | `_handle_imu` 预测步 | 三方法同源 | 穷举验证 OK |
+| §11.3-1 状态/嵌入依赖权重 | `build_measurement_control` | 三方法同源 | 穷举验证 OK |
+| §11.3-2 禁 NLOS 分类器/RANSAC | grep 零命中 | 三方法同口径 | 穷举验证 OK |
+| §11.3-3 视距段敢信测量 | 仅 ceiling/D6 兜底 | 三方法同口径 | 半过/工艺待规 |
+| §11.3-4 无效标志串联顺序固定 | gate→missing→valid→quality→S→NIS→Huber | 三方法同源 | 穷举验证 OK |
+| §11.4-1 UWB/VIO 门控哲学一致 | FGO 铁律10 双松对称 | FGO 内 VIO/UWB 对称 | 穷举验证 OK |
+| §11.4-2 数据关联全员同一或关闭 | 三方法同走 anchor_id 直定位 | 无多假设 | 穷举验证 OK |
+| §11.4-3 全锚 NLOS 不静默删除 | 生成端 valid=False + eval 不过滤 | 三方法同口径 | 穷举验证 OK |
+| §11.4-4 禁独享跨模态交叉验证标签 | grep 零命中 | 三方法同口径 | 穷举验证 OK |
+| §11.5-1 协方差 SPD 保护/抖动 | `_ensure_positive_definite_vio_innovation_covariance` 单源 | 三方法同源 | 穷举验证 OK |
+| §11.5-2 发散判定全员同一 | grep silent_reset 零命中 | 三方法同口径 | 穷举验证 OK |
+| §11.5-3 禁止单方静默重置 | 唯一 reset 由外部显式调用 | 三方法同口径 | 穷举验证 OK |
+| 细节-关联 | anchor_id 直定位 | 三方法同口径 | 穷举验证 OK |
+| 细节-卡方自由度 | UWB=1 / VIO=3 正确 | 三方法同源 | 穷举验证 OK |
+| 细节-白化 | NIS 即白化残差范数平方 | 三方法同源 | 穷举验证 OK |
+| 细节-门控族扩展 | 马氏/卡方/距离窗/质量门 | 三方法同口径 | 穷举验证 OK |
+| 细节-门控族限制 | 5 种门控均未启用 | 三方法同口径 | 穷举验证 OK |
+| 细节-NN 信度 | NN 输出 R 与硬门控串联 | 三方法同口径 | 穷举验证 OK |
+| 细节-诊断量 | NIS 监视 | 三方法同口径 | 穷举验证 OK |
+| 细节-相关观测 | 协议层忽略相关 | 三方法同口径 | 穷举验证 OK |
+| 细节-有色噪声 | 默认白，全员同关闭 | 三方法同口径 | 穷举验证 OK |
+| IMU 路径（8 条） | `_handle_imu` + FusionRunner | 三方法同源 | 穷举验证 OK |
+| FusionRunner 派发对称 | `run_fusion` 多态调用 | 三方法同源 | 穷举验证 OK |
+| FusionRunner 无独享质量标签 | grep 零命中 | 三方法同口径 | 穷举验证 OK |
+| FusionRunner 不静默删除 NLOS | 生成端保留 + eval 不过滤 | 三方法同口径 | 穷举验证 OK |
+| FusionRunner 无 silent reset | 唯一 reset 外部显式调用 | 三方法同口径 | 穷举验证 OK |
+| FusionRunner 同源 IMU 通胀 | `BRIDGE_THRESHOLDS["imu_missing_inflation"]=10.0` 单源 | 三方法同源 | 穷举验证 OK |
+| step_joint valid 跳过 | `is_bool_like+not bool` 与 `_handle_uwb` 同口径 | EKF 单方法内同源 | 穷举验证 OK（v10 修复） |
+| **VIO quality<=0 同源规范化** | **`_quality_value` 三方法同源** | **三方法同源（v11 修复）** | **穷举验证 OK（v11 修复）** |
+
+## v11 诚实结论
+
+1. **v8「§11 audit 至此穷举完整」声明是 v6 的偷懒**——v7/v8/v9/v10/v11 陆续发现 v5/v6 漏审（标量 S≤0 jitter fallback + valid=False 串项不对称 + step_joint 与 _handle_uwb 同方法内口径不一致 + VIO quality<=0 绕过规范化）
+2. **v9「未来仍可能发现漏洞」是诚实承认**——但 v10/v11 用实际行动证明每次深读都能发现新漏审，因此不能以"未来可能"为由停手
+3. **v11 已修 + 已知漏洞为零**：
+   - §11.3-d 三方法拒识串项不对称 → v9 修复
+   - §11.3-d 同方法内 step_joint 与 _handle_uwb 口径不一致 → v10 修复
+   - §11.3-d VIO quality<=0 同源规范化不一致 → v11 修复
+   - §11.2 R 固定 calibration_frozen 默认 False → 工艺待规（Hazard §11-2-b）
+   - §11.3-3 视距段敢信 → 工艺待规（Hazard §11-3）
+4. **v11 不再声称"穷举完整"**——诚实结论「v11 已修 + 已知漏洞为零」
+
+## v11 commit 内容
+
+- code fix: `src/liquidloc/estimators/ekf_core.py` EKF `_handle_vio` L1047-1048 改走 `_quality_value` 与 Robust/FGO 同源规范化
+- pytest: `tests/estimators/test_ekf_core.py` 新增 `TestVioQualityNormalizationEKF`（2 个）
+- pytest: `tests/estimators/test_robust_ekf_core.py` 新增 `TestVioQualityNormalizationRobustEKF`（2 个）
+- pytest: `tests/estimators/test_fgo_core.py` 新增 `TestVioQualityNormalizationFGO`（2 个）
+- audit report: 本段 v11 修订

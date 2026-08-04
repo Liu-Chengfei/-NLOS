@@ -743,3 +743,61 @@ class TestUwbValidFlagRejectionFGO:
         assert result["update_applied"] is False
         assert result.get("reason") == "uwb_invalid_measurement", \
             "valid=False 必须先于 quality_floor 触发，不可被 quality_floor 覆盖"
+
+
+class TestVioQualityNormalizationFGO:
+    """§11.3-d VIO quality<=0 协议级拒识同源规范化锁死。
+
+    v11 audit 发现：FGO `_handle_vio` 本走 `_quality_value` 同源规范化，
+    但 EKF 此前走捷径绕过。v11 修复后三方法同源。本测试锁死 FGO 路径。
+    """
+
+    def test_vio_quality_zero_python_zero_skips_update(self):
+        """Python 0.0 视为 quality<=0 触发 vio_quality_zero 跳过。
+
+        v11 audit：三方法 VIO quality<=0 协议级拒识同源规范化锁死。
+        本测试用合法的 0.0 quality（不触发规范化异常路径）锁死
+        三方法同源触发 vio_quality_zero 跳过行为。
+        """
+        ekf = FGOCore(_cfg())
+        ekf.step(_imu_event())
+        ekf.step(_uwb_event())
+        ekf.step(_vio_event(t=0.3))  # 初始化参考位姿
+        state_before = ekf._state.copy()
+
+        result = ekf._handle_vio(
+            {"t": 0.4, "dt": 0.1, "modality": "vio",
+             "meta": {"scene_id": "S(A0,N0,V0,G0,K6)", "seq_id": "mini_seq"},
+             "imu_payload": None, "uwb_payload": None,
+             "vio_payload": {"dx": 0.1, "dy": 0.0, "dyaw": 0.0,
+                             "quality": 0.0, "tracked_features": 0, "reproj_err": 0.0}},
+            ekf._state_vector(),
+            MeasurementControl(modality="vio", gate_action="pass_through"),
+        )
+        assert result["update_applied"] is False
+        assert result.get("reason") == "vio_quality_zero"
+        assert ekf._state["px"] == pytest.approx(state_before["px"])
+
+    def test_vio_quality_bool_rejected_by_quality_value_normalization(self):
+        """Boolean quality 必须经 _quality_value 规范化抛 TypeError，与三方法同口径。
+
+        v11 修复前 EKF 直接 float(False)=0.0 触发 vio_quality_zero 跳过，
+        与 Robust/FGO 走 _quality_value 抛 TypeError 不同源。
+        v11 修复后 EKF 也走 _quality_value，对 bool 类 quality 同源抛 TypeError。
+        本测试锁死三方法同源同口径规范化路径。
+        """
+        ekf = FGOCore(_cfg())
+        ekf.step(_imu_event())
+        ekf.step(_uwb_event())
+        ekf.step(_vio_event(t=0.3))  # 初始化参考位姿
+
+        with pytest.raises(TypeError, match="quality must be numeric"):
+            ekf._handle_vio(
+                {"t": 0.4, "dt": 0.1, "modality": "vio",
+                 "meta": {"scene_id": "S(A0,N0,V0,G0,K6)", "seq_id": "mini_seq"},
+                 "imu_payload": None, "uwb_payload": None,
+                 "vio_payload": {"dx": 0.1, "dy": 0.0, "dyaw": 0.0,
+                                 "quality": False, "tracked_features": 0, "reproj_err": 0.0}},
+                ekf._state_vector(),
+                MeasurementControl(modality="vio", gate_action="pass_through"),
+            )

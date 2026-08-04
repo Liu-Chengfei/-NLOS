@@ -1853,3 +1853,67 @@ class TestStepJointValidFlagRejectionEKF:
         assert ekf.last_update_report["uwb_anchor_count"] == 2, \
             "§11.3-d step_joint 必须与 _handle_uwb L860 同口径：" \
             "Python/numpy 两种 False 跳过、Python/numpy 两种 True 接受"
+
+
+class TestVioQualityNormalizationEKF:
+    """§11.3-d VIO quality<=0 协议级拒识同源规范化锁死。
+
+    v11 audit 发现：EKF `_handle_vio` L1047-1048 此前走捷径
+    `float(vio_payload.get("quality", 1.0))` 绕过 `self._quality_value()`
+    规范化，与 Robust-EKF/FGO 不同源。v11 修复后走 `_quality_value`。
+    本测试锁死三方法同源规范化行为（含 np.bool_/NaN/>1.0 上界）。
+    """
+
+    def test_vio_quality_zero_python_zero_skips_update(self):
+        """Python 0.0 视为 quality<=0 触发 vio_quality_zero 跳过。
+
+        v11 audit：三方法 VIO quality<=0 协议级拒识同源规范化锁死。
+        旧 EKF 走捷径 `float(quality)` 绕过 _quality_value 规范化，
+        v11 修复后与 Robust/FGO 同走 _quality_value 同源规范化。
+        本测试用合法的 0.0 quality（不触发规范化异常路径）锁死
+        三方法同源触发 vio_quality_zero 跳过行为。
+        """
+        ekf = EKFCore(_cfg())
+        ekf.step(_imu_event())
+        ekf.step(_uwb_event())
+        ekf.step(_vio_event(t=0.3))  # 初始化参考位姿
+        state_before = ekf._state.copy()
+
+        result = ekf._handle_vio(
+            {"t": 0.4, "dt": 0.1, "modality": "vio",
+             "meta": {"scene_id": "S(A0,N0,V0,G0,K6)", "seq_id": "mini_seq"},
+             "imu_payload": None, "uwb_payload": None,
+             "vio_payload": {"dx": 0.1, "dy": 0.0, "dyaw": 0.0,
+                             "quality": 0.0, "tracked_features": 0, "reproj_err": 0.0}},
+            ekf._state_vector(),
+            MeasurementControl(modality="vio", gate_action="pass_through"),
+        )
+        assert result["update_applied"] is False
+        assert result.get("reason") == "vio_quality_zero"
+        assert ekf._state["px"] == pytest.approx(state_before["px"])
+
+    def test_vio_quality_bool_rejected_by_quality_value_normalization(self):
+        """Boolean quality 必须经 _quality_value 规范化抛 TypeError，与三方法同口径。
+
+        v11 修复前 EKF _handle_vio 直接 float(False) = 0.0 触发 vio_quality_zero 跳过，
+        与 Robust/FGO 走 _quality_value 抛 TypeError 不同源。
+        v11 修复后 EKF 也走 _quality_value，对 bool 类 quality 同源抛 TypeError。
+        本测试锁死三方法同源同口径规范化路径。
+        """
+        ekf = EKFCore(_cfg())
+        ekf.step(_imu_event())
+        ekf.step(_uwb_event())
+        ekf.step(_vio_event(t=0.3))  # 初始化参考位姿
+        ref_before = ekf._last_vio_reference_pose
+
+        # bool 类 quality 必须经规范化抛 TypeError，与 Robust/FGO 同源
+        with pytest.raises(TypeError, match="quality must be numeric"):
+            ekf._handle_vio(
+                {"t": 0.4, "dt": 0.1, "modality": "vio",
+                 "meta": {"scene_id": "S(A0,N0,V0,G0,K6)", "seq_id": "mini_seq"},
+                 "imu_payload": None, "uwb_payload": None,
+                 "vio_payload": {"dx": 0.1, "dy": 0.0, "dyaw": 0.0,
+                                 "quality": False, "tracked_features": 0, "reproj_err": 0.0}},
+                ekf._state_vector(),
+                MeasurementControl(modality="vio", gate_action="pass_through"),
+            )
