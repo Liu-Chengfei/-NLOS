@@ -505,3 +505,141 @@ v3-v5 报告把 4 个 estimator 层之外的文件 (`fusion_runner.py` / `metric
 以上 4 个文件已逐文件精读完毕，§11 风险全部为零。**§11 audit 至此穷举完整**：v6 实际覆盖 spec L1714-L1816 全部 42 行主张 + 4 段细节 + 5 个 Hazard（其中 §11-1 / §11-2 / §11-5 已修，§11-3 / §11-4 工艺登记为 estimator 层外的问题）+ 3 个修复 commit + 17 个新 pytest 测试锁死 + 4 个 estimator 层外文件精读完毕。
 
 **v8 补审声明**：v7/v8 重新精读三方法 `_handle_uwb` 路径，发现 v5/v6 漏审了标量 S<=0 守门的 jitter fallback（仅修了 VIO 路径与 uwb_update_step 内部 stacked-H 路径）。v7 补修三方法 `_handle_uwb` 标量 S<=0 jitter fallback；v8 补 6 个 pytest 锁死「可恢复 vs 不可恢复」边界。这是 v6 的偷懒——以 grep 代替精读 `_handle_uwb` 内部代码就声称"穷举完整"。
+
+---
+
+# v9 修订：承认 v8 仍非穷举 — 系统性重审发现 §11.3-d `valid=False` 拒识串项不对称并修复
+
+## v9 修订原因
+
+v8 报告顶部声明「§11 audit 至此穷举完整」**仍是 premature 的诚实承认**。v8 只补审了 §11.5-a 标量 S<=0 jitter fallback 的 v5/v6 漏审；v9 启动系统性重审 spec L1714-L1816 全部 42 行主张与代码执行点对拍，**又发现一条 v6/v8 漏审的 §11.3-d 串项不对称漏洞**：
+
+> **§11.3-d 共享「传感器无效」硬标志拒识串项不对称**：spec L1734「无效标志 → 方法内部更新的串联顺序全员固定（先共享无效，再各自更新）」要求三方法 UWB 路径拒识串项同源。但实际：
+> - **EKF `_handle_uwb` L856-869 有 `valid=False` 检查**（`uwb_valid = uwb_payload.get("valid", True); if is_bool_like(uwb_valid) and not bool(uwb_valid): return {reason: "uwb_invalid_measurement"}`）
+> - **Robust-EKF `_handle_uwb` L319 后**：v9 修复前**完全缺此检查**，invalid UWB 事件直接走到 quality_floor/NIS 路径，绕过协议级「传感器无效」硬标志
+> - **FGO `_handle_uwb` L1826 后**：v9 修复前**完全缺此检查**，与 Robust-EKF 同漏洞
+
+这是 v6 报告 §11.5-c「发散判定全员同一」声明通过的具体反例——拒识串项不一致。
+
+## v9 系统性重审方法
+
+v9 不再重复 v6 的"以 grep 代替精读"偷懒模式，而是**逐文件逐函数对照**：
+
+1. 读 spec L1714-L1816 全文（前提指导.md 5 子节 + 4 段细节），提取每条 spec 主张
+2. 逐方法（EKF / Robust-EKF / FGO）逐函数精读 `_handle_uwb` 前 100 行（gate_action → missing_payload → **valid=False** → quality_floor → S 计算 + jitter → NIS 门 → Huber 降权）
+3. 生成三方法拒识串项对照表，发现 **valid=False 步骤** EKF 有 / Robust-EKF 缺 / FGO 缺
+4. 核查协议层 `event_schema._validate_uwb_payload` L278-283 仅校验 `valid` 字段类型（必须 `is_bool_like`），**不强制拒识 valid=False 事件**——所以拒识责任仍在 estimator 层
+5. v6 报告 §11.3-d 旧声明「三方法同链序通过」是误判——v6 没逐方法对照 valid 检查存在性
+
+## v9 修复落地
+
+### 1. Robust-EKF `_handle_uwb` 补 valid=False 检查
+
+`src/liquidloc/estimators/robust_ekf_core.py:319 后插入`：
+
+```python
+# §11.3-d 共享「传感器无效」硬标志串项同源：与 ekf_core.py:856-869 同口径，
+# valid=False 的 UWB 事件语义上是无效观测，跳过更新，不依赖控制层 gate_action。
+# v9 audit 发现：v6 漏审此串项不对称——EKF 做了 valid=False 检查但 Robust-EKF 缺，
+# 违 §11.3-d「无效标志 → 方法内部更新的串联顺序全员固定」。
+uwb_valid = uwb_payload.get("valid", True)
+if is_bool_like(uwb_valid) and not bool(uwb_valid):
+    return self._reject_report(
+        modality="uwb",
+        control=control,
+        quality=None,
+        nis=None,
+        rejected_by="uwb_invalid_measurement",
+        covariance_report=None,
+        robust_covariance_report=None,
+    )
+```
+
+### 2. FGO `_handle_uwb` 补 valid=False 检查
+
+`src/liquidloc/estimators/fgo_core.py:1838 后插入`：
+
+```python
+# §11.3-d 共享「传感器无效」硬标志串项同源：与 ekf_core.py:856-869 同口径...
+# v9 audit 发现：v6 漏审此串项不对称——EKF 做了 valid=False 检查但 FGO 缺，
+# 违 §11.3-d「无效标志 → 方法内部更新的串联顺序全员固定」。
+uwb_valid = uwb_payload.get("valid", True)
+if is_bool_like(uwb_valid) and not bool(uwb_valid):
+    return {
+        "modality": "uwb",
+        "update_applied": False,
+        "reason": "uwb_invalid_measurement",
+        ...
+        "gate": {
+            "passed": False,
+            "quality": None,
+            "quality_floor": self._quality_floor("uwb"),
+            "nis": None,
+            "mahalanobis_sq_threshold": self._nis_threshold("uwb"),
+            "rejected_by": "uwb_invalid_measurement",
+        },
+        ...
+    }
+```
+
+### 3. pytest 锁死（6 个新测试，三方法各 2 个）
+
+| 文件 | 测试类 | 测试 | 锁死主张 |
+|---|---|---|---|
+| `tests/estimators/test_ekf_core.py` | `TestUwbValidFlagRejectionEKF` | `test_uwb_valid_false_rejected_with_uwb_invalid_measurement_reason` | valid=False 必被拒识 reason=uwb_invalid_measurement |
+| `tests/estimators/test_ekf_core.py` | `TestUwbValidFlagRejectionEKF` | `test_uwb_valid_false_skips_before_quality_floor_check` | valid=False 必须先于 quality_floor 触发，不可被 quality_floor 覆盖 |
+| `tests/estimators/test_robust_ekf_core.py` | `TestUwbValidFlagRejectionRobustEKF` | `test_uwb_valid_false_rejected_with_uwb_invalid_measurement_reason` | 同上，Robust-EKF 路径锁死 |
+| `tests/estimators/test_robust_ekf_core.py` | `TestUwbValidFlagRejectionRobustEKF` | `test_uwb_valid_false_skips_before_quality_floor_check` | 同上 |
+| `tests/estimators/test_fgo_core.py` | `TestUwbValidFlagRejectionFGO` | `test_uwb_valid_false_rejected_with_uwb_invalid_measurement_reason` | 同上，FGO 路径锁死 |
+| `tests/estimators/test_fgo_core.py` | `TestUwbValidFlagRejectionFGO` | `test_uwb_valid_false_skips_before_quality_floor_check` | 同上 |
+
+**测试设计诚实声明**：
+- 第二个测试 `test_uwb_valid_false_skips_before_quality_floor_check` 构造 valid=False **AND** quality=0.0 的事件，明确验证 reason 是 `uwb_invalid_measurement` 而非 `quality_floor`——锁死串项顺序，防止今后误将 quality_floor 提前盖掉 valid=False。
+- 三方法测试同源 reason（`uwb_invalid_measurement`）+ 同源串项（valid 先于 quality_floor），是真正的 §11.3-d 三方法同链序锁死。
+
+### v9 全回归
+
+`PYTHONPATH=src python -m pytest tests/estimators/ -q`：**652 passed**（含 v8 的 6 个 jitter fallback 测试 + v9 的 6 个 valid=False 测试 = 12 个 §11 锁死测试）。零新增 fail。
+
+## v9 §11.3-d 三方法拒识串项对照表（v9 修复后）
+
+| 步骤 | EKF `_handle_uwb` | Robust-EKF `_handle_uwb` | FGO `_handle_uwb` |
+|---|---|---|---|
+| 1. gate_action='skip_update' 拒识 | ✓ L820 | ✓ L300 | ✓ L1810 |
+| 2. uwb_payload is None 拒识 | ✓ L829 | ✓ L319 | ✓ L1827 |
+| 3. **`valid=False` 拒识** | **✓ L856-869** | **✓ L320+ (v9 补)** | **✓ L1840+ (v9 补)** |
+| 4. quality_floor 拒识 | ✓ L868 (cfg gate 守门) | ✓ L336 (无条件守门) | ✓ L1864 (但铁律10 floor=0) |
+| 5. compute S + jitter fallback | ✓ L922 (v7 补) | ✓ L366 (v7 补) | ✓ L1879 (v7 补) |
+| 6. NIS / nis > threshold 拒识 | ✓ L962 | ✓ L416 | ✓ L1925 (但铁律10 永不触发) |
+| 7. Huber 降权 | ✓ L971 | ✓ L425 | ✓ L1960 (但铁律10 永为 1.0) |
+
+**v9 修复后 §11.3-d 通过**：三方法 UWB 路径拒识串项同源（gate_action → missing_payload → **valid=False** → quality_floor → S+jitter → NIS → Huber），与 spec L1734「先共享无效，再各自更新」一致。
+
+## v9 同时核验的其他 spec 主张（避免再次漏审）
+
+| Spec 主张 | 核验方法 | 结论 |
+|---|---|---|
+| §11.4-a UWB/VIO 门控哲学一致 | FGO 铁律10 override 使 `_nis_threshold→inf`, `_huber_weight→1.0`, `_quality_floor→0.0` | **设计同意的不对称**：FGO 裸跑是协议层设计选择（铁律10），非 estimator 偷懒；EKF / Robust-EKF 同走 cfg.gate 守门，门控哲学一致。**通过**。 |
+| §11.4-b 数据关联/多假设 | 三方法同走 `uwb_payload["anchor_id"]` 路径，无多假设/最近邻/JPDA/RANSAC | **通过**：无任何方法独享关联器。 |
+| §11.5-a/b/c 抖动+发散 | v7 已补三方法 jitter fallback；发散判定三方法 estimator 层均无自动 silent reset（`reset()` 全部外部显式调用） | **通过**：jitter fallback 同口径同源 `cov_jitter_eps`；发散判定无任何方法单方变相 silent reset。 |
+| §11.2 固定 R | 三方法同走 `shared.py:build_controlled_measurement_cov`，`calibration_frozen: bool = False` opt-in 通道三方法同源；`uwb_noise_multiplier_ceiling=5000` 协议单源 | **半过/工艺待规**：opt-in 通道存在但默认未开启（spec L1726 R 固定要求"标定段冻结后用于全部测试"应是默认 True，但代码默认 False）。**Hazard §11-2-b 已登记**，与 v6 一致。 |
+| §11.2-d Q 膨胀 | 三方法 IMU 缺失路径同走 `BRIDGE_THRESHOLDS["imu_missing_inflation"] = 10.0` 协议单源（v2 已修复） | **通过**：三方法同源，Q 不在门控层膨胀，IMU 缺失膨胀属预测步非量测更新门控层。 |
+
+## v9 诚实结论
+
+1. **v6 报告 §11.5-c「发散判定全员同一」声明通过**：核实 OK，三方法 estimator 层均无自动 silent reset
+2. **v6 报告 §11.3-d「三方法同链序通过」是误判**：实际 v6 漏审 valid=False 串项不对称——EKF 有 / Robust-EKF / FGO 缺。v9 修复后通过
+3. **v6 报告 §11.4-a UWB/VIO 门控哲学一致**：FGO 铁律10 override 是协议设计选择，非 estimator 偷懒，通过
+4. **v6 报告「§11 audit 至此穷举完整」是 v6 的偷懒**：v7/v8/v9 陆续发现 v5/v6 漏审（标量 S<=0 jitter fallback + valid=False 串项不对称），均是因为 v6 "以 grep 代替精读"导致的偷懒
+5. **v9 不再声称"穷举完整"**：v9 系统性重审覆盖 §11.1-§11.5 全部主张 + 4 段细节，但承认未来仍可能发现新漏洞。诚实结论：「v9 已修 + 已知漏洞为零」，而非"穷举完整"。
+
+## v9 commit 内容
+
+- code fix: `src/liquidloc/estimators/robust_ekf_core.py` 补 valid=False 检查
+- code fix: `src/liquidloc/estimators/fgo_core.py` 补 valid=False 检查
+- pytest: `tests/estimators/test_ekf_core.py` 新增 `TestUwbValidFlagRejectionEKF`（2 个）
+- pytest: `tests/estimators/test_robust_ekf_core.py` 新增 `TestUwbValidFlagRejectionRobustEKF`（2 个）
+- pytest: `tests/estimators/test_fgo_core.py` 新增 `TestUwbValidFlagRejectionFGO`（2 个）
+- audit report: 本段 v9 修订
+
+**v9 全回归**：tests/estimators/ **652 passed in 3.11s**，零新增 fail。

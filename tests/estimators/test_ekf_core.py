@@ -1757,3 +1757,47 @@ class TestUwbScalarSJitterFallbackEKF:
         assert result["update_applied"] is False, \
             "§11.5 不可恢复病态 S 必须被拒绝，jitter fallback 不应掩盖真病态"
         assert result.get("reason") == "nonpositive_innovation_covariance"
+
+
+class TestUwbValidFlagRejectionEKF:
+    """§11.3-d 共享「传感器无效」硬标志串项同源锁死。
+
+    spec L1734「无效标志 → 方法内部更新的串联顺序全员固定（先共享无效，再各自更新）」
+    v9 audit 发现 v6/v8 漏审：EKF `_handle_uwb` L856 有 `valid=False` 检查，
+    Robust-EKF / FGO 缺此检查。本测试锁死 EKF 路径，与 Robust-EKF / FGO 同源测试
+    共同保证三方法拒识串项一致性，防今后单方泄漏。
+    """
+
+    def test_uwb_valid_false_rejected_with_uwb_invalid_measurement_reason(self):
+        import liquidloc.estimators.ekf_core as ekf_core_mod
+
+        ekf = EKFCore(_cfg())
+        x_prev = ekf._state_vector()
+        invalid_event = _uwb_event()
+        invalid_event["uwb_payload"]["valid"] = False
+        control = MeasurementControl(modality="uwb", gate_action="pass_through")
+        result = ekf._handle_uwb(invalid_event, x_prev, control)
+
+        assert result["update_applied"] is False, \
+            "§11.3-d valid=False 事件必须被拒识，跳过更新链路"
+        assert result.get("reason") == "uwb_invalid_measurement", \
+            "§11.3-d 拒识原因必须是 uwb_invalid_measurement，与 Robust-EKF / FGO 同源"
+
+    def test_uwb_valid_false_skips_before_quality_floor_check(self):
+        """§11.3-d 串项顺序锁死：valid=False 必须在 quality_floor 之前触发。
+
+        防止今后某方法单走 quality_floor 路径绕过协议级 valid 硬标志。
+        构造一个 valid=False 且 quality=0 的事件，验证 reason 是 uwb_invalid_measurement
+        而非 quality_floor（因为 valid=False 应先触发）。
+        """
+
+        ekf = EKFCore(_cfg())
+        x_prev = ekf._state_vector()
+        invalid_event = _uwb_event(quality=0.0)
+        invalid_event["uwb_payload"]["valid"] = False
+        control = MeasurementControl(modality="uwb", gate_action="pass_through")
+        result = ekf._handle_uwb(invalid_event, x_prev, control)
+
+        assert result["update_applied"] is False
+        assert result.get("reason") == "uwb_invalid_measurement", \
+            "valid=False 必须先于 quality_floor 触发，不可被 quality_floor 覆盖"

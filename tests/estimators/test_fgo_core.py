@@ -703,3 +703,43 @@ class TestUwbScalarSJitterFallbackFGO:
         assert result["update_applied"] is False, \
             "§11.5 不可恢复病态 S 必须被拒绝，jitter fallback 不应掩盖真病态"
         assert result.get("reason") == "nonpositive_innovation_covariance"
+
+
+class TestUwbValidFlagRejectionFGO:
+    """§11.3-d 共享「传感器无效」硬标志串项同源锁死。
+
+    spec L1734「无效标志 → 方法内部更新的串联顺序全员固定」
+    v9 audit 发现 FGO `_handle_uwb` 缺 valid=False 检查；本测试锁死补后的路径。
+    """
+
+    def test_uwb_valid_false_rejected_with_uwb_invalid_measurement_reason(self):
+
+        estimator = FGOCore(_cfg())
+        x_prev = estimator._state_vector()
+        invalid_event = _uwb_event()
+        invalid_event["uwb_payload"]["valid"] = False
+        control = MeasurementControl(modality="uwb", gate_action="pass_through")
+        result = estimator._handle_uwb(invalid_event, x_prev, control)
+
+        assert result["update_applied"] is False, \
+            "§11.3-d valid=False 事件必须被拒识，跳过更新链路"
+        assert result.get("reason") == "uwb_invalid_measurement", \
+            "§11.3-d 拒识原因必须是 uwb_invalid_measurement，与 EKF / Robust-EKF 同源"
+
+    def test_uwb_valid_false_skips_before_quality_floor_check(self):
+        """§11.3-d 串项顺序锁死：valid=False 必须在 quality_floor 之前触发。
+
+        v9 audit 修复前 FGO 完全缺 valid=False 检查；
+        修复后必须验证 valid=False 先于 quality_floor，与 EKF L856 同口径。
+        """
+
+        estimator = FGOCore(_cfg())
+        x_prev = estimator._state_vector()
+        invalid_event = _uwb_event(quality=0.0)
+        invalid_event["uwb_payload"]["valid"] = False
+        control = MeasurementControl(modality="uwb", gate_action="pass_through")
+        result = estimator._handle_uwb(invalid_event, x_prev, control)
+
+        assert result["update_applied"] is False
+        assert result.get("reason") == "uwb_invalid_measurement", \
+            "valid=False 必须先于 quality_floor 触发，不可被 quality_floor 覆盖"

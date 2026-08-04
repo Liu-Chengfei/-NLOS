@@ -1831,10 +1831,35 @@ class FGOCore(EKFCore):
                 "reason": "missing_uwb_payload",
                 # §3.0.2 审计：UWB 走 h-side bias 通道
                 "bias_writeport": "h_side",
-                "measurement_control": control_to_dict(control),
-                "window_length": len(self._window_entries),
-                "gate": {"passed": False, "rejected_by": "missing_uwb_payload"},
-            }
+                "measurement_control": control_to_dict(control),  # 当前控制参数。
+                "covariance_report": None,  # 跳过路径未做协方差缩放。
+                "window_length": len(self._window_entries),  # 当前窗口长度。
+                "gate": {"passed": False, "rejected_by": "missing_uwb_payload"},  # 门控子报告结束。
+            }  # UWB 缺失 payload 跳过报告结束。
+        # §11.3-d 共享「传感器无效」硬标志串项同源：与 ekf_core.py:856-869 同口径，
+        # valid=False 的 UWB 事件语义上是无效观测，跳过更新，不依赖控制层 gate_action。
+        # v9 audit 发现：v6 漏审此串项不对称——EKF 做了 valid=False 检查但 FGO 缺，
+        # 违 §11.3-d「无效标志 → 方法内部更新的串联顺序全员固定」。
+        uwb_valid = uwb_payload.get("valid", True)
+        if is_bool_like(uwb_valid) and not bool(uwb_valid):
+            return {
+                "modality": "uwb",
+                "update_applied": False,
+                "reason": "uwb_invalid_measurement",
+                # §3.0.2 审计：UWB 走 h-side bias 通道
+                "bias_writeport": "h_side",
+                "measurement_control": control_to_dict(control),  # 当前控制参数。
+                "covariance_report": None,  # 跳过路径未做协方差缩放。
+                "gate": {  # 门控子报告。
+                    "passed": False,  # 门控未通过。
+                    "quality": None,  # valid=False 阶段未读取 quality。
+                    "quality_floor": self._quality_floor("uwb"),  # 当前模态的质量门槛。
+                    "nis": None,  # 无效测量阶段未计算 NIS。
+                    "mahalanobis_sq_threshold": self._nis_threshold("uwb"),  # 当前门限。
+                    "rejected_by": "uwb_invalid_measurement",  # 拒绝原因。
+                },  # gate 子报告结束。
+                "window_length": len(self._window_entries),  # 当前窗口长度。
+            }  # UWB 无效测量拒绝报告结束。
         quality = self._quality_value(uwb_payload)  # 读取质量值。
         if _quality_below_floor(quality, self._quality_floor("uwb")):  # 质量低于门槛就直接拒绝。
             return {  # 先返回门控失败结果。
