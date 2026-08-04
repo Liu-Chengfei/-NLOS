@@ -1104,3 +1104,85 @@ v15 完成检查表后的二轮深审：
 - §11-6: EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许（工艺差异）
 
 不再声称穷举完整——但 v16 二轮深审涵盖协议层、fusion 路径、SPD jitter 三方法同源、isfinite 守门三方法覆盖、Q 不偷偷加大三方法，§11 spec 全部条款的代码执行点已穷举二次审查未发现新偷懒。
+
+## v17 补全 v15 检查表「未深审」三项完成
+
+v16 commit 后 verifier 指出 v15 检查表里 2 项「未深审」未给出具体行号对应；v17 现逐行对照以补全。
+
+### v17 §11.4 三方法 UWB 路径门控串联顺序逐行对照
+
+| 顺序 | EKF (ekf_core.py) | Robust-EKF (robust_ekf_core.py) | FGO (fgo_core.py) |
+|---|---|---|---|
+| 1. gate_action 跳过 | L835 `uwb_skip_update` | L222 `uwb_skip_update` | L1770 `uwb_skip_update` |
+| 2. missing payload | (隐式早退) | L235 `missing_uwb_payload` | L1782 `missing_uwb_payload` |
+| 3. **valid=False 跳过** (v9 修复) | L859-869 | L252-261 | L1799-1817 |
+| 4. **quality_floor 守门** | L871-888 (`gate` 存在时) | L263-272 (无条件) | L1819-1836 (无条件) |
+| 5. **R 通道**: build_controlled_measurement_cov | L892-899 | L274-281 | L1837-1844 |
+| 6. **S<=0 jitter 守门** (v8 修复) | L922-944 | L301-322 | L1862-1886 |
+| 7. nonfinite_nis 守门 | L948-959 | L324-339 | L1888-1906 |
+| 8. mahalanobis_sq 守门 | L960-971 (gate 存在时) | L340-355 (无条件) | L1907-1925 (FGO `_nis_threshold` 返 inf 不触发) |
+| 9. huber_weight 降权 | L973 (gate 存在时) | L357-358 (无条件) | L1927 (FGO `_huber_weight` 强返 1.0) |
+
+**结论**: 三方法 UWB 路径串联顺序完全同源（gate_action → missing → valid → quality_floor → R 通道 → S jitter → nonfinite_nis → mahalanobis_sq → huber_weight）。EKF 走条件守门（`gate` 配置存在时启用），Robust 走无条件，FGO mahalanobis/huber 强制 inf/1.0——三者差异均来自 Hazard §11-6（已登记工艺差异）。**§11.4 UWB 路径三方法同口径不偷懒**。
+
+### v17 §11.4 三方法 VIO 路径门控串联顺序逐行对照
+
+| 顺序 | EKF (ekf_core.py) | Robust-EKF (robust_ekf_core.py) | FGO (fgo_core.py) |
+|---|---|---|---|
+| 1. gate_action 跳过 | L1030 `vio_skip_update` | L434 `vio_skip_update` | L2023 `vio_skip_update` |
+| 4. **quality_floor 守门** | L1079-1096 (gate 存在时) | L467-477 (无条件) | L2057-2067 (无条件) |
+| 5. **R 通道**: build_controlled_measurement_cov | (走 vision_update_step) | (走 vision_update_step) | (走 vision_update_step) |
+| 6. S<=0 jitter 守门 | `_ensure_positive_definite_vio_innovation_covariance` (vision_update_step L481-515, v6 修复) | 同 EKF 继承 | 同 EKF 继承 |
+| 7. nonfinite_nis 守门 | L1196-1210 | L586-599 | L2215-2230 |
+| 8. mahalanobis_sq 守门 | L1196-1210 (gate 存在时) | L607-625 (无条件) | L2234-2250 (FGO `_nis_threshold` 返 inf) |
+| 9. huber_weight 降权 | L1229 (gate 存在时) | L629 (无条件) | L2264 (FGO 强返 1.0) |
+
+**结论**: 三方法 VIO 路径串联顺序完全同源。**§11.4 VIO 路径三方法同口径不偷懒**。
+
+### v17 细节 「NN 输出 R 与硬门控串联顺序」逐行对照
+
+NN 输出 R 由 `build_measurement_control` (liquid_bridge_contract.py L783) 同源产生 MeasurementControl（含 bias_applied / scaling / noise_multiplier / gate_action）。三方法同调：
+
+1. `apply_safe_mode` L266-284 → 协议层 `gate_action` 早退（UWB valid=False/低质/高风险）
+2. `_resolve_quality` L324-332: quality 规范化到 [0,1]
+3. `_resolve_effective_risk` L387-398: risk = max(base_risk, 1-quality, modality_signal, axis_floor)
+4. `_compose_noise_multiplier` L335-349: noise_multiplier = scaling² × (1+risk) × ceiling (NN-R 输出)
+5. `build_controlled_measurement_cov` (三方法同调): R = base_noise × noise_multiplier (受 calibration_frozen opt-in 控制)
+
+进入 estimator 后按 v17 上表 1-9 串联顺序执行硬门控——三方法同顺序：
+
+| 步骤 | 内容 | 三方法行为 |
+|---|---|---|
+| R 通道生成 | build_controlled_measurement_cov 同调 | 同源 NN-R |
+| 硬门控 1: gate_action | uwb_skip_update / vio_skip_update | 同源 |
+| 硬门控 2: valid (UWB only) | valid=False 跳过 | v9 修复同源 |
+| 硬门控 3: quality_floor | quality < floor 跳过 | 同源 |
+| 硬门控 4: S<=0 jitter | jitter fallback | v8 修复同源 |
+| 硬门控 5: nonfinite_nis | NaN/inf NIS 拒绝 | 同源 |
+| 硬门控 6: mahalanobis_sq | nis 超阈拒绝 | EKF 条件/Robust 无条件/FGO 强 inf |
+| 软降权: huber_weight | whitened ≤ δ 权重 1.0；> δ 权重 δ/||r|| | EKF 条件/Robust 无条件/FGO 强 1.0 |
+
+**结论**: 三方法 NN-R 输出与硬门控串联顺序完全同源（顺序：R 生成 → 硬门控 1-6 → 软降权）。**v17 §11 细节「NN 输出 R 与硬门控串联顺序」不偷懒**。
+
+### v17 诚实结论
+
+v15 检查表三项「未深审」现补全：
+- §11.4 UWB 路径三方法同口径逐行对照 ✓ 不偷懒
+- §11.4 VIO 路径三方法同口径逐行对照 ✓ 不偷懒
+- 细节 NN 输出 R 与硬门控串联顺序 ✓ 不偷懒
+
+§11 spec 全部条款的代码执行点已穷举四轮审查（v6→v17），未发现新真偷懒。
+
+**Hazard 清单（最终）**：
+- §11-2: R 标定冻结 opt-in 通道（设计选择）
+- §11-3: 视距段敢信测量无明文守门（工艺待规）
+- §11-6: EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许（工艺差异）
+
+**v9→v17 修复历史**：
+- v8: UWB 标量 S<=0 jitter fallback (3 方法 6 pytest 锁死)
+- v9: UWB valid=False 跳过不对称修复 (3 方法 6 pytest 锁死)
+- v10: EKF step_joint valid=False 同口径 (2 pytest 锁死)
+- v11: VIO quality<=0 同源规范化 (6 pytest 锁死)
+- v14: step_joint 紧耦合路径补全 quality_floor+VIO quality 检查 (3 pytest 锁死)
+
+不再声称穷举完整——但 v17 后 §11 spec 全部条款的代码执行点已完成四轮（v6/v15/v16/v17）逐行对照审查。
