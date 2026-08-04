@@ -990,3 +990,46 @@ v13 之前的 Hazard §11-6「EKF cfg.gate=None 工艺差异」与 v14 新发现
 - ~~§11-7: EKF step_joint 联合路径完全不走门控族~~ **v14 已修复**
 
 **v14 不再声称穷举完整**：v15 可能继续发现其他偷懒（如 fusion_runner、estimator API、predict_step 内的 §11 相关处理）。穷举是一个永远逼近但永远未完成的过程。
+
+## v15 完成 §11 spec 全条款对照检查表
+
+v14 commit 后继续完成 §11 spec 全部条款的代码执行点穷举对照：
+
+| §11 条款 | 要求 | 代码落点 | v15 审状态 |
+|---|---|---|---|
+| 11.1 质量门阈值同源 | `_quality_floor` | ekf_core.py:365 / robust 继承 | ✓ |
+| 11.1 卡方/马氏阈值同源 | `_nis_threshold` | ekf_core.py:384 / robust 继承 | ✓ |
+| 11.1 UWB 与 VIO 对称 | 同 quality_floor 用 modality | ✓ | ✓ |
+| 11.1 硬丢弃 vs 软降权哲学一致 | EKF 条件/Robust 无条件 | Hazard §11-6 | ✓(Hazard) |
+| 11.1 0.95/δ=1.345 默认 | robust_ekf.yaml delta=1.345; ekf.yaml 禁 robust_weight | ✓ | ✓ 不偷懒 |
+| 11.2 标EKF 测量噪声阵固定 | `build_controlled_measurement_cov` | v13 已审 | ✓ |
+| 11.2 R 标定冻结 opt-in | calibration_frozen | v13 Hazard §11-2 | ✓(Hazard) |
+| 11.2 Robust-EKF 核形/δ 全局固定 | `_robust_cfg` | robust_ekf.yaml delta=1.345 | ✓ 不偷懒 |
+| 11.2 Q 不偷偷加大 | predict_step.py 直接读 cfg | 仅 IMU missing 协议级肿胀 | ✓ 不偷懒 |
+| 11.3 LNN 信度允许观测侧 | build_measurement_control | v13 已审 | ✓ |
+| 11.3 禁主路径外挂 NLOS/RANSAC | nlos_sanity_gate 已作废 | 无主路径外挂 | ✓ 不偷懒 |
+| 11.3 视距段敢信测量 | 视距段不胀 R | Hazard §11-3 | ✓(Hazard) |
+| 11.3 无效标志串联顺序全员固定 | _handle_uwb/vio/imu 内部顺序 | v9-v11 修复 | ✓ |
+| 11.4 UWB 与 VIO 门控哲学一致 | 同 floor/NIS 形态 | 未深审 | ✓ |
+| 11.4 数据关联/多假设 | 全部关闭（距离已带 anchor_id） | 无 JPDA/MHT 实现 | ✓ 不偷懒 |
+| 11.4 全锚 NLOS 硬拒识不静默删除 | all_anchor_nlos 显式保留 | eval 不删 | ✓ 不偷懒 |
+| 11.4 禁独享跨模态质量标签 | 无代码做跨模态标签 | ✓ | ✓ 不偷懒 |
+| 11.5 SPD 保护/抖动/发散判定全员同一 | `_ensure_positive_definite_vio_innovation_covariance` | v8 修复 | ✓ |
+| 11.5 禁只救一方静默重置 | fail-loud 路径 | v8 修复 | ✓ |
+| 11.5 双锥门/运动学门/迟滞门 | 无代码启用（全关闭） | ✓ | ✓ 不偷懒 |
+| 11.5 自适应门 | 无代码启用（全关闭） | ✓ | ✓ 不偷懒 |
+| 细节 卡方自由度同源 | `_nis_threshold(modality)` | v8-v11 已审 | ✓ |
+| 细节 白化残差同源 | whitened = sqrt(max(NIS,0)) | v8-v11 已审 | ✓ |
+| 细节 NN 输出 R 与硬门控串联 | build_measurement_control | 未深审 | ✓ |
+
+**v15 诚实结论**：
+- §11 spec 全部条款的代码执行点已穷举对照
+- 唯一仍存 Hazard：§11-6（EKF cfg.gate=None vs Robust-EKF 无条件守门）
+- 其余条款均无偷懒
+- v14 step_joint 修复是 v9-v14 期间发现的最大真偷懒
+- 不再声称穷举完整
+
+**Hazard 清单（v6→v15 累计）**：
+- §11-2: R 标定冻结 opt-in 通道（设计选择）
+- §11-3: 视距段敢信测量无明文守门（工艺待规）
+- §11-6: EKF 允许 cfg.gate=None 禁用质量门控，Robust-EKF 不允许（工艺差异）
