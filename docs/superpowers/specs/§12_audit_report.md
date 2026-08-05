@@ -274,7 +274,7 @@ $ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/test_ekf_core.py tests
 | §12.1-A3 | FGO/EKF/NN 挂残差不挂已清洗位姿 | `ekf_core.py:915` raw_range = float / `robust_ekf_core.py:372` / `fgo_core.py:1923` | 三 estimator 均 raw_range = float(uwb_payload["range"]) 进 predict_range(extra_bias=bias_applied_h)，bias 进 h(·) | 合规 |
 | §12.2-B1i | 测量噪声阵/标量权重 | `shared.py:56` build_controlled_measurement_cov / `ekf_core.py:894,1100` / `robust_ekf_core.py:360,568` / `fgo_core.py:1910,2154` | 三 estimator 均走同一函数，noise_multiplier 由协议层 clamp 后传入 | 合规 |
 | §12.2-B1ii | 模型一致观测映射修正 | `ekf_core.py:919` / `robust_ekf_core.py:374` / `fgo_core.py:1925` | 均 predict_range(x_prev, anchor_pos, extra_bias=bias_applied_h) | 合规 |
-| §12.2-B1iii | 共享无效标志后降权 | `liquid_bridge_contract.py:266` apply_safe_mode / `ekf_core.py:835,1030` / `robust_ekf_core.py:336` / `fgo_core.py:1870` | 三 estimator 均先 is_bool_like(uwb_valid) 再 apply_safe_mode 返回 skip_update | 合规 |
+| §12.2-B1iii | 共享无效标志后降权 | `liquid_bridge_contract.py:266` apply_safe_mode / `liquid_bridge_contract.py:829` _resolve_uwb_valid_flag(is_bool_like 在此) / `liquid_bridge_contract.py:840,857` apply_safe_mode 调用 / `fusion_runner.py:780` build_measurement_control 调用 / `ekf_core.py:1030,1476` / `robust_ekf_core.py:252,449` / `fgo_core.py:1799,2038` 仅读 control.gate_action 跳过 | fusion_runner→build_measurement_control→apply_safe_mode→gate_action→estimator 跳过 链路统一跳过；is_bool_like 在桥接合约层 _resolve_uwb_valid_flag 而非 estimator 端 | 合规 |
 | §12.2-B1iv | 视距段仍敢信的自适应 R | — | 零实现 | 合规 |
 | §12.2-B2i | 改写 raw 距离/增量 | `ekf_core.py:915` / `robust_ekf_core.py:372` / `fgo_core.py:1923` | 三 estimator 均 raw_range = float(uwb_payload["range"]) 无改写 | 合规 |
 | §12.2-B2ii | 输出世界坐标旁路距离合同 | — | 三网零实现 | 合规 |
@@ -1360,3 +1360,51 @@ $ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/ tests/protocol/ -q --
 3. **§12.2-B1iii safe_mode 同源链路通过精读**：fusion_runner → build_measurement_control → apply_safe_mode → gate_action 唯一调用链；audit 表描述架构混淆但实质合规
 4. **§12 audit 报告穷举深度再升级**：从"反推同输入→同输出"升级到"反推真实 code path 逐行精读比对"
 5. **本轮无新违规发现**：所有 audit 表声明的同源点都在真实执行路径上逐行验证通过
+
+### 第十九轮余下条款精读（D1/D3/E1/C3）
+
+#### §12.D1 对角 R
+**UWB**：`uwb_update_step.py:718 R_stacked = np.diag(np.asarray(r_values, dtype=float))` — 强制 (N,N) 对角阵 ✅
+**VIO**：`vision_update_step.py:386 _normalize_vio_covariance` 强制 3×3，L66-68/L86-87/L91-92 显式拒绝 `对角项≤0` ✅
+**结论**：UWB 与 VIO 的 R 矩阵构造都强制对角/正定，无全相关 R 实现路径
+
+#### §12.D3 _coerce_scaling 精读
+`covariance_utils.py:48` `_coerce_scaling(value, *, name)`：
+- L50 None 透传
+- L51 `_coerce_scalar(value, name=name)` 强制是标量
+- L52-53 `if not np.isfinite(scaling) or scaling <= 0.0: raise ValueError` — 真正严格强制 finite 与 >0
+- L54 返回规整后的 `scaling`
+
+`build_effective_cov` 通过 `_coerce_scaling(uwb_scaling, name="uwb_scaling")` / `_coerce_scaling(vio_scaling, name="vio_scaling")` 调用 — 三方法共用 ✅
+
+#### §12.E1 残差五点同源精读
+- **UWB**：`uwb_update_step.py:519 residual = z_range_value - z_pred`（与 estimator 端 `raw_range - z_pred` 同公式） ✅
+- **VIO**：`vision_update_step.py:737 residual = z_vio_array - z_hat`（与 estimator 端 `z_vio - z_hat` 同公式） ✅
+- L738 VIO 航向残差 `residual[2] = angle_delta_rad(z_vio[2], z_hat[2])` — 三 estimator 同口径（环形角差）✅
+
+#### §12.3-C3 NN 不直接写 state 精读
+`model_factory.py:2560 _LSTMModel.infer_intermediate`：
+- L2573 `with torch.no_grad():` 无梯度
+- L2574 `predict_intermediate_tensors(window_tensor)` 前向推理
+- L2577-2583 解 4 个中间量进 `ModelIntermediate(bias, risk, uwb_scaling, vio_scaling)` — **不写任何 estimator 状态**
+- L2585-2596 `state_dict()` 仅返回 `{network, risk_calibration}` 训练参数，非 estimator `self._state`
+- L2598+ `load_state_dict` 仅加载训练参数到 `self.network`/`self.risk_calibration`
+
+`fusion_runner.py:780 build_measurement_control(event, intermediate, ...)` 接收 ModelIntermediate → 产出 MeasurementControl → `estimator.set_measurement_control(control)` — estimator 消费 control，NN 永不绕过 estimator 直接写状态
+
+**C3 真实相符 ✅**
+
+### 第十九轮测试验证
+- `tests/estimators/` + `tests/protocol/test_covariance_utils.py` + `tests/protocol/test_vio_path.py`：686 项全过 ✅
+- `tests/protocol/test_liquid_bridge_contract.py` 收集错误 — 来自 `src/liquidloc/pipelines/train_pipeline.py:2251 unmatched '}'`（未跟踪文件，pre-existing，与本次 audit 无关）
+- 本轮无新增违规，无新增修复，仅审计表 L277 B1iii 描述修正
+
+### 第十九轮穷举深度最终结论
+
+本轮不再依靠 grep 或 audit 表声明，而是逐行精读真实执行点。**§12 全 27 条款的 4 个核心执行点已完成逐行精读比对**：
+1. **VIO 路径 10 个执行点**（9 个真同源 + 1 个 S 公式合规 + FGO 因子图结构性差异）
+2. **UWB 路径 8 个执行点**（7 个真同源 + 1 个 S 公式合规 + FGO 因子图结构性差异）
+3. **safe_mode 链路**（统一 fusion_runner→build_measurement_control→apply_safe_mode→gate_action→estimator 跳过）
+4. **D1/D3/E1/C3** 4 个条款各自独特真实执行点确认通过
+
+至此，§12 全 27 条款均在真实代码执行路径上完成逐行精读。**无任何条款仅依赖 audit 表声明**。
