@@ -1408,3 +1408,59 @@ $ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/ tests/protocol/ -q --
 4. **D1/D3/E1/C3** 4 个条款各自独特真实执行点确认通过
 
 至此，§12 全 27 条款均在真实代码执行路径上完成逐行精读。**无任何条款仅依赖 audit 表声明**。
+
+---
+
+## 第二十轮穷举自审 — 剩余 3 个执行点逐行精读（B1i/B1ii-UWB/B1iii 完整链路）
+
+> 第十九轮精读了 VIO 路径 10 个执行点、UWB 路径 8 个执行点、safe_mode 链路、D1/D3/E1/C3。本轮对剩余 3 个尚未逐行精读的执行点做完整链路精读。
+
+### §12.2-B1i build_controlled_measurement_cov 完整执行路径
+
+`shared.py:56` 完整执行链：
+1. L62-91 `calibration_frozen=True` → 直接返回 `base_cov`（§2.2 标定冻结，LNN noise_multiplier 被强制忽略）
+2. L104-105 `noise_multiplier` 必须 finite+>0 验证
+3. L107-108 UWB 走 `build_effective_cov(base_cov, uwb_scaling=noise_multiplier)`
+4. L109-110 VIO 走 `build_effective_cov(base_cov, vio_scaling=noise_multiplier)`
+5. L113-117 报告字典补充 bridge_scaling/bridge_risk/noise_multiplier/gate_action/bridge_semantics_authority
+
+**三方法同源** ✅：EKF L894/Robust L276/FGO L1839 都调用 `build_controlled_measurement_cov(base_uwb_noise, control, modality="uwb", calibration_frozen=self._calibration_frozen)`
+
+### §12.2-B1ii UWB 路径 predict_range + build_uwb_jacobian 完整执行链
+
+`predict_range`（uwb_update_step.py:335）完整执行链：
+- L370 `_coerce_state_vector(x_pred)` 规整状态
+- L371-372 `px, py = float(x_vector[_IDX_PX]), float(x_vector[_IDX_PY])` 取位置分量
+- L375 `uwb_clock_bias = float(x_vector[_IDX_UWB_CLOCK_BIAS]) if _IDX_UWB_CLOCK_BIAS < x_vector.size else 0.0` 取钟差（10 维状态必在）
+- L376 `extra_bias_value = coerce_finite_scalar(float(extra_bias), name="extra_bias")` 观测侧有界偏置修正
+- L377-378 `ax, ay = _coerce_anchor_xy(anchor_pos)` 取锚点坐标
+- L380-381 `dx = px - ax; dy = py - ay`
+- L382 `z_pred = math.hypot(dx, dy) + uwb_clock_bias + extra_bias_value` 几何距离 + 钟差 + h 侧偏置
+
+**bias 进 h(·) 侧，不改写 raw z** ✅：`extra_bias_value` 是 h(·) 内部的常量偏移，不修改 `raw_range`
+
+`build_uwb_jacobian`（uwb_update_step.py:388）三方法同源调用 ✅（已在第十九轮确认）
+
+### §12.2-B1iii apply_safe_mode 完整链路
+
+`_resolve_uwb_valid_flag`（liquid_bridge_contract.py:258）：
+- L261 `if is_bool_like(value): return bool(value)` — is_bool_like 在桥接合约层调用
+- L262 `return True` — 非 bool-like 值默认有效
+
+`_quality_below_floor`（L252）：
+- L255 `return quality_below_floor(quality, floor, epsilon=_QUALITY_FLOOR_EPSILON)` — 委托到 common.validation 共享入口
+
+`apply_safe_mode`（L266）：
+- L281 UWB 分支：`not valid or _quality_below_floor(quality, _UWB_HARD_SKIP_QUALITY_FLOOR) or risk >= _RISK_HARD_SKIP_THRESHOLD`
+- L283 VIO 分支：`_quality_below_floor(quality, _VIO_HARD_SKIP_QUALITY_FLOOR) or risk >= _RISK_HARD_SKIP_THRESHOLD`
+
+**三方法同源链路** ✅：fusion_runner L780 → `build_measurement_control` → L840/857 `apply_safe_mode` → `gate_action` → estimator 端只读 `control.gate_action` 跳过
+
+### 第二十轮最终结论
+
+1. **§12 全 27 条款的 3 个剩余执行点全部逐行精读通过**
+2. **§12.2-B1i** build_controlled_measurement_cov 内部：finite+>0 验证 + UWB/VIO 分别走 build_effective_cov + 标定冻结保护
+3. **§12.2-B1ii** UWB predict_range：bias 进 h(·) 侧不改写 raw z，extra_bias 来自 clip_uwb_bias 有界截断
+4. **§12.2-B1iii** apply_safe_mode：is_bool_like 在桥接合约层 _resolve_uwb_valid_flag，_quality_below_floor 委托到 common.validation 共享入口
+5. **§12 audit 穷举深度第六阶段完成**：file:line 锚点 → import 同源 → 数值等价 → 协议级常量单源化 → 深度反向 grep + 伪同源 + 隐藏硬编码排查 → 真实 code path 逐行精读比对 → 完整链路精读（B1i/B1ii-UWB/B1iii）
+6. **本轮无新违规发现**：所有 audit 表声明的同源点都在真实执行路径上逐行验证通过
