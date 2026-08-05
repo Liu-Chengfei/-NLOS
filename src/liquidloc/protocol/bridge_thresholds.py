@@ -32,6 +32,7 @@ from liquidloc.common.constants import (  # 桥接层阈值单源真相，protoc
     BRIDGE_SCALING_MAX,
     BRIDGE_BIAS_ABSOLUTE_MAX,
     BRIDGE_NOISE_MULTIPLIER_CEILING,
+    BRIDGE_NON_CURRENT_SCALING_CEILING,
 )
 
 
@@ -84,6 +85,7 @@ class _FrozenDict(dict):  # type: ignore[misc]
 _BRIDGE_THRESHOLDS_DATA = {  # 桥接层/融合层业务阈值表（原始可变 dict，由 _FrozenDict 包装为只读）。
     "scaling_min": 1.0,  # 缩放最小值（v3：回退到 1.0。v2 放宽到 0.5 的 soft-mask 在 e9 场景下让 Liquid 不当降权好测量，不利于高 NLOS + 异步场景。）
     "scaling_max": BRIDGE_SCALING_MAX,  # 缩放最大值（方差倍数，防止极端值导致数值溢出）。
+    "non_current_scaling_ceiling": BRIDGE_NON_CURRENT_SCALING_CEILING,  # 非当前模态 scaling 上界（§12.3-C2a 三网同一写入口：第十八轮穷举自审修复，从 model_factory.py 硬编码 2.5 迁移至此单源）。
     "risk_min": BRIDGE_RISK_MIN,  # 风险最小值。
     "risk_max": BRIDGE_RISK_MAX,  # 风险最大值。
     "uwb_hard_skip_quality_floor": 0.10,  # UWB 质量硬跳过门槛，v2 放宽至 0.10 释放更多 UWB 更新。

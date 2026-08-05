@@ -202,6 +202,11 @@ def coerce_supported_modality(modality: Any, *, name: str) -> str:
 # ---------------------------------------------------------------------------
 _SCALING_NEUTRAL_FLOOR = float(BRIDGE_THRESHOLDS["scaling_min"])
 
+# 模块级常量：非当前模态 scaling 上界，引用协议层单源真相 BRIDGE_THRESHOLDS["non_current_scaling_ceiling"]。
+# 第十八轮穷举自审修复：model_factory.py 此前硬编码非当前模态 scaling 上界（违反 §12.3-C2a 三网同一写入口精神）。
+# 现改为单源常量，禁止未来任何文件各自硬编码 scaling 上界。
+_SCALING_CEILING = float(BRIDGE_THRESHOLDS["non_current_scaling_ceiling"])
+
 
 def apply_liquid_modality_output_contract(
     normalized_outputs: Mapping[str, torch.Tensor],
@@ -234,10 +239,10 @@ def apply_liquid_modality_output_contract(
     # v3 改造：放宽非当前模态 scaling 上界从 1.0 → 2.5，让 4 头在 NLOS 场景下可以
     # 把非当前模态的 R 矩阵放大（noise_multiplier = scaling^2*(1+risk)），允许 EKF
     # 对非当前模态观测做更强降权。仍受 bridge_thresholds.scaling_max=50 顶层封顶。
-    # 第十五轮穷举自审注释同步：scaling_ceiling=2.5 当前是单点硬编码常量（apply_liquid_modality_output_contract
-    # 是唯一执行 clamp 的写入口，符合 §12.3-C2a 三网同一写入口精神）。未来若 LSTM/Transformer
-    # 真实现本体并各自写 scaling clamp，必须改为 BRIDGE_THRESHOLDS["non_current_scaling_ceiling"] 单源。
-    scaling_ceiling = 2.5
+    # 第十八轮穷举自审修复：scaling_ceiling 已改为模块级常量 _SCALING_CEILING，
+    # 单源真相在 BRIDGE_THRESHOLDS["non_current_scaling_ceiling"]（见 constants.py + bridge_thresholds.py）。
+    # 禁止未来任何文件各自硬编码 scaling 上界（违反 §12.3-C2a 三网同一写入口精神）。
+    scaling_ceiling = _SCALING_CEILING
     if modality_name == MODALITY_UWB:  # 当前是 UWB 模态。
         # D5+D10：clamp 保留到 vio_scaling_head 的梯度连接（grad not None），
         # 且在 [scaling_min, 1.0] 区间内梯度直通（torch.clamp 局部不被截断），
@@ -2540,8 +2545,10 @@ class _LSTMModel(ModelAPI):
         # v3 改造：放宽 scaling_ceiling 从 1.0 -> 2.5，同时保持 scaling_min=0.5
         # D9：模态比较必须引用 MODALITY_UWB/MODALITY_VIO 单源常量，禁止硬编码字符串漂移。
         # 软掩码：non-current modality scaling 被 clamp 到 [scaling_min, scaling_ceiling]
+        # 第十八轮穷举自审修复：禁止硬编码 scaling_ceiling 值，统一引用 _SCALING_CEILING 单源常量
+        # （与 apply_liquid_modality_output_contract 同口径，§12.3-C2a 三网同一写入口闭合）。
         modality = _resolve_modality_from_normalized_window(normalized_window)  # 从窗口提取模态。
-        scaling_ceiling = 2.5  # v3: 放宽上界，与 apply_liquid_modality_output_contract 保持同口径
+        scaling_ceiling = _SCALING_CEILING  # 单源常量：BRIDGE_THRESHOLDS["non_current_scaling_ceiling"]
         if modality == MODALITY_UWB:  # 当前是 UWB 模态。
             _safe_vio = torch.nan_to_num(normalized["vio_scaling"], nan=0.0, posinf=0.0, neginf=0.0)
             normalized["vio_scaling"] = torch.clamp(_safe_vio, min=_SCALING_NEUTRAL_FLOOR, max=scaling_ceiling)  # VIO 缩放 soft-mask

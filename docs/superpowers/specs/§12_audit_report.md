@@ -1149,3 +1149,44 @@ $ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/test_ekf_core.py \
 3. **3 处历史违规/隐患闭环保持**
 4. **2 处历史注释错配修复保持**
 5. **§12 audit 报告穷举深度升级**：从"反推 import 语句真走单源"升级到"反推同样输入→同样输出数值等价"
+
+---
+
+## 第十八轮穷举自审 — 硬编码常量单源化（§12.3-C2a 三网同一写入口闭合）
+
+> 第十七轮只验证了三方法 import 同源、数值等价。本轮从"执行点"维度检查：每个协议级常量是否真走单源、是否还有硬编码常量游离在代码里。核心发现：**model_factory.py 存在两处 `scaling_ceiling = 2.5` 硬编码**，违反 §12.3-C2a 三网同一写入口精神。
+
+### 第十八轮核心发现
+
+| 位置 | 问题 | 影响 |
+|------|------|------|
+| `model_factory.py:240` | `scaling_ceiling = 2.5` 硬编码（已在第十五轮注释同步，但本质仍是硬编码常量） | §12.3-C2a 三网同一写入口：值孤立在 model_factory.py，未注册到 BRIDGE_THRESHOLDS 单源 |
+| `model_factory.py:2549` | `scaling_ceiling = 2.5` 硬编码（LSTM infer 路径） | 同上，另一处孤硬编码 |
+
+### 第十八轮修复
+
+1. **`common/constants.py` 新增 `BRIDGE_NON_CURRENT_SCALING_CEILING = 2.5`** — 新常量单源注册，注释说明取值来源与三网统一意图
+2. **`protocol/bridge_thresholds.py` 注册 `"non_current_scaling_ceiling": BRIDGE_NON_CURRENT_SCALING_CEILING`** — 协议层单源入口
+3. **`factories/model_factory.py` L203 新增模块级常量 `_SCALING_CEILING = float(BRIDGE_THRESHOLDS["non_current_scaling_ceiling"])`** — 与 `_SCALING_NEUTRAL_FLOOR` 保持同模式
+4. **`factories/model_factory.py:240` 改为 `scaling_ceiling = _SCALING_CEILING`** — apply_liquid_modality_output_contract 路径
+5. **`factories/model_factory.py:2549` 改为 `scaling_ceiling = _SCALING_CEILING`** — LSTM infer 路径
+6. **`tests/protocol/test_covariance_utils.py` 新增 4 项锁死 pytest**：
+   - `test_non_current_scaling_ceiling_single_source_in_constants` — 验证常量存在且值=2.5
+   - `test_non_current_scaling_ceiling_in_bridge_thresholds` — 验证 BRIDGE_THRESHOLDS 注册
+   - `test_model_factory_scaling_ceiling_reads_from_bridge_thresholds` — 验证 model_factory 读单源
+   - `test_no_hardcoded_scaling_ceiling_in_estimation_code` — 验证无硬编码 2.5
+
+### 第十八轮零回归验证
+
+```
+$ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/ tests/protocol/ -q --tb=no
+998 passed, 4 failed (pre-existing), 1 warning
+```
+
+4 个 pre-existing fails（2 个 scripts + 2 个 liquid_bridge_contract safe-mode，HEAD 上同样 fail）。
+
+### 第十八轮最终结论
+
+1. **§12.3-C2a 三网同一写入口闭合**：`non_current_scaling_ceiling` 从硬编码 2.5 迁移到 `BRIDGE_THRESHOLDS["non_current_scaling_ceiling"]` 单源，model_factory.py 两处硬编码已全部消除
+2. **历史违规修复闭环**：第十八轮修复的 `scaling_ceiling=2.5` 硬编码是 §12.3-C2a 的**最新发现违规**，不在前十轮闭环范围内（前十轮只锁了 risk 投影、_normalize_vio_covariance、CONTEXT_FEATURE_KEYS）
+3. **§12 audit 报告穷举深度再升级**：从"反推同输入→同输出"升级到"反推协议级常量单源化"

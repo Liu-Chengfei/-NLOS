@@ -207,3 +207,69 @@ def test_three_estimators_all_import_build_controlled_measurement_cov_from_singl
             f"{name} 必须从 liquidloc.estimators.shared 单源 import "
             f"build_controlled_measurement_cov（禁止本地重实现）"
         )
+
+# ---------------------------------------------------------------------------
+# 第十八轮穷举自审：§12.3-C2a 三网同一写入口 — non_current_scaling_ceiling 单源锁死
+# ---------------------------------------------------------------------------
+
+
+def test_non_current_scaling_ceiling_single_source_in_constants():
+    """BRIDGE_NON_CURRENT_SCALING_CEILING 常量在 common/constants.py 单源。
+
+    锁死第十八轮修复：scaling_ceiling=2.5 从 model_factory.py 硬编码迁移到
+    common/constants.py BRIDGE_NON_CURRENT_SCALING_CEILING 单源。
+    """
+    from liquidloc.common import constants
+    assert hasattr(constants, "BRIDGE_NON_CURRENT_SCALING_CEILING")
+    assert constants.BRIDGE_NON_CURRENT_SCALING_CEILING == 2.5
+
+
+def test_non_current_scaling_ceiling_in_bridge_thresholds():
+    """BRIDGE_THRESHOLDS["non_current_scaling_ceiling"] 单源注册。
+
+    锁死 model_factory.py 的 _SCALING_CEILING 必须从此处读取。
+    """
+    from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS
+    assert "non_current_scaling_ceiling" in BRIDGE_THRESHOLDS
+    assert BRIDGE_THRESHOLDS["non_current_scaling_ceiling"] == 2.5
+
+
+def test_model_factory_scaling_ceiling_reads_from_bridge_thresholds():
+    """model_factory.py 的 _SCALING_CEILING 必须从 BRIDGE_THRESHOLDS["non_current_scaling_ceiling"] 单源读取。
+
+    锁死禁止任何文件各自硬编码 scaling 上界（违反 §12.3-C2a 三网同一写入口精神）。
+    """
+    import inspect
+
+    from liquidloc.factories import model_factory
+    src = inspect.getsource(model_factory)
+    assert "_SCALING_CEILING = float(BRIDGE_THRESHOLDS[\"non_current_scaling_ceiling\"])" in src, (
+        "model_factory.py 的 _SCALING_CEILING 必须从 BRIDGE_THRESHOLDS[\"non_current_scaling_ceiling\"] 单源读取 "
+        "（§12.3-C2a 三网同一写入口锁死）"
+    )
+
+
+def test_no_hardcoded_scaling_ceiling_in_estimation_code():
+    """禁止任何 estimator 文件硬编码 scaling 上界 2.5。
+
+    锁死 §12.3-C2a 三网同一写入口：所有 scaling 上界必须从 BRIDGE_THRESHOLDS 单源读取。
+    """
+    import inspect
+
+    for name, mod in [
+        ("ekf_core", "liquidloc.estimators.ekf_core"),
+        ("robust_ekf_core", "liquidloc.estimators.robust_ekf_core"),
+        ("fgo_core", "liquidloc.estimators.fgo_core"),
+        ("model_factory", "liquidloc.factories.model_factory"),
+    ]:
+        src = inspect.getsource(__import__(mod, fromlist=[""]))
+        # 禁止硬编码 scaling_ceiling = 2.5
+        assert "scaling_ceiling = 2.5" not in src, (
+            f"{name} 不得硬编码 scaling_ceiling = 2.5，必须从 BRIDGE_THRESHOLDS[\"non_current_scaling_ceiling\"] 单源读取 "
+            f"（§12.3-C2a 三网同一写入口锁死）"
+        )
+        # 允许单源常量的读入口（model_factory 有 _SCALING_CEILING = float(BRIDGE_THRESHOLDS["non_current_scaling_ceiling"])）
+        if name == "model_factory":
+            assert "_SCALING_CEILING = float(BRIDGE_THRESHOLDS[\"non_current_scaling_ceiling\"])" in src, (
+                f"{name} 必须从 BRIDGE_THRESHOLDS[\"non_current_scaling_ceiling\"] 单源读取 scaling_ceiling"
+            )

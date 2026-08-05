@@ -141,6 +141,17 @@ BRIDGE_BIAS_ABSOLUTE_MAX: float = 5.0  # 施加偏置绝对值上限（米），
 # （原 800.0 使 scaling_max=50 在 risk>0 时成为死代码，因为 50²×2=5000>800 会被截断）。
 BRIDGE_NOISE_MULTIPLIER_CEILING: float = 5000.0  # 噪声倍数硬上限（scaling^2*(1+risk) 封顶值）。
 
+# 非当前模态 scaling 上界（§12.3-C2a 三网同一写入口要求）。
+# 唯一写入口：factories/model_factory.py apply_liquid_modality_output_contract。
+# 历史：第十八轮穷举自审发现此值曾硬编码在 model_factory.py:240，违反 §12.3-C2a
+# 三网同一写入口精神（孤立的硬编码常量未注册到 BRIDGE_THRESHOLDS 单源）。
+# 现改为单源真相，model_factory.py 从 BRIDGE_THRESHOLDS 读，未来若 LSTM/Transformer
+# 写本体 scaling clamp 必须从此常量再引用，禁止各自硬编码。
+# 取值 2.5：v3 改造放宽非当前模态 scaling 上界从 1.0 → 2.5，让 4 头在 NLOS 场景下可以
+# 把非当前模态的 R 矩阵放大（noise_multiplier = scaling^2*(1+risk)），允许 EKF 对非当前
+# 模态观测做更强降权。仍受 scaling_max=50 顶层封顶。
+BRIDGE_NON_CURRENT_SCALING_CEILING: float = 2.5  # 非当前模态 scaling 上界（单源真相）。
+
 # 风险先验常量（单源真相，LSTM 和 Liquid 共享，保证公平性）。
 # §7.4 修复 (对齐 docs/trainer.md §10 L871 [0.4, 0.6] 健康区间):
 # RISK_PRIOR_PROB=0.10 使 sigmoid(logit)≈0.100 偏离 [0.4,0.6]；
