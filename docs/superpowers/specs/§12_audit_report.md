@@ -1107,3 +1107,45 @@ $ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/test_ekf_core.py \
 4. **2 处历史注释错配修复保持**：model_factory.py:233 注释同步 + scaling_ceiling=2.5 单点写入口注释同步
 5. **本轮穷举深度**：不仅反推 audit 表 file:line 锚点真存在，且反推每条"三方法同源"声明的 import 语句真走单源 + 每条"锁死 pytest"标注真有对应 pytest 文件锁住
 6. **§12 audit 报告穷举至全 27 条款 × 三方法同源 import × 锁死 pytest 对齐完成**
+
+---
+
+## 第十七轮穷举自审 — VIO 路径三方法同源精读 + 锁死 pytest 补齐
+
+> 第十六轮 audit 自报"三方法同源 import 反推全闭合"，但只验证了 import 路径真走单源，没有验证"同样输入是否产生同样输出"。本轮把 §12.2-B1ii VIO 路径三方法同源声明做数值等价验证。
+
+### 第十七轮三方法 VIO 路径完整同源验证
+
+| VIO 工具函数 | 三方法 import path | 单源位置 | 数值等价验证 |
+|----------------|---------------------|----------|--------------|
+| `build_vio_measurement` | `vision_update_step.py:519` | 三方法同源 | ✅ test_build_vio_measurement_identity |
+| `compute_vio_residual` | `vision_update_step.py:617` | 三方法同源 | ✅ test_compute_vio_residual_identity |
+| `_normalize_vio_covariance` | `vision_update_step.py`（共享版） | 三方法同源 | ✅ test_normalize_vio_covariance_identity |
+| `_ensure_positive_definite_vio_innovation_covariance` | `vision_update_step.py` | 三方法同源 | ✅ test_ensure_positive_definite_vio_innovation_covariance_identity |
+| `apply_vision_update` | `vision_update_step.py` | EKF/Robust-EKF 同源；FGO 用因子图 solve() 直接写状态（结构性差异，非偷懒） | ✅ test_ekf_and_robust_call_apply_vision_update_fgo_does_not |
+
+### 第十七轮锁死 pytest 新增 9 项（tests/protocol/test_vio_path.py）
+
+1. `test_compute_vio_residual_identity` — compute_vio_residual 同输入同输出（纯函数）
+2. `test_build_vio_measurement_identity` — build_vio_measurement 同输入同输出（纯函数）
+3. `test_normalize_vio_covariance_identity` — _normalize_vio_covariance 同输入同输出（纯函数）
+4. `test_ensure_positive_definite_vio_innovation_covariance_identity` — _ensure_positive_definite_vio_innovation_covariance 同输入同输出（纯函数）
+5. `test_three_methods_all_call_compute_vio_residual_from_vision_update_step` — inspect 静态锁死 compute_vio_residual 单源
+6. `test_three_methods_all_call_build_vio_measurement_from_vision_update_step` — inspect 静态锁死 build_vio_measurement 单源
+7. `test_three_methods_all_call_normalize_vio_covariance_from_vision_update_step` — inspect 静态锁死 _normalize_vio_covariance 单源
+8. `test_three_methods_all_call_ensure_positive_definite_vio_innovation_covariance` — inspect 静态锁死 _ensure_positive_definite_vio_innovation_covariance 单源
+9. `test_ekf_and_robust_call_apply_vision_update_fgo_does_not` — FGO 不用 apply_vision_update（因子图结构性差异）
+
+### 第十七轮陷阱发现（仅影响测试设计，不影响代码合规）
+
+1. `build_vio_measurement` 要求 event 完整 schema（t/dt/meta/scene_id/seq_id/vio_payload.dx/dy/dyaw/quality），测试 payload 必须满足
+2. `_resolve_reference_pose` 内调 `_coerce_state_vector` 要求 5 维或 10 维状态（不接 3 维直接 pose），compute_vio_residual 的 reference_pose 必须传 pose-only 5 维或 full 10 维
+3. 修正 `_make_payload` 满足真实 schema，修正 `compute_vio_residual` 测试用 5 维 pose-only 状态
+
+### 第十七轮最终结论
+
+1. **§12.2-B1ii VIO 路径三方法同源验证完成**：5 个 VIO 工具函数全 import 自 vision_update_step 单源 + 数值等价验证通过
+2. **第十七轮新补 9 项锁死 pytest**：tests/protocol/test_vio_path.py 9/9 全过
+3. **3 处历史违规/隐患闭环保持**
+4. **2 处历史注释错配修复保持**
+5. **§12 audit 报告穷举深度升级**：从"反推 import 语句真走单源"升级到"反推同样输入→同样输出数值等价"
