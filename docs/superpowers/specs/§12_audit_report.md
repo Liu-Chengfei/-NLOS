@@ -1018,3 +1018,92 @@ $ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/test_ekf_core.py \
    - 第十三轮 CONTEXT_FEATURE_KEYS 独立常量副本 — 已单源，`is` 同对象验证通过
 5. **§12 audit 表 file:line 锚点全部反推精读真存在**（4 处行号偏移但锚点行为真实，本轮已修正）
 6. **本轮验证穷举到 §12 全 27 条款每个 file:line 都反推代码真存在 + 锁死 pytest 对齐完成 + 注释同步到代码现状**
+
+---
+
+## 第十六轮：第十五轮穷举自审"穷举是否再再再全面"自审 — 把 §12 全 27 条款 audit 表真行为反推到三方法同源 import 锁死 pytest
+
+> 第十五轮 audit 自报"零真实违规"，但只是按 audit 表声明条款逐条反推 file:line 真存在性。本轮挑战"穷举是否再再再全面"——把 audit 表中所有"三方法同源"声明反推到三方法各自的 import 语句是否真走单源（而不仅是 file:line 锚点真存在），并检查 audit 表中所有锁死 pytest 标注是否真有对应 pytest 文件锁住。
+
+### 第十六轮三方法同源 import 反推结论表（核心反推）
+
+| §12 条款 | 三方法同源实现 | EKF import path | Robust-EKF import path | FGO import path | 反推结论 |
+|----------|----------------|-----------------|------------------------|------------------|----------|
+| §12.1-A2 S<=0 jitter | 共享 BRIDGE_THRESHOLDS["cov_jitter_eps"] 单源 | `ekf_core.py:928` | `robust_ekf_core.py:303 同公式` | `fgo_core.py:1864 同公式` | 三方法拉同一单源常量 ✅ |
+| §12.2-B1i effective_cov | `common/covariance_utils.py:183 build_effective_cov` 单源 | `ekf_core.py:26 from liquidloc.common.covariance_utils import build_effective_cov` | `robust_ekf_core.py:39 同` | `fgo_core.py:89 同` | 三方法 import 同源 ✅ |
+| §12.2-B1i scaling 控制 | `estimators/shared.py:56 build_controlled_measurement_cov` 单源 | `ekf_core.py:32 from liquidloc.estimators.shared import build_controlled_measurement_cov` | `robust_ekf_core.py:23 同` | `fgo_core.py:67 同` | 三方法 import 同源 ✅ |
+| §12.2-B1ii 观测映射 | `uwb_update_step.py build_uwb_jacobian & predict_range` 单源 | `ekf_core.py:34 from liquidloc.estimators.uwb_update_step import build_uwb_jacobian, predict_range` | `robust_ekf_core.py:32 同` | `fgo_core.py:82 同` | 三方法 import 同源 ✅ |
+| §12.2-B1iii _quality_floor | EKF 走 BRIDGE_THRESHOLDS；FGO 铁律 10 强制 0.0 裸跑 | `ekf_core.py:365-377 _quality_floor` | 继承自 EKFCore | `fgo_core.py:678-687 _quality_floor` 强制 0.0 | 三方法叙事不同但有意为之 ✅ |
+| §12.2-B1ii _normalize_vio_covariance | `vision_update_step.py:386` 单源 | `ekf_core.py:1156 _normalize_vio_covariance(...)` 调用 | 无（继承 EKFCore `_handle_vio`） | `fgo_core.py:38 import 自 vision_update_step._normalize_vio_covariance` | 第十轮锁死后未回潮 ✅ |
+| §12.3-C2a risk 投影 | `protocol/risk_projection.py:35 project_risk_to_protocol_range` 单源 | N/A（不在 estimator） | N/A | N/A | LSTM `inference.py:112` 与 Liquid `inference.py:79` 都 import 自单源 ✅ |
+| §12.3-C2b CONTEXT_FEATURE_KEYS | `common/constants.py:CONTEXT_FEATURE_KEYS` 单源 | N/A | N/A | N/A | `is True` 同对象验证 ✅ |
+| §12.3-C3 NN 直写状态 | `fgo_core.py:866 _apply_uwb_clock_bias_kalman_update` 是协议级旁路 EKF 不是 NN 直写状态字面量 | - | - | - | 零命中 ✅ |
+
+### 第十六轮 audit 表锁死 pytest 标注反推 — 发现并补齐 1 处
+
+第十六轮发现 §12.2-B1i/B1ii/B1iii "三方法同源 build_effective_cov / build_controlled_measurement_cov" 在第十五轮 audit 表中标注了锁死 pytest（"estimator + risk_projection pytest 全过"），但**实际只有 9 项 risk_projection pytest 锁死 risk 投影同源（第十四轮加的）**，**11 项 covariance_utils pytest 锁死 build_effective_cov / build_controlled_measurement_cov 同源根本不存在**！
+
+第十六轮新增 11 个 lock pytest（`tests/protocol/test_covariance_utils.py`）：
+
+1. `test_build_effective_cov_scalar_same_scaling` — 锁 scalar 同 scaling 行为
+2. `test_build_effective_cov_scalar_diff_scaling_raises` — 锁 scalar diff scaling 必 raise
+3. `test_build_effective_cov_scalar_single_scaling_works` — 锁 scalar 单 scaling 工作
+4. `test_build_effective_cov_vio_3x3_only_vio_scaling` — 锁 (3,3) base_cov 只接受 vio_scaling
+5. `test_build_effective_cov_rejects_zero_uwb_scaling` — 锁 zero scaling 被 coerce_finite_scalar 拒绝
+6. `test_build_effective_cov_rejects_negative_vio_scaling` — 锁 negative scaling 被拒
+7. `test_build_controlled_measurement_cov_consumes_noise_multiplier_literal` — 锁 build_controlled_measurement_cov 直接消费 control.noise_multiplier 字面量（scaling^2*(1+risk) 在上游 NN 桥接层算）
+8. `test_build_controlled_measurement_cov_rejects_nan_noise_multiplier_via_control` — 锁 NaN 在 MeasurementControl.__post_init__ 被 coerce_finite_scalar 拒
+9. `test_build_controlled_measurement_cov_rejects_zero_noise_multiplier_via_control` — 锁 0 被 _nm_floor 拒
+10. `test_three_estimators_all_import_build_effective_cov_from_singleton` — **核心静态锁死**：用 inspect.getsource 验证三方法 import 自 common/covariance_utils 单源
+11. `test_three_estimators_all_import_build_controlled_measurement_cov_from_singleton` — **核心静态锁死**：用 inspect.getsource 验证三方法 import 自 estimators/shared 单源
+
+### 第十六轮零回归验证
+
+```
+$ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/test_ekf_core.py \
+    tests/estimators/test_robust_ekf_core.py tests/estimators/test_fgo_core.py \
+    tests/estimators/test_uwb_update_step.py tests/protocol/test_risk_projection.py \
+    tests/protocol/test_covariance_utils.py -q --tb=no
+682 passed in 2.85s
+```
+
+### 第十六轮 §12 全 27 条款终态勾选表（反推 import 同源 + 锁死 pytest 全反推闭合）
+
+| 条款 | audit 表声明 | 反推真实行号 | 三方法同源 import 反推 | 锁死 pytest 反推 | 状态 |
+|------|---------------|------------------|---------------------------|--------------------|------|
+| §12.1-A1 raw_range 提取 | ekf_core.py:1465 | ekf:915/1502, robust:288, fgo:1852 | ✅ 三方法同口径字字一致 | estimator UWB pytest | ✅ 真 |
+| §12.1-A2 S<=0 jitter | ekf_core.py:926 | ekf:926, robust:303, fgo:1864 | ✅ 三方法拉 BRIDGE_THRESHOLDS 单源 | estimator S<=0 pytest | ✅ 真 |
+| §12.1-A3 不挂已清洗位姿 | ekf_core.py:1465 | ekf:1502 step_joint | ✅ 单点 | estimator step_joint pytest | ✅ 真 |
+| §12.2-B1i effective_cov | common/covariance_utils.py:183 | 真单一 | ✅ 三方法 import 同源 | tests/protocol/test_covariance_utils.py 11 项 | ✅ 第十六轮补锁 |
+| §12.2-B1i scaling 控制 | estimators/shared.py:56 | 真单一 | ✅ 三方法 import 同源 | 同上 | ✅ 第十六轮补锁 |
+| §12.2-B1ii 观测映射 | uwb_update_step 单源 | 真单一 | ✅ 三方法 import 同源 | estimator pytest | ✅ 真 |
+| §12.2-B1iii _quality_floor | ekf:365 / fgo:678 | 真同一叙事 | ✅ EKF/Robust 继承；FGO 铁律 10 有意不同 | estimator quality pytest | ✅ 真 |
+| §12.2-B1iv 视距段自适应R | 无 | 零命中 | - | - | ✅ 真 |
+| §12.2-B2i 不改写 raw | 无 | 零命中（grep 零命中） | - | - | ✅ 真 |
+| §12.2-B2ii 世界坐标旁路 | 无 | 零命中 | - | - | ✅ 真 |
+| §12.2-B2iii 私有NLOS | 无 | 零命中 | - | - | ✅ 真 |
+| §12.2-B2iv 永久拒识 | 无 | 零命中 | - | - | ✅ 真 |
+| §12.3-C2a 三网同一写入口 | protocol/risk_projection 单源 | 真单一 | ✅ LSTM/Liquid 同源 | 9 项 risk_projection pytest | ✅ 真 |
+| §12.3-C2b CONTEXT_FEATURE_KEYS | common/constants 单源 | 真单一 | ✅ 三处 is True 同对象 | 第十三轮 is True pytest | ✅ 真 |
+| §12.3-C3 NN 直写状态零命中 | 无 | 零命中 | - | - | ✅ 真 |
+| §12.D1 默认对角R | uwb_update_step.py:606/833 | 真单一 | ✅ | estimator pytest | ✅ 真 |
+| §12.D2 noise_multiplier 公式单源 | protocol/liquid_bridge_contract.py:335 | 真单一 | ✅ | test_covariance_utils.py 11 项 | ✅ 第十六轮补锁 |
+| §12.D3 R 上下界三网同一 | bridge_thresholds.py:85-97 | 真单一 | ✅ 三方法都拉 BRIDGE_THRESHOLDS | estimator pytest | ✅ 真 |
+| §12.D4 禁学Q | estimator 全 Q 矩阵常量 | 真单一 | ✅ | estimator pytest | ✅ 真 |
+| §12.D5 状态增广 | 无 | 零命中（grep 零命中） | - | - | ✅ 真 |
+| §12.D6 推理期改R结构 | estimator 推理不改变 R 结构 | 真单一 | ✅ | estimator pytest | ✅ 真 |
+| §12.E1 残差坐标系同一 | 同 §12.1-A1 | 真同一 | ✅ | estimator pytest | ✅ 真 |
+| §12.E2 sensor/world frame 错配 | 无 | 零命中 | - | - | ✅ 真 |
+| §12.E3 NN R/h 与 EKF 一致 | model_factory.py:206 | 真单一 | ✅ | factory pytest | ✅ 真 |
+| §12.E4 图像曝光时间戳 | 无 | 零命中 | - | - | ✅ 真 |
+| §12.E5 卷帘快门 | 无 | 零命中 | - | - | ✅ 真 |
+| §12.E6 IMU-UWB sync | 无 | 零命中 | - | - | ✅ 真 |
+
+### 第十六轮最终结论
+
+1. **零真实违规**：§12 全 27 条款三方法同源 import 反推全闭合
+2. **第十六轮新补 11 项 lock pytest**：`tests/protocol/test_covariance_utils.py` 锁死 build_effective_cov / build_controlled_measurement_cov 三方法同源 import 单源 + scaling 公式 + scaling 控制 + zero/negative scaling 拒绝 + nan/zero noise_multiplier 拒绝路径
+3. **3 处历史违规/隐患闭环保持**：第十轮 _normalize_vio_covariance + 第十四轮 LSTM risk 投影 + 第十三轮 CONTEXT_FEATURE_KEYS 同对象验证
+4. **2 处历史注释错配修复保持**：model_factory.py:233 注释同步 + scaling_ceiling=2.5 单点写入口注释同步
+5. **本轮穷举深度**：不仅反推 audit 表 file:line 锚点真存在，且反推每条"三方法同源"声明的 import 语句真走单源 + 每条"锁死 pytest"标注真有对应 pytest 文件锁住
+6. **§12 audit 报告穷举至全 27 条款 × 三方法同源 import × 锁死 pytest 对齐完成**
