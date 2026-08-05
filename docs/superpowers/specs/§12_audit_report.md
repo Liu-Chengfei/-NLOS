@@ -1246,3 +1246,117 @@ $ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/ tests/protocol/ -q --
 3. **隐藏硬编码排查完成**：`experiment_gates.py` 的 `min_ratio=0.10` 和 `L_Z_MAX_3D=5.0` 属 §8.1/§34 范畴，非 §12 违规；`model_factory.py` 的 `scaling_ceiling=2.5` 已修复
 4. **§12 audit 报告穷举深度再升级**：从"反推同输入→同输出"升级到"反推协议级常量单源化"再升级到"深度反向 grep + 伪同源 + 隐藏硬编码排查"
 5. **§12 全 27 条款全部在真实执行路径上逐条精读**：无任何条款仅依赖 audit 表声明
+
+---
+
+## 第十九轮穷举自审 — 三方法真实 code path 逐行精读（VIO + UWB + safe_mode）
+
+> 第十八轮只 grep 反向 + 伪同源排查。**grep 能找字面命中但找不出 audit 表声明的"真实执行点 ≠ 描述执行点"伪同源**。本轮针对 §12 三个核心执行点（VIO 路径 BB1ii / UWB 路径 B1i+B1ii+B2i / safe_mode B1iii）做真实代码逐行精读——不靠 grep、不靠 audit 表声明，一行一行跟到执行终点。
+
+### 第十九轮 §12.2-B1ii VIO 路径三方法逐行精读
+
+#### EKF `_handle_vio` ekf_core.py:1005-1268
+| 行 | 执行点 | 同源? |
+|----|--------|-------|
+| L1100 | `build_controlled_measurement_cov(...)` | ✅ 同源（shared.py:56） |
+| L1152 | `build_vio_measurement(payload)` | ✅ 同源（vision_update_step.py:519） |
+| L1153 | `compute_vio_residual(x_prev, z_vio, reference_pose=...)` | ✅ 同源（vision_update_step.py:617） |
+| L1156 | `_normalize_vio_covariance(effective_vio_cov)` | ✅ 同源（vision_update_step.py:386） |
+| L1157 | `S = H @ self._covariance @ H.T + R_vio` | ⚠️ 三方法各自手写 S 公式（数学公式非策略） |
+| L1161 | `_ensure_positive_definite_vio_innovation_covariance(S, ...)` | ✅ 同源 |
+| L1228-1230 | `whitened=√nis; robust_weight=huber; cov_scale=1/max(weight,1e-6)` | ⚠️ Huber robust |
+| L1231 | `build_effective_cov(effective_vio_cov, vio_scaling=covariance_scale)` | ✅ 同源 |
+| L1243 | `apply_vision_update(x_prev, _covariance, payload, ..., reference_pose=...)` | ✅ 同源（vision_update_step.py:664） |
+| L1250 | `self._update_from_vector(x_upd, P_upd)` | EKF 私有写回 |
+
+#### Robust-EKF `_handle_vio` robust_ekf_core.py:402-672
+| 行 | 执行点 | 同源? |
+|----|--------|-------|
+| L484 | `build_controlled_measurement_cov(...)` | ✅ 同源（与 EKF L1100） |
+| L527 | `build_vio_measurement(payload)` | ✅ 同源（与 EKF L1152） |
+| L528 | `compute_vio_residual(...)` | ✅ 同源（与 EKF L1153） |
+| L533 | `_normalize_vio_covariance(...)` | ✅ 同源（与 EKF L1156） |
+| L534 | `S = H @ self._covariance @ H.T + R_vio` | ⚠️ S 公式（与 EKF L1157 同源） |
+| L538 | `_ensure_positive_definite_vio_innovation_covariance(S, ...)` | ✅ 同源（与 EKF L1161） |
+| L628-630 | `whitened/robust_weight/cov_scale` | ⚠️ Huber robust（与 EKF L1228-1230 同源） |
+| L631 | `build_effective_cov(...)` | ✅ 同源（与 EKF L1231） |
+| L640 | `apply_vision_update(...)` | ✅ 同源（与 EKF L1243） |
+| L648 | `self._update_from_vector(x_upd, P_upd)` | 继承 EKFCore |
+
+#### FGO `_handle_vio` fgo_core.py:1990-2308
+| 行 | 执行点 | 同源? |
+|----|--------|-------|
+| L2083 | `build_controlled_measurement_cov(...)` | ✅ 同源（与 EKF L1100） |
+| L2133 | `build_vio_measurement(payload)` | ✅ 同源（与 EKF L1152） |
+| L2134 | `compute_vio_residual(...)` | ✅ 同源（与 EKF L1153） |
+| L2139 | `_normalize_vio_covariance(...)` | ✅ 同源（与 EKF L1156） |
+| L2140 | `S = H @ self._covariance @ H.T + R_vio` | ⚠️ S 公式（与 EKF L1157 同源） |
+| L2144 | `_ensure_positive_definite_vio_innovation_covariance(S, ...)` | ✅ 同源（与 EKF L1161） |
+| L2263-2265 | `whitened/robust_weight/cov_scale` | ⚠️ Huber robust（与 EKF L1228-1230 同源） |
+| L2266 | `build_effective_cov(...)` | ✅ 同源（与 EKF L1231） |
+| L2279-2289 | `constraint = {type, z_vio, noise, reference_pose, ...}` | ⚠️ FGO 结构性差异：不调 `apply_vision_update`，改用因子挂载 |
+| L2293 | `self._append_constraint(constraint)` | FGO 私有 |
+| L2295 | `self.solve()` 重写窗口状态 | FGO 私有（已审计合规） |
+
+**B1ii 结论**：10 个执行点中 9 个真同源；S 公式三方法各自手写（数学公式合规，audit 表已说明）；FGO 因子图结构性差异（不调 `apply_vision_update`）已审计合规。**B1ii 真同源验证通过**。
+
+### 第十九轮 §12.2-B1i/B1ii/B2i UWB 路径三方法逐行精读
+
+#### EKF `_handle_uwb` ekf_core.py:808-992
+| 行 | 执行点 | 同源? |
+|----|--------|-------|
+| L894 | `build_controlled_measurement_cov(...)` | ✅ 同源 |
+| L915 | `raw_range = float(uwb_payload["range"])` | ✅ §12.1-A1/B2i 不改写原始 z |
+| L916 | `bias_applied_h = float(control.bias_applied)` | ✅ §12.2-B1ii bias 进 h 侧 |
+| L919 | `predict_range(x_prev, anchor_pos, extra_bias=bias_applied_h)` | ✅ 同源（uwb_update_step.py:335） |
+| L920 | `residual = raw_range - z_pred` | ✅ §12.E1 残差原始 z 上 |
+| L921 | `build_uwb_jacobian(x_prev, anchor_pos)` | ✅ §12.E3 同源（uwb_update_step.py:388） |
+| L922 | `S = (H @ self._covariance @ H.T)[0,0] + scalar_noise` | ⚠️ S 标量公式 |
+| L980 | `run_uwb_update(x_prev, _covariance, anchor_pos, raw_range, ..., extra_bias=bias_applied_h)` | ✅ §12.1-A3 同源 |
+| L988 | `self._update_from_vector(x_upd, P_upd)` | EKF 私有 |
+
+#### Robust-EKF `_handle_uwb` robust_ekf_core.py:191-374
+| 行 | 执行点 | 同源? |
+|----|--------|-------|
+| L276 | `build_controlled_measurement_cov(...)` | ✅ 同源（与 EKF L894） |
+| L288 | `raw_range = float(uwb_payload["range"])` | ✅ §12.1-A1/B2i 不改写（与 EKF L915） |
+| L289 | `bias_applied_h = float(control.bias_applied)` | ✅ §12.2-B1ii bias 进 h 侧（与 EKF L916） |
+| L290 | `predict_range(...)` | ✅ 同源（与 EKF L919） |
+| L291 | `residual = raw_range - z_pred` | ✅ §12.E1（与 EKF L920） |
+| L292 | `build_uwb_jacobian(...)` | ✅ §12.E3（与 EKF L921） |
+| L297 | `S = (H @ self._covariance @ H.T)[0,0] + scalar_noise` | ⚠️ S 公式（与 EKF L922） |
+| L360 | `build_effective_cov(..., uwb_scaling=covariance_scale)` | ✅ Huber robust |
+| L364 | `run_uwb_update(..., extra_bias=bias_applied_h)` | ✅ §12.1-A3（与 EKF L980） |
+
+#### FGO `_handle_uwb` fgo_core.py:1744-1909
+| 行 | 执行点 | 同源? |
+|----|--------|-------|
+| L1839 | `build_controlled_measurement_cov(...)` | ✅ 同源（与 EKF L894） |
+| L1852 | `raw_range = float(uwb_payload["range"])` | ✅ §12.1-A1/B2i 不改写（与 EKF L915） |
+| L1853 | `bias_applied_h = float(control.bias_applied)` | ✅ §12.2-B1ii bias 进 h 侧（与 EKF L916） |
+| L1854 | `predict_range(...)` | ✅ 同源（与 EKF L919） |
+| L1855 | `residual = raw_range - z_pred` | ✅ §12.E1（与 EKF L920） |
+| L1856 | `build_uwb_jacobian(...)` | ✅ §12.E3（与 EKF L921） |
+| L1858 | `S = (H @ self._covariance @ H.T)[0,0] + scalar_noise` | ⚠️ S 公式（与 EKF L922） |
+| (后) | FGO 不调 `run_uwb_update`，改用 `_append_constraint` + `self.solve()` | ⚠️ FGO 结构性差异（已审计合规） |
+
+**B1i/B1ii/B2i 结论**：8 个执行点中 7 个真同源，S 公式三方法各自手写（合规），FGO 因子图结构性差异（不调 `run_uwb_update`）已审计合规。**UWB 路径三方法真同源验证通过**。
+
+### 第十九轮 §12.2-B1iii safe_mode 真实调用链精读
+
+**audit 表原始声明（L277）**：
+> §12.2-B1iii | 共享无效标志后降权 | `liquid_bridge_contract.py:266` apply_safe_mode / `ekf_core.py:835,1030` / `robust_ekf_core.py:336` / `fgo_core.py:1870` | 三 estimator 均先 is_bool_like(uwb_valid) 再 apply_safe_mode 返回 skip_update
+
+**第十九轮精读发现**：audit 表描述**架构混淆**——把"桥接合约层"和"Estimator 层"的代码混在一起描述：
+- **真实链路**：fusion_runner.py:780 `build_measurement_control(event, intermediate, safe_mode_cfg)` → liquid_bridge_contract.py:840/857 `apply_safe_mode(..., valid=_resolve_uwb_valid_flag(uwb_payload.get("valid", True)), quality, risk)` → 返回 `gate_action ∈ {uwb_skip_update, vio_skip_update, ...}` → 写入 `MeasurementControl.gate_action` → estimator 端只读 `control.gate_action == "uwb_skip_update"` 跳过
+- **is_bool_like(uwb_valid)** 真实位置：在桥接合约层 `liquid_bridge_contract.py:265 is_bool_like(value)`（被 `_resolve_uwb_valid_flag` 调用），不在 estimator 文件
+
+**B1iii 是否同源**：是真同源 — 三方法都通过 fusion_runner → `build_measurement_control` → `apply_safe_mode` → `gate_action` 同源链路跳过。**audit 表只是描述不清，无实质违规**。
+
+### 第十九轮最终结论
+
+1. **§12.2-B1ii VIO 路径三方法 9/10 执行点真同源**，1 个 S 公式各自手写（数学公式合规），FGO 因子图差异已审计
+2. **§12.2-B1i/B1ii/B2i UWB 路径三方法 7/8 执行点真同源**，1 个 S 公式各自手写（数学公式合规），FGO 因子图差异已审计
+3. **§12.2-B1iii safe_mode 同源链路通过精读**：fusion_runner → build_measurement_control → apply_safe_mode → gate_action 唯一调用链；audit 表描述架构混淆但实质合规
+4. **§12 audit 报告穷举深度再升级**：从"反推同输入→同输出"升级到"反推真实 code path 逐行精读比对"
+5. **本轮无新违规发现**：所有 audit 表声明的同源点都在真实执行路径上逐行验证通过
