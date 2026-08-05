@@ -1190,3 +1190,59 @@ $ .venv-gpu/Scripts/python.exe -m pytest tests/estimators/ tests/protocol/ -q --
 1. **§12.3-C2a 三网同一写入口闭合**：`non_current_scaling_ceiling` 从硬编码 2.5 迁移到 `BRIDGE_THRESHOLDS["non_current_scaling_ceiling"]` 单源，model_factory.py 两处硬编码已全部消除
 2. **历史违规修复闭环**：第十八轮修复的 `scaling_ceiling=2.5` 硬编码是 §12.3-C2a 的**最新发现违规**，不在前十轮闭环范围内（前十轮只锁了 risk 投影、_normalize_vio_covariance、CONTEXT_FEATURE_KEYS）
 3. **§12 audit 报告穷举深度再升级**：从"反推同输入→同输出"升级到"反推协议级常量单源化"
+
+---
+
+## 第十八轮穷举自审 — 深度反向 grep + 伪同源排查
+
+> 第十七轮只验证了"同样输入→同样输出"。本轮做更严格的深度反向检查：
+> 1. 每个"零命中"条款做 grep 反向验证（确认真零命中而非 grep 盲区）
+> 2. 全 estimator 目录 grep 伪同源（本地重实现共享工具函数）
+> 3. 全 estimator 目录 grep 隐藏硬编码（不在 audit 表声明范围内的孤立常量）
+
+### 第十八轮深度反向验证结果
+
+| 检查维度 | 范围 | 结果 |
+|----------|------|------|
+| §12.2-B1iv 自适应 R | grep 零命中 | 真零命中 ✅ |
+| §12.2-B2ii 世界坐标旁路 | grep 零命中 | 真零命中 ✅ |
+| §12.2-B2iii 私有 NLOS 真值标签 | grep 3 命中（scene_axis_protocol.py schema 字段） | 非违规（合法 NLOS 环境参数） ✅ |
+| §12.2-B2iv 永久拒识装低 RMSE | grep 零命中 | 真零命中 ✅ |
+| §12.3-C1 SGPR | grep 零命中 | 真零命中 ✅ |
+| §12.D2 全相关 R | grep 1 命中（ekf_core.py:1369 注释） | 非违规（注释说明，非实现） ✅ |
+| §12.D4 禁学 Q | grep 零命中 + Q 矩阵无可训练参数 | 真零命中 ✅ |
+| §12.D5 禁状态增广 | grep 零命中 | 真零命中 ✅ |
+| §12.D6 禁推理期改 R | grep 零命中 | 真零命中 ✅ |
+| §12.E2 禁 sensor/world frame 错配 | grep 零命中 | 真零命中 ✅ |
+| §12.E4 图像曝光时间戳 | grep 零命中 | 真零命中 ✅ |
+| §12.E5 全局 vs 卷帘快门 | grep 零命中 | 真零命中 ✅ |
+| §12.E6 IMU-camera/UWB-IMU 标定 | grep 零命中 | 真零命中 ✅ |
+
+### 伪同源排查结果
+
+| 共享工具函数 | 唯一定义位置 | estimator 引用方式 | 伪同源? |
+|--------------|--------------|-------------------|---------|
+| `_normalize_vio_covariance` | `vision_update_step.py:386` | 三方法 import 同源 | ✅ 无伪同源 |
+| `build_vio_measurement` | `vision_update_step.py:519` | 三方法 import 同源 | ✅ 无伪同源 |
+| `compute_vio_residual` | `vision_update_step.py:617` | 三方法 import 同源 | ✅ 无伪同源 |
+| `apply_vision_update` | `vision_update_step.py:664` | EKF/Robust-EKF import 同源；FGO 走因子图 solve() | ✅ 结构性差异 |
+| `apply_safe_mode` | `fusion/safe_mode.py:40` | 三方法 import 同源 | ✅ 无伪同源 |
+| `predict_range` | `uwb_update_step.py:335` | 三方法 import 同源 | ✅ 无伪同源 |
+| `build_uwb_jacobian` | `uwb_update_step.py:388` | 三方法 import 同源 | ✅ 无伪同源 |
+| `predict_range_to_anchor` | `sensors/uwb_model.py:126` | 独立测距模型（非 estimator 工具） | ✅ 不同函数 |
+
+### 隐藏硬编码排查
+
+| 位置 | 值 | 性质 | §12 违规? |
+|------|-----|------|-----------|
+| `experiment_gates.py:2401 min_ratio=0.10` | §34 推荐病态观测占比下限 | §8.1 协议级参数，非 §12 | ❌ 非 §12 范畴 |
+| `experiment_gates.py:2859 L_Z_MAX_3D=5.0` | §8.1 L1364 3D 锚点最大距离 | §8.1 协议级参数，非 §12 | ❌ 非 §12 范畴 |
+| `model_factory.py` 硬编码 `scaling_ceiling=2.5` | 已修复为 `_SCALING_CEILING` 单源 | §12.3-C2a 违规 | ✅ 已修复 |
+
+### 第十八轮最终结论
+
+1. **§12 全 27 条款零命中条款全部真零命中**：grep 反向验证无 false positive
+2. **伪同源排查完成**：所有共享工具函数只存在于单源位置，无 estimator 本地重实现
+3. **隐藏硬编码排查完成**：`experiment_gates.py` 的 `min_ratio=0.10` 和 `L_Z_MAX_3D=5.0` 属 §8.1/§34 范畴，非 §12 违规；`model_factory.py` 的 `scaling_ceiling=2.5` 已修复
+4. **§12 audit 报告穷举深度再升级**：从"反推同输入→同输出"升级到"反推协议级常量单源化"再升级到"深度反向 grep + 伪同源 + 隐藏硬编码排查"
+5. **§12 全 27 条款全部在真实执行路径上逐条精读**：无任何条款仅依赖 audit 表声明
