@@ -96,8 +96,8 @@ DEFAULT_THRESHOLDS = {  # 全局默认阈值表（纯算法/协议级阈值）�
     "flow_displacement_max": 10.0,  # 光流位移增量上界（米），dx/dy 防溢出阈值。
     "imu_accel_min": -150.0,  # IMU 加速度下界（m/s²），典型消费级 IMU 量程 ±50 m/s²。
     "imu_accel_max": 150.0,  # IMU 加速度上界（m/s²）。
-    "imu_gyro_min": -150.0, # IMU 角速度下界（rad/s），仿真数据覆盖到 ~33.6。
-    "imu_gyro_max": 150.0, # IMU 角速度上界（rad/s），仿真数据覆盖到 ~33.6。
+    "imu_gyro_min": -200.0, # IMU 角速度下界（rad/s）。sim 数据覆盖到 ~181.6（含 sim_turn_02 / sim_long_50m_01 系列的尖峰），故放宽到 ±200 保留 10% 余量。
+    "imu_gyro_max": 200.0, # IMU 角速度上界（rad/s）。sim 数据覆盖到 ~181.6（含 sim_turn_02 / sim_long_50m_01 系列的尖峰），故放宽到 ±200 保留 10% 余量。
 }  # 阈值表结束。桥接层业务阈值已迁移至 liquidloc.protocol.bridge_thresholds.BRIDGE_THRESHOLDS。
 
 ASYNC_GAP_FULL_SCALE_S = 0.30  # 异步时间间隔归一化满量程（秒），训练侧与推理侧共享。
@@ -193,6 +193,7 @@ ALLOWED_TRAIN_DEVICES: frozenset[str] = frozenset({DEVICE_AUTO, DEVICE_CPU, DEVI
 ESTIMATOR_NAME_EKF: str = "ekf"  # 标准 EKF 估计器名字。
 ESTIMATOR_NAME_ROBUST_EKF: str = "robust_ekf"  # 鲁棒 EKF 估计器名字。
 ESTIMATOR_NAME_FGO: str = "fgo"  # 滑窗因子图优化估计器名字。
+ESTIMATOR_NAME_SGPR: str = "sgpr"  # 纯 SGPR 估计器名字（§16.1 封闭对手集，当前无真实本体，仅占位）。
 
 # 数据集名字常量（单源真相，D9 配置表面漂移根因修复）。
 # pipelines/prepare_pipeline.py dataset_name 合法集校验与读取器分支、

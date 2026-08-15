@@ -1572,6 +1572,10 @@ class CorePipeline(PipelineAPI):  # 把场景生成、估计器/模型推理、�
                     feature_builder = _build_feature_window_builder(model_cfg, timed_estimator)  # 构窗时尽量用计时后的 estimator，保证耗时统计覆盖真实推理链路。
 
                 with torch.no_grad():  # 推理阶段禁用梯度计算，防止显存泄漏。
+                    # 三角定位必须使用与 UWB 范围同坐标系的 anchor_layout：
+                    # UWB 范围已被 _remap_uwb_ranges_for_geometry 重映射到 scenario_context 的投影坐标系，
+                    # 因此三角定位应使用 scenario_context 的 anchor_layout（投影后），而非 source_report 的原始布局。
+                    triangulation_anchor = scenario_context.get('anchor_layout')
                     bundle = run_fusion(  # 把场景事件、估计器、模型和特征构建器一起送进融合主链路。
                         scenario_events,  # 场景事件流是融合主链路的输入，决定本次推理的时间顺序。
                         timed_estimator,  # 套了计时代理的 estimator，用来同步收集耗时。
@@ -1581,6 +1585,7 @@ class CorePipeline(PipelineAPI):  # 把场景生成、估计器/模型推理、�
                             'method_name': method_name,
                             'resolved_method_name': resolved_method_name,
                             'safe_mode': deepcopy(model_cfg.get('safe_mode') or {}) if model_name is not None else None,  # 第 15 轮审查 LOW-8 修复（R15-C LOW-8）：原实现 dict() 浅拷贝，嵌套可变结构会跨 task 共享污染 model_cfg['safe_mode']，违反 D3 不可漂移合同。model_cfg 来自 _resolve_model_cfg 跨 task 共享，run_fusion 内部修改嵌套字段会反向污染。改为 deepcopy 与 _resolve_estimator_cfg/_resolve_model_cfg 口径对齐。
+                            'anchor_layout': deepcopy(triangulation_anchor) if triangulation_anchor is not None else None,  # 三角定位用 scenario_context 投影后的 anchor_layout（与重映射后的 UWB 范围同坐标系），而非 source_report 的原始布局。
                         },
                     )  # 调用融合主链路后得到最终 bundle。
                 bundle['scene_id'] = task['scene_id']  # 强制写回当前任务的场景编号。

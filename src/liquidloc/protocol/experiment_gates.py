@@ -89,7 +89,7 @@ _AGGREGATION_ORDER: tuple[str, ...] = (  # 实验结果的聚合顺序，从内�
     'scene_summary',  # 场景汇总。
     'experiment_conclusion',  # 实验结论。
 )
-_CONCLUSION_PRIORITY: tuple[str, ...] = ('p95', 'failure_rate', 'rmse', 'mae')  # 结论优先级：先看 p95 和失败率，再看 RMSE 和 MAE。
+_CONCLUSION_PRIORITY: tuple[str, ...] = ('rmse', 'p95', 'failure_rate', 'mae')  # 结论优先级：先看 rmse 主精度，再看 p95 尾部，再看 failure_rate 可用性，最后 mae 兜底。
 _PUBLIC_BENCHMARK_ALLOWED_DATASETS: tuple[str, ...] = ('miluv', 'ntu_viral')  # 公开基准只允许这两个数据集，防止随意扩展。
 _PUBLIC_BENCHMARK_FROZEN_EVAL_SPLIT: str = 'frozen_public_eval'  # 公开基准的冻结评测分割名，所有公开基准必须使用此分割。
 _TRAINING_ALLOWED_SPLIT_ROLES: tuple[str, ...] = ('train', 'val')  # 训练只允许使用 train 和 val 分割。
@@ -482,6 +482,7 @@ def _validate_frozen_experiment_protocol_cfg(cfg: Any) -> dict[str, Any]:
         'protocol_version', 'quick_full_rule', 'failure_sample_policy',
         'aggregation_order', 'conclusion_priority', 'public_benchmark',
         'training', 'evaluation', 'scene_scale', 'seed_policy',
+        'comparison_thresholds', 'failure_accounting_mode',
     })
     unknown_keys = [k for k in normalized_cfg if k not in _KNOWN_TOP_LEVEL_KEYS]
     if unknown_keys:
@@ -2915,8 +2916,32 @@ def assert_trajectory_generator_pol_2(
     return report
 
 
+def check_test_set_not_in_training_scores(
+    train_report: dict[str, Any],
+    test_split_ids: list[str],
+) -> None:
+    """§13.6.2.7 反例 gate: 校验测试集序列 ID 不渗入 train_report 的
+    val_split_ids / train_split_ids / val_selection_scores 字段。
+
+    训练 pipeline 无 test_split_ids（仅 train/val 切分），传空列表使 gate 为 no-op
+    但确保协议层可见。
+
+    参数：
+        train_report: 训练报告字典。
+        test_split_ids: 测试集序列 ID 列表（空时为 no-op）。
+    """
+    if not test_split_ids:  # 无 test_split_ids 时，gate 为 no-op。
+        return
+    for key in ('val_split_ids', 'train_split_ids', 'val_selection_scores'):
+        if key in train_report and test_split_ids & set(train_report[key]):
+            raise ValueError(
+                f'§13.6.2.7 测试集序列 ID 渗入 train_report.{key}: '
+                f'test_split_ids={test_split_ids}, '
+                f'train_report.{key}={train_report[key]}'
+            )
+
+
 def assert_trajectory_generator_pol_4(
-    generator_metadata: Mapping[str, Any] | None,
     *,
     raise_on_violation: bool = True,
 ) -> dict[str, Any]:

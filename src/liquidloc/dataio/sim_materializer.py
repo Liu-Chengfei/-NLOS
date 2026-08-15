@@ -3003,6 +3003,8 @@ def materialize_sim_raw(
     }
 
 
+SIM_GENERATOR_VERSION_CURRENT = "liquidloc.sim_materializer.v2.1"
+
 __all__ = [
     "DEFAULT_SIM_NOISE_SPEC",
     "DEFAULT_SIM_SEQUENCE_SPECS",
@@ -3010,6 +3012,10 @@ __all__ = [
     "SimNoiseSpec",
     "SimSequenceSpec",
     "ZERO_SIM_NOISE_SPEC",
+    SIM_GENERATOR_VERSION_CURRENT,
     "can_materialize_sim_raw",
     "materialize_sim_raw",
 ]
+
+SIM_GENERATOR_VERSION_CURRENT = "liquidloc.sim_materializer.v2.1"
+
