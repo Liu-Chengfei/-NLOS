@@ -1,0 +1,67 @@
+# 文件职责：定义消融实验入口。
+# 它主要比较液态方法（liquid_ekf）的不同变体，看看去掉某些机制后会发生什么。
+# 这类实验用来解释各组件的贡献，是论文消融分析的核心实验。
+# 每个变体从完整模型中去掉一个关键机制，通过对比可以量化该机制的独立贡献。
+
+# 实验编号。# 这个值用于日志、产物目录和结果汇总时标识这一组实验。
+experiment_id: e5_ablation  # 消融实验编号。
+
+# 主研究轴是消融变体。# 这里不是扫描退化轴，而是比较同一方法的不同组件配置。
+primary_axis: ablation_variant  # 主轴定义为消融变体。
+
+# 消融实验中固定的场景条件。# 所有变体在同一场景下运行，确保差异只来自组件变化。
+frozen_axes:
+  # 异步固定为中度。# A2 表示中等时间错位，避免时间因素抢走解释权。
+  A: A2  # 固定为 A2。
+
+  # NLOS 固定为中度。# N2 表示中等非视距偏差，保持非视距压力中等。
+  N: N2  # 固定为 N2。
+
+  # VIO 退化固定为中度。# V2 表示中等视觉退化，让视觉压力处于中等水平。
+  V: V2  # 固定为 V2。
+
+  # 几何固定为中等条件。# G1 表示中等几何布局，保持几何环境稳定。
+  G: G1  # 固定为 G1。
+
+  # 锚点数量固定为 4。# K4 是主表欠定默认（B30），原 K6 高冗余已弃。
+  K: K4  # 主表欠定默认（B30）；原 K6 高冗余已弃
+
+  # 模态缺失固定为无缺失。e5 消融实验关心 liquid 组件贡献，不引入模态丢失压力，
+  # 显式冻结 M=M0 与六轴协议保持一致。
+  M: M0  # 固定为无模态缺失。
+
+# 参与比较的消融变体。# 每个变体从完整 liquid_ekf 中去掉一个关键机制。
+# liquid_ekf_full：完整液态网络增强 EKF，包含所有组件，作为消融基准。
+# liquid_ekf_wo_liquid：去掉液态神经网络核心，退化为普通 EKF，验证液态网络的贡献。
+# 以下3个机制级消融变体已落地结构级实现（fusion_runner._apply_mechanism_ablation 在
+# build_measurement_control 前对 intermediate 对应字段做中性化）：
+#   liquid_ekf_wo_bias_memory：把 intermediate.bias 强制为 0.0，仅保留 EKF 内置零偏置，
+#       验证液态网络学到的偏置记忆对 UWB 偏置跟踪能力的贡献。
+#   liquid_ekf_wo_risk_gate：把 intermediate.risk 强制为 0.0，使 _resolve_effective_risk /
+#       apply_safe_mode 不再因风险触发门控，验证自适应降级策略对鲁棒性的贡献。
+#   liquid_ekf_wo_vio_confidence：在 VIO 模态把 intermediate.vio_scaling 强制为 1.0，
+#       去掉模型对 VIO 置信度的学习，验证视觉质量感知对融合的贡献。
+methods:
+  - liquid_ekf_full
+  - liquid_ekf_wo_liquid
+  - liquid_ekf_wo_bias_memory
+  - liquid_ekf_wo_risk_gate
+  - liquid_ekf_wo_vio_confidence  # 当前已实现的5个消融变体（含完整基线 + 纯EKF基线 + 3个机制级消融）。
+
+# quick/full 下的运行规模。# 消融实验不需要扫描退化轴，所以用 repeats 和 max_sequences 控制规模。
+mode_overrides:
+  # 轻量模式。# 先看最小验证集，确认消融逻辑是否正常。
+  quick:
+    # 重复次数。# 保证最小重复，避免消融实验太重。
+    repeats: 2  # quick 模式重复 2 次。
+
+    # 序列上限。# 避免消融实验太重，6 个序列足够覆盖基本场景。
+    max_sequences: 6  # quick 模式最多 6 个序列。
+
+  # 完整模式。# 用于更完整的对比，确保消融结论统计可靠。
+  full:
+    # 重复次数。# full 模式保留稳妥重复，提高统计可靠性。
+    repeats: 5  # full 模式重复 5 次。
+
+    # 不限制序列数。# 表示完整模式不裁剪，覆盖所有可用序列。
+    max_sequences: null  # full 模式不设序列上限。

@@ -22,6 +22,7 @@ from liquidloc.common.constants import (  # D9 单源常量：神经方法名、
     MODALITY_UWB,
     MODEL_NAME_LIQUID,
     MODEL_NAME_LSTM,
+    MODEL_NAME_TRANSFORMER,
 )
 from liquidloc.common.paths import resolve_output_root  # 解析项目标准目录和统一输出根目录。
 from liquidloc.common.types import ModelIntermediate  # 模型中间输出结构。
@@ -600,26 +601,21 @@ from liquidloc.common.gt_utils import align_ground_truth, normalize_gt_rows, res
 from liquidloc.common.io_utils import dumps_json_text, read_json  # D10：严格标准 JSON 读写，拒绝 NaN/Infinity；dumps_json_text 提升到模块顶层，避免在 run 主循环内反复延迟 import（原函数内 import 经多次 task/method 迭代重复执行，且空 scene_tasks 路径下落盘 L938/L941 会 NameError）。
 
 
-_NEURAL_METHODS = {MODEL_NAME_LSTM, MODEL_NAME_LIQUID}  # 需要模型参与的神经方法。
+_NEURAL_METHODS = {MODEL_NAME_LSTM, MODEL_NAME_LIQUID, MODEL_NAME_TRANSFORMER}  # 需要模型参与的神经方法。
 _CLASSICAL_METHODS = {ESTIMATOR_NAME_EKF, ESTIMATOR_NAME_ROBUST_EKF, ESTIMATOR_NAME_FGO}  # 纯估计器或经典方法。
 _LIQUID_ABLATION_METHODS: dict[str, dict[str, Any]] = {  # 液态方法的消融路由表，方法名决定最终用哪个 estimator/model。
     'liquid_ekf_full': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': MODEL_NAME_LIQUID},  # 完整液态方法，保留 EKF 外壳和 liquid 模型。
     'liquid_ekf_wo_liquid': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': None},  # 去掉模型，只保留估计器，方便看纯 EKF 基线。
-}  # 仅保留当前已被真实实现支持的液态消融路由。
-_UNIMPLEMENTED_LIQUID_MECHANISTIC_ABLATIONS: dict[str, str] = {  # 这些别名在配置里声明的是机制级消融，但当前代码并没有对应结构级实现。
-    'liquid_ekf_wo_bias_memory': (
-        'liquid_ekf_wo_bias_memory is declared as a mechanistic ablation, but the current '
-        'pipeline only supports output-level overrides; refusing to run a semantically invalid ablation'
-    ),
-    'liquid_ekf_wo_risk_gate': (
-        'liquid_ekf_wo_risk_gate is declared as a mechanistic ablation, but the current '
-        'pipeline only supports output-level overrides; refusing to run a semantically invalid ablation'
-    ),
-    'liquid_ekf_wo_vio_confidence': (
-        'liquid_ekf_wo_vio_confidence is declared as a mechanistic ablation, but the current '
-        'pipeline only supports output-level overrides; refusing to run a semantically invalid ablation'
-    ),
-}  # 这些别名必须等真实结构级消融落地后才能重新开放。
+    # 三个机制级消融变体：路由层仍复用 EKF 外壳 + liquid 模型，让模型继续学习其他控制量；
+    # 机制中性化（bias/risk/vio_scaling）由 fusion_runner._apply_mechanism_ablation 在桥接
+    # 合约前施加，确保消融是结构级而非输出级。模型越学越好的其他控制量被保留，仅目标机制被关掉。
+    'liquid_ekf_wo_bias_memory': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': MODEL_NAME_LIQUID},
+    'liquid_ekf_wo_risk_gate': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': MODEL_NAME_LIQUID},
+    'liquid_ekf_wo_vio_confidence': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': MODEL_NAME_LIQUID},
+}  # 当前已被真实实现支持的液态消融路由（含五个变体：基线 full、纯 EKF 基线 wo_liquid、三个机制级消融）。
+# 机制级消融曾在此被拦阻的别名现已迁移到 _LIQUID_ABLATION_METHODS，本字典保留为空映射，
+# 作为后续新增未实现机制的告警闸：再次声明机制级消融而未落地结构实现时，仍走报错路径。
+_UNIMPLEMENTED_LIQUID_MECHANISTIC_ABLATIONS: dict[str, str] = {}
 _SCENE_AXES = SCENE_AXES  # 场景协议里六个主轴的固定顺序，来源为冻结协议。
 _PARAM_ATTR_CANDIDATES = ('params', 'param_count', 'parameter_count', 'num_params')  # 参数数量字段的候选名字。
 _RAM_ATTR_CANDIDATES = ('ram_peak', 'ram_peak_mb', 'peak_ram_mb', 'memory_peak_mb')  # 峰值内存字段的候选名字。
@@ -1528,6 +1524,10 @@ class CorePipeline(PipelineAPI):  # 把场景生成、估计器/模型推理、�
                 resolved_method_name = route['method_name']  # 实际执行的方法名。
                 estimator_name = route['estimator_name']  # 对应估计器名。
                 model_name = route['model_name']  # 对应模型名，经典方法这里是 None。
+                # D11: 提前跳过已存在的预测，避免重复推理（断点续评估）。
+                _early_out_path = predictions_dir / f"{validate_path_component(task['task_id'], name='task_id')}__{validate_path_component(method_name, name='method_name')}.json"
+                if _early_out_path.exists():
+                    continue
                 if model_name is not None:  # 神经方法需要模型和 EKF 外壳一起工作。
                     estimator = create_estimator(  # 神经方法先创建 EKF 外壳估计器，让神经模型只负责输出中间策略量。
                         ESTIMATOR_NAME_EKF,  # D9：神经方法统一复用 EKF 外壳，引用单源常量禁止本地 'ekf' 字面量漂移，与 L633 同口径。
@@ -1653,6 +1653,8 @@ class CorePipeline(PipelineAPI):  # 把场景生成、估计器/模型推理、�
                 # 同样调用 validate_path_component 校验，与 L262 seq_id / method_name 口径对齐。
                 out_path = predictions_dir / f"{validate_path_component(task['task_id'], name='task_id')}__{validate_path_component(method_name, name='method_name')}.json"  # 每个任务方法一份预测文件。
                 out_path.parent.mkdir(parents=True, exist_ok=True)  # 运行中若目录被并发重建或清理，这里再次兜底。
+                if out_path.exists():  # D11: 跳过已存在的预测，支持断点续评估。
+                    continue  # 预测文件已存在，跳过写入。
                 out_path.write_text(dumps_json_text(bundle), encoding='utf-8')  # 落盘 bundle；dumps_json_text 已在模块顶层导入（D10）。
                 artifacts.append(str(out_path))  # 记录产物路径。
                 prediction_index.append({  # 把当前 bundle 的落盘位置写进审计索引。
