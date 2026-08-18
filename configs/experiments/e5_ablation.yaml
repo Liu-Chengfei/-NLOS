@@ -7,61 +7,51 @@
 experiment_id: e5_ablation  # 消融实验编号。
 
 # 主研究轴是消融变体。# 这里不是扫描退化轴，而是比较同一方法的不同组件配置。
-primary_axis: ablation_variant  # 主轴定义为消融变体。
+# 使用 public_sequence_category 路由，走 public benchmark 路径，读取真实仿真数据集。
+primary_axis: public_sequence_category  # 主轴定义为公开序列类别，启用数据集路由。
 
-# 消融实验中固定的场景条件。# 所有变体在同一场景下运行，确保差异只来自组件变化。
+# 消融实验中固定的场景条件。
+# 路由层通过 frozen_axes 注入降档，所有变体在同一场景下运行，确保差异只来自组件变化。
 frozen_axes:
-  # 异步固定为轻度。# A1 表示轻微时间错位，与 e4_visual 同档，避免时间因素抢走解释权。
+  # 异步固定为中度。# A1 表示轻微时间错位。
   A: A1  # 固定为 A1。
 
-  # NLOS 固定为无视距。# N0 表示直射路径，让消融差异完全来自方法组件，不被 NLOS 干扰。
-  N: N0  # 固定为 N0，避免 §8.3 簇发段时长门对冒烟事件流的拦截。
+  # NLOS 固定为中度。# N2 表示中等非视距偏差，论文消融实验的标准设置。
+  N: N2  # 固定为 N2。
 
-  # VIO 退化固定为中度。# V2 表示中等视觉退化，让视觉压力处于中等水平。
+  # VIO 退化固定为中度。# V2 表示中等视觉退化。
   V: V2  # 固定为 V2。
 
-  # 几何固定为中等条件。# G1 表示中等几何布局，保持几何环境稳定。
+  # 几何固定为中等条件。# G1 表示中等几何布局。
   G: G1  # 固定为 G1。
 
-  # 锚点数量固定为 4。# K4 是主表欠定默认（B30），原 K6 高冗余已弃。
-  K: K4  # 主表欠定默认（B30）；原 K6 高冗余已弃
+  # 锚点数量固定为 4。# K4 是主表欠定默认（B30）。
+  K: K4  # 主表欠定默认（B30）。
 
-  # 模态缺失固定为无缺失。e5 消融实验关心 liquid 组件贡献，不引入模态丢失压力，
-  # 显式冻结 M=M0 与六轴协议保持一致。
+  # 模态缺失固定为无缺失。# M0 表示不引入模态丢失压力。
   M: M0  # 固定为无模态缺失。
 
 # 参与比较的消融变体。# 每个变体从完整 liquid_ekf 中去掉一个关键机制。
 # liquid_ekf_full：完整液态网络增强 EKF，包含所有组件，作为消融基准。
 # liquid_ekf_wo_liquid：去掉液态神经网络核心，退化为普通 EKF，验证液态网络的贡献。
-# 以下3个机制级消融变体已落地结构级实现（fusion_runner._apply_mechanism_ablation 在
-# build_measurement_control 前对 intermediate 对应字段做中性化）：
-#   liquid_ekf_wo_bias_memory：把 intermediate.bias 强制为 0.0，仅保留 EKF 内置零偏置，
-#       验证液态网络学到的偏置记忆对 UWB 偏置跟踪能力的贡献。
-#   liquid_ekf_wo_risk_gate：把 intermediate.risk 强制为 0.0，使 _resolve_effective_risk /
-#       apply_safe_mode 不再因风险触发门控，验证自适应降级策略对鲁棒性的贡献。
-#   liquid_ekf_wo_vio_confidence：在 VIO 模态把 intermediate.vio_scaling 强制为 1.0，
-#       去掉模型对 VIO 置信度的学习，验证视觉质量感知对融合的贡献。
+# liquid_ekf_wo_bias_memory：把 intermediate.bias 强制为 0.0，验证偏置记忆贡献。
+# liquid_ekf_wo_risk_gate：把 intermediate.risk 强制为 0.0，验证风险门控贡献。
+# liquid_ekf_wo_vio_confidence：在 VIO 模态把 intermediate.vio_scaling 强制为 1.0，验证 VIO 置信度贡献。
 methods:
   - liquid_ekf_full
   - liquid_ekf_wo_liquid
   - liquid_ekf_wo_bias_memory
   - liquid_ekf_wo_risk_gate
-  - liquid_ekf_wo_vio_confidence  # 当前已实现的5个消融变体（含完整基线 + 纯EKF基线 + 3个机制级消融）。
+  - liquid_ekf_wo_vio_confidence  # 论文消融分析的 5 个方法。
 
-# quick/full 下的运行规模。# 消融实验不需要扫描退化轴，所以用 repeats 和 max_sequences 控制规模。
+# quick/full 下的运行规模。# 消融实验不用扫退化轴，用 repeats 控制规模。
 mode_overrides:
-  # 轻量模式。# 先看最小验证集，确认消融逻辑是否正常。
+  # 快速模式。# 仅做最小验证，确认消融逻辑正确。
   quick:
-    # 重复次数。# 保证最小重复，避免消融实验太重。
-    repeats: 2  # quick 模式重复 2 次。
+    repeats: 2        # 重复 2 次。
+    max_sequences: 6  # 仅跑前 6 个序列。
 
-    # 序列上限。# 避免消融实验太重，6 个序列足够覆盖基本场景。
-    max_sequences: 6  # quick 模式最多 6 个序列。
-
-  # 完整模式。# 用于更完整的对比，确保消融结论统计可靠。
+  # 完整模式（论文级）。# 用于正式消融结果，选取仿真数据的子集。
   full:
-    # 重复次数。# full 模式保留稳妥重复，提高统计可靠性。
-    repeats: 5  # full 模式重复 5 次。
-
-    # 不限制序列数。# 表示完整模式不裁剪，覆盖所有可用序列。
-    max_sequences: null  # full 模式不设序列上限。
+    repeats: 5           # 重复 5 次，提高统计可靠性。
+    max_sequences: 240   # 选取 240 个序列 ≈ 5 次 × 48 序列/repeat，覆盖主要场景变体。
