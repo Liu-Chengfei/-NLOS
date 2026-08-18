@@ -1,0 +1,152 @@
+# 文件职责：公开数据集注册表，注册数据集名称到 reader / 脚本 / 存储根目录的映射关系。
+# 本文件是数据集路由的统一入口，下游脚本通过数据集名称查找对应的 reader、prepare 脚本和存储路径。
+# 修改本文件会直接影响公开 benchmark 的路由，属于配置变更。
+
+# 数据集注册表，每个数据集包含完整的路由和存储信息。
+datasets:
+  # ---- MILUV 数据集 ----
+  # MILUV 是公开验证面允许的数据集之一，用于主结论和 paper-grade 对比。
+  miluv:
+    # 数据读取器路径，指向负责解析 MILUV 原始格式的 reader 模块。
+    reader: src/liquidloc/dataio/readers/miluv_reader.py
+    # 数据准备脚本路径，负责将原始数据转换为统一 schema 格式。
+    prepare_script: scripts/03_prepare_miluv_data.py
+    # 公开 benchmark 执行脚本路径，负责运行公开验证评估。
+    benchmark_script: scripts/18_run_public_benchmarks.py
+    # 数据下载脚本路径，负责从官方源下载原始数据。
+    download_script: scripts/16_download_public_datasets.py
+    # 官方数据根目录，存放从官方源下载的未经修改的原始数据。
+    official_root: data/public/official/miluv
+    # 落地原始数据目录，下载后或手工导入后的原始数据存放位置。
+    landed_raw_root: data/raw/miluv
+    # 有用资产列表，定义该数据集中哪些文件类型是核心资产。
+    # imu.json : IMU 传感器数据  uwb.json : UWB 测距数据
+    # vio.json : VIO 视觉里程计数据  gt.json : 真值数据
+    # anchor_layout.json : 锚点布局配置
+    useful_assets: [imu.json, uwb.json, vio.json, gt.json, anchor_layout.json]
+    # VIO 后端类型，json 表示 VIO 数据以 JSON 格式存储。
+    vio_backend: json
+    # 适配器脚本，null 表示不需要额外适配步骤。
+    adapter_script: null
+    # 发布层级，smoke_only 表示当前仅支持烟雾测试级别的验证。
+    release_tier: smoke_only
+    # 论文完整验证就绪标志，false 表示当前数据/流程尚未达到论文级完整验证标准。
+    paper_full_ready: false
+    # 冻结公开评测序列 ID 列表，这些序列用于公开 benchmark 评估，不可随意修改。
+    # mini_seq, mini_seq_02 是当前冻结的评测序列标识。
+    frozen_public_eval_seq_ids: [mini_seq, mini_seq_02]
+
+  # ---- NTU VIRAL 数据集 ----
+  # NTU VIRAL 是公开验证面允许的另一个数据集，与 MILUV 共享同一 benchmark 脚本。
+  ntu_viral:
+    # 数据读取器路径，指向负责解析 NTU VIRAL 原始格式的 reader 模块。
+    reader: src/liquidloc/dataio/readers/ntu_viral_reader.py
+    # 数据准备脚本路径，负责将原始数据转换为统一 schema 格式。
+    prepare_script: scripts/03_prepare_ntu_viral_data.py
+    # 公开 benchmark 执行脚本路径，与 MILUV 共享同一脚本。
+    benchmark_script: scripts/18_run_public_benchmarks.py
+    # 数据下载脚本路径，与 MILUV 共享同一下载脚本。
+    download_script: scripts/16_download_public_datasets.py
+    # 官方数据根目录，存放从官方源下载的未经修改的原始数据。
+    official_root: data/public/official/ntu_viral
+    # 落地原始数据目录，下载后或手工导入后的原始数据存放位置。
+    landed_raw_root: data/raw/ntu_viral
+    # 有用资产列表，NTU VIRAL 不含 anchor_layout.json。
+    # imu.json : IMU 传感器数据  uwb.json : UWB 测距数据
+    # vio.json : VIO 视觉里程计数据  gt.json : 真值数据
+    useful_assets: [imu.json, uwb.json, vio.json, gt.json]
+    # VIO 后端类型，json 表示 VIO 数据以 JSON 格式存储。
+    vio_backend: json
+    # 适配器脚本，负责把 flight archive 转换为 read_ntu_viral_sequence 可消费的目录结构。
+    # 不在仓库依赖范围内的是 rospy/rosbag Python 绑定，因此 IMU/UWB 当前为占位。
+    adapter_script: scripts/19_unpack_ntu_viral_archives.py
+    # 发布层级，smoke_only 表示当前仅支持烟雾测试级别的验证。
+    release_tier: smoke_only
+    # 论文完整验证就绪标志，false 表示当前数据/流程尚未达到论文级完整验证标准。
+    paper_full_ready: false
+    # 冻结公开评测序列 ID 列表，mini_seq 是当前冻结的评测序列标识。
+    frozen_public_eval_seq_ids: [mini_seq]
+
+  # ---- UTIL 补充数据集 ----
+  # UTIL 是补充路由，不属于当前官方公开 benchmark 面。
+  # 仅作为补充/未来扩展入口，不能自动并入当前官方公开 benchmark 面。
+  util:
+    # 补充路由说明：不属于当前官方公开 benchmark 面，仅作为补充/未来扩展入口。
+    # Supplementary route only; not part of the current official public benchmark surface.
+    # 数据读取器路径，指向负责解析 UTIL 原始格式的 reader 模块。
+    reader: src/liquidloc/dataio/readers/util_reader.py
+    # 数据准备脚本路径，负责将原始数据转换为统一 schema 格式。
+    prepare_script: scripts/17_prepare_util_data.py
+    # 公开 benchmark 脚本，null 表示 UTIL 不参与公开 benchmark 评估。
+    benchmark_script: null
+    # 数据下载脚本路径，与其他公开数据集共享同一下载脚本。
+    download_script: scripts/16_download_public_datasets.py
+    # 官方数据根目录，存放从官方源下载的未经修改的原始数据。
+    official_root: data/public/official/util
+    # 落地原始数据目录，下载后或手工导入后的原始数据存放位置。
+    landed_raw_root: data/raw/util
+    # 有用资产列表，UTIL 包含光流(flow)数据，不含 VIO；ToF 为可选资产。
+    # imu.json : IMU 传感器数据  uwb.json : UWB 测距数据
+    # flow.json : 光流数据  gt.json : 真值数据
+    # tof.json : ToF 测距数据（可选，当前 pipeline 不消费）
+    useful_assets: [imu.json, uwb.json, flow.json, gt.json]
+    # VIO 后端类型，null 表示 UTIL 不含 VIO 数据（用 flow+tof 替代）。
+    vio_backend: null
+    # 适配器脚本，null 表示不需要额外适配步骤。
+    adapter_script: null
+    # 发布层级，smoke_only 表示当前仅支持烟雾测试级别的验证。
+    release_tier: smoke_only
+    # 论文完整验证就绪标志，false 表示当前数据/流程尚未达到论文级完整验证标准。
+    paper_full_ready: false
+    # 冻结公开评测序列 ID 列表，null 表示 UTIL 不参与公开 benchmark 评估。
+    frozen_public_eval_seq_ids: null
+
+  # ---- SIM E9 协议仿真数据集 ----
+  # SIM E9 是协议级仿真数据集，提供 §6/§8 主表与 §12 消融实验的真实仿真数据。
+  # 它不属于官方公开 benchmark 面，仅作为补充/扩展实验路由入口（supplementary route）。
+  # Supplementary route only; not part of the official public benchmark surface.
+  sim_e9_protocol_20260726:
+    # 数据读取器路径，指向负责解析 SIM E9 原始格式的 reader 模块。
+    reader: src/liquidloc/dataio/readers/sim_reader.py
+    # 数据准备脚本路径，负责把仿真原始数据转换为统一事件流 schema。
+    prepare_script: scripts/02_prepare_sim_data.py
+    # 公开 benchmark 脚本，null 表示 SIM E9 不参与官方公开 benchmark 评估。
+    benchmark_script: null
+    # 数据下载脚本路径，null 表示 SIM E9 由仓库内 sim_materializer 生成，不走外部下载。
+    download_script: null
+    # 官方数据根目录，null 表示 SIM E9 无官方外部源，仿真在仓库内生成。
+    official_root: null
+    # 落地原始数据目录，存放 sim_materializer 物化后的未修改仿真数据。
+    landed_raw_root: data/raw/sim_e9_protocol_20260726
+    # 有用资产列表，SIM E9 提供 anchor_layout.json 与全套主表资产。
+    # imu.json : IMU 传感器数据  uwb.json : UWB 测距数据
+    # vio.json : VIO 视觉里程计数据  gt.json : 真值数据
+    # anchor_layout.json : 锚点布局配置  sim_meta.json : 仿真元数据
+    useful_assets: [imu.json, uwb.json, vio.json, gt.json, anchor_layout.json, sim_meta.json]
+    # VIO 后端类型，json 表示 VIO 数据以 JSON 格式存储。
+    vio_backend: json
+    # 适配器脚本，null 表示不需要额外适配步骤。
+    adapter_script: null
+    # 发布层级，paper_ready 表示支持论文级完整验证。
+    release_tier: paper_ready
+    # 论文完整验证就绪标志，true 表示当前数据/流程已达到论文级完整验证标准。
+    paper_full_ready: true
+    # 冻结公开评测序列 ID 列表，null 表示 SIM E9 不参与官方公开 benchmark 评估，
+    # 由调用方通过 --seq-ids 显式指定评测序列。
+    frozen_public_eval_seq_ids: null
+
+  # SIM 数据集别名：为 PreparePipeline 的硬编码 dataset_name=sim 提供匹配条目。
+  # 两者指向同一 raw_root，允许 '--dataset-name sim' 由补充路线使用。
+  sim:
+    reader: src/liquidloc/dataio/readers/sim_reader.py
+    prepare_script: scripts/02_prepare_sim_data.py
+    benchmark_script: null
+    download_script: null
+    official_root: null
+    landed_raw_root: data/raw/sim_e9_protocol_20260726
+    useful_assets: [imu.json, uwb.json, vio.json, gt.json, anchor_layout.json, sim_meta.json]
+    vio_backend: json
+    adapter_script: null
+    release_tier: paper_ready
+    paper_full_ready: true
+    frozen_public_eval_seq_ids: null
