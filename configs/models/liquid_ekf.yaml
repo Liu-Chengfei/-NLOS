@@ -1,0 +1,117 @@
+name: liquid_ekf
+# 2026-08-29 E6 run: train_liquid_smoke 当前唯一残留的 liquid_ekf 权重是
+# liquid_ekf_resume_checkpoint.pt（mtime 2026-08-26 14:38:39，58359 bytes）。
+# export_best / best / training_best / readout_warmup_best 等其他 4 个被训练清理流程删除了，
+# 只剩这一份 mtime 最新。
+checkpoint_path: E:/Q4 - 副本/outputs/train_liquid_smoke/checkpoints/liquid_ekf_resume_checkpoint.pt
+
+# Checkpoint path for pre-trained weights (N3 NLOS bias training).
+# For liquid_ekf_full and ablation variants; use same checkpoint since
+# ablation methods only disable specific heads/processors.
+# checkpoint_path: ./weights/liquid_ekf_best_checkpoint.pt  # 临时注释：quick mode 不允许使用预训练 checkpoint
+feature_order:
+- dt
+- ax
+- ay
+- gz
+- range
+- dx
+- dy
+- dyaw
+window:
+  size: 20
+  step: 1
+network:
+  input_dim: 8
+  hidden_dim: 18
+  output_heads:
+  - bias
+  - risk
+  - uwb_scaling
+  - vio_scaling
+  pooling_logit_scale: 0.2
+  cell_update_scale_floor: 0.7
+  cell_update_scale_span: 0.3
+  reliability_bias_init: 1.0
+  time_rate_scale: 180.0
+  cfA_clip_min: 0.05
+  cfA_clip_max: 0.99
+  cfB_clip_min: 0.05
+  cfB_clip_max: 0.99
+  enable_forget_root: true
+  risk_short_circuit_threshold: 1.0
+  bad_observation_floor: 0.08
+  bad_observation_span: 0.72
+  bad_observation_async_full_scale: 0.45
+  bad_observation_residual_full_scale: 0.8
+  bad_observation_reproj_full_scale: 6.0
+  bad_observation_tracked_features_floor: 22.0
+  bad_observation_track_drop_full_scale: 40.0
+  bad_observation_reproj_slope_full_scale: 1.5
+  bad_observation_geom_floor: 0.28
+  bad_observation_interaction_coeff: 0.7
+  context_modulation_scale: 0.22
+  filter_context_modulation_scale: 0.22
+train:
+  optimizer: adam
+  lr: 0.00015
+  weight_decay: 0.0
+  epochs: 160
+  batch_size: 32
+  eval_batch_size: 128
+  amp_enabled: auto
+  amp_dtype: bf16
+  save_epoch_candidates: true
+  lr_scheduler:
+    enabled: true
+    T_max: 160
+    eta_min: 5.0e-05
+  epoch_candidate_stride: 10
+  deterministic: true
+  gradient_clip_max_norm: 1.0
+  bias_huber_delta: 1.345
+  scaling_log_eps: 1.0e-06
+  loss_weights:
+    w_bias: 1.0
+    w_risk: 1.0
+    w_uwb: 1.0
+    w_vio: 1.0
+    w_cal: 0.08
+    lambda_l2: 0.0001
+    lambda_l1: 1.0e-05
+    lambda_mono: 0.0001
+  lr_layer:
+    readout: 0.001
+    gate_cal: 0.0005
+    filter_context_gate: 0.00025
+    backbone: 0.0003
+    backbone_unfreeze_ramp:
+      step1_lr: 1.0e-05
+      step1_epochs: 5
+      step2_lr: 5.0e-05
+      step2_epochs: 5
+      step3_lr: 0.0001
+  phase_schedule:
+    warmup_epochs: 20
+    gate_alignment_epochs: 40
+    full_tuning_epochs: 100
+safe_mode:
+  enabled: true
+  risk_threshold: 0.5
+bridge_thresholds:
+  robust_supplement_quality_threshold: 0.55
+  robust_supplement_alignment_threshold: 0.45
+  robust_supplement_max_boost: 0.2
+  observation_risk_blend: 0.48
+  uwb_geometric_bias_full_scale: 0.4
+  async_gap_full_scale: 0.22
+  async_uwb_scaling_coeff: 0.28
+  async_vio_scaling_coeff: 0.28
+  uwb_scaling_alignment_coeff: 0.58
+  uwb_scaling_quality_coeff: 0.3
+  uwb_scaling_geometry_coeff: 0.47
+  uwb_invalid_extra_boost: 0.15
+  vio_scaling_alignment_coeff: 0.58
+  vio_scaling_quality_coeff: 0.3
+  vio_low_features_scaling_boost: 0.16
+  vio_high_reproj_scaling_boost: 0.16
