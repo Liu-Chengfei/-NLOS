@@ -55,7 +55,9 @@ def _make_anchor_layout(seq_id: str) -> dict:
         "anchor_ids": ANCHOR_IDS,
         "anchor_positions": ANCHOR_POSITIONS,
         "anchor_count": ANCHOR_COUNT,
-        "protocol_geometry_level": "G0",
+        # 异步高NLOS实验主表 4 锚非对称欠定：G1（≥1 锚丢失相对 K 档欠定），
+        # K1（4 锚）；对齐 02_prepare_sim_data 的 allowed_geometry_levels={G0,G1,G2} 合同。
+        "protocol_geometry_level": "G1",
         "protocol_k_level": "K1",
         "source": "handbook_s2_k1_5seed",
     }
