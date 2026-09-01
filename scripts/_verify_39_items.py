@@ -121,12 +121,21 @@ def check_items_4_6() -> None:
     raw_root = (DATA_ROOT_OVERRIDE if DATA_ROOT_OVERRIDE else ROOT / "data" / "raw" / "sim_e9_protocol_20260726")
     anchors = None
     # 2026-09-01: 兼容 5-seed 模拟器（seedN/seqN/）和 stub（seqN/anchor_layout.json）。
-    # rglob 优先找到第一个含 anchor_layout.json 的目录
-    for p in raw_root.rglob("anchor_layout.json"):
+    # 兼容 (a) data_root/<seq_id>/anchor_layout.json  (单层)
+    #     (b) data_root/<seed>/<seq_id>/anchor_layout.json  (多层)
+    # rglob 先找 data_root/anchor_layout.json（单层），找不到则递归找任意深度的
+    anchor_layout_candidates = list(raw_root.glob("*/anchor_layout.json")) or \
+                               list(raw_root.rglob("anchor_layout.json"))
+    for p in anchor_layout_candidates:
         try:
             al = json.loads(p.read_text())
             if isinstance(al, dict) and "anchor_positions" in al:
-                anchors = np.array(al["anchor_positions"])
+                raw_pos = al["anchor_positions"]
+                # 兼容 list-of-list [[x,y],...] 或 list-of-dict [{"px":x,"py":y},...]
+                if raw_pos and isinstance(raw_pos[0], dict):
+                    anchors = np.array([[r["px"], r["py"]] for r in raw_pos])
+                else:
+                    anchors = np.array(raw_pos)
                 break
         except Exception:
             continue
@@ -136,16 +145,19 @@ def check_items_4_6() -> None:
         # Compute GDOP over a representative grid in workspace
         # Get GT to find workspace extent
         gt_xs, gt_ys = [], []
-        for d in list(raw_root.iterdir())[:50]:
-            if d.is_dir() and (d / "gt.json").exists():
-                gt = json.loads((d / "gt.json").read_text())
+        # 用 rglob 找 gt.json，支持 seed/seq/ 嵌套
+        for gt_path in list(raw_root.rglob("gt.json"))[:50]:
+            try:
+                gt = json.loads(gt_path.read_text())
                 for row in gt[100:300]:  # post-warmup
-                    # 兼容 5-seed 模拟器 (x/y) 与 sim_e9 stub (px/py)
+                    # 兼容 (x,y) 和 (px,py) 两种字段名
                     gx = row.get("px", row.get("x"))
                     gy = row.get("py", row.get("y"))
                     if gx is not None and gy is not None:
                         gt_xs.append(float(gx))
                         gt_ys.append(float(gy))
+            except Exception:
+                continue
         if not gt_xs:
             record("4", "SKIP", "no GT data for GDOP computation")
             return
@@ -164,10 +176,10 @@ def check_items_4_6() -> None:
                     G.append([dx/r, dy/r, 1])
             if len(G) >= 3:
                 G = np.array(G)
-                # K3 (3 anchors) → 2D GDOP using 2 of 3 unit vectors (classic ToA GDOP).
-                # DO NOT add synthetic third column [1]; that inflates GDOP to ~20+.
-                # 2D GDOP with 3 anchors: mean ~1.2-1.4, max ~1.8 — all within target.
-                G_2d = G[:, :2]  # drop the synthetic 3rd column
+                # 4 anchors → 2D GDOP using first 2 cols of G (x,y unit vectors, drop clock-bias col).
+                # 手册 S2 实测 GDOP≈1.19（1.12-1.32），K 档归属为协议裁决项（见手册 S2/0-6）。
+                # 本检查用 GDOP≤6（无退化几何）+ 均值 ≤5（有意义几何）。
+                G_2d = G[:, :2]  # drop clock-bias column; keep x,y unit vectors
                 try:
                     Q = np.linalg.inv(G_2d.T @ G_2d)
                     gdop = np.sqrt(np.trace(Q))

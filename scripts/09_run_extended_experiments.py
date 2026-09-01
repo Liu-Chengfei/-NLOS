@@ -5,6 +5,7 @@ from __future__ import annotations  # 让类型注解可以直接引用当前模
 import argparse  # 解析命令行参数。
 import copy  # 复制配置和任务对象，避免共享可变引用。
 import json  # 输出摘要报告。
+import os  # 文件系统路径判断。
 import sys  # 调整导入路径。
 from pathlib import Path  # 处理路径。
 from typing import Any  # 标注嵌套结构。
@@ -13,6 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]  # 仓库根目录。
 SRC = ROOT / "src"  # 项目源码目录。
 if str(SRC) not in sys.path:  # 如果源码目录还没加进来。
     sys.path.insert(0, str(SRC))  # 把源码目录插到前面。
+
+# 在所有导入之前清除协议快照缓存，确保 YAML 修改后立即生效。
+from liquidloc.protocol.scene_axis_protocol import _load_frozen_scene_axis_protocol_snapshot
+# 先调用一次触发 lru_cache 缓存旧值，再清除，这样后续调用才会重新加载。
+_load_frozen_scene_axis_protocol_snapshot()
+_load_frozen_scene_axis_protocol_snapshot.cache_clear()
 
 from liquidloc.common.config_utils import load_yaml_config  # 读取 YAML 配置。
 from liquidloc.common.io_utils import dumps_json_text  # 严格 JSON 序列化，拒绝 NaN/Infinity。
@@ -28,8 +35,9 @@ from liquidloc.scenarios.scene_sampler import sample_scenes  # 采样场景任�
 def _build_sim_scene_id_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, str]:
     """从 sim_meta.json 的 axes_override 生成 scene_id_by_seq。
 
-    仿真数据集准备阶段需要每个序列的 scene_id；缺失时回退主表欠定默认
-    S(A0,N0,V0,G1,K4)，禁止再回退 G0/K6。
+    scene_id 格式必须与 encode_scene / decode_scene 的 S(A,N,V,K,M) 五轴格式一致，
+    禁止包含 G 轴（几何条件由 K 轴自身编码，不单独出现在 scene_code 中）。
+    缺失时回退主表欠定默认 S(A0,N0,V0,K4,M0)。
 
     参数
     ----------
@@ -51,14 +59,16 @@ def _build_sim_scene_id_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, 
                 sim_meta = json.loads(sim_meta_path.read_text(encoding="utf-8"))
                 axes_override = sim_meta.get("axes_override") or {}
                 if axes_override:
-                    axis_order = ["A", "N", "V", "G", "K", "M"]
-                    parts = [axes_override[ax] for ax in axis_order if ax in axes_override]
+                    # encode_scene 顺序：五轴 S(A,N,V,K,M)，不含 G。
+                    # G 轴编码进 K 轴自身（G1→K3，G2→K4 等），不在 scene_code 中独立出现。
+                    axis_order = ["A", "N", "V", "K", "M"]
+                    parts = [axes_override.get(ax, _AXIS_DEFAULTS.get(ax, ax + "0")) for ax in axis_order]
                     if parts:
                         scene_id_by_seq[seq_id] = f"S({','.join(parts)})"
                         continue
             except Exception:
                 pass  # 解析失败时回退到主表欠定默认
-        scene_id_by_seq[seq_id] = "S(A0,N0,V0,G1,K4)"  # 主表欠定默认
+        scene_id_by_seq[seq_id] = "S(A0,N0,V0,K4,M0)"  # 主表欠定默认（与 encode_scene 五轴格式一致）
     return scene_id_by_seq
 
 
@@ -95,10 +105,11 @@ def _build_sim_axes_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, dict
                     continue
             except Exception:
                 pass
-        # 回退到主表欠定默认
-        axes_by_seq[seq_id] = {"A": "A0", "N": "N0", "V": "V0", "G": "G1", "K": "K4", "M": "M0"}
+        # 回退到主表欠定默认（S(A0,N0,V0,K4,M0) 与 scene_id_by_seq 的 fallback 一致）
+        axes_by_seq[seq_id] = {"A": "A0", "N": "N0", "V": "V0", "K": "K4", "M": "M0"}
     return axes_by_seq
 
+_AXIS_DEFAULTS = {"A": "A0", "N": "N0", "V": "V0", "K": "K4", "M": "M0"}  # 五轴默认值，scene_id 不含 G。
 _DEFAULT_CONFIG = ROOT / "configs" / "experiments" / "e1_main_table.yaml"  # 默认实验配置。
 _DEFAULT_OUTPUT_ROOT = ROOT / "outputs" / "extended_script_smoke"  # 默认输出目录。
 _DEFAULT_FIXTURE_ROOT = ROOT / "tests" / "fixtures" / "datasets"  # 默认 fixture 数据目录。
@@ -114,7 +125,8 @@ def _get_official_public_datasets():
     if _OFFICIAL_PUBLIC_DATASETS is None:
         _OFFICIAL_PUBLIC_DATASETS = frozenset(get_public_benchmark_allowed_datasets())
     return _OFFICIAL_PUBLIC_DATASETS
-_ALL_MODEL_CORE_SURFACE = {"ekf", "robust_ekf", "lstm_ekf", "liquid_ekf"}  # 全模型核心实验面。
+# 主表核心实验面：EKF 基线 + LSTM/Transformer/Liquid 神经网络增强 EKF（不含 FGO）。
+_ALL_MODEL_CORE_SURFACE = {"ekf", "lstm_ekf", "transformer_ekf", "liquid_ekf"}
 
 
 def _resolve_non_empty_string(raw_value: str | None, *, flag_name: str, allow_none: bool = False) -> str | None:
@@ -187,28 +199,30 @@ def _resolve_core_surface_methods(methods: list[str]) -> list[str]:
     normalized_methods = [str(method_name).strip() for method_name in methods if str(method_name).strip()]  # 去空白并过滤空项。
     if not normalized_methods:  # 没有方法就不能继续。
         raise ValueError("core experiment route requires a non-empty methods list")  # 明确报错。
-    if _ALL_MODEL_CORE_SURFACE.issubset(set(normalized_methods)) and "fgo" not in normalized_methods:  # 如果全模型都跑却没带 fgo。
-        raise ValueError("all-model core runs must include fgo")  # 说明缺了什么。
     return normalized_methods  # 返回规范化方法列表。
 
 
 def _resolve_public_dataset_name(experiment_cfg: dict[str, Any], raw_dataset_name: str | None) -> str:
     """确定公开 benchmark 使用的数据集名。"""
-    dataset_name = normalize_public_dataset_name(_resolve_non_empty_string(  # 先从命令行或配置里拿数据集名。
-        raw_dataset_name if raw_dataset_name is not None else experiment_cfg.get("dataset_name"),  # 优先命令行，其次配置。
-        flag_name="--dataset-name",  # 参数名用于报错。
-    ))  # 数据集名解析结束。
-    expected_dataset_name = str(experiment_cfg.get("dataset_name") or "").strip().lower()  # 配置里期望的数据集名。
-    experiment_id = str(experiment_cfg.get("experiment_id") or "").strip()  # 当前实验 ID。
-    if expected_dataset_name and dataset_name != expected_dataset_name:  # 如果配置和命令行不一致。
-        raise ValueError(f"{experiment_id} requires dataset_name={expected_dataset_name}")  # 直接报错。
-    registry_cfg = load_public_dataset_registry()  # 扩展实验面允许所有已注册公开数据集，而不只限官方公开 benchmark 面。
+    # 优先：命令行 > frozen_axes.dataset > experiment_cfg.dataset_name。
+    cfg_dataset = experiment_cfg.get("dataset_name")
+    frozen_dataset = (experiment_cfg.get("frozen_axes") or {}).get("dataset")
+    fallback = frozen_dataset if frozen_dataset else cfg_dataset
+    dataset_name = normalize_public_dataset_name(_resolve_non_empty_string(
+        raw_dataset_name if raw_dataset_name is not None else fallback,
+        flag_name="--dataset-name",
+    ))
+    expected_dataset_name = str(experiment_cfg.get("dataset_name") or "").strip().lower()
+    experiment_id = str(experiment_cfg.get("experiment_id") or "").strip()
+    if expected_dataset_name and dataset_name != expected_dataset_name:
+        raise ValueError(f"{experiment_id} requires dataset_name={expected_dataset_name}")
+    registry_cfg = load_public_dataset_registry()
     try:
-        get_dataset_entry(dataset_name, registry_cfg)  # 只要注册在案，就允许扩展实验路由继续决定后续执行方式。
+        get_dataset_entry(dataset_name, registry_cfg)
     except KeyError as exc:
         available = ", ".join(sorted((registry_cfg.get("datasets") or {}).keys()))
         raise ValueError(f"registered public dataset required; available: {available}") from exc
-    return dataset_name  # 返回最终数据集名。
+    return dataset_name
 
 
 def _resolve_public_seq_ids(
@@ -264,8 +278,8 @@ def _build_public_scene_tasks(
     返回
     -------
     list[dict[str, Any]]
-        任务列表，每个任务的 axes 字段只含合法场景轴（A/N/V/G/K/M），
-        dataset / split 等元数据放在 task 顶层。
+    任务列表，每个任务的 axes 字段只含合法场景轴（A/N/V/K/M），
+    dataset / split 等元数据放在 task 顶层。
     """
     tasks: list[dict[str, Any]] = []
     for index, seq_id in enumerate(seq_ids):
@@ -275,10 +289,10 @@ def _build_public_scene_tasks(
             seq_axes = dict(axes_by_seq[seq_id])
         elif frozen_axes:
             for axis_name, axis_value in dict(frozen_axes).items():
-                if axis_name in ("A", "N", "V", "G", "K", "M"):
+                if axis_name in ("A", "N", "V", "K", "M"):
                     seq_axes[axis_name] = axis_value
-        # 只挑合法的六场景轴，避免 attach_scene_parameters 报 "Unknown axis"。
-        clean_axes = {k: v for k, v in seq_axes.items() if k in ("A", "N", "V", "G", "K", "M")}
+        # 只挑合法的五场景轴（A/N/V/K/M），G 轴已并入 K。
+        clean_axes = {k: v for k, v in seq_axes.items() if k in ("A", "N", "V", "K", "M")}
         tasks.append({
             "task_id": f"public_{index:02d}",
             "scene_id": f"{dataset_name}:{seq_id}",
@@ -308,6 +322,12 @@ def _run_supplementary_public_route(
     if dataset_name == "sim":
         scene_id_by_seq = _build_sim_scene_id_by_seq(seq_ids, raw_root)
 
+    # 读取 registry 中的仿真数据合同参数（K 档 / 锚点数），用于 prepare 阶段强校验。
+    registry_cfg = load_public_dataset_registry()
+    registry_entry = get_dataset_entry(dataset_name, registry_cfg)
+    allowed_k_levels = registry_entry.get("allowed_k_levels")
+    allowed_anchor_counts = registry_entry.get("allowed_anchor_counts")
+
     prepare_result = PreparePipeline().run(
         {
             "dataset_name": dataset_name,
@@ -316,6 +336,8 @@ def _run_supplementary_public_route(
             "field_mapping": field_mapping,
             "output_root": str(prepare_output_root),
             **({"scene_id_by_seq": scene_id_by_seq} if scene_id_by_seq else {}),
+            **({"allowed_k_levels": allowed_k_levels} if allowed_k_levels else {}),
+            **({"allowed_anchor_counts": allowed_anchor_counts} if allowed_anchor_counts else {}),
         }
     )
     prepare_manifest = load_prepare_manifest(prepare_output_root)
@@ -364,7 +386,7 @@ def _resolve_core_scene_tasks(experiment_cfg: dict[str, Any]) -> list[dict[str, 
     _validate_extended_route_contract(experiment_cfg)  # 进入 scene_sampler 之前先拦住未实现的扩展主轴。
     """根据实验配置构造核心场景任务列表。"""
     experiment_id = str(experiment_cfg.get("experiment_id") or "").strip()  # 当前实验 ID。
-    if experiment_id == "e5_ablation":  # e5_ablation 走特殊固定任务。
+    if experiment_id in ("e5_ablation", "e5_ablation_new"):  # e5 消螗走特殊固定任务。
         scene_tasks = copy.deepcopy(sample_scenes(experiment_cfg))  # 先走统一采样，保留 mode_overrides 中的 repeats 语义。
         for task in scene_tasks:  # e5 仍固定最小冒烟序列，避免扩展脚本去依赖额外 fixture。
             task.setdefault("seq_id", _DEFAULT_CORE_SEQ_ID)
@@ -468,10 +490,17 @@ def _run_public_route(
 ) -> dict[str, Any]:
     """运行公开 benchmark 路线。"""
     dataset_name = _resolve_public_dataset_name(experiment_cfg, dataset_name_arg)  # 解析数据集名。
+    # Prefer --raw-root, then registry landed_raw_root, else fixture fallback.
+    registry_cfg = load_public_dataset_registry()
+    dataset_entry = get_dataset_entry(dataset_name, registry_cfg)
+    landed_root = dataset_entry.get("landed_raw_root")
+    fallback_default = (_DEFAULT_FIXTURE_ROOT / dataset_name)
+    if landed_root:
+        fallback_default = ROOT / landed_root if not os.path.isabs(landed_root) else Path(landed_root)
     raw_root = _resolve_path(  # 解析原始数据目录。
         raw_root_arg,  # 命令行原始数据目录。
         flag_name="--raw-root",  # 参数名用于报错。
-        default=_DEFAULT_FIXTURE_ROOT / dataset_name,  # 默认按数据集名定位 fixture。
+        default=fallback_default,  # 使用 registry landed_raw_root 作为默认。
     )  # 原始数据目录解析结束。
     seq_ids = _resolve_public_seq_ids(  # 解析序列列表。
         dataset_name=dataset_name,
@@ -506,7 +535,7 @@ def _run_public_route(
 
 def main(argv: list[str] | None = None) -> int:
     """脚本主入口，按实验类型选择核心或公开路线。"""
-    print("[09_ext_exp] 开始 | mode=quick", flush=True)
+    print("[09_ext_exp] 开始 | awaiting args", flush=True)
     parser = argparse.ArgumentParser(description="Run minimal extended experiments")  # 创建参数解析器。
     parser.add_argument("--config", default=str(_DEFAULT_CONFIG))  # 实验配置路径。
     parser.add_argument("--output-root", default=None)  # 输出目录。
