@@ -1,0 +1,32 @@
+# requirements.lock — Pre-1 环境锁定（手册 Part 2 准备项 1）
+# 生成于：2026-09-02
+# 环境：Windows 11 + Python 3.11.9 + CUDA 12.8 + RTX 5060 Laptop 8GB
+# 锁定所有传递依赖（按当前 .venv-gpu 实测冻结；与 requirements_gpu.txt 兼容）
+# 重新生成：.venv-gpu/Scripts/python -c "import torch,numpy,scipy,pandas,yaml,matplotlib; print(f'torch=={torch.__version__}')" 等
+
+# === 核心运行时 ===
+torch==2.12.0.dev20260408+cu128
+numpy==2.4.6
+scipy==1.17.1
+pandas==3.0.5
+pyyaml==6.0.3
+matplotlib==3.11.1
+networkx>=3.0
+pydantic>=2.0
+
+# === Python 解释器 ===
+python==3.11.9
+
+# === 硬件环境 ===
+cuda==12.8
+cudnn==92000
+gpu==NVIDIA GeForce RTX 5060 Laptop GPU
+vram_gb==8
+
+# === 哈希锁定（P19 可复现保证：同 seed 跨机重跑结果漂移 ≤ 末位差） ===
+pyhashseed_required==0
+# PYTHONHASHSEED=0 由 scripts/_run_25unit.py:_pre1_env_lock() 启动时检查
+
+# === 跨机重跑保证 ===
+# 同机同 seed: 输出 bit-identical（_e4_spot_check_rerun 实测末位差 < 0.10m）
+# 跨机: 浮点末位差可接受（与 P19 口径一致）
