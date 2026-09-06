@@ -409,23 +409,58 @@ class PreparePipeline(PipelineAPI):
             events = merge_and_finalize_events([imu_events, uwb_events, vio_events])  # 合并并整理最终事件序列。
 
             # 展开 scene_axis_protocol，将 scene_parameters 写入事件 meta 和序列产物。
+            # 阶段 12 全面审计修复 (2026-09-06 §10.2 BUG-020): sim 物化数据 sim_meta.axes_override
+            # 缺 M 字段 (物化时 axes_pool 4 元组), 原 decode_scene 路径对 sim:{seq_id} 格式 raise
+            # ValueError 走 except 静默跳过 → scene_parameters=None → meta 不写 → core_pipeline
+            # 5 轴全无. 修: sim 路径优先读 sim_meta.json axes_override 5 元组 (含 M), 缺 M 时从
+            # cfg.axes_by_seq 补 M=M1 (e9 yaml frozen_axes.M).
             scene_parameters = None  # 默认无场景参数。
-            try:
-                scene_spec = decode_scene(scene_id)  # 尝试解码 scene_id（5 轴 S(A,N,V,G,K)）。
-                # decode_scene 只解析 A/N/V/G/K 5 轴；M 轴不在 scene_code 内，但
-                # attach_scene_parameters 要求 6 轴齐全。这里用 nominal level M0
-                # 补全，与默认协议的"无缺失"baseline 一致（modality_drop_prob=0.0）。
-                from liquidloc.protocol.scene_axis_protocol import get_nominal_levels  # 局部导入避免顶层循环依赖。
-                _nominal_levels = get_nominal_levels()  # 读取每个轴的 nominal level 名。
-                scene_parameters = attach_scene_parameters({  # 展开协议为标准场景参数对象。
-                    'A': scene_spec.A_level,
-                    'N': scene_spec.N_level,
-                    'V': scene_spec.V_level,
-                    'K': scene_spec.K_value,  # §2.1 G→K 合并：G 轴并入 K 轴。
-                    'M': _nominal_levels.get('M', 'M0'),  # M 轴不在 scene_code 中，用 nominal 兜底。
-                }).to_dict()  # SceneParameters → 纯 dict，确保 JSON 可序列化。
-            except (ValueError, TypeError, KeyError):  # scene_id 不可解码时静默跳过。
-                pass
+            axes_override = None  # sim 路径优先从 sim_meta.json 读 5 轴 axes_override.
+            if dataset_name == DATASET_NAME_SIM:
+                try:
+                    # _resolved_seq_id 已含 'seed0/sim_curve_01' 格式, sim_meta 在 {raw_root}/{seed}/{seq}/sim_meta.json
+                    _raw_root_path = Path(str(cfg.get("raw_root"))) if cfg.get("raw_root") else Path(raw_root)
+                    _sim_meta_path = _raw_root_path / _resolved_seq_id / "sim_meta.json"
+                    if _sim_meta_path.is_file():
+                        _sim_meta = json.loads(_sim_meta_path.read_text(encoding="utf-8"))
+                        axes_override = dict(_sim_meta.get("axes_override") or {})
+                except Exception:
+                    pass
+                # axes_override 缺 M 字段时 (物化 axes_pool 4 元组), 从 cfg.axes_by_seq 补 M
+                if axes_override and "M" not in axes_override:
+                    # BUG-020 fix: sim_meta.json axes_override 缺 M 字段 (物化时 axes_pool 4 元组),
+                    # 从 e9 yaml 的 frozen_axes.M 补上, 让 prepare 物化 events meta 含 M=M1.
+                    frozen_axes = cfg.get("frozen_axes") if isinstance(cfg, Mapping) else None
+                    if isinstance(frozen_axes, Mapping) and "M" in frozen_axes:
+                        axes_override["M"] = str(frozen_axes["M"])
+            if axes_override:
+                # sim 路径: 用 axes_override 5 元组
+                from liquidloc.protocol.scene_axis_protocol import get_nominal_levels
+                _nominal_levels = get_nominal_levels()
+                _full_axes = {ax: axes_override.get(ax, _nominal_levels.get(ax, f"{ax}0")) for ax in _nominal_levels.keys()}
+                try:
+                    scene_parameters = attach_scene_parameters(_full_axes).to_dict()
+                except Exception:
+                    scene_parameters = None
+            if scene_parameters is None:
+                try:
+                    scene_spec = decode_scene(scene_id)  # 尝试解码 scene_id（5 轴 S(A,N,V,G,K,M)）。
+                    # BUG-020 fix: 之前 M 轴用 _nominal_levels.get('M', 'M0') 写死, 忽略 scene_spec.M_level.
+                    # 09 脚本 _build_sim_scene_id_by_seq 拼接的 scene_id 形如 S(A3,N2,V0,K1,M1),
+                    # decode_scene 返回 spec.M_level='M1', 但 prepare_pipeline 没读它, 写死了 M0.
+                    # 正确: 取 scene_spec.M_level 兜底 _nominal_levels['M'].
+                    from liquidloc.protocol.scene_axis_protocol import get_nominal_levels  # 局部导入避免顶层循环依赖。
+                    _nominal_levels = get_nominal_levels()  # 读取每个轴的 nominal level 名。
+                    _m_level = getattr(scene_spec, 'M_level', None) or _nominal_levels.get('M', 'M0')
+                    scene_parameters = attach_scene_parameters({  # 展开协议为标准场景参数对象。
+                        'A': scene_spec.A_level,
+                        'N': scene_spec.N_level,
+                        'V': scene_spec.V_level,
+                        'K': scene_spec.K_value,  # §2.1 G→K 合并：G 轴并入 K 轴。
+                        'M': _m_level,  # BUG-020: 从 scene_spec.M_level 读, 缺省回退到 nominal.
+                    }).to_dict()  # SceneParameters → 纯 dict，确保 JSON 可序列化。
+                except (ValueError, TypeError, KeyError):  # scene_id 不可解码时静默跳过。
+                    pass
             if scene_parameters is not None:  # 成功展开时，把 scene_parameters 写入每个事件的 meta。
                 for event in events:  # 逐个事件写入场景参数。
                     meta = event.get('meta')  # 取出 meta。

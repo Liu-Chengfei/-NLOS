@@ -1021,6 +1021,72 @@ def _apply_scene_task(events: Iterable[Any], task: dict[str, Any], protocol_cfg:
     axis_params = dict(scene_parameters.get('axes') or {})  # 展开后的轴级参数，包含各轴详细设置。
 
     scenario_reports: dict[str, Any] = {}  # 收集各轴变换的报告，供后续评估和审计使用。
+
+    # 阶段 12 全面审计修复 (2026-09-06 §10.2 BUG-021): M 必须在 A/N/V/K 之前处理。
+    # 原顺序 A→N→V→K→M 导致: A3 burst_missing_prob=0.74 删除 74% 连续 UWB 段后,
+    # M1 modality_drop_prob=0.05 的 contiguous 缺失段 (基于 A-shifted t_min/t_max 算的)
+    # 落到 27.4-29.5s 段, 但该段 UWB 已被 A burst_missing 删干净 → dropped_events=[] (空).
+    # 正确顺序: M 先按原始 t 删 13-15s 等段 (apply_modality_drop 自身逻辑 OK),
+    # 然后 A burst_missing 跳过已被 M 删的段, A-shifted t_min/t_max 反映 M 删后的状态.
+    # 同样 N/V/K 处理保持 M 删后再扰动.
+    if 'M' in axis_params:
+        from liquidloc.scenarios.missing_modalities import apply_modality_drop
+        modality_cfg = axis_params['M']
+        modality_drop_prob_raw = modality_cfg.get('modality_drop_prob', 0.0)
+        if isinstance(modality_drop_prob_raw, (list, tuple)) and len(modality_drop_prob_raw) >= 1:
+            modality_drop_prob = float(sum(modality_drop_prob_raw) / len(modality_drop_prob_raw))
+        else:
+            modality_drop_prob = coerce_finite_scalar(
+                modality_drop_prob_raw, name='modality_drop_prob'
+            )
+        if not 0.0 <= modality_drop_prob <= 1.0:
+            raise ValueError(
+                f'modality_drop_prob must be within [0, 1], got {modality_drop_prob}'
+            )
+        imu_drop_prob_raw = modality_cfg.get('imu_drop_prob', 0.0)
+        if isinstance(imu_drop_prob_raw, (list, tuple)) and len(imu_drop_prob_raw) >= 1:
+            imu_drop_prob = float(sum(imu_drop_prob_raw) / len(imu_drop_prob_raw))
+        else:
+            imu_drop_prob = coerce_finite_scalar(
+                imu_drop_prob_raw, name='imu_drop_prob', min_value=0.0, max_value=1.0
+            )
+        if not 0.0 <= imu_drop_prob <= 1.0:
+            raise ValueError(
+                f'imu_drop_prob must be within [0, 1], got {imu_drop_prob}'
+            )
+        raw_affected_modalities = modality_cfg.get('affected_modalities') or []
+        if isinstance(raw_affected_modalities, str):
+            raise TypeError(
+                f'affected_modalities must be a list or tuple of modality names, '
+                f'got a string {raw_affected_modalities!r} which would be split into '
+                f'individual characters by list().'
+            )
+        affected_modalities = list(raw_affected_modalities)
+        m_reports: list[dict[str, Any]] = []
+        if modality_drop_prob > 0.0 and affected_modalities and working_events:
+            # BUG-021 fix: 在 A 之前用原始 t_min/t_max 算缺失段, 这样 M 删的段 (如 13-15s)
+            # 在 A 注入 burst_missing 时已经是"已删"状态, A burst 跳过这些段, 互不干扰.
+            event_times = [coerce_finite_scalar(e.get('t', 0.0), name='event.t') for e in working_events]
+            t_min = min(event_times)
+            t_max = max(event_times)
+            total_duration = t_max - t_min
+            if total_duration > 0.0:
+                scene_id_str = str(task.get('scene_id', ''))
+                for modality_name in affected_modalities:
+                    modality_drop_prob_for_modality = imu_drop_prob if str(modality_name).strip().lower() == 'imu' else modality_drop_prob
+                    drop_duration = total_duration * modality_drop_prob_for_modality
+                    m_seed_str = f"modality_drop:{modality_name}:{scene_id_str}"
+                    m_seed = int(hashlib.sha256(m_seed_str.encode('utf-8')).hexdigest()[:8], 16)
+                    start_range = max(0.0, total_duration - drop_duration)
+                    random_fraction = (m_seed & 0xFFFF) / 65536.0
+                    drop_start = t_min + random_fraction * start_range
+                    drop_end = drop_start + drop_duration
+                    working_events, m_report = apply_modality_drop(
+                        working_events, str(modality_name).strip().lower(), [(drop_start, drop_end)]
+                    )
+                    m_reports.append(m_report)
+        scenario_reports['M'] = m_reports
+
     if 'A' in axis_params:  # A 轴代表异步扰动。
         async_level = str(axes.get('A') or axis_params['A'].get('level'))  # 选取异步等级，优先用任务显式值。
         working_events, async_report = apply_async_level(working_events, async_level, protocol_cfg['axes']['A'])  # 写回异步变换结果和报告。
@@ -1055,91 +1121,6 @@ def _apply_scene_task(events: Iterable[Any], task: dict[str, Any], protocol_cfg:
             anchor_count, k_level, protocol_cfg['axes']['K'],
         )
         scenario_reports['K'] = geometry_report  # 几何报告放入 K 轴场景报告。
-
-    # M 轴代表模态缺失（按时间段屏蔽指定模态），在 A/N/V/K 之后处理。
-    # 协议层 M 轴参数为 modality_drop_prob（单帧丢失概率）和 affected_modalities（受影响模态列表）。
-    # 此处将 prob 转换为连续缺失时间段（长度 = 总时长 × prob），调用 apply_modality_drop。
-    if 'M' in axis_params:
-        from liquidloc.scenarios.missing_modalities import apply_modality_drop
-        modality_cfg = axis_params['M']
-        # 五轴档位协议 M 轴 modality_drop_prob 是区间 [low, high] 形式。
-        # 消费者取中点作为该序列的注入代表值（与 K 轴 geom_condition 区间处理一致）。
-        modality_drop_prob_raw = modality_cfg.get('modality_drop_prob', 0.0)
-        if isinstance(modality_drop_prob_raw, (list, tuple)) and len(modality_drop_prob_raw) >= 1:
-            modality_drop_prob = float(sum(modality_drop_prob_raw) / len(modality_drop_prob_raw))
-        else:
-            modality_drop_prob = coerce_finite_scalar(
-                modality_drop_prob_raw, name='modality_drop_prob'
-            )
-        # 第 3 轮审查 HIGH-1 修复：modality_drop_prob 是概率，必须在 [0, 1] 区间。
-        # 与 async_levels.py L393-394 的 burst_missing_prob 校验口径保持一致，
-        # 否则协议 YAML 注释（"单帧丢失概率"）会被违反且无错误信号。
-        if not 0.0 <= modality_drop_prob <= 1.0:
-            raise ValueError(
-                f'modality_drop_prob must be within [0, 1], got {modality_drop_prob}'
-            )
-        # 第 8 阶段修复 HIGH-12: IMU 缺失率有专属字段 imu_drop_prob（如 M3 imu_drop_prob=[0.01,0.05]），
-        # 不能用 modality_drop_prob=0.30 给 IMU（违反协议层 "IMU ≤5%" 硬约束）。
-        # IMU 是时间基准，缺失过高导致估计器状态发散。
-        imu_drop_prob_raw = modality_cfg.get('imu_drop_prob', 0.0)
-        if isinstance(imu_drop_prob_raw, (list, tuple)) and len(imu_drop_prob_raw) >= 1:
-            imu_drop_prob = float(sum(imu_drop_prob_raw) / len(imu_drop_prob_raw))
-        else:
-            imu_drop_prob = coerce_finite_scalar(
-                imu_drop_prob_raw, name='imu_drop_prob', min_value=0.0, max_value=1.0
-            )
-        if not 0.0 <= imu_drop_prob <= 1.0:
-            raise ValueError(
-                f'imu_drop_prob must be within [0, 1], got {imu_drop_prob}'
-            )
-        # 第 3 轮审查 HIGH-2 修复：affected_modalities 必须是列表/元组，
-        # 字符串虽是 Sequence 但会被 list() 拆成字符（list("uwb") → ['u','w','b']），
-        # 导致下游 apply_modality_drop 收到非法模态名。此处显式拒绝字符串。
-        raw_affected_modalities = modality_cfg.get('affected_modalities') or []
-        if isinstance(raw_affected_modalities, str):
-            raise TypeError(
-                f'affected_modalities must be a list or tuple of modality names, '
-                f'got a string {raw_affected_modalities!r} which would be split into '
-                f'individual characters by list().'
-            )
-        affected_modalities = list(raw_affected_modalities)
-        m_reports: list[dict[str, Any]] = []
-        if modality_drop_prob > 0.0 and affected_modalities and working_events:
-            # 计算当前事件序列的时间范围，用于构造缺失时间段。
-            event_times = [coerce_finite_scalar(e.get('t', 0.0), name='event.t') for e in working_events]
-            t_min = min(event_times)
-            t_max = max(event_times)
-            total_duration = t_max - t_min
-            if total_duration > 0.0:
-                scene_id_str = str(task.get('scene_id', ''))
-                for modality_name in affected_modalities:
-                    # 语义说明（第 2 轮审查 MEDIUM）：协议 YAML 注释将 modality_drop_prob 描述为
-                    # "单帧某模态数据丢失的概率"（per-frame Bernoulli 模型），但当前实现将其解释为
-                    # "总时长 × prob = 连续缺失时间段长度"（contiguous block 模型）。两者统计特性不同：
-                    # Bernoulli 模型产生散点缺失（每帧独立丢弃，易于插值），
-                    # contiguous 模型产生连续块缺失（整段丢失，难于插值）。
-                    # 当前采用 contiguous 模型的原因：(1) 确定性可复现（无需随机数生成器）；
-                    # (2) 对下游估计器构成更强压力（连续缺失比散点缺失更难处理）；
-                    # (3) 与 A 轴 burst_missing 的 contiguous 窗口语义一致。
-                    # 若需切换到 Bernoulli 模型，需同步更新协议 YAML 注释和此实现。
-                    # 第 8 阶段修复 HIGH-12: IMU 走 imu_drop_prob（协议层 M3 imu_drop_prob=[0.01,0.05]），
-                    # 其他模态（UWB/VIO）走 modality_drop_prob。
-                    modality_drop_prob_for_modality = imu_drop_prob if str(modality_name).strip().lower() == 'imu' else modality_drop_prob
-                    drop_duration = total_duration * modality_drop_prob_for_modality
-                    # 用稳定哈希选择时间段起始位置，保证可复现（不引入 random 依赖）。
-                    m_seed_str = f"modality_drop:{modality_name}:{scene_id_str}"
-                    m_seed = int(hashlib.sha256(m_seed_str.encode('utf-8')).hexdigest()[:8], 16)
-                    # 起始位置在 [t_min, t_max - drop_duration] 范围内确定性选取。
-                    start_range = max(0.0, total_duration - drop_duration)
-                    # 用哈希值低 16 位生成 [0, 1) 确定性浮点数，替代 random.Random。
-                    random_fraction = (m_seed & 0xFFFF) / 65536.0
-                    drop_start = t_min + random_fraction * start_range
-                    drop_end = drop_start + drop_duration
-                    working_events, m_report = apply_modality_drop(
-                        working_events, str(modality_name).strip().lower(), [(drop_start, drop_end)]
-                    )
-                    m_reports.append(m_report)
-        scenario_reports['M'] = m_reports
 
     return working_events, {  # 返回重写后的事件序列和场景报告，供后续流程继续处理。
         'scene_parameters': scene_parameters,  # 返回统一格式的场景参数。

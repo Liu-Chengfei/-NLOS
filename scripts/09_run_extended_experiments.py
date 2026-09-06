@@ -437,6 +437,11 @@ def _run_supplementary_public_route(
             **({"scene_id_by_seq": scene_id_by_seq} if scene_id_by_seq else {}),
             **({"allowed_k_levels": allowed_k_levels} if allowed_k_levels else {}),
             **({"allowed_anchor_counts": allowed_anchor_counts} if allowed_anchor_counts else {}),
+            # BUG-020 fix: frozen_axes 透传给 PreparePipeline,
+            # 让 prepare_pipeline sim_meta 路径读到 axes_override 缺 M 时,
+            # 能从 frozen_axes.M='M1' 补上 M 档位 (modality_drop_prob=5%),
+            # 使物化 events meta 的 scene_parameters.axes.M='M1' (不是写死的 M0).
+            **({"frozen_axes": experiment_cfg.get("frozen_axes")} if experiment_cfg.get("frozen_axes") else {}),
         }
     )
     prepare_manifest = load_prepare_manifest(prepare_output_root)

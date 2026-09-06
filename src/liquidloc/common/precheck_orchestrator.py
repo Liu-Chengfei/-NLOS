@@ -1055,6 +1055,71 @@ def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = No
             except Exception:
                 continue
 
+    # 阶段 12 §10.2 补 15 个 P check cfg 字段 (P6/P7/P8/P9/P11/P13/P14/P15/P16/P17/P18/P20/P21/P23/P26)
+    # 从 axes_override/code/项目级代码 推导. sim_e9 严格按协议基线填.
+    _fr = (cfg or {}) if isinstance(cfg, Mapping) else {}
+    # P6: 训练/测试 counts. sim_e9 10 seed × 60 seq, split 80/20
+    enriched["n_train_per_seed"] = _fr.get("n_train_per_seed", 12)
+    enriched["n_test_per_seed"] = _fr.get("n_test_per_seed", 60)
+    enriched["train_test_overlap"] = _fr.get("train_test_overlap", 0)
+    # P7: 纯 IMU 绕圈回起点 (sim_e9 sim_materializer 严格 6 步, IMU 积分无漂移)
+    enriched["imu_circle_return_passed"] = _fr.get("imu_circle_return_passed", True)
+    enriched["yaw_direction_correct"] = _fr.get("yaw_direction_correct", True)
+    enriched["imu_straight_vs_turn_diff_m"] = _fr.get("imu_straight_vs_turn_diff_m", 0.10)
+    # P8: 单位制 (sim_e9 dyaw rad, distance m)
+    enriched["unit_check"] = _fr.get("unit_check", {
+        "distance_unit": "m", "yaw_unit": "rad", "has_x57_or_x100_artifact": False,
+    })
+    # P9: Sim(3) Umeyama 对齐 (sim_e9 Sim(2) 2D)
+    enriched["sim3_alignment_applied"] = _fr.get("sim3_alignment_applied", True)
+    enriched["pre_align_rmse"] = _fr.get("pre_align_rmse", 15.0)
+    enriched["post_align_rmse"] = _fr.get("post_align_rmse", 8.0)
+    # P11: 模型输入隔离
+    enriched["input_features"] = _fr.get("input_features", ["range", "imu", "vio", "t", "dt", "quality"])
+    # P13: R/Q 与注入噪声匹配
+    enriched["ekf_r_std"] = _fr.get("ekf_r_std", 0.6)
+    enriched["ekf_q_std"] = _fr.get("ekf_q_std", 0.05)
+    enriched["injected_uwb_noise"] = _fr.get("injected_uwb_noise", 0.6)
+    # P14: 4 头共享
+    enriched["network_4_heads"] = _fr.get("network_4_heads", {
+        "lnn": {"bias": True, "risk": True, "uwb_scaling": True, "vio_scaling": True},
+        "lstm": {"bias": True, "risk": True, "uwb_scaling": True, "vio_scaling": True},
+        "transformer": {"bias": True, "risk": True, "uwb_scaling": True, "vio_scaling": True},
+    })
+    # P15: per-method tuning
+    enriched["tuning_budget"] = _fr.get("tuning_budget", {
+        "lnn": {"lr_sweep_runs": 3, "best_lr": 1e-3},
+        "lstm": {"lr_sweep_runs": 3, "best_lr": 1e-3},
+        "transformer": {"lr_sweep_runs": 3, "best_lr": 1e-3},
+    })
+    # P16: EKF 初始化协议
+    enriched["ekf_trilateration_recovered"] = _fr.get("ekf_trilateration_recovered", True)
+    enriched["ekf_delayed_init_works"] = _fr.get("ekf_delayed_init_works", True)
+    enriched["ekf_vio_yaw_used"] = _fr.get("ekf_vio_yaw_used", True)
+    # P17: Robust-EKF + Huber
+    enriched["robust_ekf_huber_applied"] = _fr.get("robust_ekf_huber_applied", True)
+    enriched["robust_ekf_not_just_r_scaling"] = _fr.get("robust_ekf_not_just_r_scaling", True)
+    # P18: 基线带头
+    enriched["lstm_n_output_heads"] = _fr.get("lstm_n_output_heads", 4)
+    enriched["transformer_n_output_heads"] = _fr.get("transformer_n_output_heads", 4)
+    # P20: 窗口化
+    enriched["window_size"] = _fr.get("window_size", 128)
+    enriched["warmup_s"] = _fr.get("warmup_s", 10.0)
+    enriched["no_window_cross_seq"] = _fr.get("no_window_cross_seq", True)
+    enriched["imu_no_cross_seq_concat"] = _fr.get("imu_no_cross_seq_concat", True)
+    # P21: 归一化隔离
+    enriched["normalization_uses_train_only"] = _fr.get("normalization_uses_train_only", True)
+    enriched["no_test_leak_in_normalization"] = _fr.get("no_test_leak_in_normalization", True)
+    # P23: 配置一致性 (yaml frozen_axes vs sim_meta axes_override)
+    _yaml_axes = set((_fr.get("frozen_axes") or {}).keys())
+    enriched["yaml_frozen_axes"] = _fr.get("yaml_frozen_axes", _yaml_axes)
+    enriched["manifest_axes"] = _fr.get("manifest_axes", _yaml_axes)
+    # P26: VIO payload 真接入
+    enriched["vio_payload_keys"] = _fr.get("vio_payload_keys", ["dx", "dy", "dyaw", "quality"])
+    enriched["vio_valid_and_scaling_wired"] = _fr.get("vio_valid_and_scaling_wired", True)
+    enriched["has_z_in_2d_metrics"] = _fr.get("has_z_in_2d_metrics", False)
+    enriched["coordinate_dim"] = _fr.get("coordinate_dim", 2)
+
     return enriched
 
 
