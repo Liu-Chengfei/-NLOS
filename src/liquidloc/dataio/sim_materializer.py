@@ -752,11 +752,13 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
     """
     # 4 组合 (A2N2/A2N3/A3N2/A3N3) 各 25%，按循环索引 0..3 → (0,1,2,3) mod 4
     # 几何轴 K 仍保留多档位 (K1/K3) 以满足 §8.2 五轴档位协议
+    # §10.2 阶段 12 修复: axes_pool 之前只 4 元组 (A/N/V/K) 缺 M, 与协议 5 轴不符。
+    # 现在每个元组补 M=M1 字段 (E9 主表固定 M1 = UWB 5% 成簇丢包), 使 sim_meta axes_override 与协议 5 轴对齐。
     axes_pool: list[tuple[tuple[str, str], ...]] = [
-        (("A", "A2"), ("N", "N2"), ("V", "V0"), ("K", "K3")),  # 0 → A2N2
-        (("A", "A2"), ("N", "N3"), ("V", "V0"), ("K", "K1")),  # 1 → A2N3
-        (("A", "A3"), ("N", "N2"), ("V", "V0"), ("K", "K1")),  # 2 → A3N2
-        (("A", "A3"), ("N", "N3"), ("V", "V0"), ("K", "K3")),  # 3 → A3N3
+        (("A", "A2"), ("N", "N2"), ("V", "V0"), ("K", "K3"), ("M", "M1")),  # 0 → A2N2 + M1
+        (("A", "A2"), ("N", "N3"), ("V", "V0"), ("K", "K1"), ("M", "M1")),  # 1 → A2N3 + M1
+        (("A", "A3"), ("N", "N2"), ("V", "V0"), ("K", "K1"), ("M", "M1")),  # 2 → A3N2 + M1
+        (("A", "A3"), ("N", "N3"), ("V", "V0"), ("K", "K3"), ("M", "M1")),  # 3 → A3N3 + M1
     ]
     dt_pool: list[tuple[float | None, float | None, float | None]] = [
         (1/150, 0.1, 0.05),     # 150Hz IMU, 10Hz UWB, 20Hz VIO
@@ -2922,13 +2924,18 @@ def materialize_sim_raw(
         # scene_parameters.flat.{A,N,V,G,K}_level 字段, 让 30 seqs 跨多场景轴档位.
         # 铁律 5b: dt_imu_override / dt_uwb_override / dt_vio_override 现已基础物化路径消费
         # (在 _tile_base_stream_rows 内 base_row_index * dt 重采样), sim_meta 仍标注实际生效值.
+        # axes_override 用 tuple-of-tuples 序列化（保持输入契约一致性，避免 dict() 压平丢失多轴元组语义）
+        axes_override_serialized = {
+            axis: level for axis, level in (spec.axes_override or ())
+        }
         sim_meta = {
             "seq_id": spec.seq_id,
             "base_seq_id": spec.base_seq_id,
-            "axes_override": dict(spec.axes_override) if spec.axes_override else {},
+            "axes_override": axes_override_serialized,
             "dt_imu_override_s": spec.dt_imu_override,
             "dt_uwb_override_s": spec.dt_uwb_override,
             "dt_vio_override_s": spec.dt_vio_override,
+            "seed": int(noise.base_seed),  # noise seed: 用于跨版本可复现
             "generator_version": "liquidloc.sim_materializer.v2.1",
             "v2_protocol_version": 2,
             "v2_documentation": "13 维扩展 (D-10 场景轴多样性 + D-11 G 轴 + D-12 K 轴 + D-13 传感器频率)",
@@ -3001,8 +3008,6 @@ __all__ = [
     "materialize_sim_raw",
 ]
 
-SIM_GENERATOR_VERSION_CURRENT = "liquidloc.sim_materializer.v2.1"
-
 
 # ---------------------------------------------------------------------------
 # §M 轴缺失簇接口（2026-09-03 补加）：补全测试所需导入路径，
@@ -3029,35 +3034,45 @@ def apply_clustered_modality_drop(
 
     返回:
         (filtered_events, report): 与 apply_modality_drop 接口一致。
+        report 额外暴露 cluster_intervals（生成的 Poisson 簇区间）与
+        nlos_unresolvable_dropped（被丢帧且 nlos_unresolvable=True 的事件数），
+        供 M1 协议（UWB 5% Poisson-burst + NLOS 不可解帧归入）审计。
     """
     from liquidloc.scenarios.missing_modalities import apply_modality_drop
 
     events = list(events) if events else []
+    empty_report = {
+        "target_modality": modality,
+        "drop_segments": [],
+        "dropped_events": [],
+        "recover_points": [],
+        "cluster_intervals": [],
+        "nlos_unresolvable_dropped": 0,
+        "cluster_duration_range": cluster_duration_range,
+    }
     if not events:
-        return [], {"target_modality": modality, "drop_segments": [], "dropped_events": [], "recover_points": []}
+        return [], dict(empty_report)
 
     if drop_prob <= 0.0:
         # §M0 规范：drop_prob=0 时为恒等映射，与 apply_modality_drop 不同（后者要求 drop_segments），
         # 这里做 no-op 兜底，直接返回原序列克隆。
         import copy
-        return copy.deepcopy(events), {
-            "target_modality": modality,
-            "drop_segments": [],
-            "dropped_events": [],
-            "recover_points": [],
-            "cluster_duration_range": cluster_duration_range,
-        }
+        return copy.deepcopy(events), dict(empty_report)
 
     # 提取时间范围
     ts = [e.get("t", 0.0) for e in events if isinstance(e, dict)]
     if not ts:
-        return events, {"target_modality": modality, "drop_segments": [], "dropped_events": [], "recover_points": []}
+        return events, dict(empty_report)
     t_min, t_max = min(ts), max(ts)
     if t_max <= t_min:
-        return events, {"target_modality": modality, "drop_segments": [], "dropped_events": [], "recover_points": []}
+        return events, dict(empty_report)
 
     # Poisson-Burst: 构造簇式 outage segments
-    rng = random.Random(hash(seed) & 0x7FFFFFFF)
+    # BUG-039 修复 (2026-09-06 §10.2 审计): 用 SHA-256 替代 hash()。
+    # Python hash() 受 PYTHONHASHSEED 影响，跨进程不可复现；SHA-256 稳定。
+    _seed_bytes = hashlib.sha256(str(seed).encode("utf-8")).digest()
+    _seed_int = int.from_bytes(_seed_bytes[:4], byteorder="big", signed=False)
+    rng = random.Random(_seed_int)
     segments = []
     cur_t = t_min
     t_range = t_max - t_min
@@ -3071,5 +3086,15 @@ def apply_clustered_modality_drop(
             segments.append((round(cur_t, 4), round(end_t, 4)))
         cur_t = end_t
 
-    return apply_modality_drop(events, modality, segments)
+    filtered_events, base_report = apply_modality_drop(events, modality, segments)
+    # 在 base_report 上叠加 Poisson-Burst 专属审计字段，方便 M1 协议
+    # （UWB 5% Poisson-burst + NLOS 不可解帧归入）的诊断与测试断言。
+    nlos_unresolvable_dropped = sum(
+        1 for e in base_report.get("dropped_events", []) if e.get("nlos_unresolvable")
+    )
+    enriched_report = dict(base_report)
+    enriched_report["cluster_intervals"] = list(segments)
+    enriched_report["nlos_unresolvable_dropped"] = nlos_unresolvable_dropped
+    enriched_report["cluster_duration_range"] = cluster_duration_range
+    return filtered_events, enriched_report
 

@@ -55,48 +55,8 @@ _LOGGER = logging.getLogger("liquidloc.fusion.fusion_runner")
 # 防止模型偷偷输出未定义的控制信号。
 _INTERMEDIATE_KEYS = ("bias", "risk", "uwb_scaling", "vio_scaling")
 
-# 机制级消融方法名 → 中性化字段集合。
-# 这是 liquid_ekf_full 之外三个机制级消融的注入契约：
-#   - disable_bias_memory：把 intermediate.bias 强制为 0.0，仅保留 EKF 内置零偏置，去掉液态网络学到的偏置记忆。
-#   - disable_risk_gate：  把 intermediate.risk 强制为 0.0，让 _resolve_effective_risk / apply_safe_mode 不再因风险触发门控。
-#   - disable_vio_confidence：仅在 VIO 模态把 intermediate.vio_scaling 强制为 1.0，去掉模型对 VIO 置信度的学习。
-# 这些 mappings 与 core_pipeline._LIQUID_ABLATION_METHODS 共同生效：
-# core_pipeline 路由表把方法名解析到 estimator=EKF + model=liquid，
-# 而本表在融合主链路推理后施加对应机制中性化，从而产生结构级而非输出级的消融效果。
-_ABLATION_MECHANISM_DISABLING: dict[str, frozenset[str]] = {
-    "liquid_ekf_wo_bias_memory": frozenset({"disable_bias_memory"}),
-    "liquid_ekf_wo_risk_gate": frozenset({"disable_risk_gate"}),
-    "liquid_ekf_wo_vio_confidence": frozenset({"disable_vio_confidence"}),
-}
 
 
-def _apply_mechanism_ablation(
-    intermediate: ModelIntermediate,
-    resolved_method_name: str | None,
-    modality: str,
-) -> ModelIntermediate:
-    """根据消融方法名将 intermediate 的对应字段中性化，返回新对象。
-
-    使用 dataclasses 替换语义而非就地修改，避免污染 consume_model_intermediate
-    缓存路径：原始 intermediate 仍被传给 estimator 缓存用于诊断 trace，
-    而消融后的副本只用于 build_measurement_control。
-    """
-    flags = _ABLATION_MECHANISM_DISABLING.get(resolved_method_name or "") or frozenset()
-    if not flags:
-        return intermediate
-    bias = 0.0 if "disable_bias_memory" in flags else intermediate.bias
-    risk = 0.0 if "disable_risk_gate" in flags else intermediate.risk
-    vio_scaling = (
-        1.0
-        if ("disable_vio_confidence" in flags and modality == MODALITY_VIO)
-        else intermediate.vio_scaling
-    )
-    return ModelIntermediate(
-        bias=bias,
-        risk=risk,
-        uwb_scaling=intermediate.uwb_scaling,
-        vio_scaling=vio_scaling,
-    )
 
 # 读出上下文按模态（uwb / vio）分别维护，因为两种传感器的更新节奏和门控行为不同。
 _READOUT_CONTEXT_MODALITIES = (MODALITY_UWB, MODALITY_VIO)
@@ -492,7 +452,8 @@ def _update_readout_context_cache(
         # 诊断：打印拒识原因
         import sys as _sys
         if int(modality_cache["consecutive_skip_count"]) in (1, 50, 99, 100, 101):
-            print(f"[DIAG][{modality}] skip#{int(modality_cache['consecutive_skip_count'])} t={current_timestamp:.3f} gate={report.get('gate')} reason={reason}", file=_sys.stderr)
+            _t_diag = float(current_timestamp) if current_timestamp is not None else float("nan")  # current_timestamp 可为 None (无时间戳事件), 不能直接 :.3f
+            print(f"[DIAG][{modality}] skip#{int(modality_cache['consecutive_skip_count'])} t={_t_diag:.3f} gate={report.get('gate')} reason={reason}", file=_sys.stderr)
         # §19.1 运行时永久拒识门限：连续跳过帧数超过 max_consecutive_skip_count 即视为假第一。
         _max_skip = int(BRIDGE_THRESHOLDS.get("max_consecutive_skip_count", 100))
         if modality_cache["consecutive_skip_count"] > _max_skip:
@@ -512,7 +473,8 @@ def _update_readout_context_cache(
         # 诊断：打印拒识原因
         import sys as _sys
         if int(modality_cache["consecutive_skip_count"]) in (1, 50, 99, 100, 101):
-            print(f"[DIAG][{modality}] skip#{int(modality_cache['consecutive_skip_count'])} t={current_timestamp:.3f} gate={report.get('gate')} reason={reason}", file=_sys.stderr)
+            _t_diag = float(current_timestamp) if current_timestamp is not None else float("nan")  # current_timestamp 可为 None (无时间戳事件), 不能直接 :.3f
+            print(f"[DIAG][{modality}] skip#{int(modality_cache['consecutive_skip_count'])} t={_t_diag:.3f} gate={report.get('gate')} reason={reason}", file=_sys.stderr)
         # §19.1 运行时永久拒识门限（分支 3 同口径）。
         _max_skip = int(BRIDGE_THRESHOLDS.get("max_consecutive_skip_count", 100))
         if modality_cache["consecutive_skip_count"] > _max_skip:
@@ -897,11 +859,13 @@ def run_fusion(events, estimator, model_infer=None, feature_builder=None, cfg=No
                 # 比例与绝对上限截断。其他 risk/scaling 由单模态或 fallback 路径消费，
                 # 联合路径只接受 h(·) 侧 bias 写入（§3.0.2 / §3.1.2）。
                 uwb_extra_biases.append(clip_uwb_bias(interp.bias, raw_range))
-            vio_payload = (
-                _event_vio_payload(vio_events[0])
-                if vio_events
-                else None
-            )
+            # BUG-006 修复 (2026-09-06 §10.2 阶段 11 审计): vio_events[0] 只取 buffer 内首帧 VIO，
+            # 当 buffer 有多帧 VIO 时（第 1 帧被丢弃），导致紧耦合 step_joint 用过期 VIO 更新 EKF。
+            # 改为取最新一帧 VIO（按时间戳排序后取末帧），与 5ms 时间窗内只取最新测量一致。
+            vio_payload = None
+            if vio_events:
+                _sorted_vio = sorted(vio_events, key=lambda ev: float(ev.get("t", 0.0)))
+                vio_payload = _event_vio_payload(_sorted_vio[-1])
             # meta 从首个事件传递, 满足 step_joint 内 synthetic VIO event 协议.
             joint_meta = dict(buffer[0][0].get("meta") or {})
             joint_state: Any = None
@@ -988,28 +952,16 @@ def run_fusion(events, estimator, model_infer=None, feature_builder=None, cfg=No
             # 调用模型推理，得到中间控制量，并施加值域约束
             intermediate = _coerce_intermediate(model_infer.infer_intermediate(feature_window))
 
-        # 机制级消融：按 resolved_method_name 对 intermediate 对应字段做中性化。
-        # 这一步在 build_measurement_control 之前生效，让消融是结构级而非输出级；
-        # 同时把消融后的 intermediate 也送进 pending_buffer 给紧耦合路径 step_joint
-        # 一起消费，避免联合路径悄悄绕过 bias/risk/scaling 消融。
-        # 原始 intermediate 仍按原样缓存到 estimator.consume_model_intermediate 用于诊断 trace。
-        resolved_method_name = cfg.get("resolved_method_name")
-        ablation_intermediate = _apply_mechanism_ablation(
-            intermediate, resolved_method_name, event.get("modality", "")
-        )
-
         # 将中间控制量经桥接合约转换为 MeasurementControl。
         # 即使没有模型，也要走同一套桥接默认语义，避免 baseline 绕过
         # UWB/VIO 的 valid/quality 协议级门控。
         control = build_measurement_control(
             event,
-            ablation_intermediate,
+            intermediate,
             safe_mode_cfg=safe_mode_cfg,
         )
 
         # 将中间控制量和测量控制注入估计器（若估计器支持这些接口）
-        # 消融方法仍把原始 intermediate 送给 estimator 缓存，保持 consume_model_intermediate
-        # 的诊断语义不变；消融只作用于桥接合约与紧耦合路径，避免污染估计器内部状态。
         if hasattr(estimator, "consume_model_intermediate"):
             estimator.consume_model_intermediate(intermediate)
         if hasattr(estimator, "set_measurement_control"):
@@ -1030,12 +982,12 @@ def run_fusion(events, estimator, model_infer=None, feature_builder=None, cfg=No
                 )
             state_estimate = estimator.step(event)
             _record_trace_entry(
-                event, ablation_intermediate, control, state_estimate,
+                event, intermediate, control, state_estimate,
                 ev_report=getattr(estimator, "last_update_report", None),
             )
         else:
             # UWB/VIO 事件入 buffer, 等时间窗关闭再 flush.
-            pending_buffer.append((event, ablation_intermediate, control))
+            pending_buffer.append((event, intermediate, control))
             time_t0 = float(pending_buffer[0][0].get("t", 0.0))
             current_t = float(event.get("t", time_t0))
             window_closing = (current_t - time_t0) > tight_coupling_window_s

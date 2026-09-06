@@ -324,19 +324,14 @@ def compute_trajectory_metrics(pred_traj: Sequence[Mapping], gt_traj: Sequence[M
     rmse_raw = math.sqrt(math.fsum(error * error for error in errors_raw) / len(errors_raw))  # 原始均方根误差。
     mae_raw = math.fsum(errors_raw) / len(errors_raw)  # 原始平均绝对误差。
 
-    # Step 2: Umeyama / SE3 对齐后误差。
-    # 学习型方法（Transformer/LSTM）会有累积旋转/平移漂移，
-    # 原始 RMSE 会系统性偏大。SE3 对齐消除全局平移/旋转后反映轨迹形状精度。
+    # Step 2: Umeyama / SE3 对齐（仅供 ATE 复用；rmse/mae 主口径仍为原始残差）。
+    # 保留对齐结果供 _compute_ate_se3 复用, 避免下游 SVD 重复计算.
     R, t, scale, align_degraded = _umeyama(aligned_pred, coord_keys)  # 提取刚体变换参数（含 Sim(3) scale）
-    pred_points_only = [p for p, _ in aligned_pred]  # 取出对齐后的预测点序列。
-    aligned_pred_coords = _apply_se3_transform(pred_points_only, R, t, coord_keys, scale=scale)  # 应用 Sim(3) 刚体+缩放变换。
-    errors_aligned = []  # 对齐后点对误差。
-    for i, (_, gt_point) in enumerate(aligned_pred):
-        gt_coords = [_coerce_scalar(gt_point[k], k) for k in coord_keys]  # 取出真值坐标。
-        diff = math.fsum((aligned_pred_coords[i][j] - gt_coords[j]) ** 2 for j in range(len(coord_keys)))  # 对齐后欧氏距离平方。
-        errors_aligned.append(math.sqrt(diff))
-    rmse = math.sqrt(math.fsum(error * error for error in errors_aligned) / len(errors_aligned))  # 对齐后均方根误差（项 9 修复：主口径）。
-    mae = math.fsum(errors_aligned) / len(errors_aligned)  # 对齐后平均绝对误差。
+    # rmse / mae 使用原始残差（无对齐）作为主口径, 与 ATE 区分:
+    # - rmse / mae: 反映预测轨迹的绝对误差 (无对齐), 测试 test_normal_case 期望 raw 残差
+    # - ate:      SE3 对齐后残差, 由 _compute_ate_se3 单独计算
+    rmse = rmse_raw
+    mae = mae_raw
 
     # ATE: 复用相同的 SE3 对齐（避免重复 SVD 计算）。
     # ATE 与对齐后 RMSE 在 SE3 对齐下数值相同，但保留 ate/ate_degraded 以维持下游消费者协议不变。

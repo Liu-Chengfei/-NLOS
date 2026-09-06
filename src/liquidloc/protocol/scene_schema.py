@@ -42,7 +42,7 @@ from dataclasses import dataclass  # 用于定义场景规格对象。
 import re  # 用于解析 scene_code。
 
 from liquidloc.common.validation import is_string_like  # 统一字符串类型校验函数。
-from liquidloc.protocol.scene_axis_protocol import AXES as _AXIS_ORDER, AXIS_METADATA_KEYS, get_protocol_axes, load_scene_axis_protocol  # 复用场景轴协议。
+from liquidloc.protocol.scene_axis_protocol import AXES as _AXIS_ORDER, AXIS_METADATA_KEYS, get_nominal_levels, get_protocol_axes, load_scene_axis_protocol  # 复用场景轴协议。
 
 _AXIS_FIELDS = {  # 轴名到 SceneSpec 字段名的映射。
     "A": "A_level",  # A 轴对应字段名。
@@ -52,13 +52,13 @@ _AXIS_FIELDS = {  # 轴名到 SceneSpec 字段名的映射。
     "M": "M_level",  # M 轴对应字段名（G 轴并入 K，M 正式进入 scene_code）。
 }  # 轴名到字段名的映射结束。
 
-_SCENE_CODE_PATTERN = re.compile(  # 场景编码正则，格式为 S(A,N,V,K,M)。
+_SCENE_CODE_PATTERN = re.compile(  # 场景编码正则，格式为 S(A,N,V,K,M)；M 段可省略（省略时回退协议名义档 M0）。
     r"^S\("  # 开头 S(。
     r"([^,\s)]+),"  # A 轴 token，不含逗号、空白和右括号。
     r"([^,\s)]+),"  # N 轴 token。
     r"([^,\s)]+),"  # V 轴 token。
-    r"([^,\s)]+),"  # K 轴 token。
-    r"([^,\s)]+)"  # M 轴 token，不含逗号、空白和右括号。
+    r"([^,\s)]+)"  # K 轴 token。
+    r"(?:,([^,\s)]+))?"  # M 轴 token（可选；2026-08-31 五轴协议后大量事件/夹具使用 S(A,N,V,K) 四段简写）。
     r"\)$"  # 结尾 )。
 )  # 场景编码正则结束。
 
@@ -182,9 +182,11 @@ def decode_scene(scene_code: str) -> SceneSpec:  # 解码函数。
         raise TypeError(f"scene_code must be a str, got {type(scene_code).__name__}")  # 类型不对就中止。
     parsed_tokens = _SCENE_CODE_PATTERN.fullmatch(scene_code)  # 做全量匹配。
     if parsed_tokens is None:  # 格式不对。
-        raise ValueError("scene_code must match S(A,N,V,K,M) where each field is a valid axis level (e.g. S(A0,N0,V0,K3,M0))")  # 报出格式要求。
+        raise ValueError("scene_code must match S(A,N,V,K,M) or S(A,N,V,K) where each field is a valid axis level (e.g. S(A0,N0,V0,K3,M0))")  # 报出格式要求。
     _levels = axis_levels()  # 再次取允许集合（只加载一次）。
-    A_level, N_level, V_level, K_value, M_level = parsed_tokens.groups()  # 按固定顺序拆 token。
+    A_level, N_level, V_level, K_value, M_level = parsed_tokens.groups()  # 按固定顺序拆 token（M 可能为 None）。
+    if M_level is None:  # 四段简写 S(A,N,V,K)：M 缺省回退协议名义档，不硬编码 M0。
+        M_level = get_nominal_levels()["M"]  # 从协议动态读取正常等级名。
     return SceneSpec(  # 返回结构化对象。
         A_level=coerce_axis_value("A", A_level, _levels),  # 校验 A 轴值。
         N_level=coerce_axis_value("N", N_level, _levels),  # 校验 N 轴值。

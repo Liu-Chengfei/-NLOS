@@ -628,6 +628,10 @@ def apply_async_level(
         "clock_bias_ffn_ms": (
             uwb_ffn_std_ms if uwb_ffn_sequence else (vio_ffn_std_ms if vio_ffn_sequence else 0.0)
         ),  # FFN 1/f 序列实际标准差（毫秒），用于验证幅度匹配目标 σ；UWB/VIO 独立生成。
+        # B08 修复: 跨模态错位事件计数（base_shift_ms != 0 的非 IMU 事件），用于满足 §0.4 B08 ≥ 20 错位事件约束。
+        "misalignment_event_count": sum(
+            1 for plan in timing_plan if abs(float(plan.get("shift_ms", 0.0))) > 1e-6
+        ),
         "timing_plan": timing_plan,  # 每个事件的时间变更审计。
         "dropped_event_count": len(dropped_event_indices),  # 实际删除事件数。
         "blackout_segments": blackout_segments,  # blackout 时间段。

@@ -51,7 +51,7 @@ from liquidloc.interfaces.estimator_api import EstimatorAPI  # 估计器接口�
 from liquidloc.protocol.task_contract import get_sensor_roles, get_vio_update_contract  # 从协议层读取传感器角色和 VIO 更新合同，用于校验量测噪声配置。
 
 
-_SUPPORTED = {ESTIMATOR_NAME_EKF, ESTIMATOR_NAME_ROBUST_EKF, ESTIMATOR_NAME_SGPR}  # §16.1 封闭对手集：仅承认标准EKF、Robust-EKF、纯SGPR三种估计器身份；纯SGPR当前尚未实现主体，但须在封闭集内占位防止游离方法名混入主表。
+_SUPPORTED = {ESTIMATOR_NAME_EKF, ESTIMATOR_NAME_ROBUST_EKF}  # §16.1 封闭对手集：主表对手仅承认标准EKF、Robust-EKF（+NN 外壳方法由 model_factory 派发）。SGPR 当前尚未实现主体，不在封闭集内——调用 sgpr 会在工厂内主动 raise NotImplementedError（见下），防止误用占位。FGO 同样不在封闭集：FGOCore 本体存在（tests/estimators/test_fgo_core.py 直接测试），但不作为 create_estimator 可创建的主表对手身份。
 _ROBUST_EKF_REQUIRED_KEYS = ("robust_weight", "gate")  # 鲁棒 EKF 专属必填配置键，与 configs/models/robust_ekf.yaml 对齐。
 # 过程噪声必须包含的键（前提指导 §1.1 主表 8 维 + §2.3 紧耦合扩维，全体同增至 10 维状态分组）。
 # 与 predict_step._PROCESS_NOISE_KEYS 严格对齐：uwb_clock_bias / vio_scale 必须显式提供，

@@ -215,6 +215,38 @@ def _enforce_sim_materialized_contract(raw_root: Any) -> None:
     让数据完整性破坏显形而非借 AttributeError 透传。
     """
     sim_contract_report = inspect_sim_materialized_contract(raw_root)  # 阻断 stale/非法几何 raw。
+    # BUG-004 修复 (2026-09-06 §10 审计): sim_e9_main 是 seed0..seed9 嵌套结构,
+    # raw_root 顶层为多 seed 容器 (每个 seedN/ 内含 sim_curve_01/ 等 60 序列)。
+    # 顶层 raw_root 本身无 anchor_layout.json, 直接 contract 检查把 10 个 seed
+    # 当成 10 序列, 100% 报 missing_anchor_layout。当 raw_root 下含 seed*/ 子目录时,
+    # 应遍历每个 seed 目录分别检查 (任一不过则 raise)。
+    if isinstance(raw_root, (str, Path)):
+        _raw_root_path = Path(raw_root)
+        _seed_subdirs = sorted(
+            d for d in _raw_root_path.iterdir()
+            if d.is_dir() and d.name.startswith('seed')
+        ) if _raw_root_path.is_dir() else []
+        if _seed_subdirs and all(
+            (sd / 'anchor_layout.json').is_file() == False
+            for sd in _seed_subdirs
+        ):
+            # raw_root 是 seed 容器, 对每个 seed 分别检查
+            sim_contract_report = {
+                'is_valid': True,
+                'sequence_count': 0,
+                'seed_results': {},
+            }
+            all_valid = True
+            for sd in _seed_subdirs:
+                _seed_report = inspect_sim_materialized_contract(sd)
+                sim_contract_report['seed_results'][sd.name] = _seed_report
+                sim_contract_report['sequence_count'] += _seed_report.get('sequence_count', 0)
+                if not _seed_report.get('is_valid', False):
+                    all_valid = False
+                    sim_contract_report['is_valid'] = False
+                    break
+            if not all_valid:
+                sim_contract_report['is_valid'] = False
     if not isinstance(sim_contract_report, Mapping):
         # §8 fail-loud：inspect 非 Mapping 返回值不应被 .get() AttributeError 偶然 raise
         # ——显式 RuntimeError 含原 report 上下文，让上游 inspect 实现 bug 显形而非
@@ -312,13 +344,37 @@ class PreparePipeline(PipelineAPI):
         if len(set(seq_ids)) != len(seq_ids):  # 序列 ID 不允许重复。
             raise ValueError('seq_ids must not contain duplicates')
 
+        # B04: 测试轨迹数 ≥ 20 条有效计分轨（手册 §0.4 / §9 / §14）。
+        # 豁免通道（2026-09-06 AUDIT_REPORT §4 修门位置错误）: 真实实验路径仍 ≥20 硬门；
+        # smoke_mode / quick_full_rule='quick_smoke_scale__full_real_execution_required' 视为
+        # 冒烟/单轨调通场景, 跳过 B04 计数检查, 与 eval_pipeline.py:615 口径对齐.
+        cfg_quick_full_rule = cfg.get('quick_full_rule') if isinstance(cfg, Mapping) else None
+        b04_exempt = bool(cfg.get('smoke_mode')) or cfg_quick_full_rule == 'quick_smoke_scale__full_real_execution_required'
+        if not b04_exempt and len(seq_ids) < 20:
+            raise ValueError(
+                f'B04 violation: {len(seq_ids)} seq_ids provided, minimum 20 required per B04 '
+                f'(test trajectory count ≥ 20 valid scorable trajectories per §9 / §14)'
+            )
+
         artifacts: list[str] = []  # 收集输出产物路径。
         per_sequence: dict[str, Any] = {}  # 收集每条序列的处理结果。
         for seq_id in seq_ids:  # 逐条序列处理。
-            validate_path_component(seq_id, name='seq_id')  # 校验 seq_id 不含路径穿越字符，防止下游拼接 {seq_id}_events.json 时路径穿越，与 core_pipeline.py / eval_pipeline.py 模式一致。
+            # BUG-008 修复 (2026-09-06 §10 阶段 12 审计): sim_e9_main 是 seed0/sim_curve_01 嵌套结构,
+            # seq_id 含路径分隔符. sim 路径下 read_sim_sequence 自己接受嵌套路径; 通用
+            # validate_path_component 仅对 miluv/ntu_viral/util 等单层 seq_id 生效.
+            if dataset_name != DATASET_NAME_SIM:  # sim 走 sim_reader 自己路径校验, 跳过通用 path traversal 检查.
+                validate_path_component(seq_id, name='seq_id')  # 校验 seq_id 不含路径穿越字符，防止下游拼接 {seq_id}_events.json 时路径穿越，与 core_pipeline.py / eval_pipeline.py 模式一致。
+            # BUG-009 修复 (2026-09-06 §10 阶段 12 审计): sim 嵌套 seq_id 'seed0/sim_curve_01'
+            # 直接作 pickle 文件名不合法 (gzip FileNotFoundError). 这里把 / 替换为 __
+            # 得到文件系统安全名, 但下游路径拼接 (read_sim_sequence, sim_meta 路径) 用原始 seq_id.
+            safe_seq_id = seq_id.replace('/', '__') if '/' in seq_id else seq_id
             scene_id = _resolve_scene_id(cfg, dataset_name, seq_id)  # 解析当前序列对应的场景 ID。
             if dataset_name == DATASET_NAME_SIM:  # sim 走专门的读取器。
-                raw_bundle, read_report = read_sim_sequence(seq_id, raw_root)  # 读取 sim 原始 bundle 和读取报告。
+                # BUG-005 修复 (2026-09-06 §10 审计): sim_e9_main 是 seed0..seed9 嵌套结构,
+                # seq_id='seed0__sim_curve_01' (09 脚本自动扫时用 __ 分隔避免 / 被 validate_path_component 拒).
+                # read_sim_sequence 需还原为 'seed0/sim_curve_01' 路径拼接.
+                _resolved_seq_id = seq_id.replace('__', '/') if '__' in seq_id else seq_id
+                raw_bundle, read_report = read_sim_sequence(_resolved_seq_id, raw_root)  # 读取 sim 原始 bundle 和读取报告。
                 internal_bundle = dict(raw_bundle)  # sim 不需要字段映射；浅拷贝避免与 raw_bundle 共享同一可变 dict。
             elif dataset_name == DATASET_NAME_MILUV:  # MILUV 需要字段映射。
                 if not isinstance(field_mapping, Mapping) or not field_mapping:  # MILUV 必须提供非空字段映射。
@@ -389,7 +445,7 @@ class PreparePipeline(PipelineAPI):
                 seq_payload['anchor_layout'] = dict(raw_bundle['anchor_layout_raw'])  # 浅拷贝避免与 raw_bundle 共享嵌套可变 dict。
             per_sequence[seq_id] = seq_payload  # 挂到总表里。
 
-            seq_path = output_root / f'{seq_id}_events.pkl.gz'  # 每条序列单独写一份压缩 Pickle 文件（G7.1：替代 JSON，空间降至 ~10-20%）。
+            seq_path = output_root / f'{safe_seq_id}_events.pkl.gz'  # BUG-009: 嵌套 sim seq_id 含 /, 文件名替换为 __. 每条序列单独写一份压缩 Pickle 文件（G7.1：替代 JSON，空间降至 ~10-20%）。
             with gzip.open(seq_path, 'wb', compresslevel=3) as f:
                 pickle.dump(events, f, protocol=pickle.HIGHEST_PROTOCOL)  # 高效序列化后写入压缩文件。
             artifacts.append(str(seq_path))  # 记录产物路径。

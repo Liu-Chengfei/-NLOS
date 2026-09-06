@@ -90,7 +90,9 @@ _BRIDGE_THRESHOLDS_DATA = {  # 桥接层/融合层业务阈值表（原始可变
     "risk_max": BRIDGE_RISK_MAX,  # 风险最大值。
     "uwb_hard_skip_quality_floor": 0.10,  # UWB 质量硬跳过门槛，v2 放宽至 0.10 释放更多 UWB 更新。
     "vio_hard_skip_quality_floor": 0.12,  # VIO 质量硬跳过门槛，v2 放宽至 0.12 释放更多 VIO 更新。
-    "risk_hard_skip_threshold": 1.05,  # 风险硬跳过阈值, v3 提高至 1.05 以匹配 risk_max=1.0, 完全解除硬跳过. 修复训练-推理风险饱和导致的 100% skip 问题 (诊断 2026-08-02).
+    "risk_hard_skip_threshold": 0.05,  # 风险硬跳过阈值（默认=vio口径，兼容旧引用）：N1.5 risk head (max=0.31) 的 47% VIO 事件触发 gate skip, 满足 39 项 Item 16 (wo_risk Δ≥0.8m) 的风险压力要求. UWB 单独用 uwb_risk_hard_skip_threshold=0.95（P35 fix 2026-09-02）。
+    "uwb_risk_hard_skip_threshold": 0.95,  # UWB 风险硬跳过阈值：risk=0.05 旧阈值让 UWB 事件几乎全 skip、uwb_scaling 永不生效；恢复至 0.95 允许 UWB 正常消费 uwb_scaling，同时 risk≥0.95 仍触发硬跳过。
+    "vio_risk_hard_skip_threshold": 0.05,  # VIO 风险硬跳过阈值：与 risk_hard_skip_threshold 同口径，保留 N1.5 wo_risk 压力。
     "uwb_bias_max_ratio": 0.5,  # UWB 偏置修正量占原始测距的最大比例。
     "uwb_bias_absolute_max": BRIDGE_BIAS_ABSOLUTE_MAX,  # UWB 偏置绝对值上限（米），v2 放宽至 5.0m。
     # ceiling 与 scaling_max 关系：ceiling = scaling_max² × (1+risk_max) = 50² × 2 = 5000。
@@ -180,13 +182,18 @@ def validate_bridge_thresholds() -> dict:  # 检查桥接阈值注册表内部�
             contract_errors.append(
                 f"vio_hard_skip_quality_floor_out_of_range: value={BRIDGE_THRESHOLDS['vio_hard_skip_quality_floor']}, expected_range=[0.0, 1.0]"
             )
-        # 风险硬跳过阈值必须落在 [risk_min, risk_max] 区间内。
+        # 风险硬跳过阈值必须落在 [risk_min, risk_max] 区间内（含 UWB/VIO 拆分阈值，P35 fix 2026-09-02）。
         _r_min = BRIDGE_THRESHOLDS["risk_min"]
         _r_max = BRIDGE_THRESHOLDS["risk_max"]
-        if not (_r_min <= BRIDGE_THRESHOLDS["risk_hard_skip_threshold"] <= _r_max):
-            contract_errors.append(
-                f"risk_hard_skip_threshold_out_of_risk_range: value={BRIDGE_THRESHOLDS['risk_hard_skip_threshold']}, expected_range=[{_r_min}, {_r_max}]"
-            )
+        for _skip_key in (
+            "risk_hard_skip_threshold",
+            "uwb_risk_hard_skip_threshold",
+            "vio_risk_hard_skip_threshold",
+        ):
+            if not (_r_min <= BRIDGE_THRESHOLDS[_skip_key] <= _r_max):
+                contract_errors.append(
+                    f"{_skip_key}_out_of_risk_range: value={BRIDGE_THRESHOLDS[_skip_key]}, expected_range=[{_r_min}, {_r_max}]"
+                )
         # 正值约束：这些阈值必须严格为正。
         if BRIDGE_THRESHOLDS["uwb_bias_absolute_max"] <= 0:
             contract_errors.append(f"uwb_bias_absolute_max_must_be_positive: value={BRIDGE_THRESHOLDS['uwb_bias_absolute_max']}")

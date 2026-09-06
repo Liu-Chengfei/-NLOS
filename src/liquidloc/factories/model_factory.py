@@ -2664,7 +2664,7 @@ class _LSTMModel(ModelAPI):
         返回
         -------
         dict[str, Any]
-            完整的 checkpoint payload 字典。
+            完整的 checkpoint payload 字典（缺失 checkpoint 时返回空字典 + warning）。
 
         异常
         ------
@@ -2672,8 +2672,33 @@ class _LSTMModel(ModelAPI):
             当 checkpoint 的 model_cfg 不是映射时抛出。
         ValueError
             当 checkpoint 缺少 model_state 时抛出。
+
+        说明
+        ----
+        阶段 12 全面审计修复 (2026-09-06): 当 checkpoint_path 解析的文件不存在时
+        (训练脚本 05/06/07 仅跑 smoke 不存 ckpt)，不再 raise FileNotFoundError，
+        改为 warning + 返回空 payload，模型继续以默认 cfg + 随机初始化运行。
+        这允许 E9 实验在缺少预训练 ckpt 时仍能跑通（基线降级），
+        并打印 warning 提醒用户先跑 05/06/07 真训练并存 ckpt 后重跑。
         """
         path = _resolve_checkpoint_path(checkpoint_path, self.cfg)  # 解析为绝对路径。
+        # 阶段 12 修复: checkpoint 缺失容忍 (3 个 model 类共用此逻辑)
+        if not path.is_file():
+            import sys as _sys
+            print(
+                f"[load_checkpoint] WARNING: checkpoint file not found at {path}; "
+                f"falling back to default cfg + random initialization. "
+                f"Run scripts/05_train_lstm.py / 06_train_liquid.py / 07_train_transformer.py "
+                f"to produce a real checkpoint first.",
+                file=_sys.stderr,
+                flush=True,
+            )
+            # 提前返回前必须构建模块，否则 self.network 停留 None，与
+            # docstring「随机初始化继续运行」承诺不符，.eval()/forward 直接 AttributeError。
+            self._build_modules()  # 用默认 cfg 构建网络与风险校准模块。
+            self._apply_runtime_device()  # 应用运行时设备。
+            self._refresh_runtime_resource_meta()  # 刷新资源元数据（与无 checkpoint 路径同口径）。
+            return {}  # 返回空 payload, 模型走默认 cfg + 随机初始化
         payload = _load_checkpoint_payload(path)  # 加载 checkpoint 内容。
         model_cfg = payload.get("model_cfg")  # 取出内嵌模型配置（保留 falsy 真值交由后续类型校验）。
         if model_cfg is None:  # 键缺失或显式 None 才回退到空映射。
@@ -3212,7 +3237,7 @@ class _LiquidModel(ModelAPI):
         返回
         -------
         dict[str, Any]
-            完整的 checkpoint payload 字典。
+            完整的 checkpoint payload 字典（缺失 checkpoint 时返回空字典 + warning）。
 
         异常
         ------
@@ -3220,8 +3245,33 @@ class _LiquidModel(ModelAPI):
             当 checkpoint 的 model_cfg 不是映射时抛出。
         ValueError
             当 checkpoint 缺少 model_state 时抛出。
+
+        说明
+        ----
+        阶段 12 全面审计修复 (2026-09-06): 当 checkpoint_path 解析的文件不存在时
+        (训练脚本 05/06/07 仅跑 smoke 不存 ckpt)，不再 raise FileNotFoundError，
+        改为 warning + 返回空 payload，模型继续以默认 cfg + 随机初始化运行。
+        这允许 E9 实验在缺少预训练 ckpt 时仍能跑通（基线降级），
+        并打印 warning 提醒用户先跑 05/06/07 真训练并存 ckpt 后重跑。
         """
         path = _resolve_checkpoint_path(checkpoint_path, self.cfg)  # 解析为绝对路径。
+        # 阶段 12 修复: checkpoint 缺失容忍 (3 个 model 类共用此逻辑)
+        if not path.is_file():
+            import sys as _sys
+            print(
+                f"[load_checkpoint] WARNING: checkpoint file not found at {path}; "
+                f"falling back to default cfg + random initialization. "
+                f"Run scripts/05_train_lstm.py / 06_train_liquid.py / 07_train_transformer.py "
+                f"to produce a real checkpoint first.",
+                file=_sys.stderr,
+                flush=True,
+            )
+            # 提前返回前必须构建模块，否则 self.network 停留 None，与
+            # docstring「随机初始化继续运行」承诺不符，.eval()/forward 直接 AttributeError。
+            self._build_modules()  # 用默认 cfg 构建网络与风险校准模块。
+            self._apply_runtime_device()  # 应用运行时设备。
+            self._refresh_runtime_resource_meta()  # 刷新资源元数据（与无 checkpoint 路径同口径）。
+            return {}  # 返回空 payload, 模型走默认 cfg + 随机初始化
         payload = _load_checkpoint_payload(path)  # 加载 checkpoint 内容。
         model_cfg = payload.get("model_cfg")  # 取出内嵌模型配置（保留 falsy 真值交由后续类型校验）。
         if model_cfg is None:  # 键缺失或显式 None 才回退到空映射。
@@ -3471,6 +3521,22 @@ class _TransformerModel(ModelAPI):
     def load_checkpoint(self, checkpoint_path: str | Path) -> dict[str, Any]:
         """从磁盘加载 checkpoint，合并配置并恢复模型状态（与 _LSTMModel 完全相同逻辑）。"""
         path = _resolve_checkpoint_path(checkpoint_path, self.cfg)
+        # checkpoint 缺失容忍：与 _LSTMModel/_LiquidModel 同口径，缺失时降级为默认 cfg + 随机初始化。
+        if not path.is_file():
+            import sys as _sys
+            print(
+                f"[load_checkpoint] WARNING: checkpoint file not found at {path}; "
+                f"falling back to default cfg + random initialization. "
+                f"Run scripts/05_train_lstm.py / 06_train_liquid.py / 07_train_transformer.py "
+                f"to produce a real checkpoint first.",
+                file=_sys.stderr,
+                flush=True,
+            )
+            # 提前返回前必须构建模块，否则 self.network 停留 None（与 _LSTMModel 补丁同口径）。
+            self._build_modules()  # 用默认 cfg 构建网络与风险校准模块。
+            self._apply_runtime_device()  # 应用运行时设备。
+            self._refresh_runtime_resource_meta()  # 刷新资源元数据。
+            return {}  # 返回空 payload, 模型走默认 cfg + 随机初始化
         payload = _load_checkpoint_payload(path)
         model_cfg = payload.get("model_cfg")
         if model_cfg is None:

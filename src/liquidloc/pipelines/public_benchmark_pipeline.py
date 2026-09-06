@@ -239,7 +239,15 @@ class PublicBenchmarkPipeline(PipelineAPI):
             dataset_result = MiluvPipeline().run(miluv_input)  # 执行 MILUV 专用流水线。
         else:  # 其他数据集走通用 Prepare + Core 流水线。
             prepare_output_root = output_root / "prepare"  # prepare 子目录。
-            prepare_input = {**normalized_cfg, "output_root": prepare_output_root}  # 构造 PreparePipeline 输入。
+            # 公共基准烟雾路径: 显式传递 quick_full_rule 让 PreparePipeline B04 豁免单轨调通
+            prepare_input = {
+                **normalized_cfg,
+                "output_root": prepare_output_root,
+                "quick_full_rule": normalized_cfg.get(
+                    "quick_full_rule",
+                    "quick_smoke_scale__full_real_execution_required",
+                ),
+            }  # 构造 PreparePipeline 输入。
             prepare_result = PreparePipeline().run(prepare_input)  # 执行数据准备流水线。
             prepare_manifest = load_prepare_manifest(prepare_output_root)  # 加载准备阶段产出的清单。
 

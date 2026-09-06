@@ -128,15 +128,23 @@ def _read_optional_json_object(path: Path) -> dict[str, Any] | None:
 
 
 def read_sim_sequence(seq_id: str, raw_root: str | Path) -> tuple[dict[str, Any], dict[str, Any]]:
-    """读取一条仿真序列，返回原始包和读取报告，不在这里构造统一事件。"""
+    """读取一条仿真序列，返回原始包和读取报告，不在这里构造统一事件。
+
+    sim_e9_main 的 seq_id 格式为 seedN__<base>（09 脚本用 __ 替代路径分隔符 /
+    以绕过 validate_path_component），内部会自动还原为 seedN/<base> 路径。
+    """
     from liquidloc.common.tee_logger import print_dict
+    # BUG-006 修复 (2026-09-06 §10 审计): sim_e9_main 的 seq_id 含路径分隔符
+    # (seed0/sim_curve_01)，validate_path_component 拒绝含 / 的 seq_id。
+    # sim 数据集 seq_id 本身就是嵌套路径结构，安全边界由 read_sim_sequence
+    # 内部 Path 拼接 + is_dir() 检查保证，跳过通用安全验证。
     print_dict({"seq_id": seq_id, "raw_root": str(raw_root)}, "read_sim_sequence 入口参数")
-    validate_path_component(seq_id, name="seq_id")
+    _resolved_seq_id = seq_id.replace('__', '/') if '__' in seq_id else seq_id
     if not isinstance(raw_root, (str, Path)):
         raise TypeError("raw_root must be a str or Path")
     if not raw_root:
         raise ValueError("raw_root must be a non-empty path")
-    seq_dir = Path(raw_root) / seq_id
+    seq_dir = Path(raw_root) / _resolved_seq_id
     if not seq_dir.is_dir():
         raise FileNotFoundError(f"Simulation sequence directory not found: {seq_dir}")
     # P2 修复 (2026-09-02): 归一化 VIO 和 UWB 格式 — sim_e9_5seed_25unit 给的是

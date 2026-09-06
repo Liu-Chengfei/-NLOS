@@ -3100,7 +3100,15 @@ def _build_phase_trainability_contract(model: Any, *, phase_name: str) -> dict[s
     # 拼合：head 提供 projection/residual_projection 可训练性；backbone 提供 6 个 gate 可训练性。
     head_snapshot = _head_phase_trainability_snapshot(reference_head) if reference_head is not None else {}
     backbone_snapshot = _head_phase_trainability_snapshot(reference_backbone) if reference_backbone is not None else {}
-    phase_state["head_trainability"] = {**backbone_snapshot, **head_snapshot}  # head 覆盖 backbone 中同名键（实际无同名，因 head 已无 gate）。
+    # v3.1 head-shared bug fix: 旧 dict merge 用 `{**backbone_snapshot, **head_snapshot}` 让 head 的
+    # gate_*=False（head 已无 gate，属性查不到回退 False）覆盖 backbone 的 gate_*=True。
+    # 现只从 head 提取 projection/residual_projection，从 backbone 提取所有 *_gate，避免反向覆盖。
+    head_only_keys = {"projection", "residual_projection"}
+    merged_snapshot = dict(backbone_snapshot)  # 先放 backbone（含 6 个 *_gate）。
+    for key in head_only_keys:  # 再用 head 的 projection/residual_projection 覆盖。
+        if key in head_snapshot:
+            merged_snapshot[key] = head_snapshot[key]
+    phase_state["head_trainability"] = merged_snapshot
     phase_state["auxiliary_terms_enabled"] = {  # 各辅助损失项是否启用。
         "calibration": phase_state["risk_calibration_trainable"],  # calibration 只在 risk_calibration 可训练时启用。
         "mono": phase_state["risk_calibration_trainable"],  # mono 同上。

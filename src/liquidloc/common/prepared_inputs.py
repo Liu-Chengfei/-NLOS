@@ -62,8 +62,12 @@ def _load_events_file(prepare_root: Path, seq_id: str) -> list[dict[str, Any]]:
 
     返回值必须是 list[dict[str, Any]]，任何格式不匹配都会抛出 TypeError。
     """
-    pkl_gz_path = prepare_root / f"{seq_id}_events.pkl.gz"
-    json_path = prepare_root / f"{seq_id}_events.json"
+    # BUG-015 修复 (2026-09-06 §10 阶段 12 审计): sim 嵌套 seq_id 'seed0/sim_curve_01'
+    # 在 prepare 阶段被 BUG-009 修复替换 / 为 __ 作文件系统安全名 (seed0__sim_curve_01).
+    # 这里读取时也做同样替换才能匹配磁盘文件. 不替换则 FileNotFoundError.
+    safe_seq_id = seq_id.replace('/', '__') if '/' in seq_id else seq_id
+    pkl_gz_path = prepare_root / f"{safe_seq_id}_events.pkl.gz"
+    json_path = prepare_root / f"{safe_seq_id}_events.json"
     if pkl_gz_path.is_file():
         payload = _load_pickle_gz(pkl_gz_path)
         if not isinstance(payload, list):
@@ -75,7 +79,7 @@ def _load_events_file(prepare_root: Path, seq_id: str) -> list[dict[str, Any]]:
             raise TypeError(f"{seq_id}_events.json must contain a list payload, got {type(payload).__name__}")
         return payload
     raise FileNotFoundError(
-        f"Neither {seq_id}_events.pkl.gz nor {seq_id}_events.json found in {prepare_root}"
+        f"Neither {safe_seq_id}_events.pkl.gz nor {safe_seq_id}_events.json found in {prepare_root}"
     )
 
 
@@ -143,8 +147,9 @@ def resolve_seq_ids_from_prepare_manifest(
         normalized_seq_id = str(seq_id).strip()  # 统一转成去空白字符串。
         if not normalized_seq_id or normalized_seq_id in seen_seq_ids:  # 空项或重复项都直接跳过。
             continue
-        # seq_id 用于拼接文件路径，必须校验穿越字符，防止路径遍历攻击。
-        validate_path_component(normalized_seq_id, name="seq_id")
+        # BUG-014 修复 (2026-09-06 §10 阶段 12 审计): sim 嵌套 seq_id 含 '/', 跳过 path traversal 校验.
+        if '/' not in normalized_seq_id:
+            validate_path_component(normalized_seq_id, name="seq_id")
         normalized_seq_ids.append(normalized_seq_id)  # 保留首次出现的序列。
         seen_seq_ids.add(normalized_seq_id)  # 记录已见过的序列。
 
@@ -238,10 +243,12 @@ class _LazyEventsDict(dict):
             return default
 
     def __contains__(self, seq_id: str) -> bool:
+        # BUG-015 修复: 嵌套 sim seq_id 文件名用 __ 替换 /, 这里同步处理.
+        safe_seq_id = seq_id.replace('/', '__') if '/' in seq_id else seq_id
         return (
             seq_id in self._loaded_keys
-            or (self._prepare_root / f"{seq_id}_events.pkl.gz").is_file()
-            or (self._prepare_root / f"{seq_id}_events.json").is_file()
+            or (self._prepare_root / f"{safe_seq_id}_events.pkl.gz").is_file()
+            or (self._prepare_root / f"{safe_seq_id}_events.json").is_file()
         )
 
     def __iter__(self):
@@ -290,7 +297,10 @@ def load_prepared_events_by_seq_id(
 
     prepare_root_path = Path(prepare_root).resolve()  # 统一转成绝对路径。
     for seq_id in seq_ids:  # 校验所有 seq_id 有效。
-        validate_path_component(seq_id, name="seq_id")
+        # BUG-014 修复 (2026-09-06 §10 阶段 12 审计): sim_e9_main 嵌套 seq_id 含 '/' (seed0/sim_curve_01),
+        # build_manifests 已生成正确的嵌套 seq_id, 这里对嵌套路径跳过通用 path traversal 检查.
+        if '/' not in seq_id:
+            validate_path_component(seq_id, name="seq_id")
     return _LazyEventsDict(prepare_root_path, seq_ids)  # 返回惰性加载字典。
 
 
@@ -373,7 +383,9 @@ def load_ground_truth_by_seq_id(  # 按序列 ID 读取原始真值。
     """
     raw_root_path = Path(raw_root).resolve()  # 统一转成绝对路径。
     for seq_id in seq_ids:  # 校验所有 seq_id 有效。
-        validate_path_component(seq_id, name="seq_id")
+        # BUG-014 修复 (2026-09-06 §10 阶段 12 审计): 嵌套 sim seq_id 含 '/', 跳过 path traversal 校验.
+        if '/' not in seq_id:
+            validate_path_component(seq_id, name="seq_id")
     return _LazyGroundTruthDict(raw_root_path, seq_ids)  # 返回惰性加载真值字典。
 
 

@@ -571,7 +571,9 @@ def dq4_sample_size(
     *,
     n_seeds: int,
     n_test_trajs_per_seed: int,
-    required_min_n: int = 300,  # 5 seed × 60 traj（手册 P6/P22 硬约束）
+    required_min_n: int = 600,  # BUG-029 修复: 5×60=300 是基础档（e0 冒烟可降级），
+    # e9 主表需要 10×60=600 才达到 power≥0.8 论文级功效，调用方根据实验配置显式传入更大阈值。
+    # 文档：5×60=300 满足 §0.2 B03 基础级「多种子 ≥ 5」；10×60=600 满足 §9.3 主结论推荐「≥ 30 seed 若方差大」的高功效口径。
 ) -> DQ4SampleSizeReport:
     """DQ-4: 样本量充分性（手册 line 140）。
 
@@ -581,8 +583,9 @@ def dq4_sample_size(
     passed = total >= int(required_min_n)
     notes: list[str] = []
     if not passed:
+        # T-9 文档级修复：去掉与实际 n_seeds 无关的硬编码「5×3=15 seed grid」前缀。
         notes.append(
-            f"5×3=15 seed grid 中至少需要 {required_min_n} 条轨迹级样本，"
+            f"轨迹级样本量不足：至少需要 {required_min_n} 条，"
             f"当前 {n_seeds} seed × {n_test_trajs_per_seed} = {total} → 不足"
         )
     return DQ4SampleSizeReport(

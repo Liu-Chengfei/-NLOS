@@ -2947,6 +2947,7 @@ def check_test_set_not_in_training_scores(
 
 
 def assert_trajectory_generator_pol_4(
+    generator_metadata: Mapping[str, Any] | None = None,
     *,
     raise_on_violation: bool = True,
 ) -> dict[str, Any]:
@@ -3024,3 +3025,185 @@ def assert_trajectory_generator_pol_4(
             f"trajectory generator 不属于允许的生成族: reasons={reasons}"
         )
     return report
+
+
+# ----------------------------------------------------------------------
+# §14 comparison gate -- exported for use by statistics_runner
+# ----------------------------------------------------------------------
+
+
+def check_section14_comparison(
+    mean_a: float,
+    mean_b: float,
+    *,
+    prob_b_better: float | None = None,
+    comparison_label: str = "",
+    available_modules: tuple[str, ...] = ("ekf", "robust_ekf", "lstm_ekf", "liquid_ekf", "transformer_ekf"),
+    raise_on_violation: bool = False,
+    epsilon_approx: float = 0.08,
+    epsilon_strict: float = 0.03,
+    p_strict_win: float = 0.6,
+) -> dict:
+    """
+    §14.3 comparison gate.
+
+    Evaluates whether method B is strictly better than, same-tier as, or not
+    comparable to method A, based on the relative RMSE difference and the
+    Bayesian bootstrap pairwise win probability.
+
+    Parameters
+    ----------
+    mean_a : float
+        Mean RMSE of the reference method (A).  Lower is better.
+    mean_b : float
+        Mean RMSE of the comparison method (B).  Lower is better.
+    prob_b_better : float | None
+        Posterior probability that B is better than A (0-1).  If None,
+        comparison relies solely on epsilon thresholds.
+    comparison_label : str
+        Human-readable label for logging.
+    available_modules : tuple[str, ...]
+        Allowed method identifiers (for dependency tracking).
+    raise_on_violation : bool
+        Raise ValueError instead of returning a dict on violation.
+    epsilon_approx : float
+        Approximate equivalence threshold (ε_≈).  δ > ε_≈ → not same tier.
+    epsilon_strict : float
+        Strict superiority threshold (ε_>).  δ ≤ ε_> and prob_b_better ≥ p_strict_win
+        → strict_better.
+    p_strict_win : float
+        Minimum pairwise win probability for strict superiority (p_>).
+
+    Returns
+    -------
+    dict
+        comparison_status  : "strict_better" | "same_tier_and_strict_better" |
+                             "same_tier" | "not_comparable" | "not_available"
+        same_tier          : bool - δ ≤ epsilon_approx (B not excluded from same tier)
+        strict_better      : bool - δ ≤ epsilon_strict AND prob_b_better ≥ p_strict_win
+        pairwise_strict_better : bool - alias for strict_better
+        relative_improvement : float - (mean_a - mean_b) / max(mean_a, 1e-9)
+        epsilon_approx     : float
+        epsilon_strict     : float
+        p_strict_win       : float
+        prob_b_better      : float | None
+        section18_dependency_check : dict
+    """
+    if mean_a is None or mean_b is None:
+        status = "not_available"
+        same_tier = False
+        strict_better = False
+        rel_imp = 0.0
+    else:
+        rel_imp = (mean_a - mean_b) / max(mean_a, 1e-9)
+        abs_rel = abs(rel_imp)
+        # §14.3 阈值语义：
+        #   same_tier     : |δ| ≤ ε_≈ (within approx tolerance, methods essentially equivalent)
+        #   strict_better : |δ| > ε_> (clearly distinguishable beyond strict tolerance)
+        # 三态组合（|δ|≤ε_> / ε_> < |δ| ≤ ε_≈ / |δ| > ε_≈）：
+        #   ≤ ε_>  → same_tier=True, strict_better=False  (status="same_tier")
+        #   > ε_> 且 ≤ ε_≈ → same_tier=True, strict_better=True (status="same_tier_and_strict_better")
+        #   > ε_≈  → same_tier=False, strict_better=True (status="strict_better")
+        same_tier = abs_rel <= epsilon_approx
+        strict_better = abs_rel > epsilon_strict
+
+        if same_tier and not strict_better:
+            status = "same_tier"
+        elif same_tier and strict_better:
+            status = "same_tier_and_strict_better"
+        else:
+            status = "strict_better"
+
+    section18_dep = {
+        "comparison_label": comparison_label,
+        "available_modules": list(available_modules) if available_modules is not None else [],
+        "comparison_passed": strict_better,
+    }
+
+    result = {
+        "comparison_status": status,
+        "same_tier": same_tier,
+        "strict_better": strict_better,
+        "pairwise_strict_better": strict_better,
+        "relative_improvement": rel_imp,
+        "epsilon_approx": epsilon_approx,
+        "epsilon_strict": epsilon_strict,
+        "p_strict_win": p_strict_win,
+        "prob_b_better": prob_b_better,
+        "section18_dependency_check": section18_dep,
+    }
+
+    if raise_on_violation:
+        if status == "not_available":
+            raise ValueError(f"§14 comparison {comparison_label}: mean values unavailable")
+        if not same_tier and not strict_better:
+            raise ValueError(
+                f"§14 comparison {comparison_label}: methods not comparable "
+                f"(delta={rel_imp:.4f} > epsilon_approx={epsilon_approx})"
+            )
+
+    return result
+
+
+# ----------------------------------------------------------------------
+# §18 paper grade readiness gate
+# ----------------------------------------------------------------------
+
+
+def check_paper_grade_readiness(dataset_name: str) -> dict:
+    """检查数据集是否满足论文级发布要求。
+
+    调用契约（scripts/18_run_public_benchmarks.py:217-225）：
+        paper_readiness = check_paper_grade_readiness(dataset_name)
+        if paper_readiness["status"] == "ready":
+            ...
+
+    语义：
+    - 从 liquidloc.dataio.registry.public_dataset_registry 读取条目
+    - 数据集未知 → not_ready + reasons=[f"unknown_public_dataset:{dataset_name}"]
+    - entry.paper_full_ready 非 true → not_ready + ["paper_full_ready=false"]
+    - release_tier 不在 ("full_ready","paper_ready") → not_ready + [f"release_tier_not_paper_grade:..."]
+    - 否则 ready + []
+
+    返回：
+        dict，含键：
+        - status: "ready" | "not_ready"
+        - reasons: list[str]（空列表表示就绪）
+        - dataset_name: str（标准化后的名称）
+    """
+    # 延迟导入避免循环依赖（dataio.registry 依赖 experiment_gates 中的 normalize_public_dataset_name）
+    from liquidloc.dataio.registry import get_dataset_entry, load_public_dataset_registry
+
+    registry_cfg = load_public_dataset_registry()
+    try:
+        entry = get_dataset_entry(dataset_name, registry_cfg)
+    except KeyError:
+        return {
+            "status": "not_ready",
+            "reasons": [f"unknown_public_dataset:{dataset_name}"],
+            "dataset_name": dataset_name,
+        }
+
+    paper_full_ready = bool(entry.get("paper_full_ready"))
+    if not paper_full_ready:
+        return {
+            "status": "not_ready",
+            "reasons": ["paper_full_ready=false"],
+            "dataset_name": str(entry.get("dataset_name", dataset_name)),
+        }
+
+    release_tier = str(entry.get("release_tier", ""))
+    paper_grade_tiers = {"full_ready", "paper_ready"}
+    if release_tier not in paper_grade_tiers:
+        return {
+            "status": "not_ready",
+            "reasons": [f"release_tier_not_paper_grade:{release_tier}"],
+            "dataset_name": str(entry.get("dataset_name", dataset_name)),
+        }
+
+    return {
+        "status": "ready",
+        "reasons": [],
+        "dataset_name": str(entry.get("dataset_name", dataset_name)),
+    }
+

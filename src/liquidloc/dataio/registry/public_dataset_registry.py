@@ -332,6 +332,11 @@ def resolve_public_eval_seq_ids(
         raw_seq_ids = cfg.get("seq_ids")
         field_name = "experiment_cfg.seq_ids"
 
+    # §9 修复: 显式空列表 (experiment_cfg.seq_ids = []) 时回退到 registry frozen,
+    # 而非直接 raise; 显式空列表的语义是"暂未指定"而非"显式拒绝".
+    if isinstance(raw_seq_ids, list) and len(raw_seq_ids) == 0:
+        raw_seq_ids = None
+
     if raw_seq_ids is None:
         registry_cfg = load_public_dataset_registry()
         dataset_entry = get_dataset_entry(normalized_dataset_name, registry_cfg)

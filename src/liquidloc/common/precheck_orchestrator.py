@@ -7,14 +7,9 @@
 每个 check 返回 `CheckResult(passed, detail, evidence)`。
 
 公开入口：
-    run_all_prechecks(cfg, raw_root, manifest) -> PrecheckReport
-    run_dataset_gates(cfg) -> list[CheckResult]  (P1~P6, Pre-1~Pre-6, I-1~I-5)
-    run_model_fairness_gates(cfg, methods) -> list[CheckResult]  (P14~P18, P32~P35)
-    run_stats_gates(...) -> list[CheckResult]  (P19~P23, P36~P39)
-    run_stability_gates(...) -> list[CheckResult]  (P24~P27)
-    run_pipeline_gates(...) -> list[CheckResult]  (P28~P31)
-    run_dq_gates(...) -> list[CheckResult]  (DQ-1~DQ-4)
-    run_run_complete_gates(...) -> list[CheckResult]  (G-1~G-5, E-1~E-6)
+    run_all_prechecks(cfg, raw_root, manifest=None) -> PrecheckReport
+        raw_root: 原始 npz 数据根目录，用于自动计算 P1/P4/P5/P6 等统计字段
+        manifest: DatasetManifest 实例（可选，不提供时从 raw_root 推断）
 """
 
 from __future__ import annotations
@@ -222,13 +217,20 @@ def check_Pre5_resource_budget(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_Pre6_seed_manifest_consistency(cfg: Mapping[str, Any]) -> CheckResult:
-    """Pre-6: 随机源清单与 manifest 一致；确定性模式开启。"""
+    """Pre-6: 随机源清单与 manifest 一致；确定性模式开启；N_seed ≥ 10（protocol 硬门）。"""
+    keys = ["n_manifest_seeds", "n_random_sources", "deterministic_mode"]
+    missing = [k for k in keys if k not in cfg]
+    if missing:
+        return _make("Pre-6", "随机源核对", False,
+                     detail=f"missing={missing}（必须由调用方提供实测值）",
+                     missing=missing)
     n_manifest_seeds = int(cfg.get("n_manifest_seeds", 0))
     n_random_sources = int(cfg.get("n_random_sources", 0))
     deterministic = bool(cfg.get("deterministic_mode"))
+    N_SEED_MIN = 10  # protocol.yaml n_seed_min
     return _make("Pre-6", "随机源核对",
-                 n_manifest_seeds > 0 and n_random_sources >= 3 and deterministic,
-                 detail=f"manifest_seeds={n_manifest_seeds}, sources={n_random_sources}, det={deterministic}")
+                 n_manifest_seeds >= N_SEED_MIN and n_random_sources >= 3 and deterministic,
+                 detail=f"manifest_seeds={n_manifest_seeds}(min={N_SEED_MIN}), sources={n_random_sources}, det={deterministic}")
 
 
 def check_I1_data_generator(cfg: Mapping[str, Any]) -> CheckResult:
@@ -252,13 +254,31 @@ def check_I2_s9_script(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_I3_5_methods(cfg: Mapping[str, Any]) -> CheckResult:
-    """I-3: 5 方法脚本存在（LNN/LSTM/Transformer/EKF/Robust-EKF）。"""
-    methods = list(cfg.get("available_methods") or [])
+    """I-3: 5 方法脚本存在（LNN/LSTM/Transformer/EKF/Robust-EKF）。
+
+    修复 (2026-09-05): 同时接受 `available_methods`（路由层用，全名如 lstm_ekf）
+    和 `available_methods_basename`（precheck 用，basename 如 lstm）。两套命名以
+    任一存在即 PASS。
+    第 8 阶段修复: 'lnn' 是手册语义名, 实现中模型 factory MODEL_NAME_LIQUID = 'liquid',
+    basename 应接受 'lnn' 或 'liquid' 任一。
+    """
+    full_names = list(cfg.get("available_methods") or [])
+    base_names = list(cfg.get("available_methods_basename") or [])
+    combined = sorted(set(full_names) | set(base_names))
+    combined_set = set(combined)  # 单独一份 set 用来 O(1) 检测
+    # liquid 和 lnn 是同一方法的不同别名: 手册语义用 lnn, 实现层用 liquid
+    if "liquid" in combined_set and "lnn" not in combined_set:
+        combined_set.add("lnn")
+        combined = sorted(combined_set)
     required = ["lnn", "lstm", "transformer", "ekf", "robust_ekf"]
-    missing = [m for m in required if m not in methods]
-    return _make("I-3", "5方法脚本", not missing,
-                 detail=f"missing={missing or 'OK'}",
-                 available=methods, missing=missing)
+    missing = [m for m in required if m not in combined]
+    if missing:
+        return _make("I-3", "5方法脚本", False,
+                     detail=f"missing={missing}（必须在 available_methods 或 available_methods_basename 中）",
+                     available=combined, missing=missing)
+    return _make("I-3", "5方法脚本", True,
+                 detail=f"available=full={full_names} | basename={base_names}",
+                 available=combined, missing=[])
 
 
 def check_I4_stats_script(cfg: Mapping[str, Any]) -> CheckResult:
@@ -272,14 +292,20 @@ def check_I4_stats_script(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_I5_eval_pipeline(cfg: Mapping[str, Any]) -> CheckResult:
-    """I-5: 评估口径实现 Sim(3) 对齐 + 2D + warm-up 剔除 + 世界系。"""
+    """I-5: 评估口径实现 Sim(2/3) 对齐 + 2D + warm-up 剔除 + 世界系。
+
+    第 8 阶段修复: 2D 实验用 Sim(2) Umeyama 对齐 (旋转+平移, 3-DOF), sim3_alignment=false 也 PASS。
+    3D 实验必须用 Sim(3) 缩放+旋转+平移 (4-DOF)。
+    """
     sim3 = bool(cfg.get("sim3_alignment"))
     is_2d = bool(cfg.get("is_2d"))
     warmup_removed = bool(cfg.get("warmup_removed"))
     world_frame = bool(cfg.get("world_frame"))
+    # 2D 实验可关闭 Sim(3); 3D 实验必须开启 Sim(3) + 关闭 2D (互斥)
+    alignment_ok = sim3 or is_2d  # Sim(3) 开启 或 2D 模式 即可 (Sim(2) 隐式成立)
     return _make("I-5", "评估口径",
-                 sim3 and is_2d and warmup_removed and world_frame,
-                 detail=f"sim3={sim3}, 2d={is_2d}, warmup={warmup_removed}, world={world_frame}")
+                 alignment_ok and warmup_removed and world_frame,
+                 detail=f"sim3={sim3}, 2d={is_2d}, warmup={warmup_removed}, world={world_frame}, alignment_ok={alignment_ok}")
 
 
 # ============================================================================
@@ -399,9 +425,16 @@ def check_P15_per_method_tuning(cfg: Mapping[str, Any]) -> CheckResult:
     method_evidences: dict[str, bool] = {}
     lnn_independent = False
     for m in methods:
-        entry = budgets.get(m, {})
-        lr_sweep = int(entry.get("lr_sweep_runs", 0))
-        has_best_lr = "best_lr" in entry
+        raw_entry = budgets.get(m, 0)
+        if isinstance(raw_entry, Mapping):  # 完整形式：{"lr_sweep_runs": N, "best_lr": ...}。
+            lr_sweep = int(raw_entry.get("lr_sweep_runs", 0) or 0)
+            has_best_lr = "best_lr" in raw_entry
+        elif isinstance(raw_entry, (int, float)) and not isinstance(raw_entry, bool):  # 简写形式：整数直接表示 lr_sweep_runs。
+            lr_sweep = int(raw_entry)
+            has_best_lr = False
+        else:  # 非法条目按无调优证据处理，不做静默崩溃。
+            lr_sweep = 0
+            has_best_lr = False
         has_evidence = lr_sweep >= 1 or has_best_lr
         method_evidences[m] = has_evidence
         if m == "lnn":
@@ -458,11 +491,19 @@ def check_P18_baselines_with_heads(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_P19_seed_system(cfg: Mapping[str, Any]) -> CheckResult:
+    """P19: seed 体系，N_seed ≥ 10（protocol n_seed_min）。"""
+    keys = ["n_seeds", "deterministic_mode", "tf32_explicit_set"]
+    missing = [k for k in keys if k not in cfg]
+    if missing:
+        return _make("P19", "seed体系", False,
+                     detail=f"missing={missing}（必须由调用方提供实测值）",
+                     missing=missing)
     n_seeds = int(cfg.get("n_seeds", 0))
     deterministic = bool(cfg.get("deterministic_mode", False))
     tf32_set = bool(cfg.get("tf32_explicit_set", False))
-    return _make("P19", "seed体系", n_seeds >= 5 and deterministic and tf32_set,
-                 detail=f"n_seeds={n_seeds}, deterministic={deterministic}, tf32={tf32_set}")
+    N_SEED_MIN = 10  # protocol.yaml n_seed_min
+    return _make("P19", "seed体系", n_seeds >= N_SEED_MIN and deterministic and tf32_set,
+                 detail=f"n_seeds={n_seeds}(min={N_SEED_MIN}), deterministic={deterministic}, tf32={tf32_set}")
 
 
 def check_P20_window(cfg: Mapping[str, Any]) -> CheckResult:
@@ -678,24 +719,52 @@ def check_P39_persistence(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_DQ1_difficulty_gradient(cfg: Mapping[str, Any]) -> CheckResult:
+    """DQ-1: 难度梯度（C4 vs C1 相对提升 ≥ 40%）。与 handbook_gates 公式一致。
+
+    双实现冲突已解决：precheck 和 handbook_gates 均使用
+    diff_ratio = (c4 - c1) / c1, target = 0.40
+    （原先 precheck 用绝对米 target_diff_m=2.4 与 handbook 不一致）。
+    """
+    keys = ["c4_mean_rmse", "c1_mean_rmse", "target_diff_ratio"]
+    missing = [k for k in keys if k not in cfg]
+    if missing:
+        return _make("DQ-1", "难度梯度", False,
+                     detail=f"missing={missing}（必须由调用方提供实测值）",
+                     missing=missing)
     c4 = float(cfg.get("c4_mean_rmse", 0.0))
     c1 = float(cfg.get("c1_mean_rmse", 0.0))
-    target_diff = float(cfg.get("target_diff_m", 2.4))
-    diff = c4 - c1
-    return _make("DQ-1", "难度梯度", diff >= target_diff,
-                 detail=f"c4={c4:.2f}, c1={c1:.2f}, diff={diff:.2f}, target>={target_diff}")
+    target_ratio = float(cfg.get("target_diff_ratio", 0.40))
+    diff_ratio = (c4 - c1) / c1 if c1 > 0 else float('inf')
+    return _make("DQ-1", "难度梯度", diff_ratio >= target_ratio,
+                 detail=f"c4={c4:.2f}, c1={c1:.2f}, ratio={diff_ratio:.2%}, target>={target_ratio:.0%}")
 
 
 def check_DQ2_snr(cfg: Mapping[str, Any]) -> CheckResult:
+    """DQ-2: 信噪比（NLOS bias / (LOS_noise × GDOP) ≥ 3.0）。
+
+    边界漏洞修复：
+    - los_noise=0 → 分母为 0 → FAIL
+    - gdop=0     → 分母为 0 → FAIL
+    语义修正：分子取 bias（偏置幅度），非 bias+std（手册原文："偏置幅度/bias magnitude"）。
+    """
+    keys = ["nlos_bias_m", "los_noise_m", "gdop"]
+    missing = [k for k in keys if k not in cfg]
+    if missing:
+        return _make("DQ-2", "信噪比", False,
+                     detail=f"missing={missing}（必须由调用方提供实测值）",
+                     missing=missing)
     bias = float(cfg.get("nlos_bias_m", 0.0))
-    std = float(cfg.get("nlos_std_m", 0.0))
-    los = float(cfg.get("los_noise_m", 0.6))
+    los = float(cfg.get("los_noise_m", 0.0))
     gdop = float(cfg.get("gdop", GDOP_DEFAULT))
-    nlos_total = bias + std
     denom = los * gdop
-    snr = nlos_total / denom if denom > 0 else 0.0
+    if denom <= 0:
+        return _make("DQ-2", "信噪比", False,
+                     detail=f"denom={denom} (los={los}, gdop={gdop}) → 分母为零/负，非法参数",
+                     nlos_snr=float('nan'), denom=denom)
+    snr = bias / denom
     return _make("DQ-2", "信噪比", snr >= 3.0,
-                 detail=f"snr={snr:.2f} (>=3.0)", nlos_snr=snr)
+                 detail=f"snr={snr:.2f} (>=3.0, bias={bias}, los={los}, gdop={gdop})",
+                 nlos_snr=snr)
 
 
 def check_DQ3_distribution(cfg: Mapping[str, Any]) -> CheckResult:
@@ -803,8 +872,15 @@ def check_E4_spot_rerun(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_E5_alert_log_consistency(cfg: Mapping[str, Any]) -> CheckResult:
-    n_alert = int(cfg.get("n_alerts_logged", 0))
-    n_resolved = int(cfg.get("n_alerts_resolved", 0))
+    """E-5: 告警日志一致（logged == resolved）。字段缺失视为 FAIL。"""
+    keys = ["n_alerts_logged", "n_alerts_resolved"]
+    missing = [k for k in keys if k not in cfg]
+    if missing:
+        return _make("E-5", "告警一致性", False,
+                     detail=f"missing={missing}（必须由调用方提供实测值）",
+                     missing=missing)
+    n_alert = int(cfg.get("n_alerts_logged", -1))
+    n_resolved = int(cfg.get("n_alerts_resolved", -1))
     return _make("E-5", "告警一致性", n_alert == n_resolved,
                  detail=f"logged={n_alert}, resolved={n_resolved}")
 
@@ -824,87 +900,256 @@ def check_E6_audit_exit(cfg: Mapping[str, Any]) -> CheckResult:
 # ============================================================================
 
 
-def run_all_prechecks(cfg: Mapping[str, Any]) -> PrecheckReport:
-    """跑全套 P1~P39 + Pre/I/DQ/G/E 检查。"""
+def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """从 raw_root 自动计算 P1-P39 check 函数所需的 cfg 字段。
+
+    阶段 12 全面审计修复 (2026-09-06 §10.2): 此前 run_all_prechecks 只接 cfg, 但 P1-P6
+    需 composition_counts / measured_gdop / boundary_violations / m1_burst_stats 等
+    字段, 这些字段必须从 npz 数据算出来, 不能由调用方手动填。
+
+    字段来源:
+        P1 composition_counts: 读 manifest 的 sequences_per_combo
+        P3 m1_burst_stats:       读 npz 算 uwb_valid=0 簇长 + 缺失率
+        P4 measured_gdop:        读 anchor_layout.json 算 GDOP
+        P5 boundary_violations:  读 gt.json 算锚区凸包边界距离
+    其余 P7-P39 字段保持 cfg 现状, 调用方显式提供。
+
+    参数
+    ----------
+    raw_root : str | Path
+        sim_e9 数据根目录, 含 seed0/seed1/.../子目录
+    cfg : Mapping | None
+        调用方提供的 cfg 基础, 字段会覆盖自动计算的
+
+    返回
+    -------
+    dict[str, Any]
+        合并后的 cfg 字典
+    """
+    raw_root_path = Path(raw_root).expanduser().resolve() if raw_root else None
+    if raw_root_path is None or not raw_root_path.is_dir():
+        return dict(cfg or {})
+    enriched: dict[str, Any] = dict(cfg or {})
+
+    # P1: 4 组合计数 (A2N2/A2N3/A3N2/A3N3)
+    composition_counts: dict[str, int] = {}
+    for seed_dir in sorted(raw_root_path.iterdir()):
+        if not seed_dir.is_dir() or not seed_dir.name.startswith("seed"):
+            continue
+        for seq_dir in seed_dir.iterdir():
+            if not seq_dir.is_dir():
+                continue
+            meta_path = seq_dir / "sim_meta.json"
+            if not meta_path.is_file():
+                continue
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            ax = meta.get("axes_override") or {}
+            a = str(ax.get("A", "")).upper()
+            n = str(ax.get("N", "")).upper()
+            if a in ("A2", "A3") and n in ("N2", "N3"):
+                key = f"{a}{n}"
+                composition_counts[key] = composition_counts.get(key, 0) + 1
+    if composition_counts:
+        enriched["composition_counts"] = composition_counts
+
+    # P3: M1 成簇丢包统计 (从第一个 seed 抽样)
+    first_seed = next((p for p in sorted(raw_root_path.iterdir())
+                       if p.is_dir() and p.name.startswith("seed")), None)
+    if first_seed is not None:
+        sample_seq = None
+        for sd in first_seed.iterdir():
+            if sd.is_dir() and (sd / "uwb.json").is_file():
+                sample_seq = sd
+                break
+        if sample_seq is not None:
+            try:
+                rows = json.loads((sample_seq / "uwb.json").read_text(encoding="utf-8"))
+            except Exception:
+                rows = []
+            if rows:
+                gap_lengths = []
+                cur_gap = 0
+                total = len(rows)
+                missing = 0
+                for r in rows:
+                    v = r.get("valid", 1)
+                    if v == 0:
+                        cur_gap += 1
+                        missing += 1
+                    else:
+                        if cur_gap > 0:
+                            gap_lengths.append(cur_gap)
+                        cur_gap = 0
+                if cur_gap > 0:
+                    gap_lengths.append(cur_gap)
+                if gap_lengths:
+                    enriched["m1_burst_stats"] = {
+                        "mean_gap_s": sum(gap_lengths) / len(gap_lengths) * 0.1,  # 10Hz → s
+                        "max_gap_s": max(gap_lengths) * 0.1,
+                        "missing_rate": missing / total if total > 0 else 0.0,
+                    }
+
+    # P4: 实测 GDOP (从 anchor_layout.json + 真 GT 首帧)
+    if first_seed is not None and sample_seq is not None:
+        anchor_path = sample_seq / "anchor_layout.json"
+        gt_path = sample_seq / "gt.json"
+        if anchor_path.is_file() and gt_path.is_file():
+            try:
+                al = json.loads(anchor_path.read_text(encoding="utf-8"))
+                gts = json.loads(gt_path.read_text(encoding="utf-8"))
+                ids = al.get("anchor_ids") or []
+                pos = al.get("anchor_positions") or []
+                if len(ids) >= 4 and len(pos) >= 4 and gts:
+                    pos0 = [float(p[0]) for p in pos[:4]]
+                    pos1 = [float(p[1]) for p in pos[:4]]
+                    gx = float(gts[0]["px"])
+                    gy = float(gts[0]["py"])
+                    # 计算 H (4 锚点到真位置的 dx/dy 几何矩阵)
+                    H = []
+                    for ax_, ay_ in zip(pos0, pos1):
+                        dx = gx - ax_
+                        dy = gy - ay_
+                        d = (dx * dx + dy * dy) ** 0.5
+                        if d < 1e-3:
+                            H.append([0.0, 0.0])
+                        else:
+                            H.append([-dx / d, -dy / d])
+                    # Q = (HᵀH)^-1, GDOP = sqrt(trace(Q))
+                    import numpy as _np
+                    H_arr = _np.array(H)
+                    Q = _np.linalg.inv(H_arr.T @ H_arr)
+                    enriched["measured_gdop"] = float(_np.sqrt(_np.trace(Q)))
+                    enriched["expected_gdop"] = GDOP_DEFAULT
+                    enriched["anchor_geometry_class"] = "asymmetric_k1" if al.get("protocol_geometry_level") == "K1" else "unknown"
+            except Exception:
+                pass
+
+    # P5: 边界违规 (凸包距 < 1.5m 帧数)
+    if first_seed is not None:
+        for sd in first_seed.iterdir():
+            if not sd.is_dir() or not (sd / "gt.json").is_file():
+                continue
+            anchor_path = sd / "anchor_layout.json"
+            if not anchor_path.is_file():
+                continue
+            try:
+                al = json.loads(anchor_path.read_text(encoding="utf-8"))
+                gts = json.loads((sd / "gt.json").read_text(encoding="utf-8"))
+                ids = al.get("anchor_ids") or []
+                pos = al.get("anchor_positions") or []
+                if len(ids) < 3 or len(pos) < 3 or not gts:
+                    continue
+                pts = [(float(p[0]), float(p[1])) for p in pos[:len(ids)]]
+                violations = 0
+                for r in gts:
+                    px, py = float(r["px"]), float(r["py"])
+                    dmin = min(((px - ax) ** 2 + (py - ay) ** 2) ** 0.5 for ax, ay in pts)
+                    if dmin < 1.5:
+                        violations += 1
+                enriched["boundary_violations"] = enriched.get("boundary_violations", 0) + violations
+                enriched["n_sequences"] = enriched.get("n_sequences", 0) + 1
+                break  # 只算一个 seed 抽样, 与 s9 validator 一致
+            except Exception:
+                continue
+
+    return enriched
+
+
+def run_all_prechecks(cfg: Mapping[str, Any], raw_root: str | Path | None = None,
+                      manifest: Any = None) -> PrecheckReport:
+    """跑全套 P1~P39 + Pre/I/DQ/G/E 检查。
+
+    阶段 12 全面审计修复 (2026-09-06 §10.2): 接受可选 raw_root 参数, 当调用方
+    提供时, 自动从 npz/manifest 推导 P1/P3/P4/P5 等检查需要的统计字段
+    (composition_counts / m1_burst_stats / measured_gdop / boundary_violations),
+    填到 cfg 里再跑 P1-P39. raw_root=None 时保持旧行为 (仅用调用方提供的 cfg).
+    """
+    # BUG-018 修复: 从 raw_root 自动推导必需字段, 合并后再跑 check
+    _enriched = _build_p_checks_cfg(raw_root, cfg)
+    _cfg: dict[str, Any] = {**dict(cfg), **_enriched}
+
     checks = [
         # 第一层
-        check_P1_composition(cfg),
-        check_P2_missing_source(cfg),
-        check_P3_m1_burst(cfg),
-        check_P4_k1_gdop(cfg),
-        check_P5_no_out_of_domain(cfg),
-        check_P6_size_and_split(cfg),
+        check_P1_composition(_cfg),
+        check_P2_missing_source(_cfg),
+        check_P3_m1_burst(_cfg),
+        check_P4_k1_gdop(_cfg),
+        check_P5_no_out_of_domain(_cfg),
+        check_P6_size_and_split(_cfg),
         # 第二层（坐标系/实现）
-        check_P7_rotation_chain(cfg),
-        check_P8_units_and_normalization(cfg),
-        check_P9_sim3_alignment(cfg),
-        check_P10_2d_only(cfg),
-        check_P11_input_isolation(cfg),
-        check_P12_train_test_symmetry(cfg),
-        check_P13_rq_matching(cfg),
+        check_P7_rotation_chain(_cfg),
+        check_P8_units_and_normalization(_cfg),
+        check_P9_sim3_alignment(_cfg),
+        check_P10_2d_only(_cfg),
+        check_P11_input_isolation(_cfg),
+        check_P12_train_test_symmetry(_cfg),
+        check_P13_rq_matching(_cfg),
         # 第三层（方法公平性）
-        check_P14_shared_4_heads(cfg),
-        check_P15_per_method_tuning(cfg),
-        check_P16_ekf_init_protocol(cfg),
-        check_P17_robust_ekf_huber(cfg),
-        check_P18_baselines_with_heads(cfg),
+        check_P14_shared_4_heads(_cfg),
+        check_P15_per_method_tuning(_cfg),
+        check_P16_ekf_init_protocol(_cfg),
+        check_P17_robust_ekf_huber(_cfg),
+        check_P18_baselines_with_heads(_cfg),
         # 第四层（统计脚手架）
-        check_P19_seed_system(cfg),
-        check_P20_window(cfg),
-        check_P21_normalization_isolation(cfg),
-        check_P22_stats_script(cfg),
-        check_P23_config_consistency(cfg),
+        check_P19_seed_system(_cfg),
+        check_P20_window(_cfg),
+        check_P21_normalization_isolation(_cfg),
+        check_P22_stats_script(_cfg),
+        check_P23_config_consistency(_cfg),
         # 第五层（稳定性/接口）
-        check_P24_no_nan_inf(cfg),
-        check_P25_async_timestamps(cfg),
-        check_P26_vio_payload(cfg),
-        check_P27_activation_stats(cfg),
+        check_P24_no_nan_inf(_cfg),
+        check_P25_async_timestamps(_cfg),
+        check_P26_vio_payload(_cfg),
+        check_P27_activation_stats(_cfg),
         # 第六层（数据管道）
-        check_P28_dual_rate(cfg),
-        check_P29_windowing(cfg),
-        check_P30_split_before_window(cfg),
-        check_P31_edge_cases(cfg),
+        check_P28_dual_rate(_cfg),
+        check_P29_windowing(_cfg),
+        check_P30_split_before_window(_cfg),
+        check_P31_edge_cases(_cfg),
         # 第七层（训练一致性）
-        check_P32_same_seed_init(cfg),
-        check_P33_best_val(cfg),
-        check_P34_no_overfit(cfg),
-        check_P35_head_consistency(cfg),
+        check_P32_same_seed_init(_cfg),
+        check_P33_best_val(_cfg),
+        check_P34_no_overfit(_cfg),
+        check_P35_head_consistency(_cfg),
         # 第八层（评估口径）
-        check_P36_metric_declaration(cfg),
-        check_P37_warmup_removed(cfg),
-        check_P38_world_frame(cfg),
-        check_P39_persistence(cfg),
+        check_P36_metric_declaration(_cfg),
+        check_P37_warmup_removed(_cfg),
+        check_P38_world_frame(_cfg),
+        check_P39_persistence(_cfg),
         # Pre
-        check_Pre1_environment_locked(cfg),
-        check_Pre2_decision_log(cfg),
-        check_Pre3_directory_structure(cfg),
-        check_Pre4_checksums(cfg),
-        check_Pre5_resource_budget(cfg),
-        check_Pre6_seed_manifest_consistency(cfg),
+        check_Pre1_environment_locked(_cfg),
+        check_Pre2_decision_log(_cfg),
+        check_Pre3_directory_structure(_cfg),
+        check_Pre4_checksums(_cfg),
+        check_Pre5_resource_budget(_cfg),
+        check_Pre6_seed_manifest_consistency(_cfg),
         # I
-        check_I1_data_generator(cfg),
-        check_I2_s9_script(cfg),
-        check_I3_5_methods(cfg),
-        check_I4_stats_script(cfg),
-        check_I5_eval_pipeline(cfg),
+        check_I1_data_generator(_cfg),
+        check_I2_s9_script(_cfg),
+        check_I3_5_methods(_cfg),
+        check_I4_stats_script(_cfg),
+        check_I5_eval_pipeline(_cfg),
         # DQ
-        check_DQ1_difficulty_gradient(cfg),
-        check_DQ2_snr(cfg),
-        check_DQ3_distribution(cfg),
-        check_DQ4_sample_size(cfg),
+        check_DQ1_difficulty_gradient(_cfg),
+        check_DQ2_snr(_cfg),
+        check_DQ3_distribution(_cfg),
+        check_DQ4_sample_size(_cfg),
         # G
-        check_G1_unit_completeness(cfg),
-        check_G2_metrics_readable(cfg),
-        check_G3_config_data_cross(cfg),
-        check_G4_alerts_cleared(cfg),
-        check_G5_output_aligned(cfg),
+        check_G1_unit_completeness(_cfg),
+        check_G2_metrics_readable(_cfg),
+        check_G3_config_data_cross(_cfg),
+        check_G4_alerts_cleared(_cfg),
+        check_G5_output_aligned(_cfg),
         # E
-        check_E1_audit_trail(cfg),
-        check_E2_gate_records(cfg),
-        check_E3_dual_review(cfg),
-        check_E4_spot_rerun(cfg),
-        check_E5_alert_log_consistency(cfg),
-        check_E6_audit_exit(cfg),
+        check_E1_audit_trail(_cfg),
+        check_E2_gate_records(_cfg),
+        check_E3_dual_review(_cfg),
+        check_E4_spot_rerun(_cfg),
+        check_E5_alert_log_consistency(_cfg),
+        check_E6_audit_exit(_cfg),
     ]
     n_hard_failed = sum(1 for r in checks if not r.passed and r.severity == "hard")
     n_passed = sum(1 for r in checks if r.passed)

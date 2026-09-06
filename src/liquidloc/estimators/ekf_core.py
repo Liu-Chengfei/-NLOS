@@ -525,6 +525,40 @@ class EKFCore(EstimatorAPI):
         # 与 __init__ 同口径：默认解冻，保留 NN control 全套缩放字段（§5 期望）。
         self._calibration_frozen = False  # reset 后仍解冻；标定冻结需配置显式开启。
 
+    def apply_p16_init_from_first_frame(
+        self,
+        uwb_events: Sequence[Any],
+        vio_events: Sequence[Any],
+        *,
+        z_anchor_m: float = 2.5,
+        z_tag_m: float = 1.2,
+    ) -> dict[str, Any]:
+        """手册 P16 EKF 初始化协议的统一入口（异步高NLOS实验全流程保障手册）。
+
+        调用 ``ekf_init_protocol_p16`` 拿到 ``initial_state`` 与 ``init_cov_diagonal``，
+        再以这两个值调用 ``self.reset(initial_state=...)`` 并重写 cov 为 P16 计算的对角向量。
+        返回初始化报告（含 mode / n_anchors_used / trilaterated_position_xy）供上游审计与日志。
+
+        参数:
+            uwb_events: 首批 UWB 事件（建议取序列前若干帧，包含所有 4 锚的首次有效测量）。
+            vio_events: 首批 VIO 事件（建议取序列前若干帧，包含首帧 vio_yaw）。
+            z_anchor_m / z_tag_m: 锚/tag z 高度（手册 S2 锚高 2.5m，tag 高 1.1-1.3m）。
+
+        返回:
+            dict（与 ``ekf_init_protocol_p16`` 同结构）。
+        """
+        from liquidloc.estimators.ekf_init_protocol import ekf_init_protocol_p16  # 局部导入避免循环依赖
+
+        report = ekf_init_protocol_p16(
+            uwb_events=uwb_events,
+            vio_events=vio_events,
+            anchor_lookup=self._anchor_lookup,
+        )
+        self.reset(initial_state=report["initial_state"])
+        # _build_initial_covariance 期望 init_cov 是与 state_items 同长的对角向量
+        self._covariance = _build_initial_covariance(report["init_cov_diagonal"])
+        return report
+
     def consume_model_intermediate(self, intermediate: ModelIntermediate) -> None:
         """保存上游模型中间结果，供需要时转发或调试。
 

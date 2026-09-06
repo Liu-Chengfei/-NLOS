@@ -494,8 +494,8 @@ def sample_scenes(experiment_cfg: dict[str, Any], sweep_cfgs: dict[str, Any] | N
     )  # 找出既不是五轴也不是元信息的键。
     if unknown_frozen_axes:  # 不支持的键说明配置写错了。
         raise ValueError(
-            f'frozen_axes 仅支持 A/N/V/K/M 五个五轴档位协议键（plus dataset/split 元键），'
-            f'got unsupported keys: {unknown_frozen_axes}'
+            f'Unsupported frozen_axes keys: {unknown_frozen_axes}; '
+            f'frozen_axes 仅支持 A/N/V/K/M 五个五轴档位协议键（plus dataset/split 元键）'
         )
 
     # 校验公开序列专用键不能出现在非公开模式中。

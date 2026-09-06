@@ -82,14 +82,42 @@ def build_manifests(
     if not root.is_dir():
         raise FileNotFoundError(f'Data root is not a directory: {os.fspath(root)}')
 
+    # BUG-008 根因 (2026-09-06 §10 阶段 12 审计): sim_e9_main 顶层是 seed0..seed9 目录, 真正的
+    # sim_meta.json 在 seed/seq 嵌套深处. has_sim_meta 必须递归扫描 (rglob),
+    # 不能只看顶层 seq_dir / sim_meta.json.
+    _top_seq_dirs = list_sequence_dirs(root)
+    has_sim_meta = any(
+        (seq_dir / 'sim_meta.json').is_file() for seq_dir in _top_seq_dirs
+    ) or any(
+        _sub.is_file()
+        for seed_dir in _top_seq_dirs
+        for _sub in seed_dir.rglob('sim_meta.json')
+    )
     # §28.6 自证契约：当未显式指定 required_streams 时，自动检测仿真数据集
     # 根目录（任一序列目录含 sim_meta.json 即视为仿真路径），仿真路径必须
     # 满足 SIM_REQUIRED_SEQ_FILES（含 sim_meta.json），公开/真实数据集仍
     # 使用 REQUIRED_STREAMS。显式传入 required_streams 时不覆盖调用方意图。
+    #
+    # 阶段 12 全面审计修复 (2026-09-06 §10): 嵌套 sim 序列扫描必须在 effective_streams
+    # 计算前完成, 否则 required_streams 非 None 时 (如 prepare_pipeline L342 写死传
+    # REQUIRED_STREAMS) 直接跳过嵌套扫描, 走 list_sequence_dirs(root) 只返 10 seed 顶层
+    # 目录. 这里把嵌套扫描逻辑移到 if/else 之外, 总是先做嵌套/平面识别.
+    if has_sim_meta:
+        _seq_dirs: list[Path] = []
+        for seed_dir in _top_seq_dirs:
+            if (seed_dir / 'sim_meta.json').is_file():
+                _seq_dirs.append(seed_dir)
+            else:
+                _seq_dirs.extend(
+                    child
+                    for child in seed_dir.iterdir()
+                    if child.is_dir() and (child / 'sim_meta.json').is_file()
+                )
+        _seq_dirs = sorted(_seq_dirs)
+    else:
+        _seq_dirs = _top_seq_dirs
+    # 决定 required_streams 走哪条 (sim → SIM_REQUIRED_SEQ_FILES, 其他 → REQUIRED_STREAMS)
     if required_streams is None:
-        has_sim_meta = any(
-            (seq_dir / 'sim_meta.json').is_file() for seq_dir in list_sequence_dirs(root)
-        )
         effective_streams = SIM_REQUIRED_STREAMS if has_sim_meta else REQUIRED_STREAMS
     else:
         effective_streams = required_streams
@@ -99,7 +127,7 @@ def build_manifests(
     sequence_records: list[dict[str, Any]] = []
     scene_index: dict[str, list[str]] = {}
 
-    for seq_dir in list_sequence_dirs(root):
+    for seq_dir in _seq_dirs:
         file_names = sorted(path.name for path in seq_dir.iterdir() if path.is_file())
         missing_files = [name for name in effective_streams if name not in file_names]
         layout_family = _resolve_layout_family(seq_dir)
@@ -110,8 +138,11 @@ def build_manifests(
             scene_id = seq_dir.name
             scene_id_source = 'seq_dir_name'
 
+        # BUG-008: sim_e9_main 嵌套结构下 seq_id 用正斜杠 (跨平台) 而非纯目录名
+        # (Windows 下 relative_to 返回反斜杠, 不与 read_sim_sequence 路径拼接兼容)
+        _rel_path = str(seq_dir.relative_to(root)).replace(os.sep, '/')
         record: dict[str, Any] = {
-            'seq_id': seq_dir.name,
+            'seq_id': _rel_path,
             'scene_id': scene_id,
             'scene_id_source': scene_id_source,
             'seq_dir': os.fspath(seq_dir),
@@ -120,7 +151,7 @@ def build_manifests(
             'is_complete': not missing_files,
         }
         sequence_records.append(record)
-        scene_index.setdefault(scene_id, []).append(seq_dir.name)
+        scene_index.setdefault(scene_id, []).append(_rel_path)
 
     dataset_manifest: dict[str, Any] = {
         'data_root': os.fspath(root),

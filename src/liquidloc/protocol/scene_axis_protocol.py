@@ -33,14 +33,14 @@
   - attach_scene_parameters         展开所有轴的参数并扁平化
 
 核心变量定义：
-  - AXES                            冻结的轴名元组 (A, N, V, G, K, M)
+  - AXES                            冻结的轴名元组 (A, N, V, K, M)，2026-08-31 删除 G 轴并入 K
   - _PROTOCOL_VERSION               协议版本号（2）
   - _DEFAULT_PATH                   冻结场景轴协议 YAML 的默认路径
 
 关键设计决策：
   - 场景轴协议在模块加载时即冻结，后续调用只读。
   - 校验时与仓库冻结快照做精确比较，任何漂移都会导致加载失败。
-  - 只允许 A/N/V/G/K/M 六个轴，不允许动态扩展。
+  - 只允许 A/N/V/K/M 五个轴，不允许动态扩展（G 轴已删除）。
   - 每个轴的每个层级必须是映射类型，承载该层级的参数表。
 """
 
@@ -56,10 +56,19 @@ from typing import Any  # 允许类型注解里表示"任意类型"。
 from types import MappingProxyType  # 只读字典代理，防止外部修改冻结协议数据。
 
 from liquidloc.common.config_utils import find_project_root, load_yaml_config  # 加载 YAML 配置文件和项目根查找器。
-from liquidloc.common.validation import is_bool_like, is_integer, is_real, is_string_like  # 布尔类型校验工具、整数类型校验工具、数值类型校验工具和字符串类型校验工具。
+from liquidloc.common.validation import coerce_finite_scalar, is_bool_like, is_integer, is_real, is_string_like  # 标量强转、数值类型校验工具。第 8 阶段修复 HIGH-5: _interval_midpoint 需要 coerce_finite_scalar。
 from liquidloc.protocol.version import PROTOCOL_VERSION as _PROTOCOL_VERSION  # 从集中版本模块导入协议版本号。
 
 AXES = ("A", "N", "V", "K", "M")  # 冻结的轴名元组，不允许动态扩展。2026-08-31 删 G 轴（并入 K）。
+
+
+def _interval_midpoint(value: Any) -> float:
+    """把标量或区间 [a,b] 映射为中点标量, 用于范围校验。"""
+    if isinstance(value, (list, tuple)):
+        lo = coerce_finite_scalar(value[0], name='interval_low')
+        hi = coerce_finite_scalar(value[1] if len(value) >= 2 else value[0], name='interval_high')
+        return (lo + hi) / 2.0
+    return coerce_finite_scalar(value, name='scalar')
 _AXES = AXES  # 向后兼容别名。
 SCENE_AXES = AXES  # 公共导出别名，供下游模块引用，避免重复定义导致漂移。
 AXIS_METADATA_KEYS = {
@@ -400,36 +409,38 @@ def _validate_axis_param_semantic_range(axis: str, level: str, payload: Mapping[
             if float(tracked_features_range[1]) > 1000.0:
                 raise ValueError(f"{prefix}.tracked_features_range upper bound must be <= 1000.0, got {tracked_features_range[1]}")
         reproj_err_max = payload.get("reproj_err_max")
-        if is_real(reproj_err_max) and float(reproj_err_max) <= 0.0:
+        if _interval_midpoint(reproj_err_max) <= 0.0:  # HIGH-5 修复: 兼容 list/tuple 区间值, 取中点校验。
             raise ValueError(f"{prefix}.reproj_err_max must be positive, got {reproj_err_max}")
         blackout_prob = payload.get("blackout_prob")
-        if is_real(blackout_prob) and not (0.0 <= float(blackout_prob) <= 1.0):
+        if not (0.0 <= _interval_midpoint(blackout_prob) <= 1.0):  # HIGH-5 修复: 兼容 list/tuple 区间值, 取中点校验。
             raise ValueError(f"{prefix}.blackout_prob must be in [0, 1], got {blackout_prob}")
         drift_bias_sigma_mps = payload.get("drift_bias_sigma_mps")
-        if is_real(drift_bias_sigma_mps) and float(drift_bias_sigma_mps) < 0.0:
+        drift_bias_mid = _interval_midpoint(drift_bias_sigma_mps)  # HIGH-5 修复: 兼容 list/tuple 区间值, 取中点校验。
+        if drift_bias_mid < 0.0:
             raise ValueError(f"{prefix}.drift_bias_sigma_mps must be non-negative, got {drift_bias_sigma_mps}")
-        if is_real(drift_bias_sigma_mps) and float(drift_bias_sigma_mps) > 1.0:
+        if drift_bias_mid > 1.0:
             # drift_bias_sigma_mps: Wiener drift 标准差 σ（m/√s），累积幅度 = σ·√T
             raise ValueError(f"{prefix}.drift_bias_sigma_mps must be <= 1.0 (degrade_quality saturation limit), got {drift_bias_sigma_mps}")
         # 2026-08-31 新增字段校验（V2 σ 噪声放大 + V3 关键帧中断+跳变）
         increment_noise_std_mps = payload.get("increment_noise_std_mps")
-        if is_real(increment_noise_std_mps) and float(increment_noise_std_mps) < 0.0:
+        inc_noise_mid = _interval_midpoint(increment_noise_std_mps)  # HIGH-5 修复: 兼容 list/tuple 区间值, 取中点校验。
+        if inc_noise_mid < 0.0:
             raise ValueError(
                 f"{prefix}.increment_noise_std_mps must be non-negative (V0 baseline 0; V2 σ×5 放大至 0.05-0.15m), "
                 f"got {increment_noise_std_mps}"
             )
-        if is_real(increment_noise_std_mps) and float(increment_noise_std_mps) > 1.0:
+        if inc_noise_mid > 1.0:  # HIGH-5 修复: 用已算中点, 兼容 list/tuple 区间值。
             raise ValueError(
                 f"{prefix}.increment_noise_std_mps must be <= 1.0 m/步, got {increment_noise_std_mps}"
             )
         keyframe_interruptions_per_seq = payload.get("keyframe_interruptions_per_seq")
-        if is_real(keyframe_interruptions_per_seq) and float(keyframe_interruptions_per_seq) < 0.0:
+        if _interval_midpoint(keyframe_interruptions_per_seq) < 0.0:  # HIGH-5 修复: 兼容 list/tuple 区间值。
             raise ValueError(
                 f"{prefix}.keyframe_interruptions_per_seq must be non-negative (V0 baseline 0; V3 模拟 2-4 次/序列), "
                 f"got {keyframe_interruptions_per_seq}"
             )
         keyframe_recovery_jump_m = payload.get("keyframe_recovery_jump_m")
-        if is_real(keyframe_recovery_jump_m) and float(keyframe_recovery_jump_m) < 0.0:
+        if _interval_midpoint(keyframe_recovery_jump_m) < 0.0:  # HIGH-5 修复: 兼容 list/tuple 区间值。
             raise ValueError(
                 f"{prefix}.keyframe_recovery_jump_m must be non-negative (V0 baseline 0; V3 模拟 0.3-1m 跳变), "
                 f"got {keyframe_recovery_jump_m}"
@@ -640,8 +651,10 @@ def _validate_axis_monotonicity(axis: str, levels: Mapping[str, Mapping[str, Any
             values = []
             for ln in level_names:
                 v = levels[ln].get(param)
-                if is_real(v):
-                    values.append(float(v))
+                try:
+                    values.append(_interval_midpoint(v))  # HIGH-5 修复: 兼容 list/tuple 区间值, 取中点参与单调性比较。
+                except (TypeError, ValueError, KeyError):
+                    pass  # 缺字段或格式错误跳过, 由单档校验兜底。
             if len(values) == len(level_names) and values != sorted(values):
                 raise ValueError(
                     f"scene axis protocol axis {axis} parameter {param} must be monotonically "

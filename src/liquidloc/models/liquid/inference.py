@@ -398,3 +398,9 @@ def infer_intermediate(window_tensor: Any, model_state: Any = None) -> ModelInte
         normalized["vio_scaling"] = 1.0  # UWB 模态下 VIO 缩放因子强制为 1.0。
     elif modality == MODALITY_VIO:
         normalized["uwb_scaling"] = 1.0  # VIO 模态下 UWB 缩放因子强制为 1.0。
+    return ModelIntermediate(
+        bias=normalized["bias"],
+        risk=normalized["risk"],
+        uwb_scaling=normalized["uwb_scaling"],
+        vio_scaling=normalized["vio_scaling"],
+    )

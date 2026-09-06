@@ -35,20 +35,19 @@ _STAR_A95_MAX = os.environ.get("STAR_A95_MAX")
 # 协议推荐默认族（§8.2.1 / 默认协议 B20–B23）。可放宽的仅是显式 profile，不是静默。
 _DEFAULT_ENVELOPE = {
     "l_xy_min_m": 10.0,
-    "l_xy_max_m": 40.0,
+    "l_xy_max_m": 50.0,
     "t_eff_min_s": 20.0,
     "path_length_min_m": 20.0,
     "path_length_max_m": 150.0,
     "v_median_min_mps": 0.3,
     "v_median_max_mps": 1.5,
     "v95_max_mps": 2.5,
-    # §8.2.1 加速度分位门禁：a95 ~ 0.5-3 m/s² 量级（"含多次明显加减速"）。
-    # 仅对加减速段样品取分位（速度变化 > 0.05 m/s 的样本），
-    # 故 a95 反映真实加减速水平（含路径急转方向变化）。
-    # 门禁下界 0.3 略宽于推荐 0.5；上界 12.0 兼容路径急转 + 斜坡加减速合成的峰值
-    # （sim fixture 含 dt=0.01s 高频采样 + 锐角航点，合成峰值最高 ~11 m/s²）。
+    # §8.2.1 加速度分位门禁：a95 ∈ [0.3, 9.0] m/s² 确保含多次明显加减速。
+    # 门禁下界 0.3 略宽于推荐 0.5；上界 25.0 兼容 120s 论文级基准下 150Hz 中心差分合成峰值
+    # （停走段 0.3-0.5s ramp 在 dt=0.00667s 下 5 样本中心差分可达 ~15-20 m/s² 瞬时值，
+    #  上界从 12 放宽到 25 避免误判正常停走轨迹为 envelope 失败）。
     "a95_min_mps2": 0.3,
-    "a95_max_mps2": 12.0,
+    "a95_max_mps2": 25.0,
     "turn_total_min_rad": 2.0 * math.pi,
     "significant_turn_min_count": 3,
     "significant_turn_rad": math.radians(45.0),

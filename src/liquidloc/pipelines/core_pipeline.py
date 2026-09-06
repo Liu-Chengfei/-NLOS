@@ -599,19 +599,6 @@ from liquidloc.common.io_utils import dumps_json_text, read_json  # D10：严格
 
 _NEURAL_METHODS = {MODEL_NAME_LSTM, MODEL_NAME_LIQUID, MODEL_NAME_TRANSFORMER}  # 需要模型参与的神经方法。
 _CLASSICAL_METHODS = {ESTIMATOR_NAME_EKF, ESTIMATOR_NAME_ROBUST_EKF, ESTIMATOR_NAME_FGO}  # 纯估计器或经典方法。
-_LIQUID_ABLATION_METHODS: dict[str, dict[str, Any]] = {  # 液态方法的消融路由表，方法名决定最终用哪个 estimator/model。
-    'liquid_ekf_full': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': MODEL_NAME_LIQUID},  # 完整液态方法，保留 EKF 外壳和 liquid 模型。
-    'liquid_ekf_wo_liquid': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': None},  # 去掉模型，只保留估计器，方便看纯 EKF 基线。
-    # 三个机制级消融变体：路由层仍复用 EKF 外壳 + liquid 模型，让模型继续学习其他控制量；
-    # 机制中性化（bias/risk/vio_scaling）由 fusion_runner._apply_mechanism_ablation 在桥接
-    # 合约前施加，确保消融是结构级而非输出级。模型越学越好的其他控制量被保留，仅目标机制被关掉。
-    'liquid_ekf_wo_bias_memory': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': MODEL_NAME_LIQUID},
-    'liquid_ekf_wo_risk_gate': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': MODEL_NAME_LIQUID},
-    'liquid_ekf_wo_vio_confidence': {'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': MODEL_NAME_LIQUID},
-}  # 当前已被真实实现支持的液态消融路由（含五个变体：基线 full、纯 EKF 基线 wo_liquid、三个机制级消融）。
-# 机制级消融曾在此被拦阻的别名现已迁移到 _LIQUID_ABLATION_METHODS，本字典保留为空映射，
-# 作为后续新增未实现机制的告警闸：再次声明机制级消融而未落地结构实现时，仍走报错路径。
-_UNIMPLEMENTED_LIQUID_MECHANISTIC_ABLATIONS: dict[str, str] = {}
 _SCENE_AXES = SCENE_AXES  # 场景协议里六个主轴的固定顺序，来源为冻结协议。
 _PARAM_ATTR_CANDIDATES = ('params', 'param_count', 'parameter_count', 'num_params')  # 参数数量字段的候选名字。
 _RAM_ATTR_CANDIDATES = ('ram_peak', 'ram_peak_mb', 'peak_ram_mb', 'memory_peak_mb')  # 峰值内存字段的候选名字。
@@ -622,13 +609,16 @@ _DEFAULT_SCENE_CODE: str | None = None
 
 
 def _is_neural_method(method_name: str) -> bool:
-    """检测方法名是否为神经方法（直接名或 _ekf 组合名）。"""
+    """检测方法名是否为神经方法（直接名或 `<neural>_ekf` 组合名）。
+
+    严格白名单匹配：只承认 `{lstm, liquid, transformer}` 及其 EKF 外壳组合名
+    `{lstm_ekf, liquid_ekf, transformer_ekf}`。任意含关键字的未知变体
+    （如 `lstm_ekf_xxx`）不属于已注册神经面，必须返回 False，交由
+    `_resolve_method_route` 抛 Unsupported method，禁止宽匹配静默放行。
+    """
     if method_name in _NEURAL_METHODS:
         return True
-    for neural in _NEURAL_METHODS:
-        if method_name.endswith(f'_{neural}') or method_name.startswith(f'{neural}_'):
-            return True
-    return False
+    return method_name in {f"{neural}_ekf" for neural in _NEURAL_METHODS}
 
 
 def _enforce_window_size_parity_for_neural_methods(
@@ -663,6 +653,36 @@ def _enforce_window_size_parity_for_neural_methods(
             f'{dict(zip(sizes.keys(), [sizes[k] for k in sizes.keys()]))}'
         )
     return sizes
+
+
+def _resolve_git_commit() -> str | None:  # 获取当前 git HEAD commit hash。
+    """返回当前源码 HEAD 的短 hash（7位）；git 不可用时返回 None，不抛出。"""
+    import subprocess as _subprocess
+    try:
+        return _subprocess.check_output(  # 调用 git rev-parse --short=7 HEAD。
+            ['git', 'rev-parse', '--short=7', 'HEAD'],
+            cwd=find_project_root(),  # 用项目根目录而非 cwd，避免 checkout 后的边缘情况。
+            stderr=_subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+        ).strip()
+    except Exception:  # 捕获 git 不存在、非仓库、git 进程超时等所有异常。
+        return None
+
+
+def _resolve_config_hash(cfg: Mapping[str, Any]) -> str:  # 计算 experiment config 的稳定 hash。
+    """对实验配置计算 SHA256 hexdigest；排除 output_root/dataset_name 等运行时字段，保证不同实验间可比。"""
+    import hashlib as _hashlib
+    import json as _json
+    stable_cfg = {  # 只保留与实验结果强相关的字段，排除运行时推断字段。
+        k: v for k, v in cfg.items()
+        if k not in (
+            'output_root', 'project_root', 'registry_path', 'experiment_protocol_path',
+            'raw_root', 'field_mapping', 'seq_ids', 'dataset_name',
+        )
+    }
+    stable_str = _json.dumps(stable_cfg, sort_keys=True, ensure_ascii=True)
+    return _hashlib.sha256(stable_str.encode()).hexdigest()
 
 
 def _get_default_scene_code() -> str:
@@ -880,11 +900,11 @@ def _resolve_scene_parameters(task: dict[str, Any], protocol_cfg: dict[str, Any]
             if not stripped_level:
                 raise ValueError(f"scene axis level must not be blank for axis {axis}")
             payload: dict[str, Any] = {'level': stripped_level}
-            # F2-H1: 部分轴分支返回的 K payload 缺 anchor_count，下游 _apply_scene_task L402 会 KeyError。
-            # 五轴档位协议 K 轴锚数固定 4。K level 名（如 K3）仅用于选几何条件，anchor_count 不从 level 名提取。
-            # 若 level 名不符合预期格式，留待 _apply_scene_task 的容错兜底（默认 6）。
-            if axis == 'K' and stripped_level.startswith('K') and stripped_level[1:].isdigit():
-                payload['anchor_count'] = int(stripped_level[1:])
+            # F2-H1（阶段 8 修复 HIGH-9）: K level 名（如 K3）只用于选几何条件，anchor_count 不从 level 名后缀解析（K0/K1/K3 后缀是 0/1/3 与协议锚数 4 完全错位）。
+            # 从 protocol_cfg['axes']['K'][level].get('anchor_count') 读取协议事实，缺省为 4。
+            if axis == 'K':
+                k_payload = (((protocol_cfg.get('axes') or {}).get('K') or {}).get(stripped_level) or {})
+                payload['anchor_count'] = k_payload.get('anchor_count', 4)
             normalized[axis] = payload
         return normalized
 
@@ -1003,7 +1023,11 @@ def _apply_scene_task(events: Iterable[Any], task: dict[str, Any], protocol_cfg:
     scenario_reports: dict[str, Any] = {}  # 收集各轴变换的报告，供后续评估和审计使用。
     if 'A' in axis_params:  # A 轴代表异步扰动。
         async_level = str(axes.get('A') or axis_params['A'].get('level'))  # 选取异步等级，优先用任务显式值。
-        working_events, scenario_reports['A'] = apply_async_level(working_events, async_level, protocol_cfg['axes']['A'])  # 写回异步变换结果和报告。
+        working_events, async_report = apply_async_level(working_events, async_level, protocol_cfg['axes']['A'])  # 写回异步变换结果和报告。
+        scenario_reports['A'] = async_report
+        # B08 修复: 把 async_report 中的 misalignment_event_count 提升到顶层 scenario_reports 字段，
+        # 供 precheck 的总累计 ≥ 20 校验使用。
+        scenario_reports['A_misalignment_event_count'] = int(async_report.get('misalignment_event_count', 0))
         # apply_async_level 内部已排序并重算 dt（含 validate_event_sequence 校验），
         # 此处不再冗余排序和重算，避免与 _recompute_dt 的口径差异。
 
@@ -1054,6 +1078,20 @@ def _apply_scene_task(events: Iterable[Any], task: dict[str, Any], protocol_cfg:
             raise ValueError(
                 f'modality_drop_prob must be within [0, 1], got {modality_drop_prob}'
             )
+        # 第 8 阶段修复 HIGH-12: IMU 缺失率有专属字段 imu_drop_prob（如 M3 imu_drop_prob=[0.01,0.05]），
+        # 不能用 modality_drop_prob=0.30 给 IMU（违反协议层 "IMU ≤5%" 硬约束）。
+        # IMU 是时间基准，缺失过高导致估计器状态发散。
+        imu_drop_prob_raw = modality_cfg.get('imu_drop_prob', 0.0)
+        if isinstance(imu_drop_prob_raw, (list, tuple)) and len(imu_drop_prob_raw) >= 1:
+            imu_drop_prob = float(sum(imu_drop_prob_raw) / len(imu_drop_prob_raw))
+        else:
+            imu_drop_prob = coerce_finite_scalar(
+                imu_drop_prob_raw, name='imu_drop_prob', min_value=0.0, max_value=1.0
+            )
+        if not 0.0 <= imu_drop_prob <= 1.0:
+            raise ValueError(
+                f'imu_drop_prob must be within [0, 1], got {imu_drop_prob}'
+            )
         # 第 3 轮审查 HIGH-2 修复：affected_modalities 必须是列表/元组，
         # 字符串虽是 Sequence 但会被 list() 拆成字符（list("uwb") → ['u','w','b']），
         # 导致下游 apply_modality_drop 收到非法模态名。此处显式拒绝字符串。
@@ -1084,7 +1122,10 @@ def _apply_scene_task(events: Iterable[Any], task: dict[str, Any], protocol_cfg:
                     # (2) 对下游估计器构成更强压力（连续缺失比散点缺失更难处理）；
                     # (3) 与 A 轴 burst_missing 的 contiguous 窗口语义一致。
                     # 若需切换到 Bernoulli 模型，需同步更新协议 YAML 注释和此实现。
-                    drop_duration = total_duration * modality_drop_prob
+                    # 第 8 阶段修复 HIGH-12: IMU 走 imu_drop_prob（协议层 M3 imu_drop_prob=[0.01,0.05]），
+                    # 其他模态（UWB/VIO）走 modality_drop_prob。
+                    modality_drop_prob_for_modality = imu_drop_prob if str(modality_name).strip().lower() == 'imu' else modality_drop_prob
+                    drop_duration = total_duration * modality_drop_prob_for_modality
                     # 用稳定哈希选择时间段起始位置，保证可复现（不引入 random 依赖）。
                     m_seed_str = f"modality_drop:{modality_name}:{scene_id_str}"
                     m_seed = int(hashlib.sha256(m_seed_str.encode('utf-8')).hexdigest()[:8], 16)
@@ -1195,12 +1236,12 @@ def _remap_uwb_ranges_for_geometry(  # 当几何布局变化时，按残差逻�
 
 
 def _materialize_scene_task(  # 把一个场景任务真正展开成可运行的事件和场景上下文。
-    events: Iterable[Any],  # 已经经过上游准备的事件序列，后面会在副本上做场景化处理。第 12 轮审查 LOW-1 修复（R12-C L1）：补全类型注解，与 _clone_events L269 口径一致。
-    task: dict[str, Any],  # 当前任务本身，里面带着 scene_id、seq_id、axes 等控制信息。
-    protocol_cfg: dict[str, Any],  # 场景轴协议配置，用来把任务里的简写参数展开成完整规则。
-    scene_context: Mapping[str, Any] | None = None,  # 上游可选传入的快速场景上下文，存在时可以跳过部分重算。
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:  # 返回场景任务展开后的事件序列和上下文。,
-    gt_rows: Mapping[str, Any] | list[dict[str, float]] | None = None, # 上游可选传入 GT 行列表，用于 NLOS 状态依赖选择
+    events: Iterable[Any],  # 已经过上游准备的事件序列,后面会在副本上做场景化处理。第 12 轮审查 LOW-1 修复补全类型注解。
+    task: dict[str, Any],  # 当前任务本身,里面带着 scene_id、seq_id、axes 等控制信息。
+    protocol_cfg: dict[str, Any],  # 场景轴协议配置,用来把任务里的简写参数展开成完整规则。
+    scene_context: Mapping[str, Any] | None = None,  # 上游可选传入的快速场景上下文,存在时可以跳过部分重算。
+    gt_rows: Mapping[str, Any] | list[dict[str, float]] | None = None,  # 上游可选传入 GT 行列表,用于 NLOS 状态依赖选择。第 8 阶段修复 HIGH-8。
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """把一个场景任务真正展开成可运行的事件和场景上下文。"""
     scene_context = dict(scene_context or {})  # 先把上下文转成可修改的普通字典。
     if scene_context.get('quick_preprocessed_axes'):  # 快速路径已经预处理过轴时，直接复用现成结果。
@@ -1216,7 +1257,7 @@ def _materialize_scene_task(  # 把一个场景任务真正展开成可运行的
             'geometry_report': deepcopy(scene_context.get('geometry_report') or task.get('geometry_report')),  # 几何报告同样深拷贝沿用。
             'quick_preprocessed_axes': list(scene_context.get('quick_preprocessed_axes') or []),  # 记录哪些轴已经预处理过（轴名为字符串不可变，浅拷贝列表即可）。
         }
-    return _apply_scene_task(events, task, protocol_cfg)  # 非快速路径就按完整场景变换流程走。
+    return _apply_scene_task(events, task, protocol_cfg, gt_rows=gt_rows)  # 第 8 阶段修复 HIGH-8: 把 gt_rows 传给 _apply_scene_task，让 N 轴 _apply_nlos_level 能用状态依赖 NLOS 注入。
 
 
 def _read_numeric_attribute(obj: Any, candidate_names: tuple[str, ...]) -> float | None:  # 从对象属性里按候选名找第一个数值字段。
@@ -1335,10 +1376,6 @@ def _resolve_model_cfg(cfg: dict[str, Any], method_name: str) -> dict[str, Any]:
 
 def _resolve_method_route(method_name: str) -> dict[str, Any]:  # 把方法名映射成方法路由信息，告诉流水线该用哪个 estimator/model。
     """把方法名映射成方法路由信息，告诉流水线该用哪个 estimator/model。"""
-    if method_name in _UNIMPLEMENTED_LIQUID_MECHANISTIC_ABLATIONS:  # 机制级别名若无真实结构实现则必须拒绝执行，避免伪消融结果污染实验。
-        raise ValueError(_UNIMPLEMENTED_LIQUID_MECHANISTIC_ABLATIONS[method_name])  # 显式报错，逼调用方先补真实结构级实现再跑。
-    if method_name in _LIQUID_ABLATION_METHODS:  # 液态消融方法走专门分支。
-        return {'method_name': method_name, **deepcopy(_LIQUID_ABLATION_METHODS[method_name])}  # 液态消融方法走专门分支。# D10：深拷贝路由表条目，避免与 _LIQUID_ABLATION_METHODS 共享嵌套引用，保证返回字典与外部完全独立。
     if method_name in _CLASSICAL_METHODS:  # 经典方法只需要 estimator。
         # §10.2 第 2 行守卫：检测神经关键字被误注册进经典方法集合。
         for neural in _NEURAL_METHODS:
@@ -1348,7 +1385,7 @@ def _resolve_method_route(method_name: str) -> dict[str, Any]:  # 把方法名�
                     f'但被注册在 _CLASSICAL_METHODS 集合中；纯 NN 主表无 EKF 外壳被拒绝。'
                 )
         return {'method_name': method_name, 'estimator_name': method_name, 'model_name': None}  # 经典方法只需要 estimator。
-    if method_name in _NEURAL_METHODS:  # 神经方法复用 EKF 外壳。
+    if _is_neural_method(method_name):  # 神经方法复用 EKF 外壳（E9 配置用 lstm_ekf/liquid_ekf/transformer_ekf 全名，_is_neural_method 后缀匹配）。
         return {'method_name': method_name, 'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': method_name}  # 神经方法复用 EKF 外壳。# D9：引用单源常量 ESTIMATOR_NAME_EKF，禁止本地 'ekf' 字面量漂移。
     raise ValueError(f'Unsupported method: {method_name}')  # 未知方法属于值合同违例，与 model_factory/estimator_factory 同口径用 ValueError，避免静默跑偏。
 
@@ -1488,6 +1525,9 @@ class CorePipeline(PipelineAPI):  # 把场景生成、估计器/模型推理、�
         methods = list(cfg.get('methods') or experiment_cfg.get('methods') or [])  # 方法列表优先取显式配置。
         if not methods:  # 没有方法就无法跑任何实验分支。
             raise ValueError('methods must be a non-empty list')  # 没有方法就无法跑任何实验分支。
+        # §10.4 NN 截断对等 watchdog：在任务循环开始前对所有神经方法的 window.size 做对等校验，
+        # 不一致时 fail-loud（守卫必须在任何估计器步进之前挂载，防止先炸在无关路径上）。
+        _enforce_window_size_parity_for_neural_methods(methods, cfg)
 
         scene_tasks = list(cfg.get('scene_tasks') or [])  # 先看是否已经有现成任务清单。
         if not scene_tasks:  # 没有显式任务时尝试从实验配置或事件中回退生成。
@@ -1541,7 +1581,7 @@ class CorePipeline(PipelineAPI):  # 把场景生成、估计器/模型推理、�
             scene_context = _resolve_scene_context_for_task(task, cfg)  # 解析快速场景上下文。
             source_report = _resolve_source_report_for_task(task, cfg)  # 解析来源报告。
             ground_truth_rows = _resolve_ground_truth_rows_for_task(task, cfg)  # 解析对应真值。
-            scenario_events, scenario_context = _materialize_scene_task(events, task, scene_protocol_cfg, scene_context)  # 物化场景事件和上下文。
+            scenario_events, scenario_context = _materialize_scene_task(events, task, scene_protocol_cfg, scene_context, gt_rows=ground_truth_rows)  # 第 8 阶段修复 HIGH-8: 把 ground_truth_rows 传给 materialize_scene_task, 让 N 轴 _apply_nlos_level 能用状态依赖 NLOS 注入。
             if not scene_context.get('quick_preprocessed_axes'):  # 只有非快速预处理场景才需要做几何投影和重映射。
                 source_anchor_layout = source_report.get('anchor_layout')  # 若来源里有旧锚点布局，后面用于几何对齐。
                 if scenario_context.get('anchor_layout') is not None and isinstance(source_anchor_layout, Mapping):  # 当前布局和来源布局都存在时才投影。

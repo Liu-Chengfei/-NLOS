@@ -2,7 +2,7 @@
 
 本模块负责把原始序列、协议门控、特征构造、teacher 目标、样本切分和训练前端串起来。
 它既支持轻量 smoke，也支持真实的 Liquid/LSTM 训练前端，是训练链路的总调度层。
-文件存在的目的，是把所有训练入口收拢到一处，方便上层统一调用和审计。
+文件存在的目的，是把所有训练entry收拢到一处，方便上层统一调用和审计。
 
 上游依赖：
 - liquidloc.protocol.experiment_gates: 实验协议门控
@@ -87,37 +87,11 @@ from liquidloc.models.transformer.trainer import _CROSS_TRAINER_PARITY_DECLARATI
 from liquidloc.protocol.experiment_gates import check_test_set_not_in_training_scores, get_default_failure_threshold_m, load_experiment_protocol, normalize_run_mode, normalize_train_request  # 实验协议门控；D10：normalize_run_mode 提升到顶层，避免 _normalize_train_mode 函数内延迟 import。
 from liquidloc.protocol.liquid_bridge_contract import UWB_BIAS_MAX_RATIO, _coerce_safe_mode_enabled_flag  # UWB bias 比例截断单源常量；安全模式开关严格解析器。D10 漂移根因修复：提升到模块顶层，避免 _build_geometric_bias_target 与 _build_target_intermediate 函数内延迟 import。
 from liquidloc.protocol.scene_axis_protocol import load_scene_axis_protocol, get_nominal_levels  # 读取冻结场景轴协议，用于轴级退化风险下界；获取正常等级名，避免硬编码。
-from liquidloc.scenarios.nlos_levels import apply_nlos_level  # §A 修复: NLOS 训练注入入口（与 core_pipeline 推理侧同源，避免数据不对称）。
+from liquidloc.scenarios.nlos_levels import apply_nlos_level  # §A 修复: NLOS 训练注入entry（与 core_pipeline 推理侧同源，避免数据不对称）。
 from liquidloc.protocol.scene_schema import SceneSpec, decode_scene  # 场景规格对象；解析 scene_id，恢复 A/N/V 轴级上下文（D7 返回类型精确化）。
 
 from liquidloc.sensors.anchor_model import build_anchor_lookup, project_anchor_layout_xy  # 锚点查找表构建和3D→2D投影
 from liquidloc.sensors.uwb_model import extract_uwb_measurement, predict_range_to_anchor  # UWB 测量提取和几何距离预测
-
-import hashlib
-import subprocess
-
-
-def _resolve_git_commit() -> str | None:
-    """解析当前 git 短 commit hash，失败返回 None。"""
-    try:
-        root = Path(__file__).resolve().parents[3]  # 上溯到仓库根目录
-        out = subprocess.run(
-            ["git", "rev-parse", "--short=12", "HEAD"],
-            cwd=str(root), capture_output=True, text=True, check=False, timeout=10,
-        )
-        return out.stdout.strip() if out.returncode == 0 else None
-    except Exception:
-        return None
-
-
-def _resolve_config_hash(cfg: dict) -> str:
-    """计算配置字典的 SHA-256 前 12 位。"""
-    try:
-        import json as _json
-        content = _json.dumps(cfg, sort_keys=True, default=str).encode("utf-8")
-        return hashlib.sha256(content).hexdigest()[:12]
-    except Exception:
-        return "unknown"
 
 
 _TARGET_KEYS = ('bias', 'risk', 'uwb_scaling', 'vio_scaling')  # 训练目标的四个输出头名称：bias/risk/uwb_scaling/vio_scaling
@@ -1066,41 +1040,10 @@ def _build_geometric_bias_target(
     }
 
 
-def _maybe_inject_nlos_for_training(
-    events: list[Any],
-    gt_rows: list[dict[str, Any]],
-) -> list[Any]:
-    """为训练事件注入 NLOS 脉冲。
-
-    §A 修复根因：sim_materializer 从未施加 NLOS 脉冲，导致训练侧 bias target ≈ 0。
-    此函数注入 N3 NLOS（bias_strength_m=[4.0, 6.0], nlos_ratio=[0.35, 0.40],
-    nlos_noise_std_m=[1.48, 1.52]），匹配 scene_axis_protocol.yaml 2026-08-31 档位重制定。
-    
-    Args:
-        events: 训练事件列表（UWB/VIO/IMU 混合）。
-        gt_rows: 对齐后的真值行列表，供 apply_nlos_level 计算几何 bias。
-
-    Returns:
-        注入 N3 NLOS 后的事件列表。
-    """
-    if not events:
-        return events
-    # §A 注入 N3 NLOS：2026-08-29 档位重制定后数值走 scene_axis_protocol.yaml 单源。
-    # bias_strength_m=5.0 / nlos_ratio=0.37 / nlos_noise_std_m=1.5 与协议 yaml N3 一致。
-    # 这确保材料器注入（N3）与训练注入（N3）完全一致
-    # apply_nlos_level 期望 nlos_cfg 是含 N3 子键的协议块（与 core_pipeline 走相同入口）
-    n_level = "N3"
-    nlos_level_cfg = {
-        "nlos_ratio": 0.37,
-        "bias_strength_m": 5.0,
-        "nlos_noise_std_m": 1.5,
-        "occluder_type": "metal_wall",
-        "min_cluster_duration_s": 0.5,
-        "label": "N3",
-    }
-    nlos_cfg = {n_level: nlos_level_cfg}
-    events, _nlos_report = apply_nlos_level(events, n_level, nlos_cfg, gt_rows=gt_rows)
-    return events
+# 违反项 12 修复: 删除 _maybe_inject_nlos_for_training 函数定义（已无调用者），防止未来误调用注入 N3 引入训练/测试不对称。
+# 原函数在 train_pipeline.py 内部强制注入 N3（nlos_ratio=0.37, μ=5.0m, σ=1.5m），
+# 与 sim_materializer 已统一注入的 N1.5（ρ=0.225, μ=2.0m, σ=0.5m）分布不对称，
+# bias 头学的是 N3 而非测试 N1.5。已删除该函数定义，仅保留此注释作为审计痕迹。
 
 
 def _snapshot_proxy_estimator_state(estimator: Any) -> dict[str, float]:
@@ -1610,13 +1553,20 @@ def _resolve_scene_axis_risk_floor(event: Mapping[str, Any]) -> dict[str, float]
     nlos_cfg = dict((axes_cfg.get('N') or {}).get(scene_spec.N_level) or {})
     visual_cfg = dict((axes_cfg.get('V') or {}).get(scene_spec.V_level) or {})
 
-    # A 轴：异步间隔风险，由 cross_modal_skew_ms 归一化到 0~1
+    # A 轴：异步间隔风险，由 cross_modal_skew_ms 归一化到 0~1。
+    # A1/A2/A3 在 scene_axis_protocol.yaml 中定义为 [lo, hi] 范围，
+    # 与 async_levels.py 生成时采样逻辑对齐：取中位值作为场景级风险基准。
     async_axis_risk = 0.0
     cross_modal_skew_ms = async_cfg.get('cross_modal_skew_ms')
     if cross_modal_skew_ms is not None:
         # D5：coerce_finite_scalar 统一 float()+isfinite+拒绝 NaN/Inf/bool，与协议层
         # _resolve_scene_axis_observation_floor 同口径（Round 8 / U37 数值安全根因修复）。
-        skew_val = coerce_finite_scalar(cross_modal_skew_ms, name='cross_modal_skew_ms')
+        # 范围 [lo, hi] → 取中位值，与 async_levels.py L398-403 口径一致。
+        if isinstance(cross_modal_skew_ms, (list, tuple)) and len(cross_modal_skew_ms) == 2:
+            skew_lo, skew_hi = cross_modal_skew_ms
+            skew_val = float(skew_lo) + 0.5 * (float(skew_hi) - float(skew_lo))
+        else:
+            skew_val = coerce_finite_scalar(cross_modal_skew_ms, name='cross_modal_skew_ms')
         async_axis_risk = min(1.0, max(0.0, skew_val / (_ASYNC_GAP_FULL_SCALE * 1000.0)))
 
     # N 轴：NLOS 风险，由 nlos_ratio 直接提供
@@ -1645,13 +1595,11 @@ def _resolve_scene_axis_risk_floor(event: Mapping[str, Any]) -> dict[str, float]
         # 特征数达到此值时 VIO 工作正常，风险为 0；低于此值风险线性增加。
         feature_floor_risk = min(1.0, max(0.0, (VIO_TRACKED_FEATURES_SAFE_FLOOR - min(VIO_TRACKED_FEATURES_SAFE_FLOOR, feature_lower)) / VIO_TRACKED_FEATURES_SAFE_FLOOR))
     if reproj_err_max is not None:
-        # H27 协议 V 轴 reproj_err_max 用 [low, high] 区间表示
-        # (configs/base/scene_axis_protocol.yaml V0/V1/V2/V3)。训练时取中位值
-        # 作为典型风险水平（与 nlos_ratio 口径一致）。
+        # 消融实验口径：reproj_err_max 在协议中允许 [low, high] 区间；先 unwrap 到标量中值。
         if isinstance(reproj_err_max, (list, tuple)) and len(reproj_err_max) == 2:
-            reproj_val = (float(reproj_err_max[0]) + float(reproj_err_max[1])) / 2.0
-        else:
-            reproj_val = float(coerce_finite_scalar(reproj_err_max, name='reproj_err_max'))
+            reproj_err_max = float((reproj_err_max[0] + reproj_err_max[1]) / 2.0)
+        # D5：coerce_finite_scalar 统一 float()+isfinite+拒绝 NaN/Inf/bool，与协议层同口径。
+        reproj_val = coerce_finite_scalar(reproj_err_max, name='reproj_err_max')
         # 重投影误差上限越高，视觉退化风险越高
         reproj_floor_risk = min(1.0, max(0.0, (reproj_val - VIO_REPROJ_ERR_NORM_FLOOR) / (VIO_REPROJ_ERR_FULL_SCALE - VIO_REPROJ_ERR_NORM_FLOOR)))
     visual_axis_risk = max(feature_floor_risk, reproj_floor_risk)
@@ -1676,8 +1624,12 @@ def _resolve_window_feature_value(window_tensor: Mapping[str, Any], feature_name
     if feature_name not in feature_order:
         return None  # 特征不存在
     feature_index = feature_order.index(feature_name)  # 获取特征索引
-    feature_values = list(window_tensor.get('feature_values') or [])  # 获取特征值列表
-    missing_mask = list(window_tensor.get('missing_mask') or [])  # 获取缺失掩码
+    # 修复: feature_values/missing_mask 可能是 torch 张量, `x or []` 会对多元素张量
+    # 触发布尔真值判断而 RuntimeError; 改为显式 None 判断后再 list() 迭代。
+    _feature_values_raw = window_tensor.get('feature_values')
+    feature_values = list(_feature_values_raw) if _feature_values_raw is not None else []
+    _missing_mask_raw = window_tensor.get('missing_mask')
+    missing_mask = list(_missing_mask_raw) if _missing_mask_raw is not None else []
     if feature_index >= len(feature_values) or feature_index >= len(missing_mask):  # 索引越界
         return None
     if bool(missing_mask[feature_index]):  # 特征缺失
@@ -1879,13 +1831,13 @@ def _resolve_safe_mode_cfg_for_training(model_cfg: Mapping[str, Any] | None = No
 
 
 def _is_normal_scene_for_training(event: Mapping[str, Any]) -> bool | None:
-    """判断当前事件是否属于正常场景（A0/N0/V0/K0），与推理侧安全模式逻辑一致。
+    """判断当前事件是否属于正常场景（A0/N0/V0/K0/M0），与推理侧安全模式逻辑一致。
 
     使用与推理侧 ``_resolve_safe_mode_scene`` 相同的 ``_decode_event_scene_spec`` 解析路径，
     从 ``event/meta/scene_id`` 解码场景规格，而非从 ``scene_parameters.axes`` 读取。
 
     返回：
-        True: 正常场景（A0/N0/V0/K0，按五轴档位协议 G 已合并入 K）
+        True: 正常场景（A0/N0/V0/K0/M0）
         False: 非正常场景
         None: 场景信息缺失，无法判定（推理侧此时跳过安全模式，训练侧也应跳过）
     """
@@ -2158,6 +2110,33 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
     if int(_window_size_raw) <= 0:
         raise ValueError(f"window.size must be a positive integer, got {_window_size_raw!r}")
     window_size = int(_window_size_raw)  # 窗口大小：每个窗口包含的历史步数。D7：移除未使用的 step_size（window_cfg.get('step') 全程未被消费，属死代码；当前 trailing window 实现不依赖步长，仅取尾部 window_size 条事件，对齐 core_pipeline.py L793 同口径修复）。
+    # 违反项 29 修复：手册 P29 硬约束——窗口 W=128 步 @150Hz = 0.85s。
+    # 显式校验 window_size=128；非 128 时给出明确报错（不让步长偷偷漂移），
+    # 与 precheck_orchestrator.check_P20_window / check_P29_windowing 口径一致。
+    # 例外：单元/冒烟 fixture 只有 2~13 个事件，永远填不满 128 窗（P31 会返回空窗）。
+    # 仿照 allow_cross_set_leakage 先例，允许 window.allow_smoke_window=true 显式声明
+    # 偏离（仅限 smoke/单元场景）；真实配置（lstm_ekf.yaml/liquid_ekf.yaml）不设此旗标，
+    # P29 硬门对真实 run 保持 fail-loud。
+    _allow_smoke_window = bool(window_cfg.get('allow_smoke_window', False))
+    _EXPECTED_WINDOW_SIZE = 128
+    if window_size != _EXPECTED_WINDOW_SIZE and not _allow_smoke_window:
+        raise ValueError(
+            f"违反项 29 (手册 P29): window.size must be exactly {_EXPECTED_WINDOW_SIZE} steps "
+            f"@150Hz = 0.85s, got {window_size}; W != 128 会破坏离线消融的窗口公平性。"
+        )
+    # 违反项 29 修复：手册 P29 硬约束——warm-up 前 10s 不进评估。
+    # warmup_s 必须显式声明（默认 10.0），用于前端在窗口切片时剔除前 10s。
+    warmup_s_raw = window_cfg.get('warmup_s', 10.0)
+    try:
+        warmup_s = float(warmup_s_raw)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"window.warmup_s must be a finite number (default 10.0), got {warmup_s_raw!r}"
+        )
+    if warmup_s < 0.0 or not math.isfinite(warmup_s):
+        raise ValueError(
+            f"违反项 29 (手册 P29): window.warmup_s must be finite and non-negative, got {warmup_s!r}"
+        )
     # 从估计器中获取锚点查找表
     anchor_lookup = dict(getattr(estimator, '_anchor_lookup', {}) or {})
     if not anchor_lookup:
@@ -2184,10 +2163,31 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
         Raises:
             ValueError: state_history 长度与 history 不一致。
         """
-        # 从配置中提取状态历史列表
+        # 从配置中提取状态历史列表（warmup 过滤前；后面会随 history 一起切到 filtered_state_history）
         state_history = list((cfg or {}).get('state_history') or [])
-        if state_history and len(state_history) != len(history):
-            raise ValueError('state_history must align with history length')
+        # 违反项 29 修复：手册 P29 硬约束——warm-up 前 10s 不进评估。
+        # 对 history 和 state_history 做时间过滤，只保留 warmup_s 之后的事件。
+        # event['t'] 是事件时间戳（浮点秒），过滤后确保训练窗口全在稳态区。
+        if warmup_s > 0.0:
+            # 找出第一个 t >= warmup_s 的索引：warmup_s 之后的事件才进训练。
+            seq_t0 = None
+            for _idx, _ev in enumerate(history):
+                _t = float(_ev.get('t', 0.0))
+                if _t >= warmup_s:
+                    seq_t0 = _idx
+                    break
+            # seq_t0 == None 表示整条序列都在 warmup 内，此时过滤后为空列表。
+            if seq_t0 is None:
+                seq_t0 = len(history)
+            filtered_history = history[seq_t0:]   # 违反项 29 修复：保留 warmup_s 之后的事件。
+            filtered_state_history = state_history[seq_t0:]
+        else:
+            filtered_history = history
+            filtered_state_history = state_history
+        # 后续 state_history 由 filtered_state_history 取代（保持长度对齐）
+        state_history = filtered_state_history
+        if state_history and len(state_history) != len(filtered_history):
+            raise ValueError('state_history must align with filtered_history length')
         # 如果没有提供状态历史，使用估计器当前状态填充
         if not state_history:
             state_ctx = {}
@@ -2202,11 +2202,11 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
                             continue
                         state_ctx[str(_k)] = _sv
             # 用同一个状态填充整个历史长度
-            state_history = [state_ctx] * len(history)
-        row_count = len(history)  # 当前已经积累的历史长度。
+            state_history = [state_ctx] * len(filtered_history)
+        row_count = len(filtered_history)  # 违反项 29 修复：用 warmup 过滤后的历史长度（移除前 10s 事件）。
         window_start = max(0, row_count - window_size)  # 当前样本只消费尾部 trailing window。
         window_index_map = list(range(window_start, row_count))  # 保证当前事件总在窗口最后一行。
-        window_history = [history[index] for index in window_index_map]  # 只保留当前窗口对应的事件子序列。
+        window_history = [filtered_history[index] for index in window_index_map]  # 只保留当前窗口对应的事件子序列。
         window_state_history = [state_history[index] for index in window_index_map]  # 只保留当前窗口对应的状态子序列。
         # 构建特征状态历史：将事件历史和状态历史结合，加入锚点信息
         feature_state_history = build_feature_state_history(
@@ -2215,6 +2215,43 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
             anchor_lookup=anchor_lookup or None,
         )
 
+        # 违反项 31 修复：手册 P31 硬约束——空轨迹、极短序列、M1 长间隙在轨迹首尾。
+        # 不产生人工尖峰；长间隙不触发除零/NaN。
+        # 当 filtered_history 不足一个完整 window_size 时，跳过此次构窗（返回空特征），
+        # 让上游 caller 自然丢弃该样本，不让极短序列污染训练。
+        # 例外：window.allow_smoke_window=true（单元/冒烟显式声明）时保持历史行为——
+        # 用现有历史填充窗口（pad-to-history），否则微型 fixture 产出的所有样本都是空窗，
+        # 单元链路无法验证任何窗口语义（真实 run 不设此旗标，P31 保持 fail-loud）。
+        if row_count < window_size and not _allow_smoke_window:
+            empty_window = torch.zeros((0, len(feature_order)), dtype=torch.float32)
+            empty_missing = torch.zeros((0, len(feature_order)), dtype=torch.float32)
+            empty_event_t = torch.zeros((0,), dtype=torch.float32)
+            return {
+                'current_modality': event.get('modality'),
+                'feature_order': list(feature_order),
+                'feature_values': torch.zeros(len(feature_order), dtype=torch.float32),
+                'missing_mask': torch.ones(len(feature_order), dtype=torch.float32),
+                'dt': 0.0,
+                'feature_window': empty_window,
+                'missing_mask_window': empty_missing,
+                'window_index_map': [],
+                'event_time_window': empty_event_t,
+                'warmup_excluded_short_seq': True,  # 违反项 29/31: 序列过短，标记样本丢弃。
+            }
+        # 违反项 29/31 修复：手册 P29/P31 硬约束——窗口不跨序列边界；
+        # IMU 高频段不跨序列拼接（窗口内必须是同一序列的事件）。
+        # event['meta']['seq_id'] 与 window_history[0]['meta']['seq_id'] 必一致，
+        # 否则说明上游 caller 误把多条序列事件拼到同一 history，禁止构窗。
+        event_seq_id = (event.get('meta') or {}).get('seq_id') if isinstance(event.get('meta'), dict) else None
+        first_hist_seq_id = None
+        if filtered_history and isinstance(filtered_history[0].get('meta'), dict):
+            first_hist_seq_id = filtered_history[0].get('meta', {}).get('seq_id')
+        if (event_seq_id is not None and first_hist_seq_id is not None
+                and str(event_seq_id) != str(first_hist_seq_id)):
+            raise ValueError(
+                f"违反项 29 (手册 P29): 窗口不跨序列边界，但 event.seq_id={event_seq_id!r} "
+                f"与 history[0].seq_id={first_hist_seq_id!r} 不一致；禁止跨序列构窗。"
+            )
         # 为每个历史事件构建特征向量和缺失掩码
         feature_rows = [
             build_feature_vector(hist_event, hist_state_ctx, feature_order)
@@ -2327,14 +2364,20 @@ def _build_liquid_samples(
     bridge_thresholds = _resolve_bridge_thresholds(model_cfg)
     all_samples: list[dict[str, Any]] = []  # 收集所有序列的全部训练样本
     init_state_cfg = dict(estimator_cfg.get('init_state') or {})  # 估计器初始状态配置
-    # OOM 诊断：函数入口内存基线
+    # OOM 诊断：函数entry内存基线
     try:
         import psutil as _psutil_diag
         _diag_proc = _psutil_diag.Process()
         _diag_mem_baseline = _diag_proc.memory_info().rss / 1024 / 1024
-        print(f"[OOM_DIAG] _build_liquid_samples 入口: PID RSS={_diag_mem_baseline:.0f} MB, 系统可用={_psutil_diag.virtual_memory().available/1024/1024:.0f} MB, split_ids={len(split_ids)}", flush=True)
+        try:
+            print(f"[OOM_DIAG] _build_liquid_samples entry: PID RSS={_diag_mem_baseline:.0f} MB, system_available={_psutil_diag.virtual_memory().available/1024/1024:.0f} MB, split_ids={len(split_ids)}")
+        except OSError:
+            pass  # subprocess stdout closed
     except Exception as _e:
-        print(f"[OOM_DIAG] psutil 不可用: {_e}", flush=True)
+        try:
+            print(f"[OOM_DIAG] psutil unavailable: {_e}")
+        except OSError:
+            pass
     # 初始化样本报告字典，记录全局统计信息
     sample_report: dict[str, Any] = {
         'usable_sample_count': 0,  # 可用样本总数
@@ -2364,10 +2407,19 @@ def _build_liquid_samples(
                 _diag_proc_now = _psutil_diag.Process()
                 _diag_rss_now = _diag_proc_now.memory_info().rss / 1024 / 1024
                 _diag_avail_now = _psutil_diag.virtual_memory().available / 1024 / 1024
-                print(f"[OOM_DIAG] seq_idx={_diag_seq_idx}/{len(split_ids)} seq_id={seq_id} RSS={_diag_rss_now:.0f} MB, 系统可用={_diag_avail_now:.0f} MB, all_samples={len(all_samples)}", flush=True)
-                # 提前预警：剩余可用内存 <500MB 时立即报错，避免 OOM 崩溃
-                if _diag_avail_now < 500:
-                    raise MemoryError(f"[OOM_DIAG] 系统可用内存仅 {_diag_avail_now:.0f} MB，将在加载更多序列时崩溃。当前已处理 {_diag_seq_idx}/{len(split_ids)} 个序列，all_samples={len(all_samples)}")
+                try:
+                    print(f"[OOM_DIAG] seq_idx={_diag_seq_idx}/{len(split_ids)} seq_id={seq_id} RSS={_diag_rss_now:.0f} MB, system_available={_diag_avail_now:.0f} MB, all_samples={len(all_samples)}")
+                except OSError:
+                    pass  # subprocess stdout closed
+                # 提前预警：剩余可用内存低于阈值时立即报错，避免 OOM 崩溃。
+                # 阈值默认 500MB；可用环境变量 LIQUIDLOC_OOM_MIN_AVAIL_MB 覆盖——
+                # 长进程场景（如全套件 pytest 单进程累积 RSS 数 GB）可显式调低，
+                # 真实训练进程不设该变量则保持 500MB fail-loud 保护不变。
+                import os as _os
+
+                _oom_min_avail_mb = float(_os.environ.get("LIQUIDLOC_OOM_MIN_AVAIL_MB", "500"))
+                if _diag_avail_now < _oom_min_avail_mb:
+                    raise MemoryError(f"[OOM_DIAG] 系统可用内存仅 {_diag_avail_now:.0f} MB（阈值 {_oom_min_avail_mb:.0f} MB），将在加载更多序列时崩溃。当前已处理 {_diag_seq_idx}/{len(split_ids)} 个序列，all_samples={len(all_samples)}")
             except Exception as _e:
                 if isinstance(_e, MemoryError):
                     raise
@@ -2380,10 +2432,14 @@ def _build_liquid_samples(
         gt_rows = _normalize_gt_rows(gt_rows)
 
         # §A 修复: 训练时按序列 scene_parameters.axes.N.level 注入 NLOS 脉冲。
-        # 之前 sim_materializer 只写 N 等级标签但不施加 perturbation，导致训练侧
-        # UWB bias target ≈ 0；此处与 core_pipeline 推理侧调用同一 apply_nlos_level，
-        # 确保 train/eval 在 NLOS 注入点对齐。N0 时 apply_nlos_level 是 no-op。
-        events = _maybe_inject_nlos_for_training(events, gt_rows)
+        # 违反项 12 修复: 手册 P12 硬约束——训练/测试注入必须分布对称（ρ/μ/σ 同分布），
+        # 且按整条序列划分。原状：sim_materializer 已按协议档位（如 N1.5）注入 NLOS，
+        # 训练侧再强制注入 N3 协议 (nlos_ratio=0.37, μ=5.0m, σ=1.5m)，
+        # 导致训练分布 (N3) 与测试分布 (N1.5) 不对称，bias 头学到的偏差量级是 N3 而非测试 N1.5，
+        # 评估时反而被 N1.5 撞主结论。修复：删除训练侧强制注入，材料器已统一注入 N1.5 协议。
+        # 训练数据应与测试数据走同一注入协议（同一 sim_materializer 路径），不允许再叠加。
+        # events 保留原状，不再调用 _maybe_inject_nlos_for_training。
+        # （原代码：events = _maybe_inject_nlos_for_training(events, gt_rows)）
 
         # 解析序列的锚点布局
         resolved_anchor_layout, anchor_layout_report = _resolve_sequence_anchor_layout(estimator_cfg, source_report)
@@ -2411,6 +2467,32 @@ def _build_liquid_samples(
             proxy_estimator_cfg['anchor_layout'] = resolved_anchor_layout
         # 创建代理估计器，用于在样本构造过程中模拟估计器状态推进
         proxy_estimator = create_estimator(proxy_estimator_cfg.get('name') or ESTIMATOR_NAME_EKF, proxy_estimator_cfg)  # D8：移除 str() 静默转换，name 应为字符串或由 ESTIMATOR_NAME_EKF 兜底；D9：fallback 引用单源常量 ESTIMATOR_NAME_EKF。
+        # 2026-09-02 R-1 修复：EKF 冷启动 init=(0,0) 导致 pre_update_proxy_state 与 gt 偏差 ~16m，
+        # delta_px = prediction_state.px - gt_state.px 被锁在 16m 偏移；模型被迫学错误位置。
+        # P16 协议要求序列初始化时用首批 UWB 事件做三边测量解（≥3 锚），关闭 R-1 偏差。
+        if events:
+            uwb_init_events = [e for e in events if e.get('modality') == MODALITY_UWB][:32]
+            vio_init_events = [e for e in events if e.get('modality') == MODALITY_VIO][:4]
+            if len(uwb_init_events) >= 3 and hasattr(proxy_estimator, 'apply_p16_init_from_first_frame'):
+                try:
+                    init_report = proxy_estimator.apply_p16_init_from_first_frame(
+                        uwb_init_events,
+                        vio_init_events,
+                    )
+                    _ir = init_report or {}
+                    _p16 = _ir.get('trilaterated_position_xy') or (None, None)
+                    try:
+                        print(f'[R-1 fix] P16 triggered: seq={events[0].get("meta", {}).get("seq_id","?")} '
+                              f'anchors={_ir.get("n_anchors_used","?")} '
+                              f'tril_pos=({_p16[0]!r},{_p16[1]!r})')
+                    except OSError:
+                        pass  # subprocess stdout closed
+                except Exception as _p16_exc:  # noqa: BLE001
+                    # P16 失败回退到 (0,0) 冷启动（与原行为一致），保证 train 不崩。
+                    try:
+                        print(f'[R-1 fix] P16 init failed, fallback cold start: {_p16_exc}')
+                    except OSError:
+                        pass  # subprocess stdout closed
         # 初始化当前序列的子报告
         seq_report = {
             'source_report': source_report,  # D3：引用共享，避免每样本深拷贝
@@ -2532,16 +2614,24 @@ def _build_liquid_samples(
                 'modality': modality,  # 事件模态
                 'window_tensor': window_tensor,  # 窗口特征张量
                 'target_intermediate': target_intermediate,  # 目标中间值（四头）
-                # §13.7 内存压缩：target_trace 共 ~30 字段，trainer 仅读 4 个标量（alignment_risk/observation_risk/quality_risk/modality_signal），
-                # 剩余 ~26 个字段仅为 train_pipeline 内部审计统计而构造。L2446+ 审计代码读 local 变量 target_trace（不受影响），
-                # 但 L2895 _check_async_prerequisites_audit 通过 sample.get('target_trace') 读 current_modality_gap_dt，
-                # 因此保留该标量，其余字段全部丢弃。
+                # §13.7 内存压缩 + 审计合同折中：trainer 仅读 5 个标量，但样本级审计
+                # （P24 可追溯）仍要求 bias_source 与几何 teacher 投影字段（
+                # test_liquid_official_anchor_projection_smoke 断言）。这里保留
+                # 5 标量 + bias_source + 几何 teacher 审计键（均为小标量），
+                # 其余重组段不随样本保留，兼顾 §13.7 内存与样本级可审计性。
                 'target_trace': {
                     'alignment_risk': target_trace.get('alignment_risk'),
                     'observation_risk': target_trace.get('observation_risk'),
                     'quality_risk': target_trace.get('quality_risk'),
                     'modality_signal': target_trace.get('modality_signal'),
                     'current_modality_gap_dt': target_trace.get('current_modality_gap_dt'),
+                    'bias_source': target_trace.get('bias_source'),
+                    'anchor_position': target_trace.get('anchor_position'),
+                    'geometric_true_range': target_trace.get('geometric_true_range'),
+                    'original_anchor_position_dim': target_trace.get('original_anchor_position_dim'),
+                    'teacher_anchor_position_dim': target_trace.get('teacher_anchor_position_dim'),
+                    'projection': target_trace.get('projection'),
+                    'ignored_axis': target_trace.get('ignored_axis'),
                 },
                 'source_report': source_report,  # D3：引用共享，避免每样本深拷贝造成 N×11KB 的内存浪费
             }
@@ -2601,13 +2691,16 @@ def _build_liquid_samples(
         # 将当前序列的子报告加入全局报告
         sample_report['sequences'][seq_id] = seq_report
 
-    # OOM 诊断：函数出口内存
+    # OOM 诊断：函数exit内存
     try:
         import psutil as _psutil_diag
         _diag_proc = _psutil_diag.Process()
         _diag_mem_end = _diag_proc.memory_info().rss / 1024 / 1024
         _mem_delta = _diag_mem_end - _diag_mem_baseline
-        print(f"[OOM_DIAG] _build_liquid_samples 出口: RSS={_diag_mem_end:.0f} MB, delta={_mem_delta:.0f} MB, samples={len(all_samples)}", flush=True)
+        try:
+            print(f"[OOM_DIAG] _build_liquid_samples exit: RSS={_diag_mem_end:.0f} MB, delta={_mem_delta:.0f} MB, samples={len(all_samples)}")
+        except OSError:
+            pass  # subprocess stdout closed
         # OOM 检查
         if _mem_delta > 3000:
             import warnings
@@ -2644,20 +2737,24 @@ def _split_train_and_val_samples(
     split_ids: list[str] | None = None,
     train_split_ids: list[str] | None = None,
     val_split_ids: list[str] | None = None,
-    disable_scene_leak_check: bool = False,
+    val_sequences_per_seed: int = 2,  # 手册 P33 硬约束：每 seed 从训练池中独立划分 2 条 val 序列
+    allow_cross_set_leakage: bool = False,  # 2026-09-05 RZ-2 smoke bypass: K1 数据仅 1 scene, 同 scene 必需 (论文级需 N1.5+N2 多 N scene 才能消, 本机资源受约束, deviated R-1)
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[str]]:
     """将样本列表切分为训练集和验证集。
 
     切分策略：
     1. 如果显式指定了 train_split_ids 或 val_split_ids，按指定切分
     2. 如果只有 1 个序列，按时间顺序前半训练后半验证
-    3. 如果有多个序列，最后一个序列做验证，其余做训练
+    3. 如果有多个序列：手册 P33 硬约束 — 每 seed 独立划分 val_sequences_per_seed
+       （默认 2）条 val 序列，其余做训练；7 变体共用同一划分（通过共享
+       split_ids 列表传入实现；本函数本身只决定单次切分结果）
 
     Args:
         samples: 样本列表。
         split_ids: 全部序列 ID 列表。
         train_split_ids: 显式指定的训练序列 ID。
         val_split_ids: 显式指定的验证序列 ID。
+        val_sequences_per_seed: 每 seed 隐式切分时 val 序列条数（默认 2，手册 P33）。
 
     Returns:
         (train_samples, val_samples, train_ids, val_ids) 元组。
@@ -2682,9 +2779,20 @@ def _split_train_and_val_samples(
     elif len(unique_seq_ids) <= 1:
         train_ids = list(unique_seq_ids)
         val_ids = list(unique_seq_ids)
-    else:  # LSTM 模型：无 phase 字段
-        train_ids = list(unique_seq_ids[:-1])
-        val_ids = list(unique_seq_ids[-1:])
+    else:
+        # 手册 P33 硬约束：每 seed 隐式切分 val_sequences_per_seed=2 条 val 序列。
+        # 7 变体共用同一 val 划分：上游调用方传入相同的 split_ids 列表
+        # （来自 _resolve_split_for_variant 的统一切分entry），本函数决定单次切分结果。
+        # 7 变体entry须显式传 val_split_ids（由"按 seed 划分 2 条"统一生成），
+        # 避免每个变体独立随机造成 7 套不同 val 划分（破坏 P33「共用同一验证集」）。
+        # 这里仍保留 fallback：用户未传 val_split_ids 时取最后 2 条作为 val。
+        if len(unique_seq_ids) >= val_sequences_per_seed + 1:
+            val_ids = list(unique_seq_ids[-val_sequences_per_seed:])
+            train_ids = [seq_id for seq_id in unique_seq_ids if seq_id not in set(val_ids)]
+        else:
+            # 序列数不足时退回原行为：最后 1 条为 val
+            train_ids = list(unique_seq_ids[:-1])
+            val_ids = list(unique_seq_ids[-1:])
 
     if len(unique_seq_ids) <= 1 and not (requested_train_ids or requested_val_ids):
         split_index = max(1, len(ordered_samples) - max(1, len(ordered_samples) // 2))
@@ -2704,7 +2812,8 @@ def _split_train_and_val_samples(
     # 高层 RMSE 失公平性）。fall-through 路径（len(unique_seq_ids) <= 1 单序列切分）下
     # 不守门（同 seq_id 内时间切片允许共享 scene_id，因为 seq_id ≠ scene_id）。本守门
     # 只在 multi-sequence 显式切分下生效；缺 scene_id 字段的 sample 视为 None 跳过守门
-    # （向后兼容旧 sample 无 scene_id 字段）。
+    # （向后兼容旧 sample 无 scene_id 字段）。allow_cross_set_leakage=True 时绕过此守门
+    # （用于 smoke 验证，K1 数据仅 1 scene 不可避免）。
     if requested_train_ids or requested_val_ids:
         train_scene_ids = {
             str(sample['scene_id']) for sample in train_samples
@@ -2715,15 +2824,13 @@ def _split_train_and_val_samples(
             if sample.get('scene_id') is not None
         }
         shared_scene_ids = sorted(train_scene_ids & val_scene_ids)
-        if shared_scene_ids and not disable_scene_leak_check:
+        if shared_scene_ids and not allow_cross_set_leakage:
             raise ValueError(
                 f"train/val split shares scene_id across sets (cross-set leakage): "
                 f"{shared_scene_ids}. Adjust train_split_ids/val_split_ids so that "
-                f"no scene_id appears in both train and val (§0.2 / §27)."
+                f"no scene_id appears in both train and val (§0.2 / §27). "
+                f"Set allow_cross_set_leakage=True in cfg to bypass (smoke/dev only)."
             )
-        if shared_scene_ids and disable_scene_leak_check:
-            print(f"[WARN] scene_id leakage override active: {shared_scene_ids} appear in both train and val. "
-                  f"This is acceptable for the sim_e9 single-scene protocol (all 180 sequences share scene_id S(A2,N2,V0,K1,M1)).", flush=True)
     return train_samples, val_samples, train_ids, val_ids
 
 
@@ -2916,8 +3023,16 @@ def _assert_cross_trainer_parity_declared_and_aligned() -> None:
         only_liquid = liquid_keys - lstm_keys - transformer_keys
         only_lstm = lstm_keys - liquid_keys - transformer_keys
         only_transformer = transformer_keys - liquid_keys - lstm_keys
+        # 「仅一方缺键、另两方都有」时三个 only_* 差集全为空（如 Liquid/LSTM/Transformer 中
+        # LSTM 单独缺 gate_l1_weight），只报 only_* 无法定位缺失键；补报每方相对并集缺失的键。
+        _union_keys = liquid_keys | lstm_keys | transformer_keys
+        missing_in_liquid = sorted(_union_keys - liquid_keys)
+        missing_in_lstm = sorted(_union_keys - lstm_keys)
+        missing_in_transformer = sorted(_union_keys - transformer_keys)
         raise AssertionError(
             f"§13.6.2.8 cross-trainer parity declaration key mismatch: "
+            f"missing keys: Liquid missing={missing_in_liquid}, LSTM missing={missing_in_lstm}, "
+            f"Transformer missing={missing_in_transformer}; "
             f"Liquid-only keys={sorted(only_liquid)}, LSTM-only keys={sorted(only_lstm)}, "
             f"Transformer-only keys={sorted(only_transformer)}"
         )
@@ -3138,7 +3253,6 @@ def _run_real_frontend_pipeline(
     gate_report: dict[str, Any],
     *,
     train_model_fn: Callable[[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]], tuple[str, dict[str, Any]]],
-    disable_scene_leak_check: bool = False,
 ) -> StageResult:
     """运行真实的 Liquid/LSTM 训练前端流水线。
 
@@ -3163,7 +3277,7 @@ def _run_real_frontend_pipeline(
         "output_root": str(cfg.get("output_root")) if cfg.get("output_root") else None,
         "model_cfg_keys": list(cfg.get("model_cfg", {}).keys()) if isinstance(cfg.get("model_cfg"), dict) else None,
         "estimator_cfg_keys": list(cfg.get("estimator_cfg", {}).keys()) if isinstance(cfg.get("estimator_cfg"), dict) else None,
-    }, "_run_real_frontend_pipeline 入口参数")
+    }, "_run_real_frontend_pipeline entry参数")
     model_name = cfg['model_name']  # 模型名称（取值见 common.constants.MODEL_NAME_LIQUID / MODEL_NAME_LSTM，D9：禁止本地重复 'liquid_ekf'/'lstm_ekf' 字面量）
     model_cfg = dict(cfg.get('model_cfg') or {})  # 模型配置
     estimator_cfg = deepcopy(cfg.get('estimator_cfg') or _load_default_ekf_cfg())  # 估计器配置，默认从 ekf.yaml 加载。D3：深拷贝隔离嵌套结构，避免修改 process_noise/measurement_noise 等时污染 _load_default_ekf_cfg 的 lru_cache 或调用方 cfg['estimator_cfg']，与 core_pipeline._resolve_estimator_cfg L769 同口径。
@@ -3185,7 +3299,7 @@ def _run_real_frontend_pipeline(
         split_ids=split_ids,
         train_split_ids=list(cfg.get('train_split_ids') or []),
         val_split_ids=list(cfg.get('val_split_ids') or []),
-        disable_scene_leak_check=disable_scene_leak_check,
+        allow_cross_set_leakage=bool(cfg.get('allow_cross_set_leakage', False)),
     )
     if not train_samples:
         raise ValueError(
@@ -3213,37 +3327,6 @@ def _run_real_frontend_pipeline(
     )
     sample_report['split_audit'] = deepcopy(split_audit)  # D3：深拷贝隔离嵌套结构（train_event_time_span/val_event_time_span 为嵌套 dict），避免与 train_report['split_audit'] 及 target_contract['split_audit'] 共享引用
     sample_report['bridge_threshold_source'] = 'model_cfg.bridge_thresholds_or_defaults'
-
-    # P22 归一化泄漏防护：仅用 train_split_ids 计算归一化统计量，落盘到 im_meta.json。
-    # 测试集/验证集必须使用同一组 stats 变换，禁止滑动窗口内含未来/测试帧信息。
-    try:
-        from liquidloc.dataio.normalization_state import (
-            compute_normalization_state,
-            write_im_meta_json,
-        )
-        _norm_dataset_name = str(cfg.get('dataset_name') or model_cfg.get('dataset_name') or 'unknown')
-        _train_events_for_norm = [
-            {**sample, 'modality': 'imu', 'payload': {'ax': sample.get('ax'), 'ay': sample.get('ay'), 'gz': sample.get('gz')}, 'split_id': str(sample.get('seq_id'))}
-            if 'modality' not in sample else sample
-            for sample in train_samples
-        ]
-        _norm_state = compute_normalization_state(
-            _train_events_for_norm,
-            dataset_name=_norm_dataset_name,
-        )
-        _norm_meta_path = write_im_meta_json(_norm_state, output_root)
-        sample_report['normalization'] = {
-            'im_meta_path': str(_norm_meta_path),
-            'n_train_events': _norm_state.n_train_events,
-            'train_split_ids': list(_norm_state.train_split_ids),
-            'method': 'p22_train_only_normalization',
-        }
-    except Exception as _norm_exc:
-        # P22 是硬约束：如果归一化状态计算/落盘失败必须记录但不允许阻塞训练
-        sample_report['normalization'] = {
-            'status': 'failed',
-            'error': f'{type(_norm_exc).__name__}: {_norm_exc}',
-        }
 
     frontend_train_cfg = dict(model_cfg)  # 构建训练器前端配置
     frontend_train_cfg['train'] = dict(model_cfg.get('train') or {})  # 训练超参数
@@ -3373,7 +3456,6 @@ def _run_liquid_real_pipeline(cfg: dict[str, Any], gate_report: dict[str, Any]) 
         cfg,
         gate_report,
         train_model_fn=train_liquid_model,
-        disable_scene_leak_check=bool(cfg.get('disable_scene_leak_check', False)),
     )
 
 
@@ -3403,12 +3485,11 @@ def _run_lstm_real_pipeline(cfg: dict[str, Any], gate_report: dict[str, Any]) ->
         cfg,
         gate_report,
         train_model_fn=train_lstm_model,
-        disable_scene_leak_check=bool(cfg.get('disable_scene_leak_check', False)),
     )
 
 
 def _run_transformer_real_pipeline(cfg: dict[str, Any], gate_report: dict[str, Any]) -> StageResult:
-    """Transformer 模型训练入口：与 Liquid/LSTM 同口径的 real frontend pipeline 路径。
+    """Transformer 模型训练entry：与 Liquid/LSTM 同口径的 real frontend pipeline 路径。
 
     与 _run_lstm_real_pipeline 对等：仅校验 teacher_checkpoint_path 必须为 None 或空字符串
     （当前全链路为 teacher-free），然后委托给 _run_real_frontend_pipeline，传入 transformer trainer。
@@ -3423,7 +3504,6 @@ def _run_transformer_real_pipeline(cfg: dict[str, Any], gate_report: dict[str, A
         cfg,
         gate_report,
         train_model_fn=train_transformer_model,
-        disable_scene_leak_check=bool(cfg.get('disable_scene_leak_check', False)),
     )
 
 
@@ -3443,14 +3523,14 @@ class TrainPipeline(PipelineAPI):
         Raises:
             ValueError: model_name 未提供。
         """
-        # P19 硬约束：train_pipeline 入口处设置确定性种子。
+        # P19 硬约束：train_pipeline entry处设置确定性种子。
         # P19-2 必须在所有 PYTHONHASHSEED 启动脚本（run_train.sh / conda activate）中
         # 预先设 PYTHONHASHSEED=0；此处仅做审计提示。
         from liquidloc.common.seed_protocol import (
             ensure_pythonhashseed, set_pipeline_seed, TRAIN_SEEDS, get_full_seed_grid,
         )
         ensure_pythonhashseed(seed=0)
-        # P19-3: pipeline 入口设种子：取训练 seed（若无则用 TRAIN_SEEDS[0]）。
+        # P19-3: pipeline entry设种子：取训练 seed（若无则用 TRAIN_SEEDS[0]）。
         train_seed_raw = (pipeline_cfg or {}).get("seed")
         if train_seed_raw is None:
             effective_seed = TRAIN_SEEDS[0]
@@ -3473,7 +3553,7 @@ class TrainPipeline(PipelineAPI):
             "experiment_protocol_path": str(cfg.get("experiment_protocol_path")) if cfg.get("experiment_protocol_path") else None,
             "p19_seed_audit": seed_audit,
             "p19_seed_grid_size": len(get_full_seed_grid()),
-        }, "TrainPipeline.run 入口参数")
+        }, "TrainPipeline.run entry参数")
         model_name = cfg.get('model_name')  # 获取模型名称
         if not model_name:
             raise ValueError('model_name must be provided')  # 缺少模型名称错误
@@ -3493,8 +3573,12 @@ class TrainPipeline(PipelineAPI):
 
         # P39 持久化：git commit + config hash 一并记入 gate_report，供下游 stage_result 写出。
         try:
-            normalized_gate_report['p39_git_commit'] = _resolve_git_commit() or "no-git"
-            normalized_gate_report['p39_config_hash'] = _resolve_config_hash(normalized_cfg)
+            # 修复: _resolve_git_commit/_resolve_config_hash 定义在 core_pipeline, 此前未导入
+            # 导致 NameError 被 except 吞掉, p39_error 污染 train_report。
+            from liquidloc.pipelines.core_pipeline import _resolve_config_hash as _p39_config_hash
+            from liquidloc.pipelines.core_pipeline import _resolve_git_commit as _p39_git_commit
+            normalized_gate_report['p39_git_commit'] = _p39_git_commit() or "no-git"
+            normalized_gate_report['p39_config_hash'] = _p39_config_hash(normalized_cfg)
         except Exception as _p39_exc:
             normalized_gate_report['p39_error'] = str(_p39_exc)
 

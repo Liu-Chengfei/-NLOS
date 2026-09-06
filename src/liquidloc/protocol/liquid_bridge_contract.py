@@ -109,7 +109,9 @@ _VIO_HARD_SKIP_QUALITY_FLOOR = float(BRIDGE_THRESHOLDS["vio_hard_skip_quality_fl
 _QUALITY_FLOOR_EPSILON = QUALITY_FLOOR_EPSILON  # 质量比较时使用的浮点容差，来自 constants。
 _UWB_NOISE_MULTIPLIER_CEILING = float(BRIDGE_THRESHOLDS["uwb_noise_multiplier_ceiling"])  # UWB 噪声倍数硬上限；不等同于 teacher-free 标签已默认裁剪 s_{u,max}=20。D11-R2 修复后 ceiling=5000.0 = scaling_max² × (1+risk_max) = 50²×2，scaling_max=50 在 risk>0 时不再被截断为死代码；s_max=20 对应 20²×2=800 远低于 ceiling，正常训练不会触及上限。
 _VIO_NOISE_MULTIPLIER_CEILING = float(BRIDGE_THRESHOLDS["vio_noise_multiplier_ceiling"])  # VIO 噪声倍数硬上限；同 UWB，ceiling=5000.0 与 scaling_max=50 的关系一致。
-_RISK_HARD_SKIP_THRESHOLD = float(BRIDGE_THRESHOLDS["risk_hard_skip_threshold"])  # 风险高于此值时直接跳过更新，不做任何修正。
+_RISK_HARD_SKIP_THRESHOLD = float(BRIDGE_THRESHOLDS["risk_hard_skip_threshold"])  # 风险高于此值时直接跳过更新，不做任何修正（默认=vio口径，兼容旧引用）。
+_UWB_RISK_HARD_SKIP_THRESHOLD = float(BRIDGE_THRESHOLDS["uwb_risk_hard_skip_threshold"])  # P35 fix 2026-09-02: UWB 风险硬跳过阈值（0.95）独立于 VIO（0.05），让 uwb_scaling 在常规风险下仍可生效。
+_VIO_RISK_HARD_SKIP_THRESHOLD = float(BRIDGE_THRESHOLDS["vio_risk_hard_skip_threshold"])  # VIO 风险硬跳过阈值（0.05），保留 N1.5 wo_risk 的风险压力语义。
 _SCALING_MAX = float(BRIDGE_THRESHOLDS["scaling_max"])  # 缩放值上限，与 inference.py 一致。
 
 UWB_BIAS_MAX_RATIO = float(BRIDGE_THRESHOLDS["uwb_bias_max_ratio"])  # UWB 偏置修正量占原始测距的最大比例，防止过度修正。
@@ -273,9 +275,9 @@ def apply_safe_mode(*, modality: str, valid: bool, quality: float, risk: float) 
         risk: 风险评分，范围 ``[0, 1]``。
     """
 
-    if modality == MODALITY_UWB and (not valid or _quality_below_floor(quality, _UWB_HARD_SKIP_QUALITY_FLOOR) or risk > _RISK_HARD_SKIP_THRESHOLD):  # UWB 在无效、低质或高风险时直接跳过。
+    if modality == MODALITY_UWB and (not valid or _quality_below_floor(quality, _UWB_HARD_SKIP_QUALITY_FLOOR) or risk >= _UWB_RISK_HARD_SKIP_THRESHOLD):  # UWB 在无效、低质或高风险时直接跳过（P35 fix 2026-09-02: UWB 与 VIO 风险阈值独立，UWB 默认 0.95）。
         return "uwb_skip_update"  # 告诉上层不要更新 UWB 分支。
-    if modality == MODALITY_VIO and (_quality_below_floor(quality, _VIO_HARD_SKIP_QUALITY_FLOOR) or risk > _RISK_HARD_SKIP_THRESHOLD):  # VIO 在低质或高风险时直接跳过。
+    if modality == MODALITY_VIO and (_quality_below_floor(quality, _VIO_HARD_SKIP_QUALITY_FLOOR) or risk >= _VIO_RISK_HARD_SKIP_THRESHOLD):  # VIO 在低质或高风险时直接跳过（保留 0.05 阈值维持 N1.5 wo_risk 压力）。
         return "vio_skip_update"  # 告诉上层不要更新 VIO 分支。
     default_actions = {  # 其余模态走默认动作映射表。
         "uwb": "uwb_bias_and_noise_scale",  # UWB 默认同时处理偏置和噪声缩放。
@@ -854,8 +856,6 @@ def build_measurement_control(
             quality=quality,  # 传入质量。
             risk=applied_risk,  # 传入最终风险。
         )  # 动作计算结束。
-        import sys
-        print(f"[DBG-UWB] risk={applied_risk:.3f} >= {_RISK_HARD_SKIP_THRESHOLD} → action={action}", file=sys.stderr)
     elif modality == MODALITY_VIO:  # VIO 走 VIO 专属分支。
         vio_payload = event.get("vio_payload") or {}  # 没有 payload 时当作空字典处理。
         scaling = _coerce_positive_scaling(intermediate.vio_scaling, name="vio_scaling")  # 校验并规范化缩放。

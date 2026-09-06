@@ -138,7 +138,7 @@ DRIFT_PENALTY_SATURATION_M: float = 1.0  # 漂移惩罚饱和阈值（米）。
 # 桥接层阈值常量（单源真相，protocol.bridge_thresholds 从此处引用）。
 # 这些阈值是 risk/scaling 范围校验的底层真相，common 层和 protocol 层共享。
 BRIDGE_RISK_MIN: float = 0.0  # 风险最小值。
-BRIDGE_RISK_MAX: float = 1.05  # 风险最大值。v3 提高至 1.05 以容纳 risk_hard_skip_threshold=1.05, 完全解除硬跳过 (诊断修复 2026-08-02). 实际网络 risk 输出仍受 normalize_risk 限制在 [0, 1.0].
+BRIDGE_RISK_MAX: float = 1.0  # 风险最大值。v3 曾提高至 1.05 以容纳旧的 risk_hard_skip_threshold=1.05；P35 fix (2026-09-02) 将硬跳过阈值拆分为 UWB=0.95 / VIO=0.05 后，风险域回归 [0, 1] 闭区间。
 BRIDGE_SCALING_MIN: float = 1.0  # 与 bridge_thresholds.py scaling_min 保持单源一致。v3 回退到 1.0：v2 放宽至 0.5 的 soft-mask 在 e9 场景下让 Liquid 不当降权好测量，不利于高 NLOS + 异步场景。
 BRIDGE_SCALING_MAX: float = 50.0  # 缩放最大值（方差倍数，防止极端值导致数值溢出）。
 BRIDGE_BIAS_MAX: float = 10.0  # 模型输出偏置上界（与 model_factory torch.clamp 和 fusion_runner 裁剪对齐）。
@@ -200,7 +200,7 @@ ALLOWED_TRAIN_DEVICES: frozenset[str] = frozenset({DEVICE_AUTO, DEVICE_CPU, DEVI
 ESTIMATOR_NAME_EKF: str = "ekf"  # 标准 EKF 估计器名字。
 ESTIMATOR_NAME_ROBUST_EKF: str = "robust_ekf"  # 鲁棒 EKF 估计器名字。
 ESTIMATOR_NAME_FGO: str = "fgo"  # 滑窗因子图优化估计器名字。
-ESTIMATOR_NAME_SGPR: str = "sgpr"  # 纯 SGPR 估计器名字（§16.1 封闭对手集，当前无真实本体，仅占位）。
+ESTIMATOR_NAME_SGPR: str = "sgpr"  # 纯 SGPR 估计器名字（§16.1 封闭对手集，当前无真实主体，已从 estimator_factory._SUPPORTED 中移除。调用时工厂层主动 raise NotImplementedError，防止误用占位名。）
 
 # 数据集名字常量（单源真相，D9 配置表面漂移根因修复）。
 # pipelines/prepare_pipeline.py dataset_name 合法集校验与读取器分支、
