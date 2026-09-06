@@ -1,0 +1,63 @@
+# 文件职责：定义 MILUV 数据集的入口配置，包括原始数据、中间产物和最终处理结果的目录约定及字段映射关系。
+# 本文件是数据集级别的路由入口，不是单个脚本的参数文件；下游 reader、prepare 和 benchmark 都读这份约定。
+
+# 数据集在本仓库里的统一名称，供 registry 和脚本做分发判断。
+dataset_name: miluv  # MILUV 公开数据集。
+
+# 原始数据落地目录，下载脚本和本地导入脚本都会把原始资源放到这里。
+raw_root: data/raw/miluv  # 原始数据所在目录，后续 reader 默认从这里找原件。
+
+# 中间产物目录，给预处理和清洗步骤使用，通常保存比 raw 更规整但还没最终固化的数据。
+interim_root: data/interim/miluv  # 中间产物所在目录，主要供 prepare 阶段复用。
+
+# 处理后数据目录，后续 pipeline 和 benchmark 都从这里读取，是消费面最常用的稳定入口。
+processed_root: data/processed  # 最终处理后数据目录，供训练、评估和公开 benchmark 读取。
+
+# 原始字段到统一 schema 的映射，决定不同来源文件如何被统一解释。
+field_mapping:
+  # IMU 模态字段映射，仅保留当前任务真正会消费的字段。
+  imu:
+    # 时间戳字段，供时间对齐和重采样使用。
+    timestamp: timestamp  # 时间戳字段名一致，无需转换。
+    # x 轴加速度，进入状态传播或特征构造。
+    ax: ax  # x 轴加速度。
+    # y 轴加速度，进入平面运动传播。
+    ay: ay  # y 轴加速度。
+    # z 轴角速度，主要用于航向传播。
+    gz: gz  # z 轴角速度。
+  # UWB 模态字段映射，直接影响测距约束是否能正确恢复。
+  uwb:
+    # 时间戳字段，用于和 IMU/VIO 做事件对齐。
+    timestamp: timestamp  # 时间戳字段。
+    # 锚点编号，用来区分不同测距源。
+    anchor_id: anchor_id  # 锚点编号。
+    # 测距值，是 UWB 约束的核心观测量。
+    range: range  # 测距值。
+    # 是否有效，决定这条观测能否进入过滤链。
+    valid: valid  # 有效性标记。
+    # 质量值，供筛选、权重或统计分析使用。
+    quality: quality  # 质量值。
+  # VIO 模态字段映射，描述的是相对运动而不是绝对位置。
+  # 紧耦合仅声明 4 字段（dx/dy/dyaw/quality），与 sensors.yaml / event_schema.py /
+  # extract_vio_measurement 三处一致（铁律 3 后，Stage A1 下游修复）。
+  vio:
+    # 时间戳字段，控制相对运动观测的时序位置。
+    timestamp: timestamp  # 时间戳字段。
+    # x 方向相对位移，用于平面运动更新。
+    dx: dx  # x 方向相对位移。
+    # y 方向相对位移，用于平面运动更新。
+    dy: dy  # y 方向相对位移。
+    # 航向增量，用于姿态校正。单位：rad，与 task.yaml 中 dyaw 定义一致。
+    dyaw: dyaw  # 航向增量 (rad)。
+    # 视觉质量值，供可用性判定和加权使用。
+    quality: quality  # 视觉质量值。
+  # 真值字段映射，只用于监督、评估和对照，不应混进在线输入。
+  gt:
+    # 时间戳字段，真值和观测必须在时间上可对齐。
+    timestamp: timestamp  # 时间戳字段。
+    # x 位置真值，用于误差评估和对照。
+    px: px  # x 位置真值。
+    # y 位置真值，用于误差评估和对照。
+    py: py  # y 位置真值。
+    # 航向真值，用于姿态误差评估。单位：rad，与 task.yaml 中 yaw 定义一致。
+    yaw: yaw  # 航向真值 (rad)。

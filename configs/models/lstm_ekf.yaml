@@ -1,0 +1,86 @@
+name: lstm_ekf
+feature_order:
+- dt
+- ax
+- ay
+- gz
+- range
+- dx
+- dy
+- dyaw
+window:
+  size: 20
+network:
+  input_dim: 8
+  hidden_dim: 18
+  num_layers: 1
+  dropout: 0.0
+  output_heads:
+  - bias
+  - risk
+  - uwb_scaling
+  - vio_scaling
+train:
+  optimizer: adam
+  lr: 0.00015
+  weight_decay: 0.0
+  epochs: 160
+  batch_size: 32
+  eval_batch_size: 128
+  amp_enabled: auto
+  amp_dtype: bf16
+  save_epoch_candidates: true
+  epoch_candidate_stride: 10
+  patience: 160
+  lr_scheduler:
+    enabled: true
+    T_max: 160
+    eta_min: 5.0e-05
+  deterministic: true
+  gradient_clip_max_norm: 1.0
+  bias_huber_delta: 1.345
+  scaling_log_eps: 1.0e-06
+  loss_weights:
+    w_bias: 1.0
+    w_risk: 1.0
+    w_uwb: 1.0
+    w_vio: 1.0
+    w_cal: 0.08
+    lambda_l2: 0.0001
+    lambda_l1: 1.0e-05
+    lambda_mono: 0.0001
+  lr_layer:
+    readout: 0.001
+    backbone: 0.0003
+    backbone_unfreeze_ramp:
+      step1_lr: 1.0e-05
+      step1_epochs: 5
+      step2_lr: 5.0e-05
+      step2_epochs: 5
+      step3_lr: 0.0001
+  phase_schedule:
+    warmup_epochs: 0
+    gate_alignment_epochs: 0
+    full_tuning_epochs: 160
+safe_mode:
+  enabled: true
+  risk_threshold: 0.5
+bridge_thresholds:
+  robust_supplement_quality_threshold: 0.55
+  robust_supplement_alignment_threshold: 0.45
+  robust_supplement_max_boost: 0.2
+  observation_risk_blend: 0.415
+  uwb_geometric_bias_full_scale: 0.45
+  async_gap_full_scale: 0.3
+  async_uwb_scaling_coeff: 0.24
+  async_vio_scaling_coeff: 0.24
+  uwb_scaling_alignment_coeff: 0.54
+  uwb_scaling_quality_coeff: 0.275
+  uwb_scaling_geometry_coeff: 0.41
+  uwb_invalid_extra_boost: 0.15
+  vio_scaling_alignment_coeff: 0.54
+  vio_scaling_quality_coeff: 0.275
+  vio_low_features_scaling_boost: 0.13
+  vio_high_reproj_scaling_boost: 0.13
+checkpoint_path: E:\异步高NLOS\outputs\lstm_full_60ep\checkpoints\lstm_ekf_best_checkpoint.pt
+project_root: E:\异步高NLOS

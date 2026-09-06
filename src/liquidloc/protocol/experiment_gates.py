@@ -89,7 +89,7 @@ _AGGREGATION_ORDER: tuple[str, ...] = (  # 实验结果的聚合顺序，从内�
     'scene_summary',  # 场景汇总。
     'experiment_conclusion',  # 实验结论。
 )
-_CONCLUSION_PRIORITY: tuple[str, ...] = ('rmse', 'p95', 'failure_rate', 'mae')  # 结论优先级：先看 rmse 主精度，再看 p95 尾部，再看 failure_rate 可用性，最后 mae 兜底。
+_CONCLUSION_PRIORITY: tuple[str, ...] = ('rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'mae')  # 结论优先级：先看 rmse 主精度，再看均值/标准差（跨种子聚合），再看 p95 尾部，再看 failure_rate 可用性，最后 mae 兜底。
 _PUBLIC_BENCHMARK_ALLOWED_DATASETS: tuple[str, ...] = ('miluv', 'ntu_viral')  # 公开基准只允许这两个数据集，防止随意扩展。
 _PUBLIC_BENCHMARK_FROZEN_EVAL_SPLIT: str = 'frozen_public_eval'  # 公开基准的冻结评测分割名，所有公开基准必须使用此分割。
 _TRAINING_ALLOWED_SPLIT_ROLES: tuple[str, ...] = ('train', 'val')  # 训练只允许使用 train 和 val 分割。
@@ -1301,16 +1301,22 @@ def _validate_scene_scale_section(cfg: Mapping[str, Any]) -> dict[str, Any]:
     # min(5, 0.2 × 协议层 t_eff_min_s)，否则 fgo.yaml 给的 τ 超出 spec §10.3 选项 1
     # 的 τ=min(5, 0.2·T_eff) 上界（在协议层 t_eff_min_s 下限处 T_eff=t_eff_min_s
     # 时 τ 上界应是 min(5, 0.2×t_eff_min_s)，fgo.yaml 写 τ > 此上界即违例）。
-    _fgo_cfg = load_yaml_config(
-        find_project_root() / 'configs' / 'models' / 'fgo.yaml'
-    )
-    _fgo_tau = _fgo_cfg.get('tau_filt_s')
-    if _fgo_tau is not None:
-        _fgo_tau = float(_fgo_tau)
-        _proto_t_eff = float(normalized_section['t_eff_min_s'])
-        _proto_tau_upper = min(5.0, 0.2 * _proto_t_eff)
-        if _fgo_tau > _proto_tau_upper + 1e-9:  # 容差吸收浮点误差。
-            normalized_section['_section10_3_t_eff_assumed_mismatch'] = True  # 审计标记。
+    # 2026-09-03 §10.3 IO 兜底：fgo.yaml 缺失或 IO 错误时静默跳过此 cross-config sentinel
+    # 检查（不阻断 protocol gate 主流程），由审计标记层记录。
+    try:
+        _fgo_cfg = load_yaml_config(
+            find_project_root() / 'configs' / 'models' / 'fgo.yaml'
+        )
+        _fgo_tau = _fgo_cfg.get('tau_filt_s')
+        if _fgo_tau is not None:
+            _fgo_tau = float(_fgo_tau)
+            _proto_t_eff = float(normalized_section['t_eff_min_s'])
+            _proto_tau_upper = min(5.0, 0.2 * _proto_t_eff)
+            if _fgo_tau > _proto_tau_upper + 1e-9:  # 容差吸收浮点误差。
+                normalized_section['_section10_3_t_eff_assumed_mismatch'] = True  # 审计标记。
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        # fgo.yaml 缺失或 IO 错误：cross-config sentinel 跳过，避免反客为主。
+        pass
 
     return normalized_section
 
@@ -1686,7 +1692,7 @@ def check_per_trajectory_pulse_async(
 # §8.3 单轨片段覆盖门禁：实验级（非单轨迹）覆盖全部 7 项片段类型。
 # 单条轨迹按其轴配置覆盖一种或少数几种；整个实验 sweep 必须覆盖全部 7 项。
 _REQUIRED_SEGMENT_TYPES = (
-    "los_decent_geometry",        # LOS + 几何尚可 (N0 + G0/G1)
+    "los_decent_geometry",        # LOS + 几何尚可 (N0 + K0/K1，五轴档位协议)
     "pulsed_nlos",                # 脉冲 NLOS (N1/N2/N3)
     "all_anchor_nlos",            # 全锚 NLOS (N3)
     "significant_async",          # 明显异步错位 (A1/A2/A3)
@@ -1723,12 +1729,12 @@ def check_experiment_segment_coverage(
     for task in scene_tasks:
         axes = task.get("axes", {})
         n_axis = axes.get("N")
-        g_axis = axes.get("G")
+        k_axis = axes.get("K")
         a_axis = axes.get("A")
         v_axis = axes.get("V")
 
-        # 1. 视距 + 几何尚可：N0 + G0 或 N0 + G1（注：G0/G1 均为"几何尚可"，§8.3 行 1427）。
-        if n_axis == "N0" and g_axis in ("G0", "G1"):
+        # 1. 视距 + 几何尚可：N0 + K0（K 轴并入原 G 轴；K0=最优几何，K1=中等，G0/G1 已删除）。
+        if n_axis == "N0" and k_axis in ("K0", "K1"):
             covered.add("los_decent_geometry")
         # 2. 脉冲 NLOS：N1/N2/N3。
         if n_axis in ("N1", "N2", "N3"):
@@ -2063,7 +2069,7 @@ def assert_cold_start_x_underdetermined_geometry(
     §8.4 行 1440 放松则伤："优几何 → 3；强周期 → 5、6；好初值 → 3"。
 
     本门禁要求实验 sweep 至少包含一项"差冷启动（cold_start_offset_s > 0）+ 欠定/病态几何
-    （G2 或 K3/K4）"的合取任务。否则 §8.4 主张的"差冷启动 × 欠定几何"压力未被协议覆盖。
+    （K3）"的合取任务。否则 §8.4 主张的"差冷启动 × 欠定几何"压力未被协议覆盖。
 
     参数:
         scene_tasks: 场景任务列表；每项含 'axes' 子字典与 'noise_spec'（可选）
@@ -2086,10 +2092,9 @@ def assert_cold_start_x_underdetermined_geometry(
         if not isinstance(task, Mapping):
             continue
         axes = task.get("axes") or {}
-        g_axis = axes.get("G") if isinstance(axes, Mapping) else None
         k_axis = axes.get("K") if isinstance(axes, Mapping) else None
-        # 欠定/病态几何：G2 或 K3/K4（高 K 也欠定，但根据 §8.1 此处采用 K3/K4）。
-        underdet = g_axis == "G2" or k_axis in ("K3", "K4")
+        # 欠定/病态几何：K3（近共线退化；K4 已删除并入 K1）。
+        underdet = k_axis == "K3"
         # 差冷启动：noise_spec.cold_start_offset_s > 0
         noise_spec = task.get("noise_spec") or {}
         cold_start_offset = 0.0
@@ -2114,7 +2119,7 @@ def assert_cold_start_x_underdetermined_geometry(
     if not covered and raise_on_violation:
         raise ValueError(
             "§8.4 cold_start_x_underdetermined_geometry violation: no task combines a bad cold-start "
-            f"(cold_start_offset_s > 0) with an underdetermined geometry (G2 or K3/K4); "
+            f"(cold_start_offset_s > 0) with an underdetermined geometry (K3); "
             f"cold_start_count={tasks_with_cold_start}, underdet_count={tasks_with_underdet_geom}, "
             f"total={len(scene_tasks)}"
         )

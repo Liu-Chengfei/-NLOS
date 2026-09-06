@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liquidloc"
+version = "0.1.0"
+description = "Architecture skeleton for asynchronous high-NLOS UWB/IMU/VIO fusion localization"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "PyYAML>=6.0.3",
+    "pydantic",
+    "matplotlib",
+    "networkx",
+    "torch",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+cache_dir = "outputs/local_pytest/cache"
+markers = [
+    "scaffold_placeholder: explicit placeholder test scaffold that is intentionally skipped until implemented",
+]
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100

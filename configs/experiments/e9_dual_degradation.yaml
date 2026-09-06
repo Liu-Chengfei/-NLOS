@@ -1,0 +1,45 @@
+# 文件职责：定义异步 + 高 NLOS 组合实验入口（A/N 双退化，控制变量不含 VIO 退化）。
+# §6 融合主表的 VIO 退化压力由 e1_main_table（V2/V3）承担，不由本实验背锅。
+
+# 实验编号。这个值用于日志、产物目录和结果汇总时标识这一组实验。
+experiment_id: e9_dual_degradation  # 保持既有实验编号，兼容现有 paper 入口。
+
+# 主研究轴：走补充公开数据路线（sim_e9_protocol_20260726，1860 条序列）。
+# dual_degradation_bundle 会让 09 脚本落入核心冒烟路线（fixture 固定事件，
+# 不消费真实数据）；改为 public_sequence_category 后路由到
+# _run_supplementary_public_route（dataset_name=sim），由 PreparePipeline
+# 从 raw_root 真实物化事件再进 CorePipeline。
+primary_axis: public_sequence_category
+
+# 数据集名。补充路线要求 experiment_cfg.dataset_name 与 --dataset-name 一致。
+dataset_name: sim
+
+# 评测序列：置空，由脚本按 frozen_axes 从 sim_e9_protocol_20260726 全量筛选（论文级 744 条）。
+seq_ids: []
+
+# 场景轴：只展开 A/N；V 锁 V0，避免视觉压力混入 A/N 结论。
+frozen_axes:
+  # 异步看中度和重度。A2（中度）和 A3（重度）专门把时间错位压力拉高。
+  A: [A2, A3]
+
+  # NLOS 看中度和重度。N2（中度）和 N3（重度）专门把非视距压力拉高。
+  N: [N2, N3]
+
+  # VIO 固定为无退化。本实验只回答「真异步 + 高压 NLOS」；
+  # §6 要求的 VIO 退化/中断主表压力见 e1_main_table（V2/V3）。
+  V: V0
+
+  # G 轴已并入 K 轴（v27 协议），不再独立声明。
+  # K 轴合法档位：K0（3 锚最优几何）/ K1（4 锚主档）/ K3（3 锚近共线）。
+  K: [K0, K1, K3]
+
+  # 模态缺失固定为 M1（UWB 5% 成簇丢包，异步高NLOS实验主档）。
+  M: M1
+
+# 参与比较的方法。
+# ekf：标准 EKF（固定 R + 共享卡方，无 Huber）。
+# robust_ekf：鲁棒 EKF（共享卡方 + 固定 Huber）。
+# lstm_ekf：LSTM 增强 EKF。
+# liquid_ekf：液态网络增强 EKF（proposed，LNN）。
+# transformer_ekf：Transformer 增强 EKF。
+methods: [ekf, robust_ekf, lstm_ekf, liquid_ekf, transformer_ekf]  # 异步高NLOS实验全流程保障手册 Part 0 §13：5 方法必跑（EKF/Robust-EKF/LSTM/LNN/Transformer）。

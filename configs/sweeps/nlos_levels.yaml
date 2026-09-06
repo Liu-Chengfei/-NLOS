@@ -1,0 +1,56 @@
+# 文件职责：定义非视距轴（N 轴）的扫描等级，供实验配置引用。
+#
+# 本文件是场景五轴 S(A,N,V,G,K) 中 N 轴的离散等级定义。
+# "NLOS"（Non-Line-Of-Sight，非视距）指 UWB 信号在传播过程中
+# 遭遇遮挡或反射，导致测距结果产生正偏差（信号绕远路到达）。
+# NLOS 越严重，UWB 测距偏差越大、越不稳定，定位精度越容易退化。
+#
+# 本文件只定义等级名称和归一化强度（strength），不负责任何 reader 或 pipeline 逻辑。
+# 具体的物理参数（nlos_ratio、bias_strength_m、bias_drift_mps、nlos_noise_std_m）由
+# configs/base/scene_axis_protocol.yaml 中的 N 轴协议定义。
+#
+# 文件性质：本文件是参考模板，记录 N 轴等级的命名约定与强度归一化方式，
+# 供实验配置编写者参考。仓内没有任何代码直接加载本文件；
+# scene_sampler._normalize_sweep_cfgs 接受与本文件结构一致的 sweep_cfgs 字典，
+# 但仅消费 name 字段，strength 字段被原样保留供上游可选消费。
+#
+# 归一化方式：N 轴有 4 个等级（N0-N3），strength 采用序数归一化
+# strength = level_index / (max_level_index) = i / 3，因此取值 0.0/0.33/0.66/1.0。
+# 注意：0.33 与 0.66 是 1/3 与 2/3 的有限精度近似，不是精确值。
+# 注意：strength 是序数位，不等于物理参数比例（如 N2 的 strength=0.66 但 nlos_ratio=0.50）。
+# 注意：G 轴采用物理参数线性插值（0.0/0.4/1.0），与 A/N/V 轴的序数归一化不同，
+# 因此 strength 值不可跨轴直接比较。
+
+# NLOS 程度等级列表，每个等级包含名称和归一化强度。
+levels:
+  # N0：LOS 主导（los_dominant），几乎没有非视距干扰，所有 UWB 测距基本沿直射路径。
+  # 对应 scene_axis_protocol 中 nlos_ratio=0.00, bias_strength_m=0.00, bias_drift_mps=0.00, nlos_noise_std_m=0.00。
+  # 这是最干净的距离观测基线，一切比较的起点。
+  - name: N0  # 最轻 NLOS 档位名，N 代表 NLOS，0 代表最低等级。
+    # 强度归一化值，范围 [0.0, 1.0]，最低档。
+    # 0.0 表示无 NLOS 压力，用于和其他等级做排序比较和扫参横轴映射。
+    strength: 0.0  # N0 强度最小，代表 LOS 主导基线。
+
+  # N1：轻度 NLOS（mild_nlos），部分 UWB 信号遭遇遮挡或反射。
+  # 对应 scene_axis_protocol 中 nlos_ratio=0.30, bias_strength_m=5.0, nlos_noise_std_m=0.10。
+  # 有少量测距偏差但不算严重，融合算法通常能通过鲁棒估计缓解。
+  - name: N1  # 轻度 NLOS 档位名，1 代表第一级退化。
+    # 强度归一化值，序数归一化：1/3 ≈ 0.33。
+    # 0.33 表示等级序位（非物理压力比例），实际 nlos_ratio=0.30。
+    strength: 0.33  # N1 的归一化强度。
+
+  # N2：中度 NLOS（moderate_nlos），约半数 UWB 信号受非视距影响。
+  # 对应 scene_axis_protocol 中 nlos_ratio=0.50, bias_strength_m=8.0, nlos_noise_std_m=0.15。
+  # 这是比较常见的中间压力档，测距偏差已比较显著。
+  - name: N2  # 中度 NLOS 档位名，2 代表第二级退化。
+    # 强度归一化值，序数归一化：2/3 ≈ 0.66。
+    # 0.66 表示等级序位（非物理压力比例），实际 nlos_ratio=0.50（约半数受影响）。
+    strength: 0.66  # N2 的归一化强度。
+
+  # N3：重度 NLOS（severe_nlos），大部分 UWB 信号受非视距影响。
+  # 对应 scene_axis_protocol 中 nlos_ratio=0.80, bias_strength_m=12.0, nlos_noise_std_m=0.20。
+  # 这是最难的距离条件，测距偏差大且漂移快，对融合算法是极端挑战。
+  - name: N3  # 最强 NLOS 档位名，3 代表最高等级退化。
+    # 强度归一化值，序数归一化：3/3 = 1.0。
+    # 1.0 表示最高等级序位（非物理压力比例），实际 nlos_ratio=0.80。
+    strength: 1.0  # N3 强度最大，代表重度非视距。

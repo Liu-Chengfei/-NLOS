@@ -1,0 +1,37 @@
+# 文件职责：定义 paper_main 数据集的主表实验入口。
+# 池结构：A2/A3 × N2/N3 × K0/K1 = C1-C4 等比例混合（100/类 × 4 类 = 400 序列/seed）。
+  # 五轴档位协议：池结构 A2/A3 × N2/N3 × K0/K1 = C1-C4 等比例混合（100/类 × 4 类 = 400 序列/seed）。
+  # 锚数全档固定 4（K 协议硬约束），不再保留任何 5 锚档位。
+# 仅保留 3 个神经网络（lstm_ekf / liquid_ekf / transformer_ekf），与 sim 主表并行。
+# 原始数据集由 scripts/21_generate_paper_raw.py + scripts/22_prepare_paper_data.py
+# 准备，训练与推理分别由 scripts/23_train_3nn_paper.py + scripts/24_run_paper_inference.py 编排。
+
+experiment_id: e20_paper_main
+dataset_name: paper_main
+primary_axis: public_sequence_category
+
+# 评测序列：quick 模式只跑前 N 个，全模式遍历所有 paper 序列。
+# 24 脚本支持 --max-sequences CLI 覆盖。
+seq_ids: [paper_c1_0000, paper_c1_0001, paper_c1_0002, paper_c2_0100, paper_c2_0101]
+
+# C1-C4 2x2 池的 axes（不写在 frozen_axes 列表里避免 09 报错；改由 scene_id_by_seq 决定）
+# frozen_axes 单值（取 C1）：实验跑时通过 sim_meta.json 的 axes_override 实际注入每条 seq 的 axes
+frozen_axes:
+  A: A2
+  N: N2
+  V: V0
+  K: K1   # 协议 K 轴仅 K0/K1/K3；几何档归属按 anchor GDOP 特征分布判定
+  M: M1   # 协议 Part 0: 异步高NLOS实验固定 M1（UWB 5% 成簇丢包）
+
+# 3 个神经网络（与原 sim 主表 ekf/robust_ekf/fgo/lstm/liquid/transformer 6 个方法的
+# 子集；本实验只评估神经方法以聚焦学习式方法的相对差异）
+methods: [lstm_ekf, liquid_ekf, transformer_ekf]
+
+# quick / full 模式
+mode_overrides:
+  quick:
+    repeats: 1
+    max_sequences: 40
+  full:
+    repeats: 5
+    max_sequences: 2000

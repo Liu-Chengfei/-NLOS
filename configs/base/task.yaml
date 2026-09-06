@@ -1,0 +1,77 @@
+# 文件职责：定义任务层协议，决定状态空间、传感器角色和 VIO 更新合同。
+# 本文件是任务层真相源，后续 pipeline、metrics、审计和可视化均依赖此处的约定。
+# 修改本文件任何字段均属协议变更，须走协议变更流程。
+
+# 任务名称，被配置选择器、日志标识和实验编排直接引用。
+# 所有实验输出目录和报告均以此为任务标识前缀。
+task_name: uwb_imu_vio_localization
+
+# 状态向量定义，决定状态空间维度、字段顺序和所有输出结果的字段解释。
+# 顺序是硬约束——EKF 状态索引、trace 列对齐、summary 字段映射、审计校验均依赖此顺序。
+state_definition:
+  # 状态帧类型，决定状态向量的物理含义和坐标系解释。
+  # planar_xy_yaw = 平面位置 (x,y) + 航向角 (yaw)，适用于室内平面运动场景。
+  frame: planar_xy_yaw
+  # 状态项列表，顺序即为状态向量索引顺序，不可随意调换。
+  # 前提指导 §1.1 默认主表 8 维（平面位置/速度/航向 + 加计/陀螺偏置）。
+  # px  : x 方向位置 (m)
+  # py  : y 方向位置 (m)
+  # vx  : x 方向速度 (m/s)
+  # vy  : y 方向速度 (m/s)
+  # yaw : 航向角 (rad)
+  # bax : x 方向加速度计偏差 (m/s²)
+  # bay : y 方向加速度计偏差 (m/s²)
+  # bg  : 陀螺仪偏差 (rad/s)
+  # 偏差项与传感器测量项的语义映射：
+  #   bax ↔ sensors.yaml imu_fields.ax
+  #   bay ↔ sensors.yaml imu_fields.ay
+  #   bg  ↔ sensors.yaml imu_fields.gz
+  # 紧耦合扩维项（§1.1 扩展态）：
+  #   uwb_clock_bias : UWB 钟差估计（m），由 UWB 更新步修正
+  #   vio_scale      : VIO 尺度因子（无量纲），由 VIO 更新步修正
+  state_items: [px, py, vx, vy, yaw, bax, bay, bg, uwb_clock_bias, vio_scale]
+
+# 各传感器在本任务中的职责定义，决定传感器数据如何参与滤波。
+# 职责名称被 pipeline 和 EKF 实现直接引用，不可随意改名。
+sensor_roles:
+  # UWB 职责：提供绝对距离约束。
+  # UWB 测量的是锚点到标签的绝对距离，主要作用是拉回位置漂移，
+  # 防止 IMU 传播累积误差导致位置发散。
+  uwb: absolute_range_constraint
+  # IMU 职责：提供高频传播信息。
+  # IMU 以高频率（通常 100-200Hz）提供加速度和角速度，
+  # 负责短时连续状态推进，是 EKF 预测步的核心输入。
+  imu: high_rate_propagation
+  # VIO 职责：提供相对位姿约束。
+  # VIO 输出帧间相对位移和旋转，补足短时运动观测，
+  # 在 UWB 信号不可靠时提供额外的位置约束。
+  vio: relative_pose_constraint
+
+# VIO 更新阶段的合同，约束 VIO 观测如何参与 EKF 更新步。
+# 本合同防止 VIO 更新越界修改不该修改的状态分量或测量字段。
+vio_update_contract:
+  # VIO 更新只使用的测量量列表。
+  # dx   : x 方向帧间相对位移 (m)
+  # dy   : y 方向帧间相对位移 (m)
+  # dyaw : 帧间相对航向变化 (rad)
+  measurement_items: [dx, dy, dyaw]
+  # VIO 更新只允许直接更新的状态分量列表。
+  # px  : x 方向位置
+  # py  : y 方向位置
+  # yaw : 航向角
+  # uwb_clock_bias : UWB 钟差（VIO 更新不修正，仅由 UWB 更新通过 H[:,uwb_clock_bias]=+1 辨识；
+  #                  列入 updated_state_items 是协议层"七方法同模型"的占位要求，§2.3 在线钟差态前提）
+  # vio_scale      : VIO 尺度因子（VIO 更新中由 H[:,vio_scale]=R(-yaw_ref)@[px;py] 直接修正）
+  # 注意：VIO 观测直接约束 px/py/yaw（H 矩阵仅在这些列与 vio_scale 列非零）；
+  # 速度和偏差项不作为 VIO 观测的直接目标，但会因 EKF 协方差交叉耦合而被间接修正。
+  # 注意：uwb_clock_bias 由 UWB 更新路径辨识（uwb_update_step.py 的 build_uwb_jacobian
+  #       H[0, uwb_clock_bias] = +1，predict_range 的 z_pred 含钟差），不依赖 VIO 路径。
+  updated_state_items: [px, py, yaw, uwb_clock_bias, vio_scale]
+  # 学习型控制项的写入入口。
+  # 学习到的控制量写入等效测量协方差，而不是改测量值本身，
+  # 这样可以调节 VIO 更新的权重而不破坏测量值的物理含义。
+  learned_control_entry: noise_multiplier
+  # 禁止在更新过程内部重写测量字段。
+  # 设为 true 时，VIO 更新过程中不允许修改 dx/dy/dyaw 的原始值，
+  # 防止实现层为适配算法而篡改测量数据，避免协议漂移。
+  forbid_rewrite_measurement_fields_inside_update: true

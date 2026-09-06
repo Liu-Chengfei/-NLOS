@@ -53,7 +53,7 @@ def _run_section8_deep_audit(scene_tasks, cfg):
     after §8 hardening; can be disabled by setting it explicitly to False).
 
     Coverage (15 gates, all wired in this function):
-      1. §8.4 cold-start × K3/K4 underdetermined geometry conjunction.
+      1. §8.4 cold-start × K3 underdetermined geometry conjunction.
          (assert_cold_start_x_underdetermined_geometry; fired on scene_tasks)
       2. §8.1 H + 细节 R-D-C 锚点源一致性 + 移动锚点真值差分:
          (assert_moving_anchor_truth_equality; fired on cfg['method_moving_anchor_truth'])
@@ -301,7 +301,7 @@ def _build_section8_cfg_payload(scene_tasks, cfg, experiment_cfg):
       - trajectory envelope: computed from the FIRST task's gt_rows (representative
         trajectory; envelope metrics are seed-stable across tasks of one sweep).
       - weak_geometry_mask: built by classifying each sample's GDOP heuristic from
-        G-axis level (G2 = all weak; G0/G1 = weak ratio 0); conservative rule that
+        G-axis level (K3 = all weak; K0/K1 = weak ratio 0); conservative rule that
         catches §8.1 L1364 requirement at protocol-described granularity.
       - method_meta: read per-method from cfg['method_meta'] if user provided it, else
         defaults to all-methods-uniform "plane_constraint=enforced, z_constraint=fixed,
@@ -379,27 +379,27 @@ def _build_section8_cfg_payload(scene_tasks, cfg, experiment_cfg):
             raise
 
     # weak_geometry_mask: §8.1 L1364 病态观测占比门禁数据源。
-    # 早期实现使用 G 轴 proxy 派生（G2→100%、G1→5%、G0→0%），随机分布；
-    # 这种代理无法区分 G 轴内部 GDOP 时序差异，与"病态观测达到足够占比"严格语义不 1:1 对应。
+    # 早期实现使用 K 轴 proxy 派生（K3→100%、K1→5%、K0→0%），随机分布；
+    # 这种代理无法区分 K 轴内部 GDOP 时序差异，与"病态观测达到足够占比"严格语义不 1:1 对应。
     # 现改造为：使用每任务 geometry_report.gdop_above_floor_ratio（0 or 1）按样本量加权聚合；
     # 这是 build_anchor_layout 在 §4.2.2 V1 修复中显式产出的协议级 0/1 标签，
-    # 直接反映每个 G 轴级是否落入"差 GDOP"族（gdop_value ≥ floor → 1）。
+    # 直接反映每个 K 轴级是否落入"差 GDOP"族（gdop_value ≥ floor → 1）。
     # 注意：scene_tasks 在 audit 时不含 geometry_report（该字段在 _apply_scene_task 阶段才写入
-    # scenario_reports，不回写到原始 task dict），因此 fallback 至 G 轴级映射：
-    # G2 → 1.0（差 GDOP 族），G1 → 0.5（临界），G0 → 0.0（优几何）。
+    # scenario_reports，不回写到原始 task dict），因此 fallback 至 K 轴级映射（五轴档位协议 G 已并入 K）：
+    # K3 → 1.0（差 GDOP 族），K1 → 0.5（临界），K0 → 0.0（优几何）。
     weak_mask: list[int] = []
     if gt_rows and scene_tasks:
         n_total = len(gt_rows)
         per_task_samples = max(1, n_total // max(1, len(scene_tasks)))
         for task in scene_tasks:
             task_axes = (task or {}).get('axes') or {}
-            g_level = str(task_axes.get('G', 'G0'))
+            k_level = str(task_axes.get('K', 'K0'))  # 五轴档位协议：G 已并入 K
             task_geom_report = task.get('geometry_report') or {}
             if isinstance(task_geom_report, Mapping) and 'gdop_above_floor_ratio' in task_geom_report:
                 gdop_above_floor = float(task_geom_report.get('gdop_above_floor_ratio', 0.0))
             else:
-                # Fallback: G 轴级映射（G2→1.0 差 GDOP，G1→0.5 临界，G0→0.0 优几何）。
-                gdop_above_floor = 1.0 if g_level == 'G2' else (0.5 if g_level == 'G1' else 0.0)
+                # Fallback: K 轴级映射（K3→1.0 差 GDOP，K1→0.5 临界，K0→0.0 优几何；G 已并入 K）。
+                gdop_above_floor = 1.0 if k_level == 'K3' else (0.5 if k_level == 'K1' else 0.0)
             for _ in range(per_task_samples):
                 weak_mask.append(1 if gdop_above_floor >= 1.0 else 0)
         while len(weak_mask) < n_total:
@@ -467,20 +467,16 @@ def _build_section8_cfg_payload(scene_tasks, cfg, experiment_cfg):
     _anchor_layouts: dict[str, dict[str, Any]] = {}
     if target_task is not None and experiment_cfg is not None:
         ax = target_task.get('axes') or {}
-        g_level = str(ax.get('G', 'G0'))
-        k_level = str(ax.get('K', 'K4'))
-        # Derive anchor_count from K level (K3→3, K4→4, default→4).
-        if k_level.startswith('K') and k_level[1:].isdigit():
-            anchor_count = int(k_level[1:])
-        else:
-            anchor_count = 4  # protocol default (B30/K4)
+        # 五轴档位协议 K 轴锚数全档固定 4（与 K 档位无关，K0/K1/K3 均为 4 锚）。
+        anchor_count = 4  # 协议硬约束：锚数全档固定 4
+        k_level = str(ax.get('K', 'K3'))  # K 档位仅用于选几何条件（geom_condition）
         # Build layout matching the pipeline's own _materialize_scene_task path.
         try:
             from liquidloc.scenarios.geometry_levels import build_anchor_layout
             from liquidloc.protocol.scene_axis_protocol import load_scene_axis_protocol
             _protocol_cfg = load_scene_axis_protocol()
-            _g_cfg = _protocol_cfg.get('axes', {}).get('G', {})
-            _anchor_layout, _ = build_anchor_layout(anchor_count, g_level, _g_cfg)
+            _k_cfg = _protocol_cfg.get('axes', {}).get('K', {})
+            _anchor_layout, _ = build_anchor_layout(anchor_count, k_level, _k_cfg)
         except ValueError:
             # build_anchor_layout 用 ValueError 表达"G/K 级不存在或参数越界"
             # ——这是实验 cfg 不含 §8 完整 G/K 坐标的合法信号（如非 §8 风格的 pipeline test），
@@ -625,6 +621,50 @@ _MODEL_CFG_ROOT = find_project_root() / 'configs' / 'models'  # 模型配置目�
 _DEFAULT_SCENE_CODE: str | None = None
 
 
+def _is_neural_method(method_name: str) -> bool:
+    """检测方法名是否为神经方法（直接名或 _ekf 组合名）。"""
+    if method_name in _NEURAL_METHODS:
+        return True
+    for neural in _NEURAL_METHODS:
+        if method_name.endswith(f'_{neural}') or method_name.startswith(f'{neural}_'):
+            return True
+    return False
+
+
+def _enforce_window_size_parity_for_neural_methods(
+    methods: list[str], cfg: dict[str, Any]
+) -> dict[str, int]:
+    """§10.4 NN 截断对等 watchdog：解析所有神经方法的 window.size，
+    保证二者一致，不一致时 fail-loud。
+
+    - 经典方法 (ekf/robust_ekf/fgo) 和未知方法被静默跳过。
+    - 返回 {method_name: window_size}，仅含检测到的神经方法。
+    """
+    model_cfgs = cfg.get('model_cfgs') or {}
+    sizes: dict[str, int] = {}
+
+    for method in methods:
+        if method in _CLASSICAL_METHODS:
+            continue  # 经典方法无 window 字段，跳过
+        if not _is_neural_method(method):
+            continue  # 未知方法，跳过（主循环会 later 报错，这里不重复）
+        # 解析 window.size：优先显式覆盖，其次默认 YAML
+        if method in model_cfgs:
+            sizes[method] = model_cfgs[method]['window']['size']
+        else:
+            default_cfg = _resolve_model_cfg(cfg, method)
+            sizes[method] = default_cfg['window']['size']
+
+    # 对等校验：所有神经方法必须 window.size 一致
+    unique = set(sizes.values())
+    if len(unique) > 1:
+        raise ValueError(
+            f'§10.4 NN 截断对等 watchdog 检测到不一致: '
+            f'{dict(zip(sizes.keys(), [sizes[k] for k in sizes.keys()]))}'
+        )
+    return sizes
+
+
 def _get_default_scene_code() -> str:
     """惰性获取协议默认场景编码，从 get_nominal_levels 动态构造。"""
     global _DEFAULT_SCENE_CODE
@@ -632,7 +672,7 @@ def _get_default_scene_code() -> str:
         _nominal = get_nominal_levels()
         _DEFAULT_SCENE_CODE = encode_scene(SceneSpec(
             A_level=_nominal["A"], N_level=_nominal["N"], V_level=_nominal["V"],
-            G_level=_nominal["G"], K_value=_nominal["K"],
+            K_value=_nominal["K"],
         ))
     return _DEFAULT_SCENE_CODE
 
@@ -841,7 +881,7 @@ def _resolve_scene_parameters(task: dict[str, Any], protocol_cfg: dict[str, Any]
                 raise ValueError(f"scene axis level must not be blank for axis {axis}")
             payload: dict[str, Any] = {'level': stripped_level}
             # F2-H1: 部分轴分支返回的 K payload 缺 anchor_count，下游 _apply_scene_task L402 会 KeyError。
-            # K 轴 level 名格式固定为 "K<number>"（协议中 K3/K4/K6/K8），从 level 名提取锚点数。
+            # 五轴档位协议 K 轴锚数固定 4。K level 名（如 K3）仅用于选几何条件，anchor_count 不从 level 名提取。
             # 若 level 名不符合预期格式，留待 _apply_scene_task 的容错兜底（默认 6）。
             if axis == 'K' and stripped_level.startswith('K') and stripped_level[1:].isdigit():
                 payload['anchor_count'] = int(stripped_level[1:])
@@ -977,33 +1017,36 @@ def _apply_scene_task(events: Iterable[Any], task: dict[str, Any], protocol_cfg:
 
     anchor_layout = None  # 默认没有几何布局改写。
     geometry_report = None  # 默认没有几何报告。
-    if 'G' in axis_params and 'K' in axis_params:  # G 和 K 轴一起决定几何布局和锚点数量。
-        geometry_level = str(axes.get('G') or axis_params['G'].get('level'))  # 选取几何等级。
-        # F2-H1 防御：K payload 可能缺 anchor_count。
-        # 兜底顺序：payload → K level 名解析 → 主表欠定默认 4（B30/K4），禁止再默认 6。
+    # 五轴档位协议：G 轴已并入 K 轴。几何条件 + 锚数都由 K 轴决定。
+    if 'K' in axis_params:
         k_payload = axis_params['K']
         if not isinstance(k_payload, Mapping):
             raise TypeError(f"K axis payload must be a mapping, got {type(k_payload).__name__}")
-        anchor_count = k_payload.get('anchor_count')
-        if anchor_count is None:
-            k_level = str(axes.get('K') or k_payload.get('level') or '').strip()
-            if k_level.startswith('K') and k_level[1:].isdigit():
-                anchor_count = int(k_level[1:])
-            else:
-                anchor_count = 4  # 主表欠定默认（B30/K4）
-        # 直接传原值，build_anchor_layout 内部 is_integer 校验并 int() 转换，避免此处 int() 截断浮点。
-        anchor_layout, geometry_report = build_anchor_layout(anchor_count, geometry_level, protocol_cfg['axes']['G'])  # 生成锚点布局和几何报告。
-        scenario_reports['G'] = geometry_report  # 几何报告也放进场景报告里。
+        k_level = str(axes.get('K') or k_payload.get('level') or 'K3').strip()
+        anchor_count = k_payload.get('anchor_count', 4)  # 五轴档位协议：K 轴锚数全档固定 4
+        if not isinstance(anchor_count, int) or anchor_count < 3:
+            anchor_count = 4  # 兜底：协议硬约束 = 4
+        # 直接传原值，build_anchor_layout 内部 is_integer 校验。
+        anchor_layout, geometry_report = build_anchor_layout(
+            anchor_count, k_level, protocol_cfg['axes']['K'],
+        )
+        scenario_reports['K'] = geometry_report  # 几何报告放入 K 轴场景报告。
 
-    # M 轴代表模态缺失（按时间段屏蔽指定模态），在 A/N/V/G/K 之后处理。
+    # M 轴代表模态缺失（按时间段屏蔽指定模态），在 A/N/V/K 之后处理。
     # 协议层 M 轴参数为 modality_drop_prob（单帧丢失概率）和 affected_modalities（受影响模态列表）。
     # 此处将 prob 转换为连续缺失时间段（长度 = 总时长 × prob），调用 apply_modality_drop。
     if 'M' in axis_params:
         from liquidloc.scenarios.missing_modalities import apply_modality_drop
         modality_cfg = axis_params['M']
-        modality_drop_prob = coerce_finite_scalar(
-            modality_cfg.get('modality_drop_prob', 0.0), name='modality_drop_prob'
-        )
+        # 五轴档位协议 M 轴 modality_drop_prob 是区间 [low, high] 形式。
+        # 消费者取中点作为该序列的注入代表值（与 K 轴 geom_condition 区间处理一致）。
+        modality_drop_prob_raw = modality_cfg.get('modality_drop_prob', 0.0)
+        if isinstance(modality_drop_prob_raw, (list, tuple)) and len(modality_drop_prob_raw) >= 1:
+            modality_drop_prob = float(sum(modality_drop_prob_raw) / len(modality_drop_prob_raw))
+        else:
+            modality_drop_prob = coerce_finite_scalar(
+                modality_drop_prob_raw, name='modality_drop_prob'
+            )
         # 第 3 轮审查 HIGH-1 修复：modality_drop_prob 是概率，必须在 [0, 1] 区间。
         # 与 async_levels.py L393-394 的 burst_missing_prob 校验口径保持一致，
         # 否则协议 YAML 注释（"单帧丢失概率"）会被违反且无错误信号。
@@ -1297,6 +1340,13 @@ def _resolve_method_route(method_name: str) -> dict[str, Any]:  # 把方法名�
     if method_name in _LIQUID_ABLATION_METHODS:  # 液态消融方法走专门分支。
         return {'method_name': method_name, **deepcopy(_LIQUID_ABLATION_METHODS[method_name])}  # 液态消融方法走专门分支。# D10：深拷贝路由表条目，避免与 _LIQUID_ABLATION_METHODS 共享嵌套引用，保证返回字典与外部完全独立。
     if method_name in _CLASSICAL_METHODS:  # 经典方法只需要 estimator。
+        # §10.2 第 2 行守卫：检测神经关键字被误注册进经典方法集合。
+        for neural in _NEURAL_METHODS:
+            if neural in method_name:
+                raise ValueError(
+                    f'§10.2 第 2 行守卫：方法名 "{method_name}" 含神经关键字 "{neural}" '
+                    f'但被注册在 _CLASSICAL_METHODS 集合中；纯 NN 主表无 EKF 外壳被拒绝。'
+                )
         return {'method_name': method_name, 'estimator_name': method_name, 'model_name': None}  # 经典方法只需要 estimator。
     if method_name in _NEURAL_METHODS:  # 神经方法复用 EKF 外壳。
         return {'method_name': method_name, 'estimator_name': ESTIMATOR_NAME_EKF, 'model_name': method_name}  # 神经方法复用 EKF 外壳。# D9：引用单源常量 ESTIMATOR_NAME_EKF，禁止本地 'ekf' 字面量漂移。

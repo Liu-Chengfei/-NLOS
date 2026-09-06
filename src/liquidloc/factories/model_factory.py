@@ -3261,6 +3261,254 @@ class _LiquidModel(ModelAPI):
         return dict(payload)  # 返回完整 payload。
 
 
+# =============================================================================
+# _TransformerModel
+# =============================================================================
+# §10.2 Transformer+EKF：真实现（替换此前 NotImplementedError 占位壳）。
+# 与 _LSTMModel 完全相同架构，区别仅在 _build_modules 使用 TransformerNetwork 而非 LSTMNetwork。
+# 同一因果输入 + 四头 + bridge + EKF 后端——满足 spec §10.2 表行2 的 strict causal 要求。
+
+
+@dataclass(slots=True)
+class _TransformerModel(ModelAPI):
+    """Transformer-EKF 模型的工厂实例。
+
+    封装 Transformer 网络的创建、checkpoint 加载、推理和状态管理。
+    实现 ``ModelAPI`` 接口，提供统一的 ``infer_intermediate`` 方法。
+
+    与 _LSTMModel 的区别：使用 TransformerNetwork backbone（含因果掩码自注意力）。
+    所有其他方法（predict_intermediate_tensors / infer_intermediate /
+    state_dict / load_state_dict / load_checkpoint）与 _LSTMModel 完全相同，
+    复用相同的 normalize/coerce/risk_calibration 辅助函数。
+    """
+
+    name: str  # 模型名字。
+    cfg: dict[str, Any] = field(default_factory=dict)  # 模型配置字典，默认为空。
+    params: float = 0.0  # 模型参数量。
+    ram_peak: float = 1.0  # 峰值内存估算（MB）。
+    ram_peak_mb: float = 1.0  # 峰值内存估算（MB），与 ram_peak 相同。
+    runtime_resource_meta: dict[str, float] = field(init=False, repr=False, default_factory=dict)  # 运行时资源元数据。
+    network: Any = field(init=False, repr=False, default=None)  # Transformer 网络实例。
+    risk_calibration: Any = field(init=False, repr=False, default=None)  # 风险校准模块。
+    expected_feature_order: list[str] = field(init=False, repr=False, default_factory=list)  # 期望的特征顺序。
+    checkpoint_meta: dict[str, Any] = field(init=False, repr=False, default_factory=dict)  # checkpoint 元数据。
+    expected_feature_order_required: bool = field(init=False, repr=False, default=False)  # 是否要求特征顺序校验。
+    runtime_device: str = field(init=False, default="cpu")  # 运行时设备，默认 CPU。
+
+    def __post_init__(self) -> None:
+        """数据类初始化后处理：解析配置、加载 checkpoint 或构建网络。"""
+        from liquidloc.common.tee_logger import print_dict
+        _network_cfg = self.cfg.get("network") if isinstance(self.cfg, dict) else None
+        print_dict({
+            "name": self.name,
+            "network_type": "TransformerNetwork",
+            "network_hidden_dim": (_network_cfg or {}).get("hidden_dim") if isinstance(_network_cfg, dict) else None,
+            "network_input_dim": (_network_cfg or {}).get("input_dim") if isinstance(_network_cfg, dict) else None,
+            "has_checkpoint_path": "checkpoint_path" in (self.cfg or {}) if isinstance(self.cfg, dict) else False,
+            "checkpoint_path": (self.cfg or {}).get("checkpoint_path") if isinstance(self.cfg, dict) else None,
+            "window": (self.cfg or {}).get("window") if isinstance(self.cfg, dict) else None,
+        }, "_TransformerModel.__init__ 入口参数")
+        raw_feature_order = self.cfg.get("feature_order")
+        if raw_feature_order is None:
+            self.expected_feature_order = []
+        elif isinstance(raw_feature_order, (list, tuple)):
+            self.expected_feature_order = list(raw_feature_order)
+        else:
+            raise ValueError(
+                f"feature_order must be a list or tuple of strings or None, got {type(raw_feature_order).__name__}"
+            )
+        self.checkpoint_meta = {}
+        self.expected_feature_order_required = bool(self.expected_feature_order)
+
+        checkpoint_path = self.cfg.get("checkpoint_path")
+        if checkpoint_path is not None:
+            if isinstance(checkpoint_path, str) and not checkpoint_path.strip():
+                raise ValueError("checkpoint_path must not be empty when present")
+            self.load_checkpoint(checkpoint_path)
+        else:
+            self._build_modules()
+            self._apply_runtime_device()
+            self._refresh_runtime_resource_meta()
+
+    def _build_modules(self) -> None:
+        """构建 Transformer 网络模块和风险校准模块。"""
+        from liquidloc.models.transformer.network import TransformerNetwork  # 延迟导入，避免循环依赖。
+        self.network = TransformerNetwork(dict(self.cfg))  # 用配置字典创建 Transformer 网络。
+        self.risk_calibration = RiskCalibration()  # 创建风险校准模块。
+
+    def _apply_runtime_device(self) -> None:
+        """根据配置将网络模块移动到运行时设备。"""
+        device = _resolve_explicit_runtime_device(self.cfg)
+        _move_modules_to_device((self.network, self.risk_calibration), device)
+        self.runtime_device = str(device)
+
+    def _refresh_runtime_resource_meta(self) -> None:
+        """刷新运行时资源元数据（参数量和内存估算）。"""
+        if self.network is None:
+            self.runtime_resource_meta = {
+                "params": _RUNTIME_RESOURCE_DEFAULT_PARAMS,
+                "ram_peak": RAM_PEAK_FLOOR_MB,
+                "ram_peak_mb": RAM_PEAK_FLOOR_MB,
+            }
+        else:
+            self.runtime_resource_meta = _build_module_runtime_resource_meta((self.network, self.risk_calibration))
+        self.params = coerce_finite_scalar(self.runtime_resource_meta["params"], name="runtime_resource_meta.params")
+        self.ram_peak = coerce_finite_scalar(self.runtime_resource_meta["ram_peak"], name="runtime_resource_meta.ram_peak")
+        self.ram_peak_mb = coerce_finite_scalar(self.runtime_resource_meta["ram_peak_mb"], name="runtime_resource_meta.ram_peak_mb")
+
+    def reset(self) -> None:
+        """重置模型级状态（Transformer 无 hidden_state，跟 LSTM/Liquid 对齐）。
+
+        §1.4 兼容：Transformer 的注意力状态通过因果掩码在 forward 内自包含，
+        跨轨不泄漏。本方法为 no-op。
+        """
+        return None
+
+    def train(self) -> None:
+        self.network.train()
+        self.risk_calibration.train()
+
+    def eval(self) -> None:
+        self.network.eval()
+        self.risk_calibration.eval()
+
+    def parameters(self):
+        yield from self.network.parameters()
+        yield from self.risk_calibration.parameters()
+
+    def _normalize_window(self, window_tensor: Any) -> Any:
+        """校验特征窗口的特征顺序是否与期望一致。"""
+        if not self.expected_feature_order_required:
+            return window_tensor
+        if not isinstance(window_tensor, Mapping):
+            raise TypeError(
+                f"{self.name} with cfg/checkpoint expected_feature_order requires a structured "
+                "feature window mapping to validate expected_feature_order; "
+                f"got {type(window_tensor).__name__}"
+            )
+        source = _coerce_structured_window(window_tensor)
+        if source["feature_order"] != self.expected_feature_order:
+            raise ValueError(
+                "window_tensor.feature_order must match the model expected_feature_order; "
+                f"expected {self.expected_feature_order}, got {source['feature_order']}"
+            )
+        return source
+
+    def predict_intermediate_tensors(self, window_tensor: Any) -> dict[str, torch.Tensor]:
+        """前向推理，返回归一化后的中间张量字典（与 _LSTMModel 完全相同逻辑）。"""
+        normalized_window = self._normalize_window(window_tensor)
+        raw_output = self.network(normalized_window)
+        raw_outputs = _coerce_output_vector(raw_output, output_keys=_LIQUID_OUTPUT_KEYS)
+        raw_outputs["risk"] = self.risk_calibration(raw_outputs["risk"])
+        normalized = _normalize_lstm_output_tensors(raw_outputs, risk_already_calibrated=True)
+        modality = _resolve_modality_from_normalized_window(normalized_window)
+        scaling_ceiling = _SCALING_CEILING
+        if modality == MODALITY_UWB:
+            _safe_vio = torch.nan_to_num(normalized["vio_scaling"], nan=0.0, posinf=0.0, neginf=0.0)
+            normalized["vio_scaling"] = torch.clamp(_safe_vio, min=_SCALING_NEUTRAL_FLOOR, max=scaling_ceiling)
+        elif modality == MODALITY_VIO:
+            _safe_uwb = torch.nan_to_num(normalized["uwb_scaling"], nan=0.0, posinf=0.0, neginf=0.0)
+            normalized["uwb_scaling"] = torch.clamp(_safe_uwb, min=_SCALING_NEUTRAL_FLOOR, max=scaling_ceiling)
+        return normalized
+
+    def infer_intermediate(self, window_tensor: Any) -> ModelIntermediate:
+        """无梯度推理，返回 ModelIntermediate 数据类（与 _LSTMModel 完全相同逻辑）。"""
+        with torch.no_grad():
+            normalized_outputs = self.predict_intermediate_tensors(window_tensor)
+            bias_key, risk_key, uwb_scaling_key, vio_scaling_key = MODEL_INTERMEDIATE_KEYS
+            return ModelIntermediate(
+                bias=round(float(normalized_outputs[bias_key].detach().item()), 6),
+                risk=round(float(normalized_outputs[risk_key].detach().item()), 6),
+                uwb_scaling=float(normalized_outputs[uwb_scaling_key].detach().item()),
+                vio_scaling=float(normalized_outputs[vio_scaling_key].detach().item()),
+            )
+
+    def state_dict(self) -> dict[str, Any]:
+        """返回模型状态字典（与 _LSTMModel 完全相同结构）。"""
+        return {
+            "network": self.network.state_dict(),
+            "risk_calibration": self.risk_calibration.state_dict(),
+        }
+
+    def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
+        """加载模型状态字典，支持旧版 checkpoint 的输出层权重填充（与 _LSTMModel 完全相同逻辑）。"""
+        if not isinstance(state_dict, Mapping):
+            raise TypeError("state_dict must be a mapping")
+        if "network" in state_dict:
+            network_state = state_dict["network"]
+        else:
+            network_state = state_dict
+        if not isinstance(network_state, Mapping):
+            raise ValueError("state_dict must contain a network state mapping")
+
+        output_layer_weight = network_state.get("output_layer.weight")
+        if torch.is_tensor(output_layer_weight):
+            current_weight = self.network.output_layer.weight
+            if (
+                output_layer_weight.ndim == 2
+                and current_weight.ndim == 2
+                and int(output_layer_weight.shape[0]) == int(current_weight.shape[0])
+                and int(output_layer_weight.shape[1]) < int(current_weight.shape[1])
+            ):
+                padded_weight = current_weight.detach().clone()
+                padded_weight.zero_()
+                source_weight = output_layer_weight.to(current_weight.device)
+                padded_weight[:, : int(source_weight.shape[1])] = source_weight
+                network_state = dict(network_state)
+                network_state["output_layer.weight"] = padded_weight
+
+        self.network.load_state_dict(network_state)
+
+        calibration_state = state_dict.get("risk_calibration")
+        if isinstance(calibration_state, Mapping):
+            patched_calibration_state = dict(calibration_state)
+            current_calibration_state = self.risk_calibration.state_dict()
+            for state_key, state_value in current_calibration_state.items():
+                if state_key not in patched_calibration_state:
+                    patched_calibration_state[state_key] = state_value
+            self.risk_calibration.load_state_dict(patched_calibration_state)
+
+    def load_checkpoint(self, checkpoint_path: str | Path) -> dict[str, Any]:
+        """从磁盘加载 checkpoint，合并配置并恢复模型状态（与 _LSTMModel 完全相同逻辑）。"""
+        path = _resolve_checkpoint_path(checkpoint_path, self.cfg)
+        payload = _load_checkpoint_payload(path)
+        model_cfg = payload.get("model_cfg")
+        if model_cfg is None:
+            model_cfg = {}
+        if not isinstance(model_cfg, Mapping):
+            raise TypeError("checkpoint model_cfg must be a mapping")
+
+        merged_cfg = _merge_checkpoint_model_cfg(self.cfg, model_cfg)
+        self.cfg = merged_cfg
+        feature_order = merged_cfg.get("feature_order")
+        if feature_order is None:
+            feature_order = payload.get("feature_order")
+        if feature_order is None:
+            feature_order = []
+        self.expected_feature_order = list(feature_order)
+        self.expected_feature_order_required = bool(self.expected_feature_order)
+        self._build_modules()
+
+        state_dict = payload.get("model_state")
+        if state_dict is None:
+            state_dict = payload.get("state_dict")
+        if state_dict is None:
+            raise ValueError("checkpoint payload must contain model_state")
+        self.load_state_dict(state_dict)
+
+        self.checkpoint_meta = {
+            "checkpoint_path": str(path),
+            "checkpoint_format": payload.get("checkpoint_format"),
+            "best_epoch": payload.get("best_epoch"),
+            "best_loss": payload.get("best_loss"),
+            "train_window_count": payload.get("train_window_count"),
+            "val_window_count": payload.get("val_window_count"),
+        }
+        self._apply_runtime_device()
+        self._refresh_runtime_resource_meta()
+        return dict(payload)
+
+
 def create_model(name: str, cfg: Mapping[str, Any] | None) -> ModelAPI:
     """模型工厂入口：根据名字和配置创建模型实例。
 
@@ -3314,22 +3562,5 @@ def create_model(name: str, cfg: Mapping[str, Any] | None) -> ModelAPI:
     if name == MODEL_NAME_LIQUID:  # Liquid-EKF 模型。
         return _LiquidModel(name=name, cfg=model_cfg)  # 创建 Liquid 模型实例。
     if name == MODEL_NAME_TRANSFORMER:  # Transformer-EKF 模型（§10.2 第 2 行：Transformer+EKF 须为 strict causal Transformer）。
-        # §10.2 真合规守卫：spec §10.2 表行2 要求 "Transformer+EKF ... 同上 EKF 递推 + 网络隐状态（有限维）"。
-        # docs/liquid_vs_lstm_vs_fgo_full_analysis.md:3447 第 3 条已明示：
-        #   "Transformer+EKF：尚未实现的 strict causal 对照；须复用同一因果输入、四头、bridge 与 EKF"。
-        # 此前 v6 占位复用 _LSTMModel 是偷懒——LSTM 隐状态非 Transformer 自注意力，
-        # 跑主表会把 LSTM 假扮 Transformer 而自称 §10.2 合规，违反 spec 真意。
-        # 现在改为显式 NotImplementedError fail-loud：禁止任何主表/比较路径调用占位壳，
-        # 强制未来实现真 Transformer 网络本体（自注意力 + 因果掩码 + 有限维隐状态）后才能进主表。
-        # 双向 TF 已在 create_model 入口被 _TRANSFORMER_BIDIRECTIONAL_FORBIDDEN 守卫拦下；
-        # 此处 NotImplementedError 是占位壳的"未实现"诚实声明，与双向禁令互补不冲突。
-        raise NotImplementedError(
-            f"§10.2 Transformer+EKF 尚未实现：MODEL_NAME_TRANSFORMER={name!r} 当前无真 Transformer 模型本体。"
-            f"spec §10.2 表行2 要求 Transformer+EKF 必须是 strict causal Transformer (有限维隐状态、"
-            f"自注意力 + 因果掩码、复用四头合同 + bridge + EKF 后端)。"
-            f"docs/liquid_vs_lstm_vs_fgo_full_analysis.md:3447 第 3 条已声明 '尚未实现的 strict causal 对照'。"
-            f"此前 _LSTMModel 占位壳已被废弃——LSTM 隐状态非 Transformer 自注意力，跑主表会把 LSTM "
-            f"假扮 Transformer 而自称 §10.2 合规，违反 spec 真意。"
-            f"若需启用 Transformer+EKF 主表比较，必须先实现真 Transformer 网络本体并在本路由替换 NotImplementedError。"
-        )
+        return _TransformerModel(name=name, cfg=model_cfg)  # 真 Transformer 模型本体（TransformerNetwork 严格因果 + 4 头 + bridge + EKF），与 _LSTMModel 同口径。
     return _LSTMModel(name=name, cfg=model_cfg)  # 默认创建 LSTM 模型实例。

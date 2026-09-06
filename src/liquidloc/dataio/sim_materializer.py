@@ -247,7 +247,7 @@ def _load_sim_noise_defaults(yaml_path: str | Path | None = None) -> dict[str, f
 # 若 configs/base/sim_noise_spec.yaml 不存在或段缺失，回退到 dataclass 硬编码默认。
 _SIM_NOISE_DEFAULTS: dict[str, float | int] = _load_sim_noise_defaults()  # 第 13 轮审查 LOW-1 修复（R13-B L1）：base_seed 为 int，类型注解精确化。R12-B L2 + R13-B L1 两次 Edit 均未持久化，本轮第三次重做并 Read 验证。
 _nominal_levels = get_nominal_levels()
-_PAPER_SIM_GEOMETRY_LEVEL = _nominal_levels["G"]
+# 五轴档位协议：K 轴几何档位（K0=最优、K1=中等、K3=近共线退化）。原 G 轴已并入 K。
 _PAPER_SIM_K_LEVEL = _nominal_levels["K"]
 
 
@@ -289,8 +289,8 @@ class SimSequenceSpec:
         cycle_count: 铺叠周期数，决定序列总时长。
         cycle_gap_s: 周期间隔秒数，影响 cycle 边界处的时间跳跃。
         axes_override: (v2 D-10/D-11/D-12) 场景轴档位覆盖, dict 形如
-            {"A":"A1", "N":"N2", "V":"V1", "G":"G1", "K":"K4"}. 默认 None 表示
-            缺省时由 _resolve_spec_gk_levels 回落 G1/K4（主表欠定）；axes_override 可覆盖。
+            {"A":"A1", "N":"N2", "V":"V1", "K":"K3"}. 默认 None 表示
+            缺省时由 _resolve_spec_k_level 回落 K3（主表欠定非优几何）；axes_override 可覆盖。
         dt_imu_override: (v2 D-13) IMU 采样周期覆盖 (秒). 默认 None 表示用 baseline dt_imu=0.01s (100Hz).
             典型值: 0.005s (200Hz), 0.01s (100Hz), 0.02s (50Hz).
         dt_uwb_override: (v2 D-13) UWB 采样周期覆盖 (秒). 默认 None 表示用 baseline dt_uwb=0.05s (20Hz).
@@ -658,21 +658,21 @@ def _build_default_sim_sequence_specs() -> tuple[SimSequenceSpec, ...]:
     10 lead × 2 var = 30 条。默认：
     - use_protocol_trajectory=True（协议轨迹路径，GT 直接满足 B20–B23 包络；
       sample count 由 duration/dt 决定，不再依赖 fixture×cycle）
-    - G/K 主表以 G1/K4 为主，穿插 G2 差几何与 K3 临界；K6/K8 仅少量压力条且 allow_high_anchor_count
+    - 五轴档位协议：K 轴仅三档（K0 最优 / K1 中等 / K3 退化），锚数全档固定 4。
     - duration ≥ 45s，workspace 约 20m
     """
-    # 主表 G/K 池：欠定为主，禁止默认全 K6 优几何。
-    gk_pool: list[tuple[tuple[str, str], ...]] = [
-        (("G", "G1"), ("K", "K4")),
-        (("G", "G2"), ("K", "K3")),
-        (("G", "G1"), ("K", "K3")),
-        (("G", "G2"), ("K", "K4")),
-        (("G", "G1"), ("K", "K4")),
-        (("G", "G2"), ("K", "K3")),
-        (("G", "G1"), ("K", "K4")),
-        (("G", "G2"), ("K", "K4")),
-        (("G", "G1"), ("K", "K3")),
-        (("G", "G2"), ("K", "K3")),
+    # 主表 K 池：K1 中等为主，穿插 K3 差几何。K 轴仅 K0/K1/K3 三档。
+    k_pool: list[tuple[tuple[str, str], ...]] = [
+        (("K", "K3"),),
+        (("K", "K3"),),
+        (("K", "K1"),),
+        (("K", "K3"),),
+        (("K", "K3"),),
+        (("K", "K3"),),
+        (("K", "K3"),),
+        (("K", "K3"),),
+        (("K", "K1"),),
+        (("K", "K3"),),
     ]
     lead_meta = [
         ("sim_line_01", "mini_seq", 45.0, 20.0),
@@ -690,9 +690,9 @@ def _build_default_sim_sequence_specs() -> tuple[SimSequenceSpec, ...]:
     # 仍保留 cycle_count 异质化以满足 SimSequenceSpec 字段约束（>=1）。
     lead_specs: list[SimSequenceSpec] = []
     for idx, (seq_id, base_id, dur, span) in enumerate(lead_meta):
-        g_level = dict(gk_pool[idx])["G"]
-        k_level = dict(gk_pool[idx])["K"]
-        high_k = k_level in ("K6", "K8")
+        k_level = dict(k_pool[idx])["K"]
+        # 五轴档位协议 K 轴仅 K0/K1/K3，锚数全档固定 4——不再有"高锚数"档位。
+        high_k = False
         lead_specs.append(
             SimSequenceSpec(
                 seq_id,
@@ -700,7 +700,7 @@ def _build_default_sim_sequence_specs() -> tuple[SimSequenceSpec, ...]:
                 translation_xy=(0.0, 0.0),
                 cycle_count=128 + idx * 2,  # 协议轨迹路径不消费，保留字段约束
                 cycle_gap_s=0.05,
-                axes_override=gk_pool[idx],
+                axes_override=k_pool[idx],
                 use_protocol_trajectory=True,  # 协议轨迹路径，满足 B20–B23 包络
                 duration_s=float(dur),
                 workspace_span_m=float(span),
@@ -746,39 +746,24 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
 
     相对旧 compact：
     - 不再 short 2–4s / L_xy<1m 的 fixture 铺叠
-    - 默认 G1/K4（欠定），穿插 G2/K3；K6/K8 仅压力条且 allow_high_anchor_count
+    - 五轴档位协议：默认 K1（中等几何），穿插 K3 差几何；K 轴仅 K0/K1/K3 三档。
     - duration ≥ 30s，workspace 15–25m，满足 B20–B23
     - 保留 A/N/V 多样性与 dt 覆盖，供异步/NLOS 命题
     """
+    # 4 组合 (A2N2/A2N3/A3N2/A3N3) 各 25%，按循环索引 0..3 → (0,1,2,3) mod 4
+    # 几何轴 K 仍保留多档位 (K1/K3) 以满足 §8.2 五轴档位协议
     axes_pool: list[tuple[tuple[str, str], ...]] = [
-        (("A", "A2"), ("N", "N2"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
-        (("A", "A2"), ("N", "N3"), ("V", "V0"), ("G", "G2"), ("K", "K3")),
-        (("A", "A3"), ("N", "N2"), ("V", "V0"), ("G", "G1"), ("K", "K3")),
-        (("A", "A3"), ("N", "N3"), ("V", "V0"), ("G", "G2"), ("K", "K4")),
-        (("A", "A2"), ("N", "N2"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
-        (("A", "A2"), ("N", "N3"), ("V", "V0"), ("G", "G2"), ("K", "K3")),
-        (("A", "A3"), ("N", "N2"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
-        (("A", "A3"), ("N", "N3"), ("V", "V0"), ("G", "G2"), ("K", "K3")),
-        (("A", "A2"), ("N", "N2"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
-        (("A", "A3"), ("N", "N3"), ("V", "V0"), ("G", "G2"), ("K", "K4")),
-        # long / 压力：允许少量 K6/K8
-        (("A", "A2"), ("N", "N2"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
-        (("A", "A3"), ("N", "N3"), ("V", "V0"), ("G", "G2"), ("K", "K3")),
-        (("A", "A2"), ("N", "N3"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
-        (("A", "A3"), ("N", "N2"), ("V", "V0"), ("G", "G2"), ("K", "K4")),
-        (("A", "A2"), ("N", "N2"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
-        (("A", "A0"), ("N", "N2"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
-        (("A", "A1"), ("N", "N3"), ("V", "V0"), ("G", "G2"), ("K", "K3")),
-        (("A", "A2"), ("N", "N2"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
-        (("A", "A3"), ("N", "N3"), ("V", "V0"), ("G", "G2"), ("K", "K3")),
-        (("A", "A2"), ("N", "N3"), ("V", "V0"), ("G", "G1"), ("K", "K4")),
+        (("A", "A2"), ("N", "N2"), ("V", "V0"), ("K", "K3")),  # 0 → A2N2
+        (("A", "A2"), ("N", "N3"), ("V", "V0"), ("K", "K1")),  # 1 → A2N3
+        (("A", "A3"), ("N", "N2"), ("V", "V0"), ("K", "K1")),  # 2 → A3N2
+        (("A", "A3"), ("N", "N3"), ("V", "V0"), ("K", "K3")),  # 3 → A3N3
     ]
     dt_pool: list[tuple[float | None, float | None, float | None]] = [
-        (0.01, 0.1, 0.05),
-        (0.01, 0.05, 0.05),
-        (0.02, 0.1, 0.05),
-        (0.01, 0.1, 0.0333),
-        (0.005, 0.05, 0.05),
+        (1/150, 0.1, 0.05),     # 150Hz IMU, 10Hz UWB, 20Hz VIO
+        (1/150, 0.05, 0.05),    # 150Hz IMU, 20Hz UWB, 20Hz VIO
+        (1/150, 0.1, 0.0333),   # 150Hz IMU, 10Hz UWB, 30Hz VIO
+        (1/150, 0.05, 0.05),    # 150Hz IMU, 20Hz UWB, 20Hz VIO
+        (1/150, 0.1, 0.05),     # 150Hz IMU, 10Hz UWB, 20Hz VIO
     ]
     lead_names = [
         ("sim_line_01", "mini_seq", 40.0, 18.0),
@@ -805,8 +790,8 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
     lead_specs: list[SimSequenceSpec] = []
     for idx, (seq_id, base_id, dur, span) in enumerate(lead_names):
         axes = axes_pool[idx % len(axes_pool)]
-        k_level = dict(axes).get("K", "K4")
-        high_k = k_level in ("K6", "K8")
+        # 五轴档位协议 K 轴仅 K0/K1/K3，锚数全档固定 4——不再有高锚档位。
+        high_k = False
         dt = dt_pool[idx % len(dt_pool)]
         lead_specs.append(
             SimSequenceSpec(
@@ -1529,35 +1514,33 @@ def _transform_gt_rows(tiled_gt_rows: list[dict[str, float]], spec: SimSequenceS
     return _round_gt_rows(transformed)
 
 
-def _resolve_spec_gk_levels(spec: SimSequenceSpec) -> tuple[str, str]:
-    """从 axes_override 解析 G/K 档位；缺省回落协议主表默认 G1/K4（欠定，非优几何 K6）。"""
-    g_level = "G1"
-    k_level = "K4"
+def _resolve_spec_k_level(spec: SimSequenceSpec) -> str:
+    """从 axes_override 解析 K 档位；缺省回落协议主表默认 K3（欠定非优几何）。"""
+    k_level = "K3"
     for axis_name, level_name in spec.axes_override:
-        if axis_name == "G":
-            g_level = str(level_name).strip()
-        elif axis_name == "K":
+        if axis_name == "K":
             k_level = str(level_name).strip()
-    return g_level, k_level
+    return k_level
 
 
 def _transform_anchor_layout(anchor_layout: dict[str, Any], spec: SimSequenceSpec) -> dict[str, Any]:
-    """按 axes_override 的 G/K 生成锚点，并缩放到 workspace_span_m（§8.1/§8.2.1）。
+    """按 axes_override 的 K 生成锚点，并缩放到 workspace_span_m（§8.1/§8.2.1）。
 
-    不再写死 G0/K6 paper 基线。主表默认 G1/K4（欠定压力）；若 override 给 K6/K8
-    则允许高锚数消融，但须在 envelope 中显式 allow_high_anchor_count。
+    五轴档位协议：G 已并入 K，K 轴决定几何条件 + 锚数（锚数全档固定 4）。
+    主表默认 K3（欠定压力）；若 override 给 K1/K0 等其他档位同样合规。
     """
     protocol_cfg = load_scene_axis_protocol()
-    g_level, k_level = _resolve_spec_gk_levels(spec)
+    k_level = _resolve_spec_k_level(spec)
     if k_level not in protocol_cfg["axes"]["K"]:
         raise ValueError(f"unknown K level {k_level!r} for seq={spec.seq_id}")
-    if g_level not in protocol_cfg["axes"]["G"]:
-        raise ValueError(f"unknown G level {g_level!r} for seq={spec.seq_id}")
     anchor_count = int(protocol_cfg["axes"]["K"][k_level]["anchor_count"])
+    # 五轴档位协议：build_anchor_layout 第二参数支持 K 字符串（"K0"/"K1"/"K3"），
+    # 内部按 level 查找 geom_condition 区间字段。让 build_anchor_layout 自己解析
+    # K 档位，无需 sim_materializer.py 自己处理区间/中点。
     paper_anchor_layout, geometry_report = build_anchor_layout(
         anchor_count,
-        g_level,
-        protocol_cfg["axes"]["G"],
+        k_level,
+        protocol_cfg["axes"]["K"],
         workspace_span_m=float(spec.workspace_span_m),
     )
     # 协议轨迹模式：锚点已在世界系米制尺度，直接使用，不再投影到迷你 fixture 锚。
@@ -1598,7 +1581,7 @@ def _transform_anchor_layout(anchor_layout: dict[str, Any], spec: SimSequenceSpe
     projected_layout["base_layout_id"] = family_id
     projected_layout["layout_id"] = spec.seq_id
     projected_layout["source"] = "protocol_geometry" if spec.use_protocol_trajectory else anchor_layout.get("source", "sim_materialized")
-    projected_layout["protocol_geometry_level"] = g_level
+    projected_layout["protocol_geometry_level"] = k_level  # 五轴档位协议：G 已并入 K，几何档位 = K 档位。
     projected_layout["protocol_k_level"] = k_level
     projected_layout["geometry_report"] = geometry_report
     projected_layout["workspace_span_m"] = float(spec.workspace_span_m)
@@ -2120,7 +2103,7 @@ def _materialize_uwb_rows(
         )
         fell_back = False  # 组16: 标记是否发生锚点回退
         if target_anchor_ids and anchor_id not in anchor_lookup:
-            # 旧 fixture 锚点 ID 可能不在当前协议布局中；回退到当前布局锚点轮询（主表 K3/K4）。
+            # 旧 fixture 锚点 ID 可能不在当前协议布局中；回退到当前布局锚点轮询（主表 K3）。
             warn_key = (seq_id, str(anchor_id))
             if warn_key not in warned_fallback_pairs:
                 warned_fallback_pairs.add(warn_key)
@@ -2946,6 +2929,7 @@ def materialize_sim_raw(
             "dt_imu_override_s": spec.dt_imu_override,
             "dt_uwb_override_s": spec.dt_uwb_override,
             "dt_vio_override_s": spec.dt_vio_override,
+            "generator_version": "liquidloc.sim_materializer.v2.1",
             "v2_protocol_version": 2,
             "v2_documentation": "13 维扩展 (D-10 场景轴多样性 + D-11 G 轴 + D-12 K 轴 + D-13 传感器频率)",
         }
@@ -3018,4 +3002,74 @@ __all__ = [
 ]
 
 SIM_GENERATOR_VERSION_CURRENT = "liquidloc.sim_materializer.v2.1"
+
+
+# ---------------------------------------------------------------------------
+# §M 轴缺失簇接口（2026-09-03 补加）：补全测试所需导入路径，
+# 使 liquidloc.dataio.sim_materializer.apply_clustered_modality_drop 存在。
+# 实现语义：drop_prob=0 → no-op 原序列返回；drop_prob>0 → 按 seed
+# 构造 Poisson 簇式 outage segments，再调用 missing_modalities 底层逻辑。
+# ---------------------------------------------------------------------------
+
+def apply_clustered_modality_drop(
+    events,
+    modality: str,
+    drop_prob: float,
+    seed: str,
+    cluster_duration_range: tuple[float, float] = (0.3, 2.0),
+):
+    """对指定模态按概率构造 Poisson 簇式缺失，再委托 apply_modality_drop 执行。
+
+    参数:
+        events: 原始事件序列（list[dict]）。
+        modality: 目标模态名（如 "uwb" / "visual"）。
+        drop_prob: 单次独立缺失概率（Poisson-Burst 模型参数 p_B）。
+        seed: 随机种子（str，内部用 hash 转 int）。
+        cluster_duration_range: 簇持续时长区间（秒），默认 (0.3, 2.0)。
+
+    返回:
+        (filtered_events, report): 与 apply_modality_drop 接口一致。
+    """
+    from liquidloc.scenarios.missing_modalities import apply_modality_drop
+
+    events = list(events) if events else []
+    if not events:
+        return [], {"target_modality": modality, "drop_segments": [], "dropped_events": [], "recover_points": []}
+
+    if drop_prob <= 0.0:
+        # §M0 规范：drop_prob=0 时为恒等映射，与 apply_modality_drop 不同（后者要求 drop_segments），
+        # 这里做 no-op 兜底，直接返回原序列克隆。
+        import copy
+        return copy.deepcopy(events), {
+            "target_modality": modality,
+            "drop_segments": [],
+            "dropped_events": [],
+            "recover_points": [],
+            "cluster_duration_range": cluster_duration_range,
+        }
+
+    # 提取时间范围
+    ts = [e.get("t", 0.0) for e in events if isinstance(e, dict)]
+    if not ts:
+        return events, {"target_modality": modality, "drop_segments": [], "dropped_events": [], "recover_points": []}
+    t_min, t_max = min(ts), max(ts)
+    if t_max <= t_min:
+        return events, {"target_modality": modality, "drop_segments": [], "dropped_events": [], "recover_points": []}
+
+    # Poisson-Burst: 构造簇式 outage segments
+    rng = random.Random(hash(seed) & 0x7FFFFFFF)
+    segments = []
+    cur_t = t_min
+    t_range = t_max - t_min
+    while True:
+        cur_t += rng.expovariate(1.0 / (drop_prob * max(t_range, 1.0) + 1e-12))
+        if cur_t >= t_max:
+            break
+        dur = rng.uniform(*cluster_duration_range)
+        end_t = min(cur_t + dur, t_max)
+        if end_t > cur_t:
+            segments.append((round(cur_t, 4), round(end_t, 4)))
+        cur_t = end_t
+
+    return apply_modality_drop(events, modality, segments)
 

@@ -80,6 +80,13 @@ DEFAULT_REQUIRED_OUTPUT_FILES = (  # 最小运行时必须能看到的产物路�
     "audits/protocol_snapshot.json",  # 协议快照检查文件。
 )  # 必需输出文件列表结束。
 
+# 五轴档位协议下，public_benchmark 合同与 default 合同目录差异：public_benchmark 仅要求
+# public_benchmarks 单一目录（嵌套结构，不平铺其他子目录）。
+PUBLIC_BENCHMARK_OUTPUT_DIRS = ("public_benchmarks",)  # 公开基准输出合同要求的目录集合。
+PUBLIC_BENCHMARK_REQUIRED_OUTPUT_FILES = (  # 公开基准合同最小必须看到的产物路径。
+    "public_benchmarks/manifest.json",  # 公开基准 manifest 清单。
+)  # 公开基准要求文件列表结束。
+
 # 真值文件名字常量（单源真相，D9 配置表面漂移根因修复）。
 # pipelines/eval_pipeline.py、pipelines/core_pipeline.py、pipelines/train_pipeline.py、
 # dataio/*_reader.py、dataio/manifests/dataset_checks.py、common/prepared_inputs.py 均从此处引用，

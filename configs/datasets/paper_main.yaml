@@ -1,0 +1,122 @@
+# 文件职责：定义论文主实验数据集 paper_main 的可执行规格。
+# 与 sim 数据集（sim_e9_protocol_20260726）共存，本文件不修改 sim 的任何契约。
+# 池结构：A2/A3 × N2/N3 × K0/K1 = C1-C4 等比例混合。
+# 2000 条序列（5 seed × 400 序列/seed），1:9 序列级 train/test 划分。
+
+dataset_name: paper_main
+raw_root: data/raw/paper_main_v1
+processed_root: data/processed/paper_main_v1
+interim_root: data/interim/paper_main_v1
+manifests_root: data/manifests/paper_main_v1
+prepare_root: outputs/prepare_paper_main_v1
+
+# 主实验数据集完整规格（与 docs/2026-08-29-pasted-spec 一一对应）
+paper_spec:
+  protocol_version: 27
+  generator_version: paper_main_v1
+
+  # §1 场地与坐标系
+  site_xy_m: [20.0, 20.0]      # 20m × 20m 单层室内
+  coordinate: ENU               # x 向东, y 向北, z 向上
+  warmup_s: 10.0
+  effective_duration_s: 50.0    # 60s 总时长 - 10s warmup
+
+  # §2 传感器配置
+  imu_hz: 150                   # dt_imu = 6.67ms
+  uwb_hz: 10                    # dt_uwb = 100ms
+  vio_hz: 20                    # dt_vio = 50ms
+
+  uwb_sigma_m: 0.1186           # §2.2 LOS 测距噪声 [7]
+  imu_accel_white_psd: 0.02     # m/s²/√Hz
+  imu_gyro_white_psd: 0.005     # rad/s/√Hz
+  imu_accel_bias_instab: 0.001  # m/s²
+  imu_gyro_bias_instab: 0.0005  # rad/s
+  vio_dx_dy_std_m: 0.02         # m/步
+  vio_yaw_drift_dps: 0.0083     # 0.5°/min
+
+  # §3 时间异步（A 档位与协议 yaml 单源）
+  async_uwb_offset_ms:
+    A0: [0, 0]
+    A2: [20, 50]                # A2 中度异步
+    A3: [100, 200]              # A3 重度异步
+  async_uwb_jitter_ms:
+    A0: 0
+    A2: 8
+    A3: 15
+  async_vio_offset_ms:
+    A0: 0
+    A2: 20
+    A3: 75
+  async_vio_jitter_ms:
+    A0: 0
+    A2: 5
+    A3: 10
+
+  # §4 NLOS（连续段语义，与原 apply_nlos_level 的 poisson scatter 不同）
+  nlos_uwb_bias_m:
+    N0: 0.0
+    N2: 2.5                     # 25-30% 区间中位
+    N3: 5.0                     # 30-35% 区间中位（按用户规格压低后上界）
+  nlos_uwb_noise_std_m:
+    N0: 0.0
+    N2: 0.5
+    N3: 1.0
+  nlos_segment_block_s: [2.0, 5.0]
+  nlos_segment_count_range: [2, 4]
+
+  # §5 丢包
+  uwb_drop_prob_range: [0.05, 0.15]
+  uwb_drop_burst_range: [2, 5]
+  uwb_drop_gap_s_range: [0.3, 2.0]
+  vio_drop_prob_range: [0.10, 0.30]
+  vio_drop_gap_s_range: [0.5, 3.0]
+
+  # §6 轨迹生成
+  trajectory_classes: [line_back_forth, random_walk, polygon]
+  # 2026-08-29 简化：移除 figure_eight 和 stop_turn——两者在 50Hz 采样下产生 ±π atan2
+  # 边界跳变，导致 IMU 中心差分 ax/ay 越界（150 m/s² 上限）。Lissajous/急转弯的 yaw
+  # 平滑性受 atan2(±π) 限制，必须做 unwrap 才能让中心差分收敛；为简化档位落定，去掉这
+  # 两类，保留 3 类（直行往返/随机游走/多边形），均匀等比例分配到 C1-C4。
+  speed_bins: [slow, mid, fast]
+  speed_range_mps:
+    slow: [0.5, 1.0]
+    mid: [1.0, 2.0]
+    fast: [2.0, 3.0]
+  window_size: 128             # W = 128 IMU 步 ≈ 0.85s
+  window_stride: 8             # stride = 8 IMU 步 ≈ 66.7ms
+
+  # 池结构：A2/A3 × N2/N3 × K0/K1 = C1-C4 等比例混合。
+  # 2026-09-03：原 K4/K5 内部命名（4 锚/5 锚）已与五轴档位协议 K0/K1 统一；
+  # K4 实际为 K0（4 锚对称/非对称欠定），K5 实际为 K1（5 锚布局）。
+  pool_layout:
+    - {class_id: C1, A: A2, N: N2, K: K0, share: 0.25}
+    - {class_id: C2, A: A2, N: N3, K: K1, share: 0.25}
+    - {class_id: C3, A: A3, N: N2, K: K0, share: 0.25}
+    - {class_id: C4, A: A3, N: N3, K: K1, share: 0.25}
+
+  # §1 锚点固定布局（与 spec 严格一致）
+  # 2026-09-03：paper K0/K1 是 paper 私有 4 锚/5 锚布局选择符，
+  # 映射到协议 K0/K1 时不改变 anchor 坐标（K0=4锚好几何，K1=5锚）。
+  anchors:
+    K0:
+      - [2.0, 2.0, 2.5]
+      - [18.0, 3.0, 2.5]
+      - [4.0, 17.0, 2.5]
+      - [16.0, 16.0, 2.5]
+    K1:
+      - [2.0, 2.0, 2.5]
+      - [18.0, 3.0, 2.5]
+      - [4.0, 17.0, 2.5]
+      - [16.0, 16.0, 2.5]
+      - [10.0, 1.2, 2.5]
+
+  # §7.2 规模与划分
+  scale:
+    per_seed_sequences: 400     # 100/类 × 4 类 = 400
+    n_seed: 5
+    train_test_ratio: 0.1       # 1:9 序列级划分
+
+  # §7.3 冻结轴
+  frozen_v: V0                 # 健康 VIO
+  frozen_m: M0                 # 模态齐全
+  # 2026-09-03：G 已合并入 K，frozen_g 指令已废止。

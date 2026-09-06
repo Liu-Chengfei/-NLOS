@@ -1556,7 +1556,7 @@ class EKFCore(EstimatorAPI):
                 # 或 quality<floor），此 if 守门避免对 None 调用 build_vio_measurement。
                 if vio_payload is not None:
                     meta_for_event = dict(meta) if meta is not None else {
-                        "scene_id": "S(J,U,V,0,K6)",
+                        "scene_id": "S(J,U,V,0,K3)",  # 五轴档位协议 K 轴仅 K0/K1/K3
                         "seq_id": "joint_step",
                     }
                     synthetic_vio_event = {

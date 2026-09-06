@@ -1,0 +1,49 @@
+# 文件职责：仿真数据物化层（sim_materializer.SimNoiseSpec）基础传感器噪声参数冻结。
+# 本文件独立于 sensors.yaml，因为 sensors.yaml 的顶级键由 protocol 层
+# sensor_contract.py 严格校验（仅允许 *_fields 和 feature_missing_policy）。
+# sim_noise_spec 不属于传感器字段合同，而是仿真物化层的噪声模型参数，
+# 因此单独冻结在此文件中，避免触发 protocol 层未知键校验。
+# 修改本文件任何参数均属协议变更，须走协议变更流程。
+# 字段语义对齐 MATLAB imuSensor 与 IEEE Std 952-2020 Allan 方差模型。
+
+# SimNoiseSpec 13 项噪声/协方差参数默认值。
+# dataio 层 SimNoiseSpec.from_yaml() 优先从此处加载；
+# 字段未指定时回退到 SimNoiseSpec dataclass 硬编码默认值。
+sim_noise_spec:
+  # UWB 测距噪声标准差（米），典型 Decawave DW1000 约 0.05 m。
+  uwb_range_std_m: 0.05
+  # IMU x 轴加速度噪声标准差（m/s²），典型 MEMS 约 0.03。
+  imu_ax_std: 0.03
+  # IMU y 轴加速度噪声标准差（m/s²），典型 MEMS 约 0.03。
+  imu_ay_std: 0.03
+  # IMU z 轴角速度噪声标准差（rad/s），典型 MEMS 约 0.01。
+  imu_gz_std: 0.01
+  # 加速度计 bias 不稳定性（m/s²），对应 MATLAB imuSensor Accelerometer.BiasInstability。
+  # 模拟 Allan 方差中频段 FFN (1/f flicker frequency noise)。
+  imu_accel_bias_instability: 0.015
+  # 陀螺仪 bias 不稳定性（rad/s），对应 MATLAB imuSensor Gyroscope.BiasInstability。
+  imu_gyro_bias_instability: 0.0005
+  # 加速度计 Rate Random Walk 系数（m/s²·√s⁻¹），对应 Allan 方差低频段 RWFN。
+  imu_accel_rrw_mps2_per_sqrt_s: 1.0e-4
+  # 陀螺仪 Rate Random Walk 系数（rad/s·√s⁻¹），对应 Allan 方差低频段 RWFN。
+  imu_gyro_rrw_rads_per_sqrt_s: 1.0e-5
+  # VIO x 方向位移增量噪声标准差（米）。
+  vio_dx_std: 0.01
+  # VIO y 方向位移增量噪声标准差（米）。
+  vio_dy_std: 0.01
+  # VIO 航向角增量噪声标准差（弧度）。
+  vio_dyaw_std: 0.005
+  # VIO 尺度漂移速率（1/s），典型纯 VO 约 1%/100s。
+  vio_scale_drift_rate: 1.0e-4
+  # 高斯噪声的确定性种子基，保证可复现。
+  base_seed: 20260605
+  # §5.3 短时 IMU 主导段——UWB 全锚 NLOS 持续段。每段为 [start_s, end_s] 闭区间，
+  # 时戳语义同序列内累计秒。段内 UWB 行 valid=False + quality=0（全锚 NLOS），
+  # IMU 主导该时段的姿态推进。默认空 list 即无 outage；统计级 N3 (nlos_ratio)
+  # 是逐观测脉冲，与本字段"持续段"语义不同。修改本字段须走协议变更流程。
+  uwb_outage_segments: []
+  # §5.3 短时 IMU 主导段——VIO 持续中断段。每段为 [start_s, end_s] 闭区间，
+  # 段内 VIO 行 dx/dy/dyaw=0 + quality=0（视觉失能/黑屏持续段），IMU 主导该时段。
+  # 与统计级 V3 (blackout_prob) 逐帧独立概率不同——本字段是时序段。
+  # 默认空 list 即无 outage；修改本字段须走协议变更流程。
+  vio_outage_segments: []

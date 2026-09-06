@@ -1,0 +1,11 @@
+numpy
+scipy
+pandas
+PyYAML>=6.0.3
+pydantic
+matplotlib
+networkx
+torch
+
+[dev]
+pytest

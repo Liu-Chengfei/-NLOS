@@ -1,0 +1,119 @@
+# 文件职责：定义消融实验入口（使用 N2/A2/V1 三轴注入激活所有 4 个头）。
+# 这套配置基于消融实验方案.txt，确保 bias/risk/uwb_scaling/vio_scaling 四个头都能被激活。
+# 
+# 关键设计：
+# - N2 轴：nlos_ratio=0.50, bias_strength_m=8.0 → 激活 bias + uwb_scaling
+# - A2 轴：cross_modal_skew_ms=60ms, burst_missing_prob=0.06 → 激活 risk + uwb_scaling  
+# - V1 轴：reproj_err_max=1.00, blackout_prob=0.02, drift_bias_sigma_mps=0.05 → 激活 vio_scaling
+#
+# 数据集说明：
+# 使用 sim_e9_ablation 数据集（N2/A2/V1 三轴注入），确保所有 4 个头在训练/推理时都有激活机会。
+
+# 实验编号。
+experiment_id: e5_ablation_new
+
+# 主研究轴是消融变体（K 轴扫描配合 frozen_axes A2/N2/V1，5 变体方法 × 固定轴）。
+# 使用 sim_e9_ablation 数据集（N2/A2/V1 三轴注入），K 轴固定 K1（欠定条件）。
+primary_axis: K
+
+# 场景轴配置：使用 N2/A2/V1 三轴注入激活所有头部
+# 注意：这些值是硬编码的，实际数据集的 axes_override 由 sim_meta.json 决定
+frozen_axes:
+  A: A2  # 中度异步注入，激活 risk 头
+  N: N2  # 中度 NLOS，激活 bias + uwb_scaling 头
+  V: V1  # 轻度 VIO 退化，激活 vio_scaling 头
+  K: K1  # 欠定锚数（与主表 K3 不同），激活头部感知欠定条件
+  M: M0  # 无模态缺失
+
+# 消融变体矩阵（5 变体）
+# 参考：docs/消融实验方案.txt 第 2 节
+methods:
+  - liquid_ekf_full          # Full：完整液态网络增强 EKF，4 个头都激活
+  - liquid_ekf_wo_bias_memory  # wo_bias_memory：关闭 bias 记忆头 (bias=0)，激活 risk/uwb_scaling/vio_scaling
+  - liquid_ekf_wo_risk_gate    # wo_risk_gate：关闭风险门控 (risk=0)，激活 bias/uwb_scaling/vio_scaling
+  - liquid_ekf_wo_vio_confidence  # wo_vio_confidence：关闭 vio confidence 调制，激活 bias/risk/uwb_scaling
+  - liquid_ekf_wo_liquid     # wo_liquid：等价于标准 EKF (所有 4 头关闭)，验证网络整体贡献
+
+# 运行规模
+mode_overrides:
+  quick:
+    repeats: 2
+    max_sequences: 60
+    
+  full:
+    repeats: 5
+    max_sequences: 60
+
+# 数据集名称（使用 sim 数据集，已配置为 N2/A2/V1 注入）
+dataset_name: sim
+
+# 显式序列列表：覆盖全部 60 条 N2/A2/V1 注入序列（30 主序列 + 30 变体段）。
+# public_sequence_category 路由要求 experiment_cfg 显式给出 seq_ids。
+seq_ids:
+- sim_line_01
+- sim_line_01_var_01
+- sim_line_01_var_02
+- sim_line_02
+- sim_line_02_var_01
+- sim_line_02_var_02
+- sim_curve_01
+- sim_curve_01_var_01
+- sim_curve_01_var_02
+- sim_curve_02
+- sim_curve_02_var_01
+- sim_curve_02_var_02
+- sim_mirror_01
+- sim_mirror_01_var_01
+- sim_mirror_01_var_02
+- sim_rotate_01
+- sim_rotate_01_var_01
+- sim_rotate_01_var_02
+- sim_shift_01
+- sim_shift_01_var_01
+- sim_shift_01_var_02
+- sim_shift_02
+- sim_shift_02_var_01
+- sim_shift_02_var_02
+- sim_turn_01
+- sim_turn_01_var_01
+- sim_turn_01_var_02
+- sim_turn_02
+- sim_turn_02_var_01
+- sim_turn_02_var_02
+- sim_long_10m_01
+- sim_long_10m_01_var_01
+- sim_long_10m_01_var_02
+- sim_long_20m_01
+- sim_long_20m_01_var_01
+- sim_long_20m_01_var_02
+- sim_long_30m_01
+- sim_long_30m_01_var_01
+- sim_long_30m_01_var_02
+- sim_long_40m_01
+- sim_long_40m_01_var_01
+- sim_long_40m_01_var_02
+- sim_long_50m_01
+- sim_long_50m_01_var_01
+- sim_long_50m_01_var_02
+- sim_long_10m_02
+- sim_long_10m_02_var_01
+- sim_long_10m_02_var_02
+- sim_long_20m_02
+- sim_long_20m_02_var_01
+- sim_long_20m_02_var_02
+- sim_long_30m_02
+- sim_long_30m_02_var_01
+- sim_long_30m_02_var_02
+- sim_long_40m_02
+- sim_long_40m_02_var_01
+- sim_long_40m_02_var_02
+- sim_long_50m_02
+- sim_long_50m_02_var_01
+- sim_long_50m_02_var_02
+
+# Ablation statistics reporting format (参考《消融实验方案.txt》第 3 节)
+# 每个变体需要报告 4 个头的激活统计：
+# - bias：输出均值 >0.1m 且有分布
+# - risk：risk≠0 的事件比例 5-30%
+# - uwb_scaling：输出偏离 1.0 的比例
+# - vio_scaling：输出偏离 1.0 的比例

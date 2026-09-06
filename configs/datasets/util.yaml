@@ -1,0 +1,69 @@
+# 文件职责：定义 UTIL 公开补充数据集的目录和字段映射，作为补充 benchmark 复用层，与主仿真链路解耦。
+# 本文件主要给次公开 benchmark 复用，不污染普通仿真链路；配置尽量与主链路解耦。
+
+# 数据集统一名称，给 registry、脚本和输出目录使用。
+dataset_name: util  # UTIL 补充数据集的标准名称。
+
+# 原始数据目录，存放导入的原始文件。
+raw_root: data/raw/util  # UTIL 原始数据所在目录。
+
+# 中间产物目录，用于 prepare 和清洗过程中的临时结果。
+interim_root: data/interim/util  # UTIL 中间产物所在目录。
+
+# 最终处理后目录，下游 benchmark、评估和统计会从这里读取。
+processed_root: data/processed  # UTIL 最终处理后目录。
+
+# 原始字段到统一 schema 的映射，决定不同模态怎么被统一成同一套字段名。
+field_mapping:
+  # IMU 模态字段映射，直接服务于传播和短时动态估计。
+  imu:
+    # 时间戳，用于和其他模态做时间对齐。
+    timestamp: timestamp  # IMU 的时间戳字段。
+    # x 轴加速度，进入平面传播或特征提取。
+    ax: ax  # IMU 的 x 轴加速度字段。
+    # y 轴加速度，进入平面传播或特征提取。
+    ay: ay  # IMU 的 y 轴加速度字段。
+    # z 轴角速度，主要用于航向推进。
+    gz: gz  # IMU 的 z 轴角速度字段。
+  # UWB 模态字段映射，负责距离约束输入。
+  uwb:
+    # 时间戳，用于与传播链和其他观测对齐。
+    timestamp: timestamp  # UWB 的时间戳字段。
+    # 锚点编号，用于标识具体的距离源。
+    anchor_id: anchor_id  # UWB 的锚点编号字段。
+    # 测距值，是 UWB 观测的核心数值。
+    range: range  # UWB 的测距字段。
+    # 有效位，表示这条观测是否可以进入后续计算。
+    valid: valid  # UWB 的有效性标记。
+    # 质量值，用于筛选、加权或统计分析。
+    quality: quality  # UWB 的质量字段。
+  # 光流或流量类模态字段映射，表示相对位移或流量型观测。
+  flow:
+    # 时间戳，与其他模态对齐的基准字段。
+    timestamp: timestamp  # flow 模态时间戳字段。
+    # x 方向增量，表示横向变化量。
+    dx: dx  # flow 的 x 方向增量字段。
+    # y 方向增量，表示纵向变化量。
+    dy: dy  # flow 的 y 方向增量字段。
+    # 质量值，表示这条观测的可信度。
+    quality: quality  # flow 的质量字段。
+  # ToF 模态字段映射，通常也是距离类观测。
+  # 注意：ToF 在 field_mapping 中声明了字段结构，但 tof.json 不在 useful_assets 中，
+  # 因为当前 pipeline 不消费 ToF 数据；tof.json 为可选资产，未来启用时需同步加入 useful_assets。
+  tof:
+    # 时间戳，用于和其他传感器同步。
+    timestamp: timestamp  # ToF 的时间戳字段。
+    # 测距值，作为 ToF 核心观测。
+    range: range  # ToF 的测距字段。
+    # 质量值，用于判断是否可用。
+    quality: quality  # ToF 的质量字段。
+  # 真值字段映射，只用于监督、评估和对照。
+  gt:
+    # 时间戳，用于真值与观测的时间对齐。
+    timestamp: timestamp  # 真值时间戳字段。
+    # x 位置真值，作为位置误差计算的基准。
+    px: px  # 真值的 x 位置字段。
+    # y 位置真值，作为位置误差计算的基准。
+    py: py  # 真值的 y 位置字段。
+    # 航向真值，作为姿态误差计算的基准。
+    yaw: yaw  # 真值的航向字段。

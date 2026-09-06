@@ -1,0 +1,54 @@
+# 文件职责：定义异步轴（A 轴）的扫描等级，供实验配置引用。
+#
+# 本文件是场景五轴 S(A,N,V,G,K) 中 A 轴的离散等级定义。
+# "异步"指不同传感器（UWB、IMU、视觉）之间的时间戳不对齐，
+# 包括时钟偏移、抖动、突发丢帧、跨模态偏斜和时钟漂移等现象。
+# 异步越严重，融合滤波器对测量时间的信任越低，定位精度越容易退化。
+#
+# 本文件只定义等级名称和归一化强度（strength），不负责任何 reader 或 pipeline 逻辑。
+# 具体的物理参数（offset_ms、jitter_ms、burst_missing_prob、cross_modal_skew_ms、clock_drift_ppm）由
+# configs/base/scene_axis_protocol.yaml 中的 A 轴协议定义。
+#
+# 文件性质：本文件是参考模板，记录 A 轴等级的命名约定与强度归一化方式，
+# 供实验配置编写者参考。仓内没有任何代码直接加载本文件；
+# scene_sampler._normalize_sweep_cfgs 接受与本文件结构一致的 sweep_cfgs 字典，
+# 但仅消费 name 字段，strength 字段被原样保留供上游可选消费。
+#
+# 归一化方式：A 轴有 4 个等级（A0-A3），strength 采用序数归一化
+# strength = level_index / (max_level_index) = i / 3，因此取值 0.0/0.33/0.66/1.0。
+# 注意：0.33 与 0.66 是 1/3 与 2/3 的有限精度近似，不是精确值。
+# 注意：G 轴采用物理参数线性插值（0.0/0.4/1.0），与 A/N/V 轴的序数归一化不同，
+# 因此 strength 值不可跨轴直接比较。
+
+# 异步程度等级列表，每个等级包含名称和归一化强度。
+levels:
+  # A0：近同步（near_sync），几乎没有异步扰动，作为一切比较的基线参照点。
+  # 对应 scene_axis_protocol 中 offset_ms=[0,10], jitter_ms=2, burst_missing_prob=0.00, cross_modal_skew_ms=5, clock_drift_ppm=0。
+  - name: A0  # 最轻异步档位名，A 代表 Async，0 代表最低等级。
+    # 强度归一化值，序数归一化：0/3 = 0.0。
+    # 0.0 表示最低等级序位（非物理压力比例），用于档位排序。
+    strength: 0.0  # A0 强度最小，代表近同步基线。
+
+  # A1：轻度异步（mild_async），传感器时间戳有轻微错位。
+  # 对应 scene_axis_protocol 中 offset_ms=[10,40], jitter_ms=5, burst_missing_prob=0.02, cross_modal_skew_ms=20, clock_drift_ppm=40。
+  # 比基线更明显，但融合算法通常仍能较好地补偿。
+  - name: A1  # 轻度异步档位名，1 代表第一级退化。
+    # 强度归一化值，序数归一化：1/3 ≈ 0.33。
+    # 0.33 表示等级序位（非物理压力比例），用于档位排序。
+    strength: 0.33  # A1 的归一化强度。
+
+  # A2：中度异步（moderate_async），传感器时间戳有明显错位。
+  # 对应 scene_axis_protocol 中 offset_ms=[40,120], jitter_ms=12, burst_missing_prob=0.06, cross_modal_skew_ms=60, clock_drift_ppm=120。
+  # 这是中间压力档，融合算法需要主动处理时间对齐问题。
+  - name: A2  # 中度异步档位名，2 代表第二级退化。
+    # 强度归一化值，序数归一化：2/3 ≈ 0.66。
+    # 0.66 表示等级序位（非物理压力比例），用于档位排序。
+    strength: 0.66  # A2 的归一化强度。
+
+  # A3：重度异步（severe_async），传感器时间戳严重不对齐。
+  # 对应 scene_axis_protocol 中 offset_ms=[120,240], jitter_ms=25, burst_missing_prob=0.12, cross_modal_skew_ms=120, clock_drift_ppm=240。
+  # 这是压力最高的档位，融合算法面临最大时间对齐挑战。
+  - name: A3  # 最强异步档位名，3 代表最高等级退化。
+    # 强度归一化值，序数归一化：3/3 = 1.0。
+    # 1.0 表示最高等级序位（非物理压力比例），用作极端异步对照。
+    strength: 1.0  # A3 强度最大，代表重度异步。

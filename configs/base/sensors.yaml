@@ -1,0 +1,98 @@
+# 文件职责：定义传感器字段冻结口径和特征缺失处理策略。
+# 本文件冻结的是字段契约（名称、类型、语义），不是特征工程实现。
+# 具体计算逻辑（归一化、滤波、特征构造等）在 reader、pipeline 和 model 里完成。
+# 修改本文件任何字段均属协议变更，须走协议变更流程。
+
+# 偏差项与测量项的语义映射（隐含关系，供下游开发者参考）：
+#   task.yaml state_items 中的 bax ↔ 本文件 imu_fields 中的 ax（加速度计x偏差↔x加速度）
+#   task.yaml state_items 中的 bay ↔ 本文件 imu_fields 中的 ay（加速度计y偏差↔y加速度）
+#   task.yaml state_items 中的 bg  ↔ 本文件 imu_fields 中的 gz（陀螺仪偏差↔z轴角速度）
+#   'b' 前缀表示偏差(bias)，对应测量项去除偏差后得到真实物理量。
+# IMU 载荷保留字段列表，直接进入后续特征构造或对齐逻辑。
+# 这些字段名必须与 reader/schema 中的定义严格一致，否则数据对齐会失败。
+# ax : x 方向加速度 (m/s²)，来自加速度计，是 IMU 传播的核心输入之一。
+# ay : y 方向加速度 (m/s²)，来自加速度计，与 ax 共同描述平面加速度。
+# gz : z 轴角速度 (rad/s)，来自陀螺仪，用于航向角传播。
+imu_fields: [ax, ay, gz]
+
+# UWB 载荷必须和 reader/schema 对齐的字段列表。
+# 这些字段名必须与 reader/schema 中的定义严格一致，否则数据对齐会失败。
+# anchor_id   : 锚点标识符，用于区分不同 UWB 基站，类型通常为整数或字符串。
+# range       : 锚点到标签的测距值 (m)，是 UWB 定位的核心观测量。
+# valid       : 测距有效性标志，true 表示本次测距有效，false 表示应丢弃或降权。
+# quality     : 测距质量指标，数值越高表示信号质量越好，可用于加权或筛选。
+uwb_fields: [anchor_id, range, valid, quality]
+
+# §4.1.c 协议纪律（前提指导.md:889）：单程/双程、天线延迟补偿深度全员同一。
+# 本仓库的 UWB 测距预处理深度由下列冻结口径显式约束，无单方特权路径：
+#   1. 主输入只有标量 range（ToA/TWR 类），不含差分距离/多普勒/载波相位/AOA/TDoA。
+#   2. 单一观测模型 h(·)：estimators/uwb_update_step.py:predict_range L367
+#      `z_pred = math.hypot(dx, dy) + uwb_clock_bias + extra_bias_value`，所有估计器
+#      （EKF / robust_ekf / FGO / NN+EKF）共享同一公式，无单方预处理。
+#   3. 单一有界偏置入口 `extra_bias`（默认 0.0），由 fusion 层 clip_uwb_bias
+#      （protocol/liquid_bridge_contract.py:754-780）做协议级截断，所有方法同一截断规则。
+#   4. 不存在单方天线延迟校准/电缆长度补偿/射频开关切换的私有路径
+#      （grep `antenna_delay|sds_twr|cable_delay|rf_switch` 在 src/ 下 0 命中）。
+# 任何新增预处理必须在协议层（scene_axis_protocol.py）登记并全员同一应用。
+
+# §4.4 默认关闭模态清单（前提指导.md:1081-1091）：以下 UWB 衍生观测量在主表全部关闭，
+# 若启用须全体同一并重写命题（C 类不可让步前提）：
+#   - 差分测距 / 相对距离变化率（delta_range, range_diff）
+#   - 多普勒 / 径向速度（doppler, radial_velocity）
+#   - 载波相位 / 整周模糊度（carrier_phase, integer_ambiguity）
+#   - 多天线分集 / 切换天线瞬间（antenna_selection, antenna_diversity）
+#   - 金机 / 参考应答器 / 空口校准特权（reference_transponder, golden_node）
+#   - 测角 / AOA / TDoA / PDOA 主输入（aoa, pdoa, tdoa）
+#   - 基于 CIR / 峰比的修正距离（cir_corrected, peak_corrected）
+#   - 滑动中值 / 均值 / 指数平滑测距（sliding_median, rolling_mean, exponential_smooth）
+#   - 异常值剪裁 / 软削波只给一方（outlier_clip, soft_clip）
+#   - 射频开关 / 天线切换瞬间（rf_switch, antenna_switch_event）
+# 协议层拒绝锚点：scene_axis_protocol.py:68-79 _AXIS_LEVEL_PARAM_KEYS 6 轴白名单 +
+# L463-474 unknown_keys 校验 → 任一上述字段名写入 scene_axis_protocol.yaml 即抛 ValueError。
+# 协议级护栏：grep 上述任一关键字在 src/ 下均为 0 命中；任何引入都必须先改协议 §4.4。
+
+# VIO 载荷保留字段列表，既是观测量，也是质量与可用性判定的输入。
+# 这些字段名必须与 reader/schema 中的定义严格一致，否则数据对齐会失败。
+# dx      : x 方向帧间相对位移 (m)，VIO 输出的核心位置观测量。
+# dy      : y 方向帧间相对位移 (m)，VIO 输出的核心位置观测量。
+# dyaw    : 帧间相对航向变化 (rad)，VIO 输出的核心姿态观测量。
+# quality : VIO 整体质量指标，数值越高表示本次 VIO 输出越可信。
+# 铁律 3 (Stage A1 下游修复, 2026-07-23): 删 tracked_features / reproj_err —
+# 紧耦合单目 VIO 仅输出位姿增量 (dx, dy, dyaw) 与 quality, 不再输出特征点跟踪数与重投影误差.
+# sim_materializer / event_builder / field_mapper / ntu_viral_reader / model_factory /
+# feature_builder 已同步移除此两字段的下游引用.
+vio_fields: [dx, dy, dyaw, quality]
+
+# 光流/流量类载荷保留字段列表（UTIL 数据集）。
+# flow 模态是 VIO 的替代数据源，字段更精简，通常只包含平移增量和质量。
+# 这些字段名必须与 reader/schema 中的定义严格一致，否则数据对齐会失败。
+# dx      : x 方向帧间相对位移 (m)，与 VIO 的 dx 语义一致。
+# dy      : y 方向帧间相对位移 (m)，与 VIO 的 dy 语义一致。
+# quality : 光流跟踪质量指标，数值越高表示本次观测越可信。
+flow_fields: [dx, dy, quality]
+
+# ToF 测距类载荷保留字段列表（UTIL 数据集）。
+# ToF 模态是距离类观测，字段结构与 UWB 类似但缺少锚点标识和有效性标志。
+# 这些字段名必须与 reader/schema 中的定义严格一致，否则数据对齐会失败。
+# range   : ToF 测距值 (m)，是 ToF 定位的核心观测量。
+# quality : 测距质量指标，数值越高表示信号质量越好。
+tof_fields: [range, quality]
+
+# 特征缺失时的统一处理策略，适用于所有传感器模态。
+# 当某个字段在数据源中不存在或读取失败时，按此策略处理。
+feature_missing_policy:
+  # 缺失值读取优先级，从高到低依次尝试。
+  # event_root       : 优先从事件根节点读取，根节点通常携带最原始的完整数据。
+  # modality_payload : 其次从模态载荷读取，模态载荷是该传感器类型的专用数据区。
+  # state_ctx        : 最后从状态上下文读取，状态上下文携带滤波器当前状态信息。
+  source_precedence: [event_root, modality_payload, state_ctx]
+  # 数值缺失时默认补 0.0。
+  # 注意：这是结构占位，不是真实物理值，后续必须配合 missing_mask 区分"真 0"和"补零"。
+  numeric_fill_value: 0.0
+  # 存在缺失值时必须同时提供缺失掩码。
+  # missing_mask 与原始字段一一对应，true 表示该位置为缺失补零，false 表示真实值。
+  # 这是区分"真实测量值为 0"和"数据缺失补 0"的唯一手段。
+  require_missing_mask: true
+  # 缺失语义统一由 missing_mask 承载。
+  # 不允许用 NaN、-1、特殊标记等其他方式表示缺失，统一用 missing_mask 布尔掩码。
+  missing_semantics_carrier: missing_mask

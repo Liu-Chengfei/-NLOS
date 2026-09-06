@@ -1,0 +1,2 @@
+# Convenience install entry; canonical dependency metadata lives in pyproject.toml.
+-e .[dev]

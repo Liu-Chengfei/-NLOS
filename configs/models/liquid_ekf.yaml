@@ -1,13 +1,6 @@
 name: liquid_ekf
-# 2026-08-29 E6 run: train_liquid_smoke 当前唯一残留的 liquid_ekf 权重是
-# liquid_ekf_resume_checkpoint.pt（mtime 2026-08-26 14:38:39，58359 bytes）。
-# export_best / best / training_best / readout_warmup_best 等其他 4 个被训练清理流程删除了，
-# 只剩这一份 mtime 最新。
-checkpoint_path: E:/Q4 - 副本/outputs/train_liquid_smoke/checkpoints/liquid_ekf_resume_checkpoint.pt
-
-# Checkpoint path for pre-trained weights (N3 NLOS bias training).
-# For liquid_ekf_full and ablation variants; use same checkpoint since
-# ablation methods only disable specific heads/processors.
+# 2026-09-02: 重置 checkpoint_path。真实训由 06_train_liquid.py 调用，
+# 脚本从 liquid_ekf.yaml.train.checkpoint_dir 写入，无需预先存在。
 # checkpoint_path: ./weights/liquid_ekf_best_checkpoint.pt  # 临时注释：quick mode 不允许使用预训练 checkpoint
 feature_order:
 - dt
@@ -67,6 +60,7 @@ train:
     T_max: 160
     eta_min: 5.0e-05
   epoch_candidate_stride: 10
+  patience: 160
   deterministic: true
   gradient_clip_max_norm: 1.0
   bias_huber_delta: 1.345
@@ -102,16 +96,17 @@ bridge_thresholds:
   robust_supplement_quality_threshold: 0.55
   robust_supplement_alignment_threshold: 0.45
   robust_supplement_max_boost: 0.2
-  observation_risk_blend: 0.48
-  uwb_geometric_bias_full_scale: 0.4
-  async_gap_full_scale: 0.22
-  async_uwb_scaling_coeff: 0.28
-  async_vio_scaling_coeff: 0.28
-  uwb_scaling_alignment_coeff: 0.58
-  uwb_scaling_quality_coeff: 0.3
-  uwb_scaling_geometry_coeff: 0.47
+  observation_risk_blend: 0.415
+  uwb_geometric_bias_full_scale: 0.45
+  async_gap_full_scale: 0.3
+  async_uwb_scaling_coeff: 0.24
+  async_vio_scaling_coeff: 0.24
+  uwb_scaling_alignment_coeff: 0.54
+  uwb_scaling_quality_coeff: 0.275
+  uwb_scaling_geometry_coeff: 0.41
   uwb_invalid_extra_boost: 0.15
-  vio_scaling_alignment_coeff: 0.58
-  vio_scaling_quality_coeff: 0.3
-  vio_low_features_scaling_boost: 0.16
-  vio_high_reproj_scaling_boost: 0.16
+  vio_scaling_alignment_coeff: 0.54
+  vio_scaling_quality_coeff: 0.275
+  vio_low_features_scaling_boost: 0.13
+  vio_high_reproj_scaling_boost: 0.13
+project_root: E:\异步高NLOS

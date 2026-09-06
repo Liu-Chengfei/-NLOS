@@ -1,0 +1,63 @@
+# 文件职责：定义视觉退化轴（V 轴）的扫描等级，供实验配置引用。
+#
+# 本文件是场景五轴 S(A,N,V,G,K) 中 V 轴的离散等级定义。
+# "视觉退化"指视觉惯性里程计（VIO）的观测质量下降。
+# 2026-08-31 档位重制定：
+#   V0 = 健康（特征 >50/frame, σ=0.01-0.03m/步, 帧有效 100%, 无间隙）
+#   V1 = 黑屏（视觉完全失效, 增量在但置零, scaling→0, 每序列 1-2 次）
+#   V2 = 特征丢失（特征 10-20/frame, σ 5×放大至 0.05-0.15m/步, scaling→0.3-0.7）
+#   V3 = 关键帧中断（增量缺失-质量触发, 间隙 0.5-3s, 恢复跳变 0.3-1m）
+# 判别规则：A 轴丢帧=数据不在(时间戳级缺失); V1=数据在但置零; V2=数据在但变糙; V3=数据不在(质量触发)+恢复跳变。
+#
+# 本文件只定义等级名称和归一化强度（strength），不负责任何 reader 或 pipeline 逻辑。
+# 具体的物理参数（tracked_features_range、reproj_err_max、blackout_prob、drift_bias_sigma_mps）由
+# configs/base/scene_axis_protocol.yaml 中的 V 轴协议定义。
+#
+# 文件性质：本文件是参考模板，记录 V 轴等级的命名约定与强度归一化方式，
+# 供实验配置编写者参考。仓内没有任何代码直接加载本文件；
+# scene_sampler._normalize_sweep_cfgs 接受与本文件结构一致的 sweep_cfgs 字典，
+# 但仅消费 name 字段，strength 字段被原样保留供上游可选消费。
+#
+# 归一化方式：V 轴有 4 个等级（V0-V3），strength 采用序数归一化
+# strength = level_index / (max_level_index) = i / 3，因此取值 0.0/0.33/0.66/1.0。
+# 注意：0.33 与 0.66 是 1/3 与 2/3 的有限精度近似，不是精确值。
+# 注意：strength 是序数位，不由物理参数（tracked_features_range 等）线性推导，
+# 若需按物理参数做扫参横轴，应直接使用协议中的物理参数而非 strength。
+# 注意：G 轴采用物理参数线性插值（0.0/0.4/1.0），与 A/N/V 轴的序数归一化不同，
+# 因此 strength 值不可跨轴直接比较。
+
+# 视觉退化等级列表，每个等级包含名称和归一化强度。
+levels:
+  # V0：健康 VIO（nominal_vio），特征 >50/frame，σ=0.01-0.03m/步，帧有效 100%，无间隙。
+  # 对应 scene_axis_protocol 中 tracked_features_range=[50,200], reproj_err_max=0.50,
+  # blackout_prob=0.00, drift_bias_sigma_mps=0.0, keyframe_interruptions_per_seq=0。
+  # 这是最稳定的视觉档位，一切比较的基线。
+  - name: V0  # 最轻视觉退化档位名，V 代表 Visual，0 代表最低等级。
+    # 强度归一化值，序数归一化：0/3 = 0.0。
+    # 0.0 表示最低等级序位（非物理压力比例），用于档位排序。
+    strength: 0.0  # V0 强度最小，代表正常视觉基线。
+
+  # V1：黑屏 VIO（blackout_vio），视觉完全失效：增量在但置零(=0)，scaling→0。
+  # 每序列 1-2 次黑屏，单次 0.5-2s，占轨迹 5-10%。
+  # 对应 scene_axis_protocol 中 tracked_features_range=[30,80], reproj_err_max=1.00,
+  # blackout_prob=0.07, drift_bias_sigma_mps=0.05, keyframe_interruptions_per_seq=0。
+  - name: V1  # 黑屏视觉退化档位名，1 代表黑屏级退化。
+    # 强度归一化值，序数归一化：1/3 ≈ 0.33。
+    strength: 0.33  # V1 的归一化强度。
+
+  # V2：特征丢失 VIO（feature_loss_vio），特征 10-20/frame，σ 5×放大至 0.05-0.15m/步。
+  # 占轨迹 20-40%，连续段 1-3s，scaling→0.3-0.7。
+  # 对应 scene_axis_protocol 中 tracked_features_range=[10,20], reproj_err_max=2.00,
+  # blackout_prob=0.05, drift_bias_sigma_mps=0.15, keyframe_interruptions_per_seq=1。
+  - name: V2  # 特征丢失视觉退化档位名，2 代表第二级退化。
+    # 强度归一化值，序数归一化：2/3 ≈ 0.66。
+    strength: 0.66  # V2 的归一化强度。
+
+  # V3：关键帧中断 VIO（keyframe_interrupt_vio），增量缺失（质量触发，非时间戳缺失），
+  # 每序列 2-4 次，间隙 0.5-3s，占轨迹 10-20%，恢复后重定位跳变 0.3-1m。
+  # 对应 scene_axis_protocol 中 tracked_features_range=[0,15], reproj_err_max=4.00,
+  # blackout_prob=0.10, drift_bias_sigma_mps=0.30, keyframe_interruptions_per_seq=3,
+  # keyframe_recovery_jump_m=0.65。
+  - name: V3  # 最强视觉退化档位名，3 代表最高等级退化。
+    # 强度归一化值，序数归一化：3/3 = 1.0。
+    strength: 1.0  # V3 强度最大，代表重度视觉退化。

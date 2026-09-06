@@ -1,0 +1,193 @@
+# 文件职责：定义论文主实验数据集 paper_main 的可执行规格。
+# 与 sim 数据集（sim_e9_protocol_20260726）共存，本文件不修改 sim 的任何契约。
+# 池结构：A2/A3 × N2/N3 × K0/K1 = C1-C4 等比例混合。
+# 2000 条序列（5 seed × 400 序列/seed），1:9 序列级 train/test 划分。
+
+dataset_name: paper_main
+raw_root: data/raw/paper_main_v2
+processed_root: data/processed/paper_main_v2
+interim_root: data/interim/paper_main_v2
+manifests_root: data/manifests/paper_main_v2
+prepare_root: outputs/prepare_paper_main_v2
+
+# 主实验数据集完整规格（与 docs/2026-08-29-pasted-spec 一一对应）
+paper_spec:
+  protocol_version: 27
+  generator_version: paper_main_v2
+
+  # §1 场地与坐标系
+  site_xy_m: [20.0, 20.0]      # 20m × 20m 单层室内
+  coordinate: ENU               # x 向东, y 向北, z 向上
+  warmup_s: 10.0
+  effective_duration_s: 50.0    # 60s 总时长 - 10s warmup
+
+  # §2 传感器配置
+  imu_hz: 150                   # dt_imu = 6.67ms
+  uwb_hz: 10                    # dt_uwb = 100ms
+  vio_hz: 20                    # dt_vio = 50ms
+
+  uwb_sigma_m: 0.1186           # §2.2 LOS 测距噪声 [7]
+  imu_accel_white_psd: 0.02     # m/s²/√Hz
+  imu_gyro_white_psd: 0.005     # rad/s/√Hz
+  imu_accel_bias_instab: 0.001  # m/s²
+  imu_gyro_bias_instab: 0.0005  # rad/s
+  imu_accel_rrw: 1.0e-6         # m/s²/√s, 60s 内 std ≈ 0.0006 m/s² 远小于 bias_instab
+  imu_gyro_rrw: 1.0e-7          # rad/s/√s
+  vio_dx_dy_std_m: 0.02         # m/步
+  vio_yaw_drift_dps: 0.0083     # 0.5°/min
+
+  # §3 时间异步（A 档位与协议 yaml 单源）
+  async_uwb_offset_ms:
+    A0: [0, 0]                  # 同步
+    A1: [5, 20]                 # A1 轻异步：UWB 时钟偏移 5-20ms
+    A2: [20, 50]                # A2 中度异步
+    A3: [100, 200]              # A3 重度异步
+  # UWB 往返延迟：单独字段（在 sim_main 异步表中拆出 RTT 通道）
+  async_uwb_rtt_ms:
+    A0: 0
+    A1: [20, 40]
+    A2: [40, 80]
+    A3: [120, 250]
+  async_uwb_jitter_ms:
+    A0: 0
+    A1: 1                       # A1 轻抖动 ±1ms
+    A2: 3
+    A3: 10
+  async_imu_offset_ms:
+    A0: [0, 0]
+    A1: [1, 5]                  # A1 轻 IMU 时钟偏移 1-5ms
+    A2: [5, 15]
+    A3: [20, 50]
+  async_imu_jitter_ms:
+    A0: 0
+    A1: 1
+    A2: 3
+    A3: 10
+  async_vio_offset_ms:
+    A0: [0, 0]
+    A1: [5, 20]                 # A1 轻 VIO 时钟偏移 5-20ms
+    A2: [20, 50]
+    A3: [100, 200]
+  async_vio_proc_delay_ms:
+    A0: 0
+    A1: [10, 30]                # A1 轻 VIO 处理延迟 10-30ms
+    A2: [30, 80]
+    A3: [150, 300]
+  async_vio_jitter_ms:
+    A0: 0
+    A1: 1
+    A2: 5
+    A3: 10
+
+  # §4 NLOS（连续段语义，与原 apply_nlos_level 的 poisson scatter 不同）
+  nlos_uwb_bias_m:
+    N0: 0.0
+    N1: 0.7                     # 10-15% 区间中位（保留 N1 字段完整性，主池不调用）
+    N2: 2.5                     # 25-30% 区间中位
+    N3: 5.0                     # 30-35% 区间中位（按用户规格压低后上界）
+  nlos_uwb_noise_std_m:
+    N0: 0.0
+    N1: 0.3
+    N2: 0.8                     # 中度 NLOS 噪声 (0.8m 偏保守，论文 30-35% 区间对应 std ≈ 0.6-0.8m)
+    N3: 1.5                     # 重度 NLOS 噪声 (1.5m 偏保守，论文 35-40% 区间对应 std ≈ 1.0-1.5m)
+  nlos_segment_block_s: [2.0, 5.0]
+  nlos_segment_count_range: [2, 4]
+
+  # §4b V 轴 4 档视觉退化（与 configs/base/scene_axis_protocol.yaml V 同源）
+  visual_levels:
+    V0:  # 正常 VIO，视觉特征充足
+      tracked_features_range: [100, 200]
+      reproj_err_max: 0.50
+      blackout_prob: 0.00
+      drift_bias_sigma_mps: 0.0
+    V1:  # 轻度退化
+      tracked_features_range: [60, 120]
+      reproj_err_max: 1.00
+      blackout_prob: 0.02
+      drift_bias_sigma_mps: 0.05
+    V2:  # 中度退化
+      tracked_features_range: [30, 80]
+      reproj_err_max: 2.00
+      blackout_prob: 0.08
+      drift_bias_sigma_mps: 0.15
+    V3:  # 重度退化
+      tracked_features_range: [0, 40]
+      reproj_err_max: 4.00
+      blackout_prob: 0.20
+      drift_bias_sigma_mps: 0.30
+
+  # §4c M 轴 4 档模态丢失（与 configs/base/scene_axis_protocol.yaml M 同源）
+  modality_levels:
+    M0:  # 无缺失（baseline）
+      modality_drop_prob: 0.00
+      affected_modalities: []
+    M1:  # 轻度缺失
+      modality_drop_prob: 0.05
+      affected_modalities: ["uwb"]
+    M2:  # 中度缺失
+      modality_drop_prob: 0.15
+      affected_modalities: ["uwb", "vio"]
+    M3:  # 重度缺失
+      modality_drop_prob: 0.30
+      affected_modalities: ["uwb", "vio", "imu"]
+
+  # §5 丢包
+  uwb_drop_prob_range: [0.05, 0.15]
+  uwb_drop_burst_range: [2, 5]
+  uwb_drop_gap_s_range: [0.3, 2.0]
+  vio_drop_prob_range: [0.10, 0.30]
+  vio_drop_gap_s_range: [0.5, 3.0]
+
+  # §6 轨迹生成
+  trajectory_classes: [line_back_forth, random_walk, figure_eight, stop_turn, polygon]
+  # 5 轨迹类（直行往返/随机游走/八字形/停转/多边形），与用户 2026-09-05 规格一致。
+  speed_bins: [slow, mid, fast]
+  speed_range_mps:
+    slow: [0.5, 1.0]
+    mid: [1.0, 2.0]
+    fast: [2.0, 3.0]
+  window_size: 128             # W = 128 IMU 步 ≈ 0.85s
+  window_stride: 8             # stride = 8 IMU 步 ≈ 66.7ms
+
+  # §7 主表池结构（A2/A3 × N2/N3 × K1 4 锚，V0/M1 frozen）
+  # v27 协议：K 轴仅 K0/K1/K3；G 轴已并入 K 轴；4 类 = 2 档 A × 2 档 N × 同一 K1 锚配置。
+  # V/M frozen：V0（健康 VIO）/ M1（轻度缺模态，UWB 5% 成簇丢包）。
+  pool_layout:
+    - {class_id: C1, A: A2, N: N2, K: K1, V: V0, M: M1, share: 0.25}  # 轻异步 + 中 NLOS + 4 锚
+    - {class_id: C2, A: A2, N: N3, K: K1, V: V0, M: M1, share: 0.25}  # 轻异步 + 重 NLOS + 4 锚
+    - {class_id: C3, A: A3, N: N2, K: K1, V: V0, M: M1, share: 0.25}  # 重异步 + 中 NLOS + 4 锚
+    - {class_id: C4, A: A3, N: N3, K: K1, V: V0, M: M1, share: 0.25}  # 重异步 + 重 NLOS + 4 锚（最压力档）
+
+  # §1 锚点固定布局（v27 协议 K 轴仅 K0/K1/K3，G 轴已并入 K 轴）
+  anchors:
+    # K0：3 锚点（基准最优几何，绑 A0/N0 baseline）
+    K0:
+      - [2.0, 2.0, 2.5]
+      - [18.0, 2.0, 2.5]
+      - [10.0, 18.0, 2.5]
+    # K1：4 锚点（主档，绑 N2/N3 — handbook S2 协议裁决项）
+    # 准则 §4 GDOP 主用布局：A1(2,2)/A2(18,3)/A3(6,17)/A4(16,18) 非对称分布，
+    # 实测 GDOP ≈1.19（活动区凸包内缩 1.5m 轨迹带），手册允许 K 档归属协议裁决。
+    K1:
+      - [2.0, 2.0, 2.5]
+      - [18.0, 3.0, 2.5]
+      - [6.0, 17.0, 2.5]
+      - [16.0, 18.0, 2.5]
+    # K3：3 锚点（近共线退化，绑压力测试）
+    K3:
+      - [-1.0, 0.0, 2.5]
+      - [-0.33, 0.0, 2.5]
+      - [0.33, 0.0, 2.5]
+      - [0.0, 1.5, 2.5]
+
+  # §7.2 规模与划分
+  scale:
+    per_seed_sequences: 200      # quick test: 200 序列/seed，n_seed=10 → 2000 seqs（手册 S3）
+    n_seed: 10                    # 手册 S3 硬约束：10 seed × 5 method = 50 单元（论文级唯一基线）
+    train_test_ratio: 0.1       # 1:9 序列级划分（200 train / 1800 test per seed）
+
+  # §7.3 frozen axes (v27 协议对齐)
+  # G 轴已并入 K 轴，不存在独立的 frozen_g。
+  # V 固定 V0（健康档），M 固定 M1（UWB 5% 成簇丢包）。
+  frozen_v: V0
+  frozen_m: M1

@@ -1,0 +1,211 @@
+# 文件职责：定义实验协议，规定全局约束口径。
+# 训练、评估、公开验证和审计流程均须遵守本文件中的约定。
+# 修改本文件任何字段均属协议变更，须走协议变更流程。
+
+# 协议版本号, 与代码冻结版本对应.
+# 版本号变更意味着协议发生了不可逆的改动, 所有历史结果需标注对应版本.
+# v27 (2026-09-02): 与 scene_axis_protocol.yaml 同步升 v27（H27 协议 v27）。
+#   (1) K 轴：删除 K4（合并不再使用）；保留 K0/K1/K3（handbook S2）
+#   (2) G 轴：4 档全部并入 K 轴
+#   (3) A 轴：A2/A3 为主档；A0/A1 仅用于 baseline
+#   (4) N 轴：N2/N3 为主档；N0/N1 仅用于 baseline
+#   (5) V 轴：V0 为主档；V1/V2/V3 仅用于敏感性
+#   (6) M 轴：M1 为主档（UWB 5% 成簇丢包）
+# v2 (2026-04-28): 与 scene_axis_protocol.yaml 同步升 v2.
+#   (1) 子代 D 8 patches + 主线程扩展 5: 13 维数据集扩展
+#   (2) experiment protocol 与 scene_axis 协议必须版本同步
+#   (3) 历史结果标注: v1 → v2 (45 seqs 13 维扩展)
+# v2.1 (2026-08-02): 补齐 §9 场景尺度与分布模块协议字段.
+protocol_version: 27
+
+# quick/full 规则声明。
+# quick 只表示轻量烟雾跑（用于快速验证流程是否通畅），full 只表示完整真实执行（用于产出正式结果）。
+# quick 和 full 不携带任何科学语义，不得将 quick 结果当作正式结论，也不得用 full 暗示"更优"。
+quick_full_rule: quick_smoke_scale__full_real_execution_required
+
+# 失败样本处理策略。
+# 失败样本（误差超过阈值的帧/序列）必须保留并进入审计流程，不可删除。
+# 删除失败样本属于挑样本行为，违反公平性原则，会导致结果不可复现和不可比较。
+failure_sample_policy: retain_and_audit
+
+# 结果汇总顺序，定义从原始数据到实验结论的聚合层级。
+# 必须严格按此顺序逐层汇总，不可跳层或乱序。
+# single_run         : 单次运行结果，是最原始的评估产出。
+# repeat_summary     : 重复运行汇总，对同一配置多次运行的结果取统计量（均值、标准差等）。
+# scene_summary      : 场景汇总，对同一场景下所有重复运行汇总结果再汇总。
+# experiment_conclusion : 实验结论，对所有场景汇总结果形成最终结论。
+aggregation_order: [single_run, repeat_summary, scene_summary, experiment_conclusion]
+
+# 结论比较时的指标优先级，越靠前越优先。
+# 当两个方法在不同指标上互有胜负时，按此优先级判定优劣。
+# 注意：此处的排序与 metrics.yaml 中 primary_metrics 的展示排序不同——
+#   conclusion_priority 是决策优先级（先看尾部可靠性和安全性），
+#   primary_metrics 是展示优先级（先看整体精度）。
+#
+# §14.1 主指标为「未做鲁棒变换的 raw 平均位置误差」（§14.1 + §14.4 细节）
+# §14.4 细节「禁止用分位数主序（仅 P95）、中位数、裁剪平均、评价阶段再剔异常段，
+#   来改写全序」. 故 rmse 须优先于 p95; p95 退为辅决策参考.
+# §14.4「主报告统计：至少报 raw 位置误差的均值与分散；六比较分条」+ §14.3 六比较分条
+#   要求全序判定走同档/严格优于二阶判定, 不允许单凭 p95 分位数主序宣称全序.
+# p95            : 第 95 百分位误差，作为辅决策参考（不得替代 rmse 主序）。
+# failure_rate   : 失败率，反映系统可用性；与 failure_accounting_mode 联动。
+# rmse           : 均方根误差，§14.1 主指标，反映整体精度，全序主序依据。
+# mae            : 平均绝对误差，第四优先，兜底参考指标；虽属 secondary_metrics，
+#                  但在结论判定中作为兜底参考指标参与比较。
+conclusion_priority: [rmse, mean_rmse, std_rmse, p95, failure_rate, mae]
+  # 注意：conclusion_priority 仅包含决策判定所需的核心指标。
+  # secondary_metrics（p99/ate/rpe/yaw_rmse/yaw_p95）、mechanism_metrics 和 runtime_metrics
+  # 不参与结论判定，但仍在主表和补充表中展示，供分析参考。
+  # §14.4 细节：rmse 是 §14.1 主指标；p95 仅作辅参考，不得替代 rmse 主序判定全序。
+
+# 公开 benchmark 约束，确保公开验证的公平性和可复现性。
+public_benchmark:
+  # 当前官方公开验证面允许的数据集，属于主结论和 paper-grade 对比必须对齐的固定范围。
+  # 其他已注册 public route 只能作为补充/未来扩展入口，不能自动并入当前官方公开 benchmark 面。
+  allowed_datasets: [miluv, ntu_viral]
+  # 使用冻结评测拆分，避免数据边界漂移。
+  # 冻结意味着拆分方式（哪些序列用于评测）一旦确定就不再改变，
+  # 防止通过调整拆分来优化结果。
+  frozen_eval_split: frozen_public_eval
+  # 公开验证阶段禁止调参，保证可比性。
+  # 所有参与公开验证的方法必须使用在训练/验证阶段确定的超参数，
+  # 不允许看到公开评测结果后回调参数。
+  tuning_forbidden: true
+  # 所有方法必须共享同一拆分，确保公平比较。
+  # 不同方法必须在完全相同的评测数据上比较，否则结果不可比。
+  shared_split_required: true
+
+# 训练阶段的拆分角色约束，防止训练数据泄露。
+training:
+  # 训练阶段只允许使用 train 和 val 两类角色的数据。
+  # train : 用于模型参数优化的数据。
+  # val   : 用于超参数选择和早停的数据。
+  allowed_split_roles: [train, val]
+  # 测试、外部和冻结评测数据禁止进入训练流程。
+  # test             : 测试集，用于最终评估，任何情况下不得参与训练。
+  # external         : 外部数据，来自不同数据源，未经授权不得混入训练。
+  # frozen_public_eval : 冻结公开评测集，用于公开验证，严禁泄露到训练。
+  forbidden_split_roles: [test, external, frozen_public_eval]
+
+# 评估阶段的输出和真值约束，确保评估结果的完整性和可信度。
+evaluation:
+  # 必须产出预测包，供 metrics/analysis/plotting 消费。
+  # 预测包包含所有时刻的状态估计、协方差和辅助信息，
+  # 是后续所有分析和可视化的基础输入。
+  require_prediction_bundles: true
+  # 默认失败阈值 1 米，failure_rate 等指标沿用此口径。
+  # 当某帧的位置误差超过此阈值时，该帧被标记为失败帧。
+  # 此阈值是安全性和可用性的分界线，修改此值属于口径变更。
+  default_failure_threshold_m: 1.0
+  # 失效阈值上限 10 米，超过此值说明配置不合理。
+  # 此上限防止误配过大的阈值导致 failure_rate 失去区分度。
+  failure_threshold_max_m: 10.0
+  # 除最小烟雾测试外，评估必须有真值。
+  # 烟雾测试只需验证流程通畅，不需要真值；
+  # 但所有正式评估必须有真值参与，否则无法计算误差指标。
+  require_ground_truth_unless_smoke: true
+
+# -----------------------------------------------------------------------------
+# §9 场景尺度与分布模块协议字段（前提指导 §9.1 / §9.2 / §9.3 与 §9 三段细节）.
+#
+# 本块集中声明 §9 与 §0.2 操作定义槽中需要协议显式赋值的字段; 任何不满足
+# 下界的 run 不构成 §17 全序结论, 只能在 round7 单种子/cold-start 未划除
+# 等已知缺口下作为『协议级候选』结诗并由 verify_scene_scale_and_seed_gates
+# 抛 ValueError 或在下游 statistics 显式降级处理.
+#
+# 字段对照 §9 文本:
+#   T_eff_min_s            §9.3 「冷启动后 T_eff ≥ 20 s 量级」
+#   cold_start_offset_s    §9 / §9.1 「冷启动是否计入事先固定」+ §0.2 B06
+#   n_pulse_min            §9.3 「每轨 n_pulse ≥ 30 次量级」+ §0.2 B07
+#   n_async_min            §9.3 「每轨 n_async ≥ 20 次量级」+ §0.2 B08
+#   layout_family_min      §9.3 「测试覆盖 ≥3 种锚点-环境布局族, 禁单布局刷满 20 轨」
+# -----------------------------------------------------------------------------
+scene_scale:
+  # 冷启动后有效计分段最短时长 (§0.2 B06 / §9.3). 等于 20 量级门, 与
+  # geometry_motion_envelope.t_eff_min_s 一致口径; 评估接口在去除
+  # cold_start_offset_s 后再核对剩余段长是否仍 ≥ 该量级.
+  t_eff_min_s: 20.0
+  # 冷启动段统一划除偏移 (§0.2 B06 / §9.1). 全员同一, 禁止只删对某方法
+  # 不利的起止段; 不满足情况看下补 cold_start_global_enforced. 0 表示
+  # 全程累计; >0 表示每轨前 N 秒不计入有效计分段.
+  # 准则 37：默认 10s，前 10s 不进入 RMSE 计算。
+  cold_start_offset_s: 10.0
+  # 冷启动统一划除是否强制 (§9 「事先固定且全员同一」). True 表示凡是
+  # eval 必须按 cold_start_offset_s 划除; False 仅记录为协议默认但允许
+  # 单 run 显式声明不划除 (此时须另行在 metric_runner 标注).
+  cold_start_global_enforced: true
+  # 有效段单轨最短 UWB 脉冲数 (§0.2 B07 / §9.3). 量级门, 低于此值比较 1
+  # 与 5 无统计功效, 由 metric_runner 在每轨报告口径中降级标志.
+  n_pulse_min: 30
+  # 有效段单轨最短显著异步错位事件 (§0.2 B08 / §9.3). 量级门, 低于此值比
+  # 较 1 与 5 无统计功效.
+  n_async_min: 20
+  # 测试布局族数下限 (§9.3 「≥3 种锚点-环境布局族, 禁单布局刷满 20 轨」).
+  # 与 split_builder._MIN_FAMILY_COUNT_FOR_GROUPING 同口径.
+  layout_family_min: 3
+  # 起飞/降落/人为静止标定段处理口径 (§9 「事先固定且全员同一」).
+  # allowed: ['exclude_unified', 'include_unified', 'manual_guard']
+  takeoff_landing_policy: exclude_unified
+  # 室内外 / 楼层切换制度 (§9 「全员同一处理或排除出主计分段」).
+  floor_transition_policy: exclude_unified
+
+# -----------------------------------------------------------------------------
+# §9.3 多种子与功效门 (与 §17 6 比较脚手架 D4 / §27 联动).
+# N_seed_min=10 是 §9.3 量级门; N_seed_recommended=30 对应 'main conclusion
+# recommends ≥ 30 if variance large' 下界. train_test_ratio_max=0.1 来自
+# §0.2 B05 「训练/测试规模比 ≤0.1 (少样本)」, 否则宽网比较 5、6 上翻.
+# N_traj_te_min=20 来自 §0.2 B04 / §9.3 「测试轨迹数 ≥ 20 量级」.
+# N_seed_min_single_method_conclusion: 单种子定全序不构成 (§9.3 第二条).
+# -----------------------------------------------------------------------------
+seed_policy:
+  # 协议硬门: 跨种子数 ≥10. 现 round7 n_seed=1 只能是『协议级候选』.
+  n_seed_min: 10
+  # 主结论推荐: ≥30; 分散大 (例如 std/mean > 0.3) 时 statistics 应升级到 30.
+  n_seed_recommended: 30
+  # 单种子不构成全序结论; statistics 必须 raise / 显式降级.
+  single_seed_no_conclusion: true
+  # 训练轨迹数 / 测试轨迹数 ≤ 0.1 (§9.2 少样本硬门).
+  train_test_ratio_max: 0.1
+  # 测试有效计分轨数 ≥ 30 (§9.3 量级门; N_seed=30 协议要求).
+  n_traj_te_min: 30
+  # 场景 / NLOS / 丢包 / 初值 / 网络初始化 / 划分 多源种子应分列 (§9 细节),
+  # scene_seed_scope 用于审计时校验种子列表是否分列.
+  scene_seed_scope: ['scene', 'nlos_packet_loss', 'init_value', 'network_init', 'split']
+  # §14.4 异常种子剔除规则: 事先固定, 禁事后扔掉不利种子.
+  # 'none'               : 不剔除任何种子 (默认, 保守策略).
+  # 'variance_outlier'   : 剔除与同组均值偏差超过 k 倍标准差的种子 (k 须事先写死).
+  # 'performance_floor'  : 剔除低于协议性能下限的种子 (下限须事先写死).
+  # 任何非 'none' 的剔除规则必须在协议中事先声明, 并在 audit 中报告剔除依据.
+  outlier_rejection_rule: 'none'
+
+# -----------------------------------------------------------------------------
+# §14 评价与指标模块协议字段 (前提指导 §14.3 / §14.4).
+# -----------------------------------------------------------------------------
+# §14.3 同档与六比较:
+#   ε_approx=0.08  — 同档阈值 (δ_≈ ≤ ε_≈ ⇒ 同档).
+#   ε_strict=0.03  — 严格优于阈值 (相对改进 ≥ ε_> ⇒ 可能严格优于).
+#   p_strict_win=0.6 — 配对胜率阈值 (prob_b_better ≥ p_> ⇒ 严格优于).
+#   六比较分条全部成立才宣称全序; 4 或 6 不稳 → 降级子排序 (§29).
+# §14.4 失败轨计分 (事先写死一种):
+#   'overrides_threshold' — 记协议上限误差 e_max (推荐 10m 或 0.5 L_xy).
+#   'failure_rate'        — 记失败并单独报失败率, 主排序在成功轨上比较.
+#   'cap_at_threshold'     — 记 +∞ 并在排序中视为最差.
+#   禁止默认静默丢弃失败轨却不报失败率.
+# §14.4 主报告统计: 至少报 raw 位置误差的均值与分散; 同档/严格优于用 §0.2 阈值.
+# §14.4 预注册精神: 主指标、同档阈值、失败定义、封闭方法集在看测试结果前固定.
+comparison_thresholds:
+  epsilon_approx: 0.08  # §14.3 同档相对阈值 ε_≈.
+  epsilon_strict: 0.03  # §14.3 严格优于相对阈值 ε_>.
+  p_strict_win: 0.6  # §14.3 配对胜率阈值 p_>; prob_b_better ≥ 0.6 ⇒ 严格优于.
+  six_cmp_required: true  # §14.3 六比较分条全部成立才宣称全序.
+  # 比较 2 与 4 可分设但须事先写死 (此处统一为 ε_≈, 两者共用同一阈值).
+  comparison_2_epsilon_approx: 0.08  # 比较 2 同档阈值 (默认与 ε_≈ 一致).
+  comparison_4_epsilon_approx: 0.08  # 比较 4 同档阈值 (默认与 ε_≈ 一致).
+# §14.4 失败轨计分模式: 事先写死一种.
+#   'overrides_threshold' — 记协议上限误差 e_max (e.g. 10m 或 0.5 L_xy).
+#   'failure_rate'        — 记失败并单独报失败率, 主排序在成功轨上比较.
+#   'cap_at_threshold'    — 记 +∞ 并在排序中视为最差.
+# 禁止默认静默丢弃失败轨却不报失败率.
+failure_accounting_mode: 'failure_rate'
+
+

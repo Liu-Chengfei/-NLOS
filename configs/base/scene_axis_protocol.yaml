@@ -1,0 +1,487 @@
+# 文件职责：定义场景轴协议，规定实验维度的含义、档位名和数值范围。
+# 供场景合成与实验编排共用，后续脚本按此解释 A/N/V/K/M 五轴。
+# 修改本文件任何字段均属协议变更，须走协议变更流程。
+# 五轴含义概览：
+#   A = Asynchrony（异步程度）：传感器时间同步的偏差程度
+#   N = NLOS（非视距程度）：UWB 信号受遮挡和反射的严重程度
+#   V = VIO Degradation（VIO 退化程度）：视觉惯性里程计的退化程度
+#   K = Anchor Configuration（锚点配置）：锚点数量 + 几何分布（GDOP）的统一档位
+#   M = Missing Modality（缺失模态）：传感器模态偶发/间歇/长时间缺失的程度
+
+# 协议版本号，与代码冻结版本对应。
+# 版本号变更意味着轴定义或档位参数发生了不可逆的改动。
+# v27 (2026-09-02): 与《五轴档位协议定义.md》(H27 协议 v27) 对齐。
+#   - K 轴：K4 删除（原 G 轴 4 档合并），保留 K0/K1/K3
+#   - G 轴逻辑并入 K 轴（K 轴档位 = 原 G 轴 4 档 × 锚点数量组合）
+#   - A 轴：A2/A3 保留，A0/A1 仅用于 baseline 实验
+#   - N 轴：N2/N3 为实验主档，N0/N1 仅用于 baseline
+#   - V 轴：V0 为实验主档，V1/V2/V3 仅用于敏感性分析
+#   - M 轴：M1 为实验主档（M1 簇缺失间隙 0.3–2s）
+protocol_version: 27
+
+# 扰动注入点声明（D-1 双轨声明 v2）：
+# 旧 v1 声明 "perturbation_injection_point: sim_materializer" 不准确, 实际扰动分两轨:
+#   (1) 基础高斯噪声 (IMU 加速度/角速度白噪声, UWB 测距高斯噪声, VIO 重投影噪声等):
+#       在 sim_materializer 物化 raw 仿真事件时直接注入, 进 imu.json/uwb.json/vio.json 文件.
+#   (2) 场景轴退化 (A/N/V/M 轴的突发事件: 异步 burst missing / NLOS 偏差 / VIO 漂移 / 模态缺失):
+#       在 core_pipeline runtime 注入 (async_levels.py / nlos_levels.py / visual_levels.py /
+#       missing_modalities.py), reader/prepare 不扰动, 与 v1 一致.
+# 双轨声明让审稿人/复现者理解: sim_materializer 不是单一扰动注入点, 而是 base noise 物化层;
+# core_pipeline 才是场景轴退化 runtime 注入层. 协议修复组 D-1 落实.
+perturbation_injection_point: dual_track
+perturbation_injection_tracks:
+  base_noise: sim_materializer    # 基础高斯噪声 (IMU/UWB/VIO 白噪声) 在物化时注入
+  scene_axis: core_pipeline       # 场景轴退化 (A/N/V/M 突发事件) 在 runtime 注入
+
+# IMU jitter 豁免声明 (D-8 v2 文档化):
+# V 轴 blackout/drift 仅作用于 VIO 不作用于 IMU, 是设计意图而非缺陷:
+#   (1) 物理原因: IMU 高频 (50-200Hz) 状态传播, jitter 在积分过程中被低通平滑, 不构成退化;
+#       而 VIO jitter 直接进 EKF 测量更新, 影响状态估计.
+#   (2) 边界条件: 仅当 step_dt < 0.005s (200Hz 以上) 时 IMU jitter 才有显著影响, 当前
+#       sim 默认 dt_imu=0.01s (100Hz) 在边界下方, IMU jitter 可豁免.
+#   (3) 与 VIO 关系: V 轴 drift_bias_sigma_mps 仅作用于 VIO 的语义保证, 协议层冻结.
+# 审稿人/复现者一看即知 IMU jitter 豁免是设计意图, 边界条件清晰, 论文复现性提高.
+imu_jitter_exemption: enabled
+imu_jitter_exemption_reason: "high_freq_integration_low_pass: IMU 50-200Hz integration smooths jitter; VIO jitter directly enters EKF measurement update"
+imu_jitter_exemption_step_dt_threshold_s: 0.005
+
+# 五轴总入口（2026-08-31 档位重制定：G 轴并入 K 轴）。
+# A/N/V/M 轴各有 4 个档位（0-3），K 轴有 3 个档位（K0/K1/K3）。
+# 按「五轴档位协议定义」：K 锚数全档固定 4（K0 对称矩形四角 / K1 非对称欠定 / K3 近共线退化）。
+# 文档仅定义 K0/K1/K3 三档，K4 已删除（sim_turn 系列改用 K1 覆盖 GDOP 2-4 区间）。
+# 锚数全档固定 4；模型输入不含锚点坐标。
+axes:
+  # ============================================================
+  # A 轴：异步程度（Asynchrony）
+  # 描述传感器之间时间同步的偏差程度。
+  # 异步越严重，多传感器数据对齐越困难，定位精度越容易下降。
+  # ============================================================
+  A:
+    # 字段语义重映射说明（2026-08-31 目标表对齐改造）：
+    # 协议层 7 字段按"目标表 6 物理通道 + 派生增强"映射，不扩白名单。
+    #   offset_ms                  ← UWB 时钟偏移（直接承载）
+    #   cross_modal_skew_ms        ← UWB 往返延迟中位（直接承载，单向传输 ≈ RTT/2）
+    #   jitter_ms                  ← IMU 采样抖动（直接承载）
+    #   burst_missing_prob         ← 派生：UWB 往返延迟中位 / 250（协议层增强，不在目标表）
+    #   clock_drift_ppm            ← 派生：VIO 处理延迟中位 / 1ms（VIO 延迟的 ppm 表达）
+    #   clock_rrw_per_sqrt_s_ms    ← IMU 时钟偏移中位（直接承载，IMU 偏移/RW 联合）
+    #   clock_bias_instability_ms  ← VIO 时钟偏移中位（直接承载，VIO 偏移/bias 联合）
+    #
+    # 目标表 6 通道 ↔ 协议字段 7 字段映射（6+1 派生）：
+    #   UWB 时钟偏移       → offset_ms
+    #   UWB 往返延迟       → cross_modal_skew_ms（≈RTT/2）
+    #   IMU 时钟偏移       → clock_rrw_per_sqrt_s_ms
+    #   IMU 采样抖动       → jitter_ms
+    #   VIO 时钟偏移       → clock_bias_instability_ms
+    #   VIO 处理延迟       → clock_drift_ppm（delay_ms * 1ppm = clock_drift_ppm）
+    #   （协议层增强）突发  → burst_missing_prob（RTT/250）
+    #
+    # A0：近似同步，传感器时间戳几乎完全对齐，是最理想的条件。
+    A0:
+      label: near_sync
+      # 目标表 6 通道全 0：完全同步。
+      offset_ms: [0, 0]              # UWB 时钟偏移 0ms
+      jitter_ms: 0                    # IMU 采样抖动 0ms
+      cross_modal_skew_ms: 0          # UWB 往返延迟 0ms
+      burst_missing_prob: 0.00        # 派生：RTT 0/250 = 0
+      clock_drift_ppm: 0             # 派生：VIO 延迟 0ms → 0ppm
+      clock_rrw_per_sqrt_s_ms: 0     # IMU 时钟偏移 0ms
+      clock_bias_instability_ms: 0    # VIO 时钟偏移 0ms
+    # A1：轻度异步，存在可感知但可控的时间偏差。
+    A1:
+      label: mild_async
+      # 目标表：A1=5-20ms(UWB偏移)/20-40ms(RTT)/1-5ms(IMU偏移)/±1ms(IMU抖动)/5-20ms(VIO偏移)/10-30ms(VIO延迟)
+      offset_ms: [5, 20]             # UWB 时钟偏移 5-20ms
+      jitter_ms: 1                    # IMU 采样抖动 ±1ms
+      cross_modal_skew_ms: 30        # UWB 往返延迟中位 30ms（落在文档 RTT 20-40ms 中位）
+      burst_missing_prob: 0.12       # 派生：RTT 中位 30ms / 250
+      clock_drift_ppm: 10            # 派生：VIO 延迟中位 10ms → 10ppm
+      clock_rrw_per_sqrt_s_ms: 3.0   # IMU 时钟偏移中位 3ms（1-5ms 中位）
+      clock_bias_instability_ms: 10.0  # VIO 时钟偏移中位 10ms（5-20ms 中位）
+    # A2：中度异步，时间偏差明显，需要算法主动补偿。
+    A2:
+      label: moderate_async
+      # 目标表：A2=20-50ms(UWB偏移)/40-80ms(RTT)/5-15ms(IMU偏移)/±3ms(IMU抖动)/20-50ms(VIO偏移)/30-80ms(VIO延迟)
+      offset_ms: [20, 50]            # UWB 时钟偏移 20-50ms
+      jitter_ms: 3                   # IMU 采样抖动 ±3ms
+      cross_modal_skew_ms: 60        # UWB 往返延迟中位 60ms（落在文档 RTT 40-80ms 中位）
+      burst_missing_prob: 0.24       # 派生：RTT 中位 60ms / 250
+      clock_drift_ppm: 55           # 派生：VIO 延迟中位 55ms → 55ppm
+      clock_rrw_per_sqrt_s_ms: 10.0  # IMU 时钟偏移中位 10ms（5-15ms 中位）
+      clock_bias_instability_ms: 35.0  # VIO 时钟偏移中位 35ms（20-50ms 中位）
+    # A3：重度异步，时间偏差严重，对算法鲁棒性构成重大挑战。
+    A3:
+      label: severe_async
+      # 目标表：A3=100-200ms(UWB偏移)/120-250ms(RTT)/20-50ms(IMU偏移)/±10ms(IMU抖动)/100-200ms(VIO偏移)/150-300ms(VIO延迟)
+      offset_ms: [100, 200]          # UWB 时钟偏移 100-200ms
+      jitter_ms: 10                  # IMU 采样抖动 ±10ms
+      cross_modal_skew_ms: 185       # UWB 往返延迟中位 185ms（落在文档 RTT 120-250ms 中位）
+      burst_missing_prob: 0.74       # 派生：RTT 中位 185ms / 250
+      clock_drift_ppm: 225          # 派生：VIO 延迟中位 225ms → 225ppm
+      clock_rrw_per_sqrt_s_ms: 35.0  # IMU 时钟偏移中位 35ms（20-50ms 中位）
+      clock_bias_instability_ms: 150.0  # VIO 时钟偏移中位 150ms（100-200ms 中位）
+
+  # ============================================================
+  # N 轴：NLOS 偏差（Non-Line-of-Sight，纯偏差定义）
+  # 2026-08-31 档位重制定：N 轴只描述偏差（值不对），全档固定 4 锚、可解率 100%。
+  # 「解不出的帧」（不可解/无测距值）不属 N 轴，归 M 轴描述。
+  # NLOS 越严重，UWB 测距偏差越大，定位精度越容易下降。
+  # ============================================================
+  N:
+    # §4.3.1 L933「主表须事先写死生成族」+ L935「允许的生成族（协议二选一或组合，须声明）」
+    # H26 真改协议层显式声明 N 轴所选 NLOS 生成族 = C. A+B 混合（A 几何视线/遮挡 +
+    #   B 状态条件统计混合）。
+    nlos_generation_family: C_AB_hybrid
+    nlos_generation_family_doc: "C. A+B 混合（几何视线 A + 状态条件统计混合 B），与 §4.3.1 L933/L935 字面要求一致；H26 真改协议层显式声明"
+    # N0：LOS 主导，UWB 信号几乎全部为直射路径，测距基本无偏差。
+    N0:
+      label: nominal_nlos
+      # NLOS 观测占比，所有 UWB 测距中非视距观测的比例。
+      # [0.00, 0.05] 表示在数据生成时该区间内均匀随机取值。
+      nlos_ratio: [0.00, 0.05]
+      # 测距偏差强度(m)，NLOS 条件下测距的正向偏差大小。
+      # [0.00, 0.00] 表示无偏差，测距值完全准确。
+      bias_strength_m: [0.00, 0.00]
+      # NLOS 附加噪声标准差(m)，多径散射导致的额外测距不确定性。
+      # [0.00, 0.00] 表示无附加噪声，与 LOS 场景噪声特性相同。
+      nlos_noise_std_m: [0.00, 0.00]
+      # H22a 真改 §4.3 L927：协议层声明簇发最短持续时段为 0.5s，apply_nlos_level
+      # 在 _enforce_min_cluster_duration 强制至少一段连续簇发时长 ≥ 0.5s。
+      # N0–N3 全员 0.5s 与 §4.3 L927 字面要求一致。
+      min_cluster_duration_s: 0.5
+      # H24d 真改 §4.3.1 L1002：遮挡物类型枚举。N0=machine_body 让 4 档字段集一致。
+      occluder_type: machine_body
+    # N1：轻度 NLOS，少部分观测受遮挡影响。
+    N1:
+      label: mild_nlos
+      # NLOS 观测占比：10-15% 区间，生成时均匀采样。
+      nlos_ratio: [0.10, 0.15]
+      # 大脉冲幅度基准：0.5-1m 区间，生成时均匀采样。
+      bias_strength_m: [0.5, 1.0]
+      # NLOS 附加高斯噪声 σ：0.28-0.32m 区间（目标表 σ=0.3 ±0.02），生成时均匀采样。
+      nlos_noise_std_m: [0.28, 0.32]
+      min_cluster_duration_s: 0.5
+      # N1 = 轻度 NLOS 选 machine_body（机身自遮挡为主）。
+      occluder_type: machine_body
+    # N2：中度 NLOS，半数观测受遮挡。
+    N2:
+      label: moderate_nlos
+      # NLOS 观测占比：25-30% 区间，生成时均匀采样。
+      nlos_ratio: [0.25, 0.30]
+      # 大脉冲幅度基准：2-3m 区间，生成时均匀采样。
+      bias_strength_m: [2.0, 3.0]
+      # NLOS 附加高斯噪声 σ：0.78-0.82m 区间（目标表 σ=0.8 ±0.02），生成时均匀采样。
+      nlos_noise_std_m: [0.78, 0.82]
+      min_cluster_duration_s: 0.5
+      # N2 = 中度 NLOS 选 concrete_wall（混凝土墙体遮挡为主）。
+      occluder_type: concrete_wall
+    # N3：重度 NLOS，完全遮挡极端。
+    N3:
+      label: severe_nlos
+      # NLOS 观测占比：35-40% 区间，生成时均匀采样。
+      nlos_ratio: [0.35, 0.40]
+      # 大脉冲幅度基准：4-6m 区间，生成时均匀采样。
+      bias_strength_m: [4.0, 6.0]
+      # NLOS 附加高斯噪声 σ：1.48-1.52m 区间（目标表 σ=1.5 ±0.02），生成时均匀采样。
+      nlos_noise_std_m: [1.48, 1.52]
+      min_cluster_duration_s: 0.5
+      # N3 = 重度 NLOS 选 metal_wall（金属墙体遮挡为主）。
+      occluder_type: metal_wall
+
+  # ============================================================
+  # V 轴：VIO 退化程度（VIO Degradation）
+  # 描述视觉惯性里程计的退化程度。
+  # VIO 退化越严重，相对位姿估计越不可靠，对融合算法的鲁棒性要求越高。
+  #
+  # 判别规则（与 A 轴丢帧的区分）：
+  #   A 轴丢帧 = 数据不在（时间戳级缺失）
+  #   V1 = 数据在但置零（黑屏，增量有效但为0，scaling→0）
+  #   V2 = 数据在但变糙（σ×5，特征点稀疏）
+  #   V3 = 数据不在（质量触发关键帧中断）+ 恢复跳变 0.3-1m
+  #
+  # 【重要说明】V0-V3 各档位的 tracked_features_range 是该等级下的
+  # **模拟采样包络**，用于数据生成时在该范围内随机抽取特征点数量。
+  # 相邻档位的采样范围允许重叠（如 V0 >50 与 V1 在边界重叠），
+  # 这并不矛盾——场景等级是先给定的（V0/V1/V2/V3），
+  # 而非由观测到的特征点数量反推判定。因此这些范围**不是分类边界**，
+  # 不应用于"给定特征点数 → 判定退化等级"的判别逻辑。
+  # ============================================================
+  V:
+    # 字段语义重映射说明（2026-08-31 目标表对齐改造）：
+    # 协议层 7 字段按"目标表 4 退化机制通道 + 协议层增强"映射，不扩白名单。
+    #   tracked_features_range        ← 特征点数（直接承载，V0>50/V1 稀疏/V2 极少/V3 断崖）
+    #   reproj_err_max              ← 重投影误差(pixel)（直接承载，σ 放大倍数）
+    #   blackout_prob               ← 黑屏概率（直接承载，VIO 完全失效 1-2 次/序列 0.5-2s）
+    #   drift_bias_sigma_mps        ← Wiener drift σ（直接承载，长期累积漂移）
+    #   increment_noise_std_mps     ← 增量噪声 σ (m/步)（V2 新增，σ×5 放大至 0.05-0.15m）
+    #   keyframe_interruptions_per_seq ← 关键帧中断次数/序列（V3 新增，2-4 次/序列 0.5-3s）
+    #   keyframe_recovery_jump_m   ← 中断恢复跳变(m)（V3 新增，0.3-1m 跳变）
+    #
+    # 目标表 4 退化机制 ↔ 协议字段 7 字段映射（4+3 增强）：
+    #   黑屏(置零/scaling→0)  → blackout_prob
+    #   特征稀疏(特征点数)    → tracked_features_range
+    #   噪声放大(σ×5)         → reproj_err_max（像素→σ 换算）+ increment_noise_std_mps（直接）
+    #   中断+跳变(恢复跳变)   → keyframe_interruptions_per_seq + keyframe_recovery_jump_m
+    #
+    # range_semantics 声明 V 轴 tracked_features_range 的语义类型。
+    # sampling_envelope：范围是数据生成时的采样包络，不是分类边界。
+    # 相邻档位允许重叠，场景等级是先给定的，不是由特征点数反推的。
+    range_semantics: sampling_envelope
+    # backward_compatibility_alias：声明本轴字段的历史旧名，用于下游消费者向后兼容。
+    # drift_bias_sigma_mps 的旧字段名为 drift_bias_m（语义模糊，易被误解为累积幅度）。
+    # 下游 visual_levels.py 等消费者需同步更新字段读取（待其他修复组同步）。
+    backward_compatibility_alias: drift_bias_m
+    # V0：健康 VIO，特征 >50/frame，噪声 σ=0.01-0.03m/步，帧有效 100%，无间隙。
+    V0:
+      label: nominal_vio
+      # 可跟踪特征点数量范围，特征点越多 VIO 越稳定。
+      # [100, 200] 表示特征点非常充足，VIO 工作在最佳状态。
+      tracked_features_range: [100, 200]
+      # 最大重投影误差(pixel)，重投影误差越小位姿估计越准确。
+      # [0.48, 0.52] 表示特征点充足，位姿估计非常精确；consumer 采样提供真正随机性。
+      reproj_err_max: [0.48, 0.52]
+      # 黑屏缺失概率，VIO 完全丢失跟踪（如遮挡、快速运动）的概率。
+      # [0.00, 0.00] 表示正常条件下不会出现黑屏；区间化提供真正随机性。
+      blackout_prob: [0.00, 0.00]
+      # V0 健康 baseline：黑屏持续时间 0s。
+      blackout_duration_range_s: [0.0, 0.0]
+      # V0 健康 baseline：黑屏占轨迹 0%。
+      blackout_fraction: [0.00, 0.00]
+      # drift_bias_sigma_mps: Wiener drift 标准差 σ（m/√s），累积幅度 = σ·√T
+      # bias_x/y 按时间累积 N(0, drift_bias_sigma_mps·√dt)，第一个 VIO 事件无前驱不累积。
+      # V0 无漂移。
+      # dx_after = dx_before + bias_x·sign(dx_before)，与 Scaramuzza VIO 教程一致
+      # （VO 长期漂移是随机积累误差，非固定 scale）。
+      drift_bias_sigma_mps: [0.0, 0.0]
+      # 2026-08-31 新增：增量噪声 σ (m/步)，目标 σ=0.01-0.03m/步 中位值 0.02。
+      increment_noise_std_mps: [0.01, 0.03]
+      # 2026-08-31 新增：关键帧中断次数/序列，V0 健康 baseline 0。
+      keyframe_interruptions_per_seq: [0, 0]
+      # V0 健康 baseline：关键帧 burst 持续时间 0s。
+      keyframe_burst_duration_range_s: [0.0, 0.0]
+      # V0 健康 baseline：关键帧占轨迹 0%。
+      keyframe_burst_fraction: [0.00, 0.00]
+      # 2026-08-31 新增：中断恢复跳变(m)，V0 健康 baseline 0。
+      keyframe_recovery_jump_m: [0.0, 0.0]
+    # V1：黑屏 VIO，视觉完全失效：增量在但置零(=0)，scaling→0。
+    # 每序列 1-2 次，单次 0.5-2s，占轨迹 5-10%。
+    V1:
+      label: mild_degradation
+      tracked_features_range: [60, 120]
+      # [0.98, 1.02] pixel：黑屏 VIO 中等退化；consumer 采样提供真正随机性。
+      reproj_err_max: [0.98, 1.02]
+      # [0.01, 0.03]：黑屏概率 1-3%/序列；consumer 采样。
+      blackout_prob: [0.01, 0.03]
+      # V1 黑屏持续时间区间(s)：单次 0.5-2s，生成时均匀采样。
+      blackout_duration_range_s: [0.5, 2.0]
+      # V1 黑屏占轨迹比例：5-10%，与上条共同确定黑屏发生频率。
+      blackout_fraction: [0.05, 0.10]
+      drift_bias_sigma_mps: [0.05, 0.05]
+      # V1 增量噪声 baseline（V1 主要退化是黑屏置零，不是 σ 放大）
+      increment_noise_std_mps: [0.01, 0.03]
+      keyframe_interruptions_per_seq: [0, 0]
+      # V1 无关键帧中断：burst 持续时间 0s，baseline。
+      keyframe_burst_duration_range_s: [0.0, 0.0]
+      # V1 无关键帧中断：占轨迹 0%，baseline。
+      keyframe_burst_fraction: [0.00, 0.00]
+      keyframe_recovery_jump_m: [0.0, 0.0]
+    # V2：特征丢失，特征 10-20/frame；增量噪声放大 5×（σ→0.05-0.15m/步）；占轨迹 20-40%，连续段 1-3s；scaling→0.3-0.7。
+    V2:
+      label: moderate_degradation
+      # 特征丢失：目标 10-20/frame
+      tracked_features_range: [10, 20]
+      # [1.98, 2.02] pixel：特征丢失显著放大误差；consumer 采样。
+      reproj_err_max: [1.98, 2.02]
+      # [0.07, 0.09]：黑屏概率 7-9%/序列；≥V1 上界 0.03，monotone。
+      blackout_prob: [0.07, 0.09]
+      # V2 黑屏(Partial scaling 0.3-0.7)持续时间区间(s)：单次 1-3s。
+      blackout_duration_range_s: [1.0, 3.0]
+      # V2 黑屏占轨迹比例：20-40%。
+      blackout_fraction: [0.20, 0.40]
+      drift_bias_sigma_mps: [0.15, 0.15]
+      # V2 关键：σ×5 放大至 0.05-0.15m/步（中位 0.10m）
+      increment_noise_std_mps: [0.05, 0.15]
+      # V2 偶有 1 次关键帧中断
+      keyframe_interruptions_per_seq: [1, 1]
+      # V2 关键帧 burst 持续时间区间(s)：0s（V2 退化主体是黑屏，不是关键帧中断）。
+      keyframe_burst_duration_range_s: [0.0, 0.0]
+      # V2 关键帧占轨迹比例：0%。
+      keyframe_burst_fraction: [0.00, 0.00]
+      # V2 偶有 1 次关键帧中断，但无恢复跳变（跳变是 V3 专属）。
+      keyframe_recovery_jump_m: [0.0, 0.0]
+    # V3：关键帧中断，增量缺失（质量触发，非时间戳缺失）；每序列 2-4 次，间隙 0.5-3s，占轨迹 10-20%；恢复后重定位跳变 0.3-1m。
+    V3:
+      label: severe_degradation
+      # 特征极少：0-15/frame
+      tracked_features_range: [0, 15]
+      # [3.98, 4.02] pixel：特征极少大幅放大误差；consumer 采样。
+      reproj_err_max: [3.98, 4.02]
+      # V3 黑屏概率：≥V2 最小值 0.07（协议格式要求单调递增）。
+      # 注意：V3 的主体退化是关键帧中断，非黑屏；此处设为与 V2 等效极小值以满足协议格式约束。
+      # [0.07, 0.09]：区间化，consumer 采样。
+      blackout_prob: [0.07, 0.09]
+      # V3 黑屏持续时间区间(s)：0s（V3 主体是关键帧中断，不是黑屏）。
+      blackout_duration_range_s: [0.0, 0.0]
+      # V3 黑屏占轨迹比例：0%。
+      blackout_fraction: [0.00, 0.00]
+      drift_bias_sigma_mps: [0.25, 0.30]
+      # V3 增量噪声大幅放大（极端条件）
+      increment_noise_std_mps: [0.20, 0.30]
+      # V3 关键：2-4 次/序列 关键帧中断（2026-09-03 补区间，与协议文本 "2-4 次/序列" 对齐）
+      keyframe_interruptions_per_seq: [2, 4]
+      # V3 关键帧 burst 持续时间区间(s)：单次 0.5-3s。
+      keyframe_burst_duration_range_s: [0.5, 3.0]
+      # V3 关键帧占轨迹比例：10-20%。
+      keyframe_burst_fraction: [0.10, 0.20]
+      # V3 关键：0.3-1m 恢复跳变（2026-09-03 补区间，与协议文本 "0.3-1m" 对齐；中位 0.65m 由采样实现）
+      keyframe_recovery_jump_m: [0.3, 1.0]
+
+  # ============================================================
+  # K 轴：锚点配置（Anchor Configuration，含原 G 轴几何分布语义）
+  # 2026-08-31 档位重制定：原 G 轴（几何质量）并入 K 轴；锚数全档固定 4。
+  # K0/K1/K3 三档分别对应"好几何/中等几何/严重退化"。
+  # 5 锚档已删除；模型输入不含锚点坐标。
+  # ============================================================
+  K:
+    # K0：4 锚对称（矩形四角），GDOP 1.5-2.5，最优几何，方位均匸覆盖。
+    K0:
+      label: anchor_count_4_symmetric
+      # 锚点数固定 4（4 锚对称矩形四角）。
+      anchor_count: 4
+      # 几何条件数值 1.0，对称矩形四角，GDOP 1.5-2.5；consumer 采样在 [0.8, 1.2] 区间内均匀采样。
+      geom_condition: [0.8, 1.2]
+    # K1：4 锚非对称欠定，GDOP 3-5，锚点分布不均、存在共线倾向。
+    K1:
+      label: anchor_count_4_asymmetric
+      # 锚点数固定 4（非对称欠定）。
+      anchor_count: 4
+      # 几何条件数值 2.0，非对称欠定，GDOP 3-5；consumer 采样在 [1.8, 2.2] 区间内均匀采样。
+      geom_condition: [1.8, 2.2]
+    # K3：4 锚近共线退化，GDOP 8-15+，3 锚近似共线 + 1 锚孤立，精度崩溃边缘。
+    # 按「五轴档位协议定义」K 轴仅 K0/K1/K3 三档，K4 已删除（GDOP 2-4 区间由 K1 覆盖）。
+    K3:
+      label: anchor_count_4_collinear_degraded
+      # 锚点数固定 4（3 共线 + 1 孤立，与文档「锚数全档固定 4」一致）。
+      anchor_count: 4
+      # 几何条件数值 10.0，严重退化，GDOP 8-15+；consumer 采样在 [9.0, 11.0] 区间内均匀采样。
+      geom_condition: [9.0, 11.0]
+  # ============================================================
+  # M 轴：数据缺失（Missing Data，到没到，承接可解率/不可解帧）
+  # 2026-08-31 档位重制定：M 轴语义改为"数据到没到"——含 NLOS 引起的不可解帧。
+  # 不可解/无测距值统一视为缺失，归 M 轴注入；M 轴定义各模态的到达率/缺失率。
+  # 字段：modality_drop_prob（区间, 0.0-1.0）、affected_modalities（list, 子集 of ["uwb","vio","imu"]）
+  # 规则：M2 为 UWB/VIO 各自 15%（非合计）；M3 中 IMU 缺失率上限 5%
+  # （IMU 是时间基准，缺失过高导致状态发散）。
+  # ============================================================
+  M:
+    # M0：0% 缺失（理想传输），所有模态正常工作。
+    M0:
+      label: no_missing
+      # 模态缺失概率 [0.0, 0.0]：baseline 条件下无缺失。
+      modality_drop_prob: [0.00, 0.00]
+      # 成簇持续时间区间(s)：baseline 无缺失，0s。
+      cluster_duration_range_s: [0.0, 0.0]
+      # 受影响的模态列表，baseline 为空列表（无模态受影响）。
+      # affected_modalities 是 ["uwb","vio","imu"] 的子集。
+      affected_modalities: []
+    # M1：UWB 5% 成簇丢包（含 NLOS 引起的不可解帧，统一为缺失注入）。
+    # 成簇产生长间隙 0.3-2s，UWB 受影响；IMU/VIO 不缺失。
+    M1:
+      label: uwb_clustered_dropout
+      # UWB 5% 概率成簇丢包，影响较小。
+      # 区间 [0.04, 0.05] 表示生成时在 4%-5% 均匀采样。
+      modality_drop_prob: [0.04, 0.05]
+      # UWB 成簇丢包持续时间区间(s)：单次 0.3-2s，产生长间隙。
+      cluster_duration_range_s: [0.3, 2.0]
+      # UWB 成簇丢包（含 NLOS 不可解帧统一注入为缺失）。
+      affected_modalities: ["uwb"]
+    # M2：UWB 15% + VIO 15% 各自独立缺失（IMU 不缺失）。
+    M2:
+      label: uwb_vio_independent_missing
+      # 15% 概率间歇缺失，对融合算法有显著影响。
+      # 区间 [0.14, 0.15] 表示生成时在 14%-15% 均匀采样。
+      # 规则：UWB 15% + VIO 15% 是各自独立的缺失率（非合计 30%）。
+      modality_drop_prob: [0.14, 0.15]
+      # 成簇持续时间区间(s)：与 M1 一致，单次 0.3-2s。
+      cluster_duration_range_s: [0.3, 2.0]
+      # UWB 和 VIO 各自独立 15% 缺失，IMU 仍正常工作提供时间基准。
+      affected_modalities: ["uwb", "vio"]
+    # M3：UWB 30% + VIO 30% + IMU ≤5% 全模态重缺失。
+    M3:
+      label: all_modalities_severe_missing
+      # UWB/VIO 30% 长时间缺失，区间化表达。
+      # 区间 [0.29, 0.30] 表示生成时在 29%-30% 均匀采样。
+      modality_drop_prob: [0.29, 0.30]
+      # 成簇持续时间区间(s)：重度缺失，持续时间延长至 1-3s。
+      cluster_duration_range_s: [1.0, 3.0]
+      # UWB、VIO 重度缺失，IMU 缺失率上限 5%（IMU 是时间基准，
+      # 缺失过高导致状态发散），独立表达。
+      imu_drop_prob: [0.01, 0.05]
+      affected_modalities: ["uwb", "imu", "vio"]
+
+# ============================================================
+# 扩展维度声明 (D-9 ~ D-13, v2 主线程扩展)
+# 用于让 30 seqs 跨场景轴多样化, 不再全 S(A0,N0,V0,K0),
+# 论文立论 OOD 鲁棒性 + 算力 + 适应 + 可解释性四维方块有数据集语义支撑.
+# ============================================================
+
+# D-10: 场景轴多样性 (default 30 seqs 不再全 S(A0,N0,V0,K0))
+# 30 seqs 跨 A0/A1/A2/A3 × N0/N1/N2/N3 × V0/V1/V2 各档位, 在 lead_specs 各条
+# 通过 SimSequenceSpec.axes_override 字段指定.
+# 论文立论支撑: 训练时见多场景, 测试 OOD 立论更有数据集语义.
+scene_axis_diversity:
+  enabled: true
+  coverage_target:
+    A: ["A0", "A1", "A2", "A3"]   # 异步 4 档全覆盖
+    N: ["N0", "N1", "N2", "N3"]   # NLOS 4 档全覆盖
+    V: ["V0", "V1", "V2"]         # VIO 退化 3 档 (V3 极端值留作压力测试, 不进默认 lead)
+  assignment_strategy: round_robin   # 30 seqs 按顺序循环分配场景轴档位
+  documentation: "30 seqs 不再全 S(A0,N0,V0,K0), 训练时见多场景轴组合, 论文 OOD 立论有数据集支撑"
+
+# D-11/D-12 合并: 几何 + 锚数统一由 K 轴展开
+# 2026-08-31 档位重制定：G 轴并入 K 轴（原 G0/G1/G2/G3 → K0/K1/K3）。
+# K 轴每档固定 4 锚，通过 geom_condition 区分几何质量。
+# 原 geometry_axis_expansion + anchor_count_axis_expansion 合并为本块。
+k_axis_expansion:
+  enabled: true
+  coverage_target:
+    K: ["K0", "K1", "K3"]  # K轴 3 档覆盖（原G轴4档合并）：K0好几何/K1中等/K3严重退化
+  assignment_strategy: interleave  # 10 short K0, 5 long K1, 5 K3, K0 是默认好几何基线
+  documentation: "E6 geometry 展开由 K 轴统一承载；K0(好几何)为默认基线，K1(中等几何)为中档，K3(严重退化)为压力档；锚数全档固定4，geom_condition 区分几何质量"
+
+# D-13: 传感器频率多样化 (default 30 seqs 不再全 dt=0.05s)
+# SimSequenceSpec 加 dt_imu_override / dt_uwb_override / dt_vio_override 字段,
+# 让 IMU 取 {100Hz, 150Hz, 200Hz}, UWB 取 {10Hz, 20Hz}, VIO 取 {10Hz, 30Hz}.
+# §26.1 强制约束: IMU 100-200Hz / UWB 5-20Hz / VIO 10-30Hz.
+# 原 [50,100,200]/[10,20,50]/[30,60] 中 50Hz(UWB)/60Hz(VIO)/50Hz(IMU) 均越界, 已修正.
+# 论文论证 "Liquid 适应 nyquist-different sensors" — Liquid 时间常数 B 在不同 dt 下
+# 发挥不同 t_interp, 论证补救 cell.py:683 short_dt under-update.
+sensor_frequency_diversity:
+  enabled: true
+  coverage_target:
+    imu_hz: [100, 150, 200] # IMU 3 档 (默认 100Hz)，§26.1 r=100-200Hz，原 [50,100,200] 50Hz 低于下界，已修正为 100/150/200
+    uwb_hz: [10, 20] # UWB 2 档 (默认 20Hz)，§26.1 r=5-20Hz，原 [10,20,50] 的 50Hz 超出 §26.1 上界
+    vio_hz: [10, 30] # VIO 2 档 (默认 30Hz)，§26.1 r=10-30Hz，原 [30,60] 的 60Hz 超出 §26.1 上界
+  assignment_strategy: round_robin # 30 seqs 按顺序循环分配频率档位
+  documentation: "Liquid 时间常数 B 在 dt=0.05s 下 t_interp 仅 1.2%/step, 在 dt=0.01s 下 t_interp=5.9%/step, 论证 Liquid 适应不同 nyquist 传感器"
+
+# D-9: splits OOD 改进声明
+# 当前 default_split_rules.yaml train_count=3 val_count=2, 让 turn_* 全 OOD (turn_01 val / turn_02 test)
+# v2 改为 train_count=4 val_count=1, 让 turn_02 进 train, turn_01 留 val, turn_02_var_* 进 train.
+# 论文立论 OOD 鲁棒性需保留 turn OOD 评估 (turn_02_var_* OOD vs train), 但 RMSE 公平比较需
+# 让 turn 进 train, 不再让 Liquid 在 turn 周期上完全 OOD 测试.
+splits_ood_balance:
+  enabled: true
+  documentation: "v1 splits 让 turn_* 全 OOD, Liquid 在 turn 周期上完全 unseen, RMSE 公平比较不利; v2 让 turn_02 进 train, turn_01 留 val, turn_02_var_* 进 train, 保留 turn_02_var_02 OOD 评估"
+
+# H24a 真改 §4.2 L894「差 GDOP、病态观测时段达到足够占比」评估层守门：
+# 单布局层 build_anchor_layout (geometry_levels.py L409-411/444-446) 已产出
+# gdop_value/gdop_floor/gdop_above_floor_ratio 0/1 信号；本顶层 evaluation_gates 块
+# 显式声明评估层聚合下界 gdop_occupancy_min_ratio=0.30（与铁律 4 N1 nlos_ratio=0.30 同口径），
+# metric_runner._aggregate_gdop_occupancy 按 N 个轨迹布局的 0/1 信号聚合占比，
+# 占比 < gdop_occupancy_min_ratio 时 raise ValueError 阻断评估。
+# 缺省 0.30 与 N1 / 铁律 4「高压占比 ≥30%」一致；本字段不在 _AXIS_LEVEL_PARAM_KEYS
+# 单轴白名单内（属于评估层 gate 而非轴级字段），由 load_scene_axis_protocol 顶层解析校验。
+evaluation_gates:
+  gdop_occupancy_min_ratio: 0.30
+  documentation: "§4.2 L894 评估层 gdop 占比守门阈值；metric_runner._aggregate_gdop_occupancy 按轨迹时序聚合 N 个布局的单布局 0/1 信号成 gdop_occupancy_ratio=sum(gdop_above_floor)/N，< gdop_occupancy_min_ratio 抛 ValueError"

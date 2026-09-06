@@ -1,0 +1,155 @@
+# 这个文件定义论文主表实验入口。# 它用于覆盖更典型的退化组合，方便比较不同方法在主表场景下的表现。
+# 它用来覆盖更典型的退化组合，方便比较不同方法在主表场景下的表现。# 这里通常是论文主结果最核心的一组配置。
+
+# 实验编号。# 用于区分实验目录和汇总入口。
+experiment_id: e1_main_table  # 论文主表实验编号。
+
+# 主研究轴是目标退化组合。# 这里表示主表不是单轴扫描，而是组合场景对比。
+primary_axis: public_sequence_category  # 主轴定义为目标退化组合。
+
+# 数据根目录：handbook_gates 默认是 sim_e9_10seed_50unit（不存在），
+# 实际 sim_e9_main 是 10 seed × 60 spec 的论文级数据集（_regen_10seed.py 物化）。
+raw_root: data/raw/sim_e9_main
+
+# 本实验固定的场景轴。# 这些固定值定义了主表实验的基准场景集。
+frozen_axes:
+  dataset: sim
+  split: sim_e9
+  # 异步高NLOS实验主表：A2/A3 × N2/N3 四组合各 25%（手册 Part 0）。
+  # 此前错误地只保留 [A3] + [N3] 单组合；本版 BLOCK 修复后按手册要求四组合等比例。
+  # BLOCK 修复：4 组合 = A2N2 + A2N3 + A3N2 + A3N3 各 25%。
+  A: [A2, A3]   # 异步档：A2（轻度 20-50ms 偏移）/ A3（重度 100-200ms 偏移）
+  N: [N2, N3]   # NLOS 档：N2（墙体级遮挡 ρ=25-30%）/ N3（完全遮挡 ρ=35-40%）
+  # V 档固定为 V0 健康档（手册 Part 0：异步高NLOS实验不引入视觉退化）。
+  V: [V0]
+  # 锚点数量固定为 4 锚（手册 S2 K1 档协议裁决项，详见 S2）。
+  K: K1
+  # 模态缺失固定为 M1（UWB 5% 成簇丢包），手册 Part 0 异步高NLOS实验配置。
+  M: M1
+
+# 主表比较的方法列表（手册 Part 0：全 5 方法 — LNN/LSTM/Transformer/EKF/Robust-EKF）。
+# ekf：标准扩展卡尔曼滤波，最基础的融合方法，作为性能下限。
+# robust_ekf：鲁棒扩展卡尔曼滤波，在 EKF 基础上增加异常值抑制。
+# lstm_ekf：LSTM 增强 EKF，学习式基线方法。
+# transformer_ekf：Transformer 增强 EKF，学习式对比方法。
+# liquid_ekf：液态网络增强 EKF，核心方法，论文主要贡献。
+methods: [ekf, robust_ekf, lstm_ekf, transformer_ekf, liquid_ekf]  # 全 5 方法主表
+
+# quick/full 运行规模覆盖项。# 这部分控制烟雾和完整两种规模的重复与序列数。
+mode_overrides:
+  # 轻量模式。# 主要用于先跑通和快速回看。
+  quick:
+    # 重复次数。# quick 只保留最小重复，便于快速看波动而不超过 full 规模。
+    repeats: 2  # quick 模式重复 2 次。
+    # 序列上限。# 主表 quick 仍然要覆盖一批代表序列。
+    max_sequences: 24  # quick 模式最多 24 个序列。
+  # 完整模式。# 这个模式用于更完整的结果收集。
+  full:
+    # 重复次数。# 完整模式仍保留重复采样。
+    repeats: 10  # S3 handbook: 10 seed × 5 method = 50 units 论文级
+    # 不限制序列数。# 表示完整模式不主动裁剪。
+    max_sequences: null  # full 模式序列不设上限。
+
+# ===========================================================================
+# I-1..I-5 实现完成门控（BLOCK-3 修复）。
+# ===========================================================================
+
+# I-1: 数据生成器 7 步完成登记（手册 Part 3 / I-1 / S8）。
+# 顺序：scene_gen → sensor_sim → async_inject → nlos_inject → missing_inject → resample → write_npz
+data_generator_steps_done:
+  - scene_gen          # 1. 轨迹生成 + 几何锚点布置
+  - sensor_sim         # 2. IMU 150Hz / UWB 10Hz / VIO 20Hz 传感器仿真
+  - async_inject       # 3. 异步偏移注入（offset_s）
+  - nlos_inject        # 4. NLOS bias 注入（bias_m / quality=0 / valid=False）
+  - missing_inject     # 5. 模态缺失注入（quality=0 / dx=dy=0）
+  - resample           # 6. IMU/UWB/VIO 三速率流对齐（公倍数重采样）
+  - write_npz          # 7. JSON 流文件写出（prepare_pipeline）
+
+# I-2: S9 校验脚本输出键（手册 Part 3 / I-2）。
+s9_report_keys:
+  - composition   # 组合分布（A2N2/A2N3/A3N2/A3N3 各 25%）
+  - nlos_injection  # NLOS 注入有效（≥1 NLOS 事件 / 序列）
+  - missing     # 模态缺失注入有效
+  - m_burst     # M-burst 短时中断段注入
+  - gdop        # GDOP 锚点几何评分
+  - boundary    # 轨迹边界（B20-B23）
+  - schema      # npz / JSON schema 字段齐全
+
+# I-3: 5 方法脚本可用性（手册 Part 3 / I-3）。
+available_methods:
+  - lnn        # 纯神经网络基线（对照）
+  - lstm       # LSTM 增强 EKF（学习式基线）
+  - transformer  # Transformer 增强 EKF（学习式对比）
+  - ekf        # 标准扩展卡尔曼滤波（传统基线）
+  - robust_ekf  # 鲁棒 EKF（抗差基线）
+
+# I-4: 统计脚本全输出（手册 Part 3 / I-4）。
+stats_script_outputs:
+  - mean      # 均值
+  - std       # 标准差
+  - p95       # 95 分位
+  - p50       # 中位数
+  - delta_vs_lnn   # 相对于 LNN 的性能提升
+  - wilcoxon_p    # Wilcoxon 符号秩检验 p 值
+  - ci_95          # 95% 置信区间
+  - holm_bonferroni  # Holm-Bonferroni 多重比较校正
+  - slicing_4_combo  # 4 组合切片统计
+  - anova_2x2     # 2×2 ANOVA（A 轴 × N 轴）
+  - c1_vs_c4      # C1（好几何）vs C4（差几何）对比
+
+# I-5: 评估口径确认（手册 Part 3 / I-5）。
+sim3_alignment: true   # Sim(3) 对齐（平移+旋转+尺度）
+is_2d: true           # 2D 定位（x,y,yaw，z=0）
+warmup_removed: true  # 前 1s warm-up 剔除
+world_frame: true     # 世界坐标系（不是 body 帧）
+
+# P25: 异步时间戳注入顺序确认（手册 Part 3 / P25）。
+# BLOCK-6 修复：async_inject 在 resample 之前，确保异步偏移以原始 IMU 帧为基准注入，
+# 避免 resample 后跨帧插值破坏异步特征。
+timestamps_monotonic: true          # UWB 时间戳单调递增（允许 ±10ms 异步抖动容差）
+async_injected_before_resample: true   # 异步偏移在 resample 步骤之前注入
+jitter_per_packet: true           # 每个 UWB 脉冲独立采样抖动（非固定偏移）
+
+# ===========================================================================
+# R-1..R-5 失败归因登记（手册 Part 3 / R 系列）。
+# ===========================================================================
+failure_classification_register:
+  class_①_实现:  # 实现缺陷（代码 bug / 数值不稳定）
+    - phenomenon: sim_e9 NLOS bias 偏移极小导致 EKF 量测更新量不足
+      timestamp: "2025-07-27T00:00:00+00:00"
+      status: closed
+  class_②_执行:  # 执行错误（超参 / seed / 路径）
+    - phenomenon: seed 重复导致噪声轨迹退化
+      timestamp: "2025-07-27T00:00:00+00:00"
+      status: closed
+  class_③_方法:  # 方法局限性（架构 / 假设违反）
+    - phenomenon: LNN 泛化能力差，在 NLOS 主导段完全失效
+      timestamp: "2025-07-27T00:00:00+00:00"
+      status: closed
+  class_④_统计:  # 统计不确定性（样本不足 / p 值不显著）
+    []
+  class_⑤_数据:  # 数据问题（难度不足 / 分布偏差）
+    - phenomenon: sim_e9 数据集 NLOS bias 偏移极小（3.2~3.7m），难度梯度不足
+      timestamp: "2025-07-27T00:00:00+00:00"
+      status: closed
+  class_⑥_硬件环境:  # 硬件/环境（GPU / 内存 / CUDA 版本）
+    []
+
+rca_entries:
+  - id: RCA-001
+    phenomenon: sim_e9 NLOS bias 偏移极小（3.2~3.7m）、样本数量不足（15条序列约6000个bias样本）、分布单一、泛化能力差；VIO 主导定位贡献98%+状态更新，NN bias 修正收益被稀释
+    timestamp: "2025-07-27T00:00:00+00:00"
+    status: closed
+    evidence: "FINAL_REPORT.md §3.1: 序列平均 bias 均值 3.2~3.7m；模型在训练集接近真值但未见序列完全失效"
+    disposition: 数据性失败确认，DQ-1(难度梯度不足)、DQ-2(信噪比低)、DQ-3(分布不可学)、DQ-4(样本量不足) 全指向数据
+
+rerun_rounds: 0   # 手册 R-3：重跑轮次上限 2
+
+honest_report_decision:
+  in_effect: true
+  report_file: FINAL_REPORT.md
+
+fallback_exit:
+  declared: true
+  class: class_⑤_数据
+  rationale: sim_e9 数据集 NLOS bias 偏移极小、样本数量不足、分布单一，统计功效不足，无法拒绝零假设（方法间无显著差异）

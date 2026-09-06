@@ -1,0 +1,41 @@
+# 文件职责：定义 MILUV 公开数据实验入口。
+# MILUV 是一个公开的 UWB-视觉-惯性融合 benchmark 数据集，
+# 本实验在 MILUV 的公开评测拆分上比较各方法，不改数据边界。
+# 这是公开 benchmark 的固定入口之一，结果需要可复现、可核验。
+
+# 实验编号。# 这个值用于日志、产物目录和结果汇总时标识这一组实验。
+experiment_id: e7_miluv  # MILUV 公开实验编号。
+
+# 本实验对应的数据集名称。# 用于让编排器自动选择正确的数据读取器和预处理流程。
+dataset_name: miluv  # 数据集名称为 miluv。
+
+# 主研究轴是公开序列类别。# 公开数据集不扫描合成退化轴，而是按数据集自带的场景类别分组。
+primary_axis: public_sequence_category  # 主轴定义为公开序列类别。
+
+# 公开评测需要固定的轴。# 公开 benchmark 不允许修改数据边界和评测拆分，确保结果可复现。
+frozen_axes:
+  # 数据集名固定为 miluv。# 避免跨数据集比较混到一起，确保只使用 MILUV 数据。
+  dataset: miluv  # 固定数据集为 miluv。
+
+  # 拆分固定为公开冻结评测拆分。# frozen_public_eval 表示使用预先冻结的评测集，不允许修改拆分边界。
+  # 这样才能保证边界不漂移，结果可复现、可与其他论文横向对比。
+  split: frozen_public_eval  # 固定使用冻结评测拆分。
+
+# 参与比较的方法。# 泛化实验比较 3 个神经网络方法 + 传统 EKF 基线。
+# ekf：标准扩展卡尔曼滤波，基线方法。
+# lstm_ekf：LSTM 增强 EKF。
+# liquid_ekf：液态网络增强 EKF。
+# transformer_ekf：Transformer 增强 EKF。
+methods: [ekf, lstm_ekf, liquid_ekf, transformer_ekf]  # 传统基线 + 3 个神经网络方法参与公开评测。
+
+# quick/full 下的序列数量控制。# 公开数据集不用 levels 扫描，只控制跑多少序列。
+mode_overrides:
+  # 轻量模式。# 只跑少量序列，用于快速检查链路是否正常。
+  quick:
+    # quick 只跑少量序列。# 3 个序列足够验证链路，不追求覆盖面。
+    max_sequences: 3  # quick 模式最多 3 个序列。
+
+  # 完整模式。# 不主动裁剪，由底层数据集和资源决定实际规模。
+  full:
+    # full 不限制序列数。# 由底层数据集和资源决定实际规模，确保完整覆盖所有评测序列。
+    max_sequences: null  # full 模式不设序列上限。

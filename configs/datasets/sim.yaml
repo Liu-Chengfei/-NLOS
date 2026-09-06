@@ -1,0 +1,31 @@
+# 文件职责：定义仿真数据集的目录入口与路径分层约定。
+# 本文件只管路径定名，不管数据生成逻辑；仿真场景生成、清单构造和读取逻辑在别的模块里完成。
+
+# 扰动一次定稿 (v2 D-1 dual_track 改名, 2026-04-28):
+# v1 声明 "场景扰动只在 sim_materializer 注入" 不准确, v2 协议声明双轨:
+#   (1) 基础高斯噪声 (IMU/UWB/VIO 白噪声) 在 sim_materializer 物化时注入;
+#   (2) 场景轴退化 (A/N/V/M 突发事件) 在 core_pipeline runtime 注入.
+# reader/prepare 仍不扰动 (与 v1 一致). 此约定与 configs/base/scene_axis_protocol.yaml
+# 的 perturbation_injection_point: dual_track 声明一致,
+# 任何 reader/prepare 模块均不得在数据读取或预处理阶段注入场景轴扰动.
+# v2 D-13: sim_meta.json 标注的 axes_override + dt_override 由 prepare 阶段读取后
+# 注入 manifest 的 scene_parameters 字段, runtime core_pipeline 消费 manifest 退化.
+
+# 数据集统一名称，供脚本路由、registry 索引和日志标识使用。
+dataset_name: sim  # 仿真数据集的标准名称。
+
+# 仿真原始数据目录。
+# 异步高NLOS实验主表数据集：A2/A3 × N2/N3 四组合 × K1 × V0 × M1。
+# S3 硬约束：10 seed × 5 method = 50 单元（训练 12-15 条/seed、测试 ≥100 条/seed）。
+# P2 修复 (2026-09-02): 切换到 sim_e9_5seed_25unit_flat — 100 条序列，4 组合各 25 条。
+# S3 修复 (2026-09-02): 必须扩展到 sim_e9_10seed_40unit — 200 条序列 × 10 seed（已注册协议裁决项 PA-2026-S3-SCALE）。
+raw_root: data/raw/sim_e9_10seed_40unit
+interim_root: data/interim/sim_e9_10seed_40unit
+processed_root: data/processed/sim_e9_10seed_40unit
+manifests_root: data/manifests/sim_e9_10seed_40unit
+prepare_root: outputs/prepare_sim_e9_10seed_40unit
+
+
+# 仿真数据集不需要 field_mapping，因为数据由代码生成，字段名已与统一 schema 对齐。
+# 如需引入非标准字段，应在此处添加 field_mapping 并在 sim_reader.py 中消费。
+# 注意：若 sim 数据经 field_mapper 流程处理，仍需提供非空 field_mapping。

@@ -1,40 +1,36 @@
 # 文件职责：定义几何相关实验入口。
-# 它同时看几何质量 G 和锚点数量 K 两个维度，所以主轴写成了一个列表。
-# 这是一个双维度几何敏感性实验，通过扫描 G 轴（几何布局质量）和 K 轴（锚点数量），
-# 观察不同几何条件下各方法的定位表现差异。
+# 五轴档位协议下 G 已并入 K：扫描 K 轴档位覆盖协议定义的几何质量维度。
+# 协议 K 轴档位：K0（最优 GDOP 0.8-1.2） / K1（中等 GDOP 1.8-2.2） / K3（近共线退化 GDOP 9-11+）。
+# 本实验扫 K1/K3 观察不同几何条件下各方法的定位表现差异。
 #
 # 2026-08-29 改造：原 primary_axis: [G, K] 走 core route，用 _default_core_events
 # 硬编码事件 fixture，与 sim_e9 数据集不兼容。改为 public_sequence_category 路由，
 # 与 E5 同构，consume sim_e9_protocol_20260726 数据集。
 #
-# 关键说明：sim_e9 数据集实际只覆盖 (G1, K3) 和 (G2, K4) 两组 (G, K) 组合——
-#   sim_curve_01*: G1/K3 (93 base × 30 seeds = 2790 entries, 实有 ~93)
-#   sim_curve_02*: G2/K4 (93 base × 30 seeds = 2790 entries, 实有 ~93)
-# 论文级 full 模式要求的 G0/G1/G2 × K4/K6/K8 9 组合不在 sim_e9 中，需要扩数据集。
-# 当前 quick 模式只覆盖 2 个 (G, K) 组合，在 commit message 中明确说明覆盖度局限。
+# 2026-09-03 五轴档位协议：sim_e9 数据集覆盖 (K1, K3) 几何档位——
+#   sim_curve_01*: K3 (93 base × 30 seeds = 2790 entries, 实有 ~93)
+#   sim_curve_02*: K1 (93 base × 30 seeds = 2790 entries, 实有 ~93)
+# 论文级 full 模式要求的 K0/K1/K3 几何全档扫描在 sim_e9 中（已全部覆盖）。
+# 当前 quick 模式只覆盖 K1 + K3 两个 K 档位组合，在 commit message 中明确说明覆盖度局限。
 
 # 实验编号。# 这个值用于日志、产物目录和结果汇总时标识这一组实验。
 experiment_id: e6_geometry  # 几何实验编号。
 
 # 主研究轴改成公开序列路由。# 启用数据集路由，让 _resolve_sim_protocol_seq_ids 按 frozen_axes 过滤 sim_e9。
-# A/N/V/G/K 轴以 sim_meta.json 的 axes_override 为准，frozen_axes 只用于路由过滤。
+# A/N/V/K 轴以 sim_meta.json 的 axes_override 为准，frozen_axes 只用于路由过滤。
 primary_axis: public_sequence_category  # 公开序列路由。
 
 # 数据集名称。# 路由到 sim 公开补充路线，走 Prepare + Core 完整链路。
 dataset_name: sim  # 仿真数据集。
 
-# 冻结轴。# 这里只声明 G/K 两个扫描维度，其余轴由 sim_meta.json 的 axes_override 决定。
+# 冻结轴。# 这里只声明 K 档位扫描维度，其余轴由 sim_meta.json 的 axes_override 决定。
 # A/N/V 不写入 frozen_axes，避免 _resolve_sim_protocol_seq_ids 严格匹配时把 sim_e9 全部过滤掉。
-# sim_curve_01*: A3/N2/V0/G1/K3；sim_curve_02*: A3/N3/V0/G2/K4。
+# sim_curve_01*: A3/N2/V0/K3；sim_curve_02*: A3/N3/V0/K1。
 #
-# 2026-08-29: SIM_MATERIALIZED_ALLOWED_GEOMETRY_LEVELS 加 G2（dataset_checks.py:57），
-# 放开 G2 合同（与 e9_batch2 跑通的合同保持一致），让 E6 跑 G1×K3 + G2×K4 两个 (G,K) 组合。
+# 2026-09-03: 五轴档位协议下合同从原 K3+K1 扫描。
 frozen_axes:
-  # 几何扫描维：覆盖 sim_e9 实际拥有的 G1 (sim_curve_01) 和 G2 (sim_curve_02)。
-  G: [G1, G2]  # 几何扫描维。
-
-  # 锚点扫描维：覆盖 sim_e9 实际拥有的 K3 (sim_curve_01) 和 K4 (sim_curve_02)。
-  K: [K3, K4]  # 锚点扫描维。
+  # 几何扫描维：覆盖 sim_e9 实际拥有的 K3 (sim_curve_01) 和 K1 (sim_curve_02)。
+  K: [K1, K3]  # K 轴档位扫描维（五轴档位协议 G 已并入 K）。
 
 # 参与比较的方法。# 覆盖传统、鲁棒和学习式方法，便于观察几何条件对不同范式的影响。
 # ekf：标准 EKF，对几何退化敏感，GDOP 恶化时精度下降明显。
@@ -51,7 +47,7 @@ mode_overrides:
     # 重复次数。# public_sequence_category 不支持 repeats（allow_repeats=False），此字段作占位。
     repeats: 2  # quick 模式重复 2 次（占位，不生效）。
 
-    # 序列上限。# 覆盖 G1×K3 + G2×K4 全部基础序列（约 12 个 base curve），足够快速验证。
+    # 序列上限。# 覆盖 K1×K3 全部基础序列（约 12 个 base curve），足够快速验证。
     max_sequences: 24  # quick 模式最多 24 个序列。
 
   # 完整模式。# 论文级全量覆盖。

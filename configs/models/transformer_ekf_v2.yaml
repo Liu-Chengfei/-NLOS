@@ -1,0 +1,98 @@
+# 文件职责：定义 Transformer+EKF 模型的静态参数，供工厂和脚本路由使用。
+name: transformer_ekf
+
+# 铁律 9 / §5.2: LNN 吃传感器观测 + EKF 状态特征实现"后端接 EKF"
+feature_order:
+  # 传感器观测特征 (8 项)
+  - dt  # 相邻观测时间间隔（秒），用于离散化运动模型。
+  - ax  # IMU x 轴加速度（m/s²）。
+  - ay  # IMU y 轴加速度（m/s²）。
+  - gz  # IMU z 轴角速度（rad/s）。
+  - range  # UWB 测距值（m）。
+  - dx  # VIO x 方向位移增量（m）。
+  - dy  # VIO y 方向位移增量（m）。
+  - dyaw  # VIO 航向增量（rad）。
+  # EKF 状态特征 (9 项) —— 后端接 EKF 状态
+  - px  # EKF 位置 x 估计值（m）
+  - py  # EKF 位置 y 估计值（m）
+  - vx  # EKF 速度 x 估计值（m/s）
+  - vy  # EKF 速度 y 估计值（m/s）
+  - yaw  # EKF 航向角估计值（rad）
+  - bax  # EKF 加速度 bias 估计值
+  - bay  # EKF 角速度 bias 估计值
+  - bg   # EKF 陀螺仪 bias 估计值
+  - uwb_clock_bias  # EKF UWB 时钟偏置估计值
+
+window:
+  size: 20  # 窗口长度为 20 帧（与 LSTM/Liquid 对等）。
+  step: 1  # 步长为 1，逐帧滑动。
+
+network:
+  input_dim: 17  # 8 sensor + 9 EKF_state
+  hidden_dim: 36  # 36 可被 nhead=3 整除 (36/3=12)，接近 2*input_dim≈34
+  num_layers: 1  
+  dropout: 0.1  
+  output_heads:
+    - bias  
+    - risk  
+    - uwb_scaling  
+    - vio_scaling  
+
+train:
+  optimizer: adam
+  lr: 0.00015  # 与 lstm_ekf.yaml / liquid_ekf.yaml 对齐（准则 15 训练配置一致）.
+  weight_decay: 0.0
+  epochs: 160  
+  batch_size: 32  # 与 lstm_ekf.yaml / liquid_ekf.yaml 对齐（准则 15 训练配置一致）.
+  eval_batch_size: 128  
+  amp_enabled: auto
+  amp_dtype: bf16
+  save_epoch_candidates: true
+  epoch_candidate_stride: 10
+  patience: 160
+  lr_scheduler:
+    enabled: true
+    T_max: 160  
+    eta_min: 5.0e-5
+  deterministic: true
+  gradient_clip_max_norm: 1.0
+  bias_huber_delta: 1.345
+  scaling_log_eps: 1.0e-6
+  loss_weights:
+    w_bias: 1.0
+    w_risk: 1.0
+    w_uwb: 1.0
+    w_vio: 1.0
+    w_cal: 0.08
+    lambda_l2: 1.0e-4
+    lambda_l1: 1.0e-5
+    lambda_mono: 1.0e-4
+  lr_layer:
+    readout: 1.0e-3
+    backbone: 3.0e-4
+  phase_schedule:
+    warmup_epochs: 0
+    gate_alignment_epochs: 0
+    full_tuning_epochs: 160
+
+safe_mode:
+  enabled: true
+  risk_threshold: 0.5
+
+bridge_thresholds:
+  robust_supplement_quality_threshold: 0.55
+  robust_supplement_alignment_threshold: 0.45
+  robust_supplement_max_boost: 0.20
+  observation_risk_blend: 0.35
+  uwb_geometric_bias_full_scale: 0.50
+  async_gap_full_scale: 0.30
+  async_uwb_scaling_coeff: 0.20
+  async_vio_scaling_coeff: 0.20
+  uwb_scaling_alignment_coeff: 0.50
+  uwb_scaling_quality_coeff: 0.25
+  uwb_scaling_geometry_coeff: 0.35
+  uwb_invalid_extra_boost: 0.15
+  vio_scaling_alignment_coeff: 0.50
+  vio_scaling_quality_coeff: 0.25
+  vio_low_features_scaling_boost: 0.10
+  vio_high_reproj_scaling_boost: 0.10

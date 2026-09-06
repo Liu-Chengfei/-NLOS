@@ -1,0 +1,55 @@
+# 文件职责：定义指标汇总口径，规定展示哪些指标、优先看哪些指标。
+# 本文件只负责指标分类和展示优先级，计算公式由 metrics 代码负责。
+# 修改本文件任何字段均属口径变更，须走协议变更流程。
+
+# 主表优先展示的核心指标列表。
+# 这些指标出现在实验报告的主表和摘要中，是评判算法性能的首要依据。
+# rmse          : 均方根误差 (Root Mean Square Error)，衡量位置估计的整体精度，单位 m。
+#                 对大误差敏感，是定位精度最常用的综合指标。
+#                 §14.1 主指标为「未做鲁棒变换的平均位置误差」; rmse 是 raw 位置误差的平方均值开方，
+#                 符合 §14 主指标精神; 全序判定主序必须以 rmse 为准 (§14.4 细节)。
+# p95           : 第 95 百分位误差，衡量 95% 时刻的误差上界，单位 m。
+#                 反映尾部误差水平，比 rmse 更能体现最差情况下的可靠性。
+#                 §14.4 细节「禁止用分位数主序（仅 P95）来改写全序」; p95 仅作辅决策参考，
+#                 不得替代 rmse 作主序判定; conclusion_priority 中 rmse 优先于 p95。
+# failure_rate  : 失败率，误差超过阈值（见 experiment_protocol.yaml 中 default_failure_threshold_m）的帧占比。
+#                 直接反映系统可用性，是最关键的安全指标。
+#                 与 experiment_protocol.yaml 中 §14.4 failure_accounting_mode 联动。
+primary_metrics: [rmse, mean_rmse, std_rmse, p95, failure_rate]
+
+# 主表未覆盖时补充展示的指标列表，补足误差视角。
+# 这些指标在主表之后展示，提供更细粒度的误差分析。
+# p99  : 第 99 百分位误差，衡量极端尾部误差，单位 m。
+#         比 p95 更严格，反映最差 1% 时刻的表现。
+# mae  : 平均绝对误差 (Mean Absolute Error)，单位 m。
+#         对异常值不如 rmse 敏感，反映典型误差水平。
+# ate  : 绝对轨迹误差 (Absolute Trajectory Error)，单位 m。
+#         衡量整条轨迹的全局一致性，对漂移敏感。
+# rpe  : 相对位姿误差 (Relative Pose Error)，单位 m。
+#         衡量相邻帧间相对运动估计的一致性，对短时精度敏感。
+# yaw_rmse : 航向角均方根误差 (rad)，衡量航向估计的整体精度。
+#            使用 angle_delta_rad 计算角度差，正确处理 [-π, π) 环绕。
+# yaw_p95  : 航向角第 95 百分位误差 (rad)，衡量 95% 时刻的航向误差上界。
+secondary_metrics: [p99, mae, ate, rpe, yaw_rmse, yaw_p95]
+
+# 解释机制和偏差的指标列表。
+# 这些指标不直接衡量定位精度，而是帮助理解算法内部机制是否正常工作。
+# risk_error_corr    : 风险估计与实际误差的相关性。
+#                       衡量学习型协方差估计是否能有效预测误差大小，
+#                       高相关性意味着风险模型是可靠的。
+# coverage           : 覆盖率，有效估计帧占总帧的比例。
+#                       反映算法在多大比例的时间能产出有效结果。
+# bias_alignment     : 偏差对齐度，衡量偏差估计方向与真实偏差方向的一致性。
+#                       高对齐度意味着偏差校正方向正确。
+# corr_scaling_error : 协方差缩放误差，衡量预测协方差与实际误差的匹配程度。
+#                       理想情况下协方差应与实际误差统计一致。
+mechanism_metrics: [risk_error_corr, coverage, bias_alignment, corr_scaling_error]
+
+# 描述速度和资源占用的指标列表。
+# 这些指标衡量算法的实时性和部署可行性，不影响精度评判但影响实用性。
+# latency_mean : 平均推理延迟 (ms)，单帧从输入到输出的平均耗时。
+# latency_p50  : 第 50 百分位推理延迟 (ms)，即中位数延迟，反映典型耗时。
+# latency_p95  : 第 95 百分位推理延迟 (ms)，反映尾部延迟，对实时性要求高的场景关键。
+# params       : 模型参数量 (count)，按原始参数个数汇报，衡量模型规模和存储需求。
+# ram_peak     : 峰值内存占用 (MB)，按 MB 汇报运行时内存需求，影响部署设备选择。
+runtime_metrics: [latency_mean, latency_p50, latency_p95, params, ram_peak]

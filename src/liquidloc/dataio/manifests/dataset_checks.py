@@ -48,15 +48,13 @@ ANCHOR_LAYOUT_FILENAME = 'anchor_layout.json'
 _LAYOUT_FAMILY_FIELD = 'base_layout_id'
 _LAYOUT_SEQUENCE_FIELD = 'layout_id'
 _nominal_levels = get_nominal_levels()
-# 2026-07-26：主表欠定身份。禁止再把 G0/K6 当成唯一合法物化合同。
-SIM_MATERIALIZED_BASELINE_GEOMETRY_LEVEL = "G0"
-SIM_MATERIALIZED_BASELINE_K_LEVEL = "K4"
-# 2026-08-29 档位重制定：主表允许的 G/K 集合。
-# G 集合加 G2（sim_curve_02* 数据集用 G2，与 e9_batch2 实际跑的合同保持一致）。
-# K 集合加 K5（K5↔N3 压力档主表绑定）。
-# K6/K8 仍由 allow_high_anchor_count=True 走压力条。
-SIM_MATERIALIZED_ALLOWED_GEOMETRY_LEVELS = frozenset({"G0", "G1", "G2"})
-SIM_MATERIALIZED_ALLOWED_K_LEVELS = frozenset({"K3", "K4", "K5"})
+# H27 协议 (2026-09-02) 升级：原 G 轴并入 K 轴。K 档仅 K0/K1/K3 三档（K4 已删除）。
+# 主表 baseline 使用 K1（非对称欠定，4 锚），主表允许 K0/K1/K3。
+SIM_MATERIALIZED_BASELINE_GEOMETRY_LEVEL = "K1"
+SIM_MATERIALIZED_BASELINE_K_LEVEL = "K1"
+# 2026-08-29 → 2026-09-02 协议升级：K 集合精简为 K0/K1/K3（K4/K5 已废弃并入 K0/K1/K3）。
+SIM_MATERIALIZED_ALLOWED_GEOMETRY_LEVELS = frozenset({"K0", "K1", "K3"})
+SIM_MATERIALIZED_ALLOWED_K_LEVELS = frozenset({"K0", "K1", "K3"})
 # 从协议动态推导锚点数映射。
 # 注意：模块加载时读协议配置；无 configs/ 时会失败，属有意闸门。
 _protocol_cfg = load_yaml_config(find_project_root() / "configs" / "base" / "scene_axis_protocol.yaml")
@@ -434,18 +432,18 @@ def inspect_sim_materialized_contract(
     anchor_layout_filename: str = ANCHOR_LAYOUT_FILENAME,
     uwb_filename: str = 'uwb.json',
 ) -> dict[str, Any]:
-    """检查 materialized SIM raw 是否满足当前主表几何合同（欠定 G/K 集合）。
+    """检查 materialized SIM raw 是否满足当前主表几何合同（K 轴，五轴档位协议 G 已并入 K）。
 
-    2026-07-26 起：默认接受 G∈{G1,G2}、K∈{K3,K4} 的异构主表集合，
-    不再要求全库单一 G0/K6。若传入 expected_* 单值，则退化为旧的严格单档校验。
+    五轴档位协议：G 轴已删除并入 K 轴。K 档位仅 K0/K1/K3（K4–K8 已删除）。
+    默认接受 K∈{K1,K3} 的欠定异构主表集合。若传入 expected_* 单值，则退化为严格单档校验。
 
     参数：
         dataset_root: 数据集根目录路径（字符串或 Path）。
         expected_anchor_count: 可选单值锚点数；与 allowed_anchor_counts 互斥优先单值。
-        expected_geometry_level: 可选单值 G 档。
+        expected_geometry_level: 已废弃（G 轴已删除），请使用 expected_k_level。
         expected_k_level: 可选单值 K 档。
-        allowed_geometry_levels: 允许的 G 档集合，默认主表 {G1,G2}。
-        allowed_k_levels: 允许的 K 档集合，默认主表 {K3,K4}。
+        allowed_geometry_levels: 已废弃（G 轴已删除），请使用 allowed_k_levels。
+        allowed_k_levels: 允许的 K 档集合，默认主表 {K1,K3}。
         allowed_anchor_counts: 允许的锚点数集合；默认由 allowed_k_levels 推导。
         anchor_layout_filename: 布局元数据文件名，默认为 anchor_layout.json。
         uwb_filename: UWB 数据文件名，默认为 uwb.json。

@@ -48,7 +48,7 @@ from liquidloc.dataio.manifests.build_manifests import build_manifests  # 生成
 from liquidloc.dataio.manifests.dataset_checks import REQUIRED_RAW_KEYS  # 标准数据集必须有的原始键。
 from liquidloc.dataio.manifests.dataset_checks import UTIL_REQUIRED_RAW_KEYS  # util 数据集必须有的原始键。
 from liquidloc.dataio.manifests.dataset_checks import (
-    inspect_sim_materialized_contract,  # SIM 物化合同校验（主表 G1/G2 + K3/K4）。
+    inspect_sim_materialized_contract,  # SIM 物化合同校验（主表 K1/K3 几何档位，五轴档位协议）。
     validate_sim_generator_version,  # §28.6 仿真生成器版本自证契约校验。
 )
 from liquidloc.dataio.manifests.dataset_checks import run_dataset_checks  # 运行数据集合法性检查。
@@ -201,10 +201,10 @@ def _raise_if_dataset_check_failed(check_report: dict[str, Any], *, seq_id: str)
 
 
 def _enforce_sim_materialized_contract(raw_root: Any) -> None:
-    """对 SIM 数据集强校验主表几何合同（G∈{G1,G2}, K∈{K3,K4}）。
+    """对 SIM 数据集强校验主表几何合同（K∈{K1,K3}，五轴档位协议 G 已并入 K）。
 
     用户审查标准 #3 要求 inspect_sim_materialized_contract 在 prepare 阶段
-    强校验。2026-07-26 起合同从单一 G0/K6 改为欠定主表允许集，阻断旧 2 锚
+    强校验。五轴档位协议下合同从单一 K0 改为欠定主表允许集（K1/K3），阻断旧 2 锚
     或优几何高冗余 raw。
 
     §8 / fail-loud 守卫：inspect_sim_materialized_contract 契约声明返回 dict[str, Any]，
@@ -228,7 +228,7 @@ def _enforce_sim_materialized_contract(raw_root: Any) -> None:
     if not sim_contract_report.get('is_valid'):
         raise RuntimeError(
             'sim raw_root does not satisfy the paper-grade materialized SIM contract '
-            '(allowed G∈{G1,G2}, K∈{K3,K4}); '
+            '(allowed K∈{K1,K3}); '
             f"report={sim_contract_report}. Re-run scripts/02_generate_sim_raw.py or point "
             '--raw-root to a protocol-trajectory undetermined-geometry sim raw directory.'
         )
@@ -365,8 +365,7 @@ class PreparePipeline(PipelineAPI):
                     'A': scene_spec.A_level,
                     'N': scene_spec.N_level,
                     'V': scene_spec.V_level,
-                    'G': scene_spec.G_level,
-                    'K': scene_spec.K_value,
+                    'K': scene_spec.K_value,  # §2.1 G→K 合并：G 轴并入 K 轴。
                     'M': _nominal_levels.get('M', 'M0'),  # M 轴不在 scene_code 中，用 nominal 兜底。
                 }).to_dict()  # SceneParameters → 纯 dict，确保 JSON 可序列化。
             except (ValueError, TypeError, KeyError):  # scene_id 不可解码时静默跳过。
