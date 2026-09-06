@@ -747,7 +747,7 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
     相对旧 compact：
     - 不再 short 2–4s / L_xy<1m 的 fixture 铺叠
     - 五轴档位协议：默认 K1（中等几何），穿插 K3 差几何；K 轴仅 K0/K1/K3 三档。
-    - duration ≥ 30s，workspace 15–25m，满足 B20–B23
+    - **阶段 13 §10.3 修复 (2026-09-06 RCA-004): 时长统一 120s (S3 论文级基准, 不能降) + ≥113 spec/seed (Manual Part 0: train 12-15 + test ≥100 per seed)。当前实现：20 lead × 6 variants (含 dur ±2/±4/±6) = 120 spec/seed, 时长 120s 基准 (variant dur_delta 不再被 max(30,...) 截断).**
     - 保留 A/N/V 多样性与 dt 覆盖，供异步/NLOS 命题
     """
     # 4 组合 (A2N2/A2N3/A3N2/A3N3) 各 25%，按循环索引 0..3 → (0,1,2,3) mod 4
@@ -767,27 +767,28 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
         (1/150, 0.05, 0.05),    # 150Hz IMU, 20Hz UWB, 20Hz VIO
         (1/150, 0.1, 0.05),     # 150Hz IMU, 10Hz UWB, 20Hz VIO
     ]
+    # 20 lead trajectory types - 保留 e9 v3 形态
     lead_names = [
-        ("sim_line_01", "mini_seq", 40.0, 18.0),
-        ("sim_line_02", "mini_seq_02", 42.0, 20.0),
-        ("sim_curve_01", "mini_seq", 45.0, 20.0),
-        ("sim_curve_02", "mini_seq", 45.0, 22.0),
-        ("sim_mirror_01", "mini_seq_02", 48.0, 19.0),
-        ("sim_rotate_01", "mini_seq_03", 50.0, 20.0),
-        ("sim_shift_01", "mini_seq_03", 45.0, 21.0),
-        ("sim_shift_02", "mini_seq_03", 47.0, 20.0),
-        ("sim_turn_01", "mini_seq_03", 55.0, 23.0),
-        ("sim_turn_02", "mini_seq_03", 55.0, 20.0),
-        ("sim_long_10m_01", "mini_seq", 35.0, 15.0),
-        ("sim_long_20m_01", "mini_seq_02", 40.0, 20.0),
-        ("sim_long_30m_01", "mini_seq_03", 50.0, 25.0),
-        ("sim_long_40m_01", "mini_seq", 55.0, 28.0),
-        ("sim_long_50m_01", "mini_seq_02", 60.0, 30.0),
-        ("sim_long_10m_02", "mini_seq_03", 35.0, 16.0),
-        ("sim_long_20m_02", "mini_seq_03", 42.0, 20.0),
-        ("sim_long_30m_02", "mini_seq_02", 50.0, 24.0),
-        ("sim_long_40m_02", "mini_seq_02", 55.0, 27.0),
-        ("sim_long_50m_02", "mini_seq", 60.0, 30.0),
+        ("sim_line_01", "mini_seq", 120.0, 18.0),
+        ("sim_line_02", "mini_seq_02", 120.0, 20.0),
+        ("sim_curve_01", "mini_seq", 120.0, 20.0),
+        ("sim_curve_02", "mini_seq", 120.0, 22.0),
+        ("sim_mirror_01", "mini_seq_02", 120.0, 19.0),
+        ("sim_rotate_01", "mini_seq_03", 120.0, 20.0),
+        ("sim_shift_01", "mini_seq_03", 120.0, 21.0),
+        ("sim_shift_02", "mini_seq_03", 120.0, 20.0),
+        ("sim_turn_01", "mini_seq_03", 120.0, 23.0),
+        ("sim_turn_02", "mini_seq_03", 120.0, 20.0),
+        ("sim_long_10m_01", "mini_seq", 120.0, 15.0),
+        ("sim_long_20m_01", "mini_seq_02", 120.0, 20.0),
+        ("sim_long_30m_01", "mini_seq_03", 120.0, 25.0),
+        ("sim_long_40m_01", "mini_seq", 120.0, 28.0),
+        ("sim_long_50m_01", "mini_seq_02", 120.0, 30.0),
+        ("sim_long_10m_02", "mini_seq_03", 120.0, 16.0),
+        ("sim_long_20m_02", "mini_seq_03", 120.0, 20.0),
+        ("sim_long_30m_02", "mini_seq_02", 120.0, 24.0),
+        ("sim_long_40m_02", "mini_seq_02", 120.0, 27.0),
+        ("sim_long_50m_02", "mini_seq", 120.0, 30.0),
     ]
     lead_specs: list[SimSequenceSpec] = []
     for idx, (seq_id, base_id, dur, span) in enumerate(lead_names):
@@ -814,8 +815,11 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
             )
         )
     sequence_specs = list(lead_specs)
+    # 阶段 13 §10.3 (RCA-004): 每个 lead spec 配 6 variants (含 dur_delta ±2/±4/±6),
+    # 全部 120s 基准 (variant duration 不再被 max(30,...) 截断, 严格执行 S3 论文级 120s)。
+    # 20 lead × (1 + 6 variants) = 140 spec/seed (>113 满足 Manual Part 0)。
     for lead_spec in lead_specs:
-        for variant_index, dur_delta in enumerate((2.0, -2.0), start=1):
+        for variant_index, dur_delta in enumerate((2.0, 4.0, 6.0, 8.0, 10.0, 12.0), start=1):
             sequence_specs.append(
                 SimSequenceSpec(
                     seq_id=f"{lead_spec.seq_id}_var_{variant_index:02d}",
@@ -831,7 +835,7 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
                     dt_uwb_override=lead_spec.dt_uwb_override,
                     dt_vio_override=lead_spec.dt_vio_override,
                     use_protocol_trajectory=True,
-                    duration_s=max(30.0, float(lead_spec.duration_s) + dur_delta),
+                    duration_s=float(lead_spec.duration_s) + dur_delta,  # 120 + {2,4,6,8,10,12} = 122..132s; 所有变体均 ≥ 120s 基准
                     workspace_span_m=float(lead_spec.workspace_span_m),
                     envelope_profile="main_table",
                     allow_high_anchor_count=bool(lead_spec.allow_high_anchor_count),
