@@ -64,6 +64,9 @@ _NTU_VIRAL_SEQUENCE_DATAFILE_IDS = {
     "spms_03": 98193,
 }
 _NTU_VIRAL_DATAFILE_BASE_URL = "https://researchdata.ntu.edu.sg/api/access/datafile/"
+# NTU VIRAL Dataverse API 端点（root metadata JSON），由 scripts/_build_ntu_viral_fetch_manifest 消费；
+# 测试通过 monkeypatch._load_json_url 旁路真实网络，因此 URL 字面值不影响测试。
+_NTU_VIRAL_DATAVERSE_URL = "https://researchdata.ntu.edu.sg/api/datasets/:persistentId/?persistentId=doi:10.21979/N14/MHKVVE"
 _NTU_VIRAL_ONEDRIVE_SHARE_URL = (
     "https://ntuedusg-my.sharepoint.com/:f:/g/personal/"
     "cle003_e_ntu_edu_sg/EiJtY9L3g9JAtJHmF8X0jLABvZrSLYrFm0Y3JbPvGJjMxQ"

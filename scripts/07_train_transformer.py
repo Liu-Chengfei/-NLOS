@@ -8,7 +8,7 @@
 
 调用示例：
   python scripts/07_train_transformer.py --split-ids mini_seq --epochs 5
-  python scripts/07_train_transformer.py --dataset-name sim --events-root outputs/prepare_sim_e9_protocol_20260726
+  python scripts/07_train_transformer.py --dataset-name sim --events-root outputs/prepare_sim_e9_main
 """
 
 from __future__ import annotations
@@ -153,7 +153,7 @@ def main(argv=None):
         from liquidloc.common.prepared_inputs import load_prepared_events_by_seq_id
         from liquidloc.common.prepared_inputs import load_ground_truth_by_seq_id
         from liquidloc.common.io_utils import read_json
-        _prepare_root = Path(args.events_root) if args.events_root else Path("outputs/prepare_sim_e9_protocol_20260726")
+        _prepare_root = Path(args.events_root) if args.events_root else Path("outputs/prepare_sim_e9_main")
         _manifest_candidate = _prepare_root / "prepare_manifest.json"
         if not _manifest_candidate.is_file():
             _manifest_candidate = _prepare_root / "sim" / "prepare_manifest.json"

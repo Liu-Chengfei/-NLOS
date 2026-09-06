@@ -56,7 +56,7 @@ def record(item: str, status: str, evidence: str) -> None:
 # ============================================================================
 def check_items_1_3() -> None:
     print("\n=== Layer 1: Data Correctness (Items 1-3) ===")
-    raw_root = (DATA_ROOT_OVERRIDE if DATA_ROOT_OVERRIDE else ROOT / "data" / "raw" / "sim_e9_protocol_20260726")
+    raw_root = (DATA_ROOT_OVERRIDE if DATA_ROOT_OVERRIDE else ROOT / "data" / "raw" / "sim_e9_main")
     # Item 1: Mixed pool composition
     pool_count: dict[tuple[str, str], int] = {}
     a_total, n_total = {"A2": 0, "A3": 0}, {"N2": 0, "N3": 0}
@@ -118,7 +118,7 @@ def check_items_4_6() -> None:
     print("\n=== Layer 1: Items 4-6 ===")
     # Item 4: K1 GDOP (K3 in actual config = 3 anchors, but per docs K1 is "weak geometry")
     # Check anchor layout
-    raw_root = (DATA_ROOT_OVERRIDE if DATA_ROOT_OVERRIDE else ROOT / "data" / "raw" / "sim_e9_protocol_20260726")
+    raw_root = (DATA_ROOT_OVERRIDE if DATA_ROOT_OVERRIDE else ROOT / "data" / "raw" / "sim_e9_main")
     anchors = None
     # 2026-09-01: 兼容 5-seed 模拟器（seedN/seqN/）和 stub（seqN/anchor_layout.json）。
     # 兼容 (a) data_root/<seq_id>/anchor_layout.json  (单层)
@@ -239,7 +239,7 @@ def check_items_4_6() -> None:
     # Item 6: train/test split (sequence-level)
     # The manifest itself is just a sequence listing; actual split is done by the pipeline.
     # Check if there's a separate splits file or if the pipeline defines the split logic.
-    raw_root = (DATA_ROOT_OVERRIDE if DATA_ROOT_OVERRIDE else ROOT / "data" / "raw" / "sim_e9_protocol_20260726")
+    raw_root = (DATA_ROOT_OVERRIDE if DATA_ROOT_OVERRIDE else ROOT / "data" / "raw" / "sim_e9_main")
     manifest_path = raw_root / "prepare_manifest.json"
     split_file = raw_root / "splits.json"
     # Check for train_test_split in configs
@@ -681,7 +681,7 @@ def check_items_24_27() -> None:
     # Item 25: A2/A3 timestamp semantics
     # Sim_e9 has A0 by default in raw data, A2/A3 is runtime-injected
     # Check that the data has monotonic timestamps
-    raw_root = (DATA_ROOT_OVERRIDE if DATA_ROOT_OVERRIDE else ROOT / "data" / "raw" / "sim_e9_protocol_20260726")
+    raw_root = (DATA_ROOT_OVERRIDE if DATA_ROOT_OVERRIDE else ROOT / "data" / "raw" / "sim_e9_main")
     ts_check = {}
     for seq_name in ["sim_curve_01_seed0", "sim_long_10m_02_seed0"]:
         seq_dir = raw_root / seq_name

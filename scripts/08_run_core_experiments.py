@@ -87,16 +87,19 @@ def main(argv: list[str] | None = None) -> int:
     """Run the minimal core experiment path and print a summary."""
     print("[08_core_exp] 开始 | mode=quick scene=toy_scene_00", flush=True)
     parser = argparse.ArgumentParser(description="Run minimal core experiments")
-    parser.add_argument("--config", default=str(ROOT / "configs" / "experiments" / "e1_main_table.yaml"))
+    parser.add_argument("--config", default=None)
     parser.add_argument("--output-root", default=None)
     args = parser.parse_args(argv)
     from liquidloc.common.tee_logger import print_args, print_dict
     print_args(args, "08_run_core_experiments")
 
-    print("[08_core_exp] 加载配置 | config=e1_main_table.yaml", flush=True)
+    print("[08_core_exp] 加载配置", flush=True)
+    if not args.config:
+        print("[08_core_exp] 错误: 需要 --config 指定实验配置文件", flush=True)
+        return 1
     experiment_cfg = copy.deepcopy(load_yaml_config(args.config))
     experiment_cfg.setdefault("mode", "quick")
-    print_dict(experiment_cfg, "实验配置 (e1_main_table.yaml)")
+    print_dict(experiment_cfg, "实验配置")
     events = _default_events()
     scene_tasks = _scene_tasks_from_events(events)
     output_root = args.output_root or str(ROOT / "outputs" / "core_script_smoke")

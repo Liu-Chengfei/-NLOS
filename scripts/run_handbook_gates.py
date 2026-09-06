@@ -12,7 +12,7 @@ _verify_r_series.py / block1_gdop_verifier.py 中的门控汇总成一个 CLI。
     Step 4 验收：R-1..R-5
 
 用法:
-    python scripts/run_handbook_gates.py --config configs/experiments/e1_main_table_paper.yaml \
+    python scripts/run_handbook_gates.py --config configs/experiments/e9_dual_degradation.yaml \
         --data-root data/raw/sim_e9 --report outputs/handbook_gates.json
 """
 
@@ -327,6 +327,29 @@ def run_s9_validation(data_root: Path) -> dict[str, Any]:
     }
 
 
+from liquidloc.common.precheck_orchestrator import run_all_prechecks
+
+
+def _p_checks_to_dict(report) -> dict[str, Any]:
+    """将 PrecheckReport dataclass 序列化为 JSON-safe dict（供 handbook_gates JSON 输出）。
+
+    PrecheckReport 包含 CheckResult 子对象；递归展平为 {"id": ..., "passed": bool, "detail": str}。
+    P1-P39 结果按 id 分组输出，missing / evidence 附加字段直接保留。
+    """
+    def _flatten(obj):
+        from dataclasses import is_dataclass, asdict
+        if is_dataclass(obj):
+            d = asdict(obj)
+            # CheckResult / PrecheckReport → 展平
+            return {k: _flatten(v) for k, v in d.items()}
+        if isinstance(obj, dict):
+            return {k: _flatten(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_flatten(v) for v in obj]
+        return obj
+    return _flatten(report)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="异步高NLOS实验全流程保障手册 全门控入口")
     parser.add_argument("--config", type=Path, required=True, help="实验配置文件 (YAML)")
@@ -345,6 +368,9 @@ def main() -> int:
         "config_path": str(args.config.resolve()),
         "data_root": str(args.data_root.resolve()),
         "pre_gates": run_pre_gates(cfg),
+        # BUG-017 修复 (2026-09-06 §10.2): 加上 P1-P39 + Pre-1..6 + I-1..5 + DQ-1..4 + G-1..5 + E-1..6 全套
+        # 检查. 此前 run_all_prechecks 从未被生产链路调用, E9 在协议完全未验证下跑了.
+        "p_checks": _p_checks_to_dict(run_all_prechecks(cfg, args.data_root)),
         "i_gates": run_i_gates(cfg),
         "39_item_audit": run_39_item_audit(args.data_root),
         "s9_validation": run_s9_validation(args.data_root),

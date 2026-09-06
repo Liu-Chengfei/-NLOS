@@ -159,7 +159,7 @@ def main(argv=None):
         from liquidloc.common.prepared_inputs import load_prepared_events_by_seq_id
         from liquidloc.common.prepared_inputs import load_ground_truth_by_seq_id
         from liquidloc.common.io_utils import read_json
-        _prepare_root = Path(args.events_root) if args.events_root else Path("outputs/prepare_sim_e9_protocol_20260726")
+        _prepare_root = Path(args.events_root) if args.events_root else Path("outputs/prepare_sim_e9_main")
         # 兼容 prepare_root 下嵌套 sim/ 子目录的情况（如 prepare/sim/prepare_manifest.json）
         _manifest_candidate = _prepare_root / "prepare_manifest.json"
         if not _manifest_candidate.is_file():
@@ -208,7 +208,7 @@ def main(argv=None):
         # "no events found for seq_id='mini_seq'"，训练根本无法启动 1860 个序列。
         train_payload["split_ids"] = split_ids
         _events_by_seq_id = load_prepared_events_by_seq_id(_prepare_root, split_ids)
-        _raw_root = Path(args.raw_root) if args.raw_root else ROOT / "data/raw/sim_e9_protocol_20260726"
+        _raw_root = Path(args.raw_root) if args.raw_root else ROOT / "data/raw/sim_e9_main"
         _gt_by_seq_id = load_ground_truth_by_seq_id(_raw_root, split_ids)
         train_payload["events_by_seq_id"] = _events_by_seq_id
         train_payload["ground_truth_by_seq_id"] = _gt_by_seq_id

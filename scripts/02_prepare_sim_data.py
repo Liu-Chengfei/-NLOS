@@ -176,21 +176,22 @@ def _ensure_seed_variant_dirs(
                 dst = variant_dir / fname
                 if src.is_file() and not dst.exists():
                     try:
-                        os.symlink(src, dst, target_is_directory=False)
+                        os.symlink(src, dst, target_is_directory=True)
                     except (OSError, NotImplementedError):
-                        # Windows 上 symlink 可能失败，回退使用 junction。
+                        # Windows symlink 需要 SeCreateSymbolicLinkPrivilege，回退使用 junction。
                         try:
                             import subprocess
+                            # mklink /J <junction_path> <target_path>：junction 不需要权限，参数顺序是 dst src。
                             subprocess.run(
-                                ["mklink", str(dst), str(src)],
+                                ["cmd", "/c", "mklink", "/J", str(dst), str(src)],
                                 check=True,
-                                shell=True,
                                 capture_output=True,
+                                text=True,
                             )
                         except Exception:
-                            # 最后的回退：复制文件。
+                            # 最后的回退：复制目录（保留时间戳）。
                             import shutil
-                            shutil.copy2(src, dst)
+                            shutil.copytree(src, dst, dirs_exist_ok=True, copy_function=shutil.copy2)
             # 写入种子变体的 sim_meta.json。
             variant_sim_meta = dict(base_sim_meta)
             variant_sim_meta["seq_id"] = variant_name
@@ -237,7 +238,7 @@ def _build_scene_id_by_seq(
                         continue
             except Exception:
                 pass  # 解析失败时回退到主表欠定默认
-        scene_id_by_seq[seq_id] = "S(A0,N0,V0,K3)"  # 五轴档位协议：主表欠定默认 K3（K 轴仅 K0/K1/K3，锚数全档固定 4）
+        scene_id_by_seq[seq_id] = "S(A0,N0,V0,K3,M0)"  # 五轴档位协议：主表欠定默认 K3（K 轴仅 K0/K1/K3，锚数全档固定 4）+ M0（无模态缺失）
     return scene_id_by_seq
 
 
@@ -279,20 +280,43 @@ def _build_pipeline_cfg(project_root: Path, raw_root: Path | None, output_root: 
     # 使 read_sim_sequence 能从 raw_root / seq_id 正确读取原始数据。
     if n_seed > 1:
         _ensure_seed_variant_dirs(resolved_raw_root, base_seq_ids, n_seed)
-    sim_contract_report = inspect_sim_materialized_contract(resolved_raw_root)  # 阻断非法几何 raw。
-    if not sim_contract_report["is_valid"]:
-        raise RuntimeError(
-            "sim raw_root does not satisfy the paper-grade materialized SIM contract "
-            "(allowed K∈{K0,K1}); "
-            f"report={sim_contract_report}. Re-run scripts/02_generate_sim_raw.py or point "
-            "--raw-root to a protocol-trajectory undetermined-geometry sim raw directory."
-        )
+    # BUG-003 修复 (2026-09-06 §10 审计): sim_e9_main 是 seed0..seed9 嵌套结构，
+    # 每个 seedN/ 才是 sim 序列容器（如 seed0/sim_curve_01/）。直接对顶层
+    # sim_e9_main/ 做 contract 检查会把 seed 目录当序列，导致 10/10 missing anchor_layout。
+    # n_seed > 1 时对每个 seed 目录分别做 contract 检查；n_seed==1 时直接对目录本身检查。
+    if n_seed > 1:
+        seed_dirs = [resolved_raw_root / s for s in base_seq_ids if (resolved_raw_root / s).is_dir()]
+        if not seed_dirs:
+            raise RuntimeError(
+                f"n_seed={n_seed} but no seed subdirs found under {resolved_raw_root}"
+            )
+        for seed_dir in seed_dirs:
+            sim_contract_report = inspect_sim_materialized_contract(seed_dir)
+            if not sim_contract_report["is_valid"]:
+                raise RuntimeError(
+                    f"sim seed {seed_dir.name} does not satisfy the paper-grade materialized SIM contract "
+                    f"(allowed K∈{{K0,K1,K3}}); report={sim_contract_report}. "
+                    f"Re-run scripts/02_generate_sim_raw.py or point --raw-root to a protocol-trajectory "
+                    f"undetermined-geometry sim raw directory."
+                )
+    else:
+        sim_contract_report = inspect_sim_materialized_contract(resolved_raw_root)
+        if not sim_contract_report["is_valid"]:
+            raise RuntimeError(
+                "sim raw_root does not satisfy the paper-grade materialized SIM contract "
+                "(allowed K∈{K0,K1,K3}); "
+                f"report={sim_contract_report}. Re-run scripts/02_generate_sim_raw.py or point "
+                "--raw-root to a protocol-trajectory undetermined-geometry sim raw directory."
+            )
     scene_id_by_seq = _build_scene_id_by_seq(seq_ids, resolved_raw_root)  # 从 sim_meta.json 读取 axes_override。
     cfg: dict[str, Any] = {  # 下面组装的是 prepare pipeline 的输入配置。
         "dataset_name": dataset_cfg["dataset_name"],  # 这里保留数据集名给流水线使用。
         "raw_root": str(resolved_raw_root),  # 这里写入最终 raw_root。
         "seq_ids": seq_ids,  # 这里写入全部序列 ID（多种子时含 seed 后缀）。
-        "output_root": str(output_root or (project_root / "outputs" / "prepare_sim")),  # 这里写入默认输出目录。
+        # BUG-010 修复 (2026-09-06 §10.2 审计): 之前默认 outputs/prepare_sim 不含数据集名，
+        # 导致 sim_e9_main 数据准备好后落到 outputs/prepare_sim 而非 configs/datasets/sim.yaml 的 prepare_root。
+        # 现在跟 sim.yaml.prepare_root 对齐（data/raw/sim_e9_main → outputs/prepare_sim_e9_main）。
+        "output_root": str(output_root or (project_root / dataset_cfg.get("prepare_root", "outputs/prepare_sim"))),  # 这里写入默认输出目录。
         "scene_id_by_seq": scene_id_by_seq,  # v2: 从 sim_meta.json 读取, 不再硬编码 baseline.
         "n_seed": n_seed,  # 种子变体数量，供下游消费方参考。
     }  # pipeline 配置到这里结束。

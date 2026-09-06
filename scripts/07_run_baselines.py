@@ -32,18 +32,21 @@ from liquidloc.dataio.readers.miluv_reader import read_miluv_sequence
 from liquidloc.pipelines.core_pipeline import CorePipeline
 from liquidloc.scenarios.scene_sampler import sample_scenes
 
-_DEFAULT_CONFIG = ROOT / "configs" / "experiments" / "e1_main_table.yaml"
 _DEFAULT_RAW_ROOT = ROOT / "tests" / "fixtures" / "datasets" / "miluv"
 _DEFAULT_OUTPUT_ROOT = ROOT / "outputs" / "baseline_script_smoke"
 _SMOKE_SEQ_ID = "mini_seq"
 _SMOKE_SCENE_ID = "S(A3,N3,V2,K0,M0)"  # 五轴档位协议：G 已并入 K，K 轴仅 K0/K1/K3。
 _BASELINE_METHODS = ("ekf",)  # 基线：仅 EKF（无 FGO）。
 _MILUV_CONFIG = ROOT / "configs" / "datasets" / "miluv.yaml"
-_SIM_DEFAULT_PREPARE_ROOT = Path("outputs/prepare_sim_e9_protocol_20260726")
+_SIM_DEFAULT_PREPARE_ROOT = Path("outputs/prepare_sim_e9_main")
 
 
 def _resolve_non_empty_path(raw_value, *, flag_name, default):
     if raw_value is None:
+        # 默认值可能为 None（当调用方只想检查 raw_value 是否被显式提供时），
+        # 此时返回 None 而非对 None 调用 .resolve()。调用方负责 None 分支处理。
+        if default is None:
+            return None
         return default.resolve()
     value = str(raw_value).strip()
     if not value:
@@ -120,7 +123,7 @@ def _default_smoke_task() -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     print("[07_baselines] 开始 | E9 multi-pathway", flush=True)
     parser = argparse.ArgumentParser(description="Baseline smoke — E9 multi-pathway (miluv or sim)")
-    parser.add_argument("--config", default=str(_DEFAULT_CONFIG))
+    parser.add_argument("--config", default=None)
     parser.add_argument("--raw-root", default=None)
     parser.add_argument("--output-root", default=None)
     parser.add_argument("--split-ids", default=None, help="Comma-separated seq IDs (default: mini_seq)")
@@ -131,7 +134,10 @@ def main(argv: list[str] | None = None) -> int:
     from liquidloc.common.tee_logger import print_args, print_dict
     print_args(args, "07_run_baselines")
 
-    config_path = _resolve_non_empty_path(args.config, flag_name="--config", default=_DEFAULT_CONFIG)
+    config_path = _resolve_non_empty_path(args.config, flag_name="--config", default=None)
+    if config_path is None:
+        print("[07_baselines] 错误: 需要 --config 指定实验配置文件", flush=True)
+        return 1
     raw_root = _resolve_non_empty_path(args.raw_root, flag_name="--raw-root", default=_DEFAULT_RAW_ROOT)
     output_root = _resolve_non_empty_path(args.output_root, flag_name="--output-root", default=_DEFAULT_OUTPUT_ROOT)
     output_root.mkdir(parents=True, exist_ok=True)
@@ -176,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # 加载真值和来源报告
     if _ds_name == "sim":
-        gt_root = ROOT / "data/raw/sim_e9_protocol_20260726"
+        gt_root = ROOT / "data/raw/sim_e9_main"
     else:
         gt_root = _effective_raw_root
     ground_truth_by_seq_id = load_ground_truth_by_seq_id(gt_root, _split_ids_list)

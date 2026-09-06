@@ -29,6 +29,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 cache_dir = "outputs/local_pytest/cache"
 markers = [
     "scaffold_placeholder: explicit placeholder test scaffold that is intentionally skipped until implemented",

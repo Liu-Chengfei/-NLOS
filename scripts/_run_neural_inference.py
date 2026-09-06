@@ -28,7 +28,7 @@ from liquidloc.factories.model_factory import create_model  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 EVENTS_DIR = ROOT / "outputs" / "prepare_sim"
-RAW_ROOT = ROOT / "data" / "raw" / "sim_e9_protocol_20260726"
+RAW_ROOT = ROOT / "data" / "raw" / "sim_e9_main"
 
 CHECKPOINTS = {
     "lstm_ekf": ROOT / "outputs" / "lstm_train" / "checkpoints" / "lstm_ekf_best_checkpoint.pt",

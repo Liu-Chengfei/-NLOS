@@ -139,7 +139,7 @@ def main(argv=None):
         from liquidloc.common.prepared_inputs import load_prepared_events_by_seq_id
         from liquidloc.common.prepared_inputs import load_ground_truth_by_seq_id
         from liquidloc.common.io_utils import read_json
-        _prepare_root = Path(args.events_root) if args.events_root else Path("outputs/prepare_sim_e9_protocol_20260726")
+        _prepare_root = Path(args.events_root) if args.events_root else Path("outputs/prepare_sim_e9_main")
         # 兼容 prepare_root 下嵌套 sim/ 子目录的情况（如 prepare/sim/prepare_manifest.json）
         _manifest_candidate = _prepare_root / "prepare_manifest.json"
         if not _manifest_candidate.is_file():

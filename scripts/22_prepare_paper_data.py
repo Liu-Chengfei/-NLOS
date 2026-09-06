@@ -69,10 +69,10 @@ def _build_seq_id_dirs(raw_root: Path, seq_ids: list[str]) -> dict[str, Path]:
 
 def _ensure_sim_e9_symlinks(raw_root: Path, project_root: Path) -> None:
     """为每条 paper 序列在 sim_e9 raw_root 下建 symlink，绕开 05/06/07 训练脚本
-    写死的 'data/raw/sim_e9_protocol_20260726' 路径（仅用于 gt.json 回查）。
+    写死的 'data/raw/sim_e9_main' 路径（仅用于 gt.json 回查）。
     不复制文件、不污染 sim_e9，symlink 失效时下游报错而非静默错误。
     """
-    sim_e9_root = project_root / "data" / "raw" / "sim_e9_protocol_20260726"
+    sim_e9_root = project_root / "data" / "raw" / "sim_e9_main"
     sim_e9_root.mkdir(parents=True, exist_ok=True)
     for seed_dir in sorted(raw_root.iterdir()):
         if not seed_dir.is_dir() or not seed_dir.name.startswith("seed"):

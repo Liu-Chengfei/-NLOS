@@ -9,6 +9,7 @@ import os  # 文件系统路径判断。
 import sys  # 调整导入路径。
 from pathlib import Path  # 处理路径。
 from typing import Any  # 标注嵌套结构。
+from collections.abc import Mapping  # 阶段 12 全面审计修复 (2026-09-06): BUG-011 Mapping 未导入导致 L122 isinstance 失败.
 
 ROOT = Path(__file__).resolve().parents[1]  # 仓库根目录。
 SRC = ROOT / "src"  # 项目源码目录。
@@ -32,12 +33,20 @@ from liquidloc.protocol.experiment_gates import _PUBLIC_BENCHMARK_FROZEN_EVAL_SP
 from liquidloc.scenarios.scene_sampler import sample_scenes  # 采样场景任务。
 
 
-def _build_sim_scene_id_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, str]:
+def _build_sim_scene_id_by_seq(
+    seq_ids: list[str],
+    raw_root: Path,
+    experiment_cfg: dict[str, Any] | None = None,
+) -> dict[str, str]:
     """从 sim_meta.json 的 axes_override 生成 scene_id_by_seq。
 
     scene_id 格式必须与 encode_scene / decode_scene 的 S(A,N,V,K,M) 五轴格式一致，
     禁止包含 G 轴（几何条件由 K 轴自身编码，不单独出现在 scene_code 中）。
     缺失时回退主表欠定默认 S(A0,N0,V0,K3,M0)（K 轴协议仅 K0/K1/K3，锚数全档固定 4）。
+
+    BUG-007 修复 (2026-09-06 §10 阶段 12 审计): 早期物化 sim_meta.json 的 axes_override
+    缺 M 字段. 这里接受 experiment_cfg['frozen_axes'] 覆盖, 保证 e9 yaml M:M1
+    能在 scene_id 编码里出现, 让 _resolve_scene_parameters 走 5 轴路径.
 
     参数
     ----------
@@ -52,8 +61,17 @@ def _build_sim_scene_id_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, 
         序列 ID 到场景 ID 的映射。
     """
     scene_id_by_seq: dict[str, str] = {}
+    frozen_axes = (experiment_cfg or {}).get("frozen_axes") or {}
+    # e9 yaml 的 M 轴通常为单值 (M:M1), 但允许 [M1, M2] 列表形式, 取第一项
+    yaml_m_override = None
+    if isinstance(frozen_axes.get("M"), list) and frozen_axes["M"]:
+        yaml_m_override = str(frozen_axes["M"][0]).strip()
+    elif isinstance(frozen_axes.get("M"), str):
+        yaml_m_override = str(frozen_axes["M"]).strip()
     for seq_id in seq_ids:
-        sim_meta_path = raw_root / seq_id / "sim_meta.json"
+        # BUG-005 链路: 09 seq_id='seed0__sim_curve_01', 实际路径 seed0/sim_curve_01/sim_meta.json
+        resolved_seq_id = seq_id.replace('__', '/') if '__' in seq_id else seq_id
+        sim_meta_path = raw_root / resolved_seq_id / "sim_meta.json"
         if sim_meta_path.is_file():
             try:
                 sim_meta = json.loads(sim_meta_path.read_text(encoding="utf-8"))
@@ -68,11 +86,19 @@ def _build_sim_scene_id_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, 
                         continue
             except Exception:
                 pass  # 解析失败时回退到主表欠定默认
-        scene_id_by_seq[seq_id] = "S(A0,N0,V0,K3,M0)"  # 五轴档位协议：主表欠定默认 K3（K 轴仅 K0/K1/K3）
+        # 缺 axes_override 或解析失败时回退. e9 yaml 的 M 覆盖 (e9 frozen_axes.M:M1).
+        if yaml_m_override is not None:
+            scene_id_by_seq[seq_id] = f"S(A0,N0,V0,K3,{yaml_m_override})"
+        else:
+            scene_id_by_seq[seq_id] = "S(A0,N0,V0,K3,M0)"  # 五轴档位协议：主表欠定默认 K3（K 轴仅 K0/K1/K3）
     return scene_id_by_seq
 
 
-def _build_sim_axes_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, dict[str, str]]:
+def _build_sim_axes_by_seq(
+    seq_ids: list[str],
+    raw_root: Path,
+    experiment_cfg: dict[str, Any] | None = None,
+) -> dict[str, dict[str, str]]:
     """从 sim_meta.json 的 axes_override 为每个序列收集实际的场景轴。
 
     这对于从 supplementary_public_route 运行的实验至关重要：
@@ -93,24 +119,47 @@ def _build_sim_axes_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, dict
         seq_id -> {A: ..., N: ..., V: ..., G: ..., K: ..., M: ...} 的映射。
         若 sim_meta.json 不存在或 axes_override 不完整，回退到主表默认值。
     """
+    yaml_m_override = None
+    if isinstance(experiment_cfg, Mapping):
+        frozen_axes = (experiment_cfg or {}).get("frozen_axes") or {}
+        if isinstance(frozen_axes.get("M"), list) and frozen_axes["M"]:
+            yaml_m_override = str(frozen_axes["M"][0]).strip()
+        elif isinstance(frozen_axes.get("M"), str):
+            yaml_m_override = str(frozen_axes["M"]).strip()
     axes_by_seq: dict[str, dict[str, str]] = {}
     for seq_id in seq_ids:
-        sim_meta_path = raw_root / seq_id / "sim_meta.json"
+        # BUG-005 链路修复: 09 脚本 seq_id='seed0__sim_curve_01', 但 sim_meta.json 在
+        # raw_root / 'seed0' / 'sim_curve_01' / 'sim_meta.json' (嵌套 seed/seq 结构).
+        # read_sim_sequence 已接受 __ 并还原 /; 这里对 _build_sim_axes_by_seq 同样处理.
+        resolved_seq_id = seq_id.replace('__', '/') if '__' in seq_id else seq_id
+        sim_meta_path = raw_root / resolved_seq_id / "sim_meta.json"
         if sim_meta_path.is_file():
             try:
                 sim_meta = json.loads(sim_meta_path.read_text(encoding="utf-8"))
                 axes_override = sim_meta.get("axes_override") or {}
                 if axes_override:
-                    axes_by_seq[seq_id] = dict(axes_override)
+                    # BUG-007 修复 (2026-09-06 §10 阶段 12 审计): 早期物化 sim_meta.json 的
+                    # axes_override 只有 4 字段 (A/N/V/K), 缺 M. 5 轴退化 (A/N/V/K/M) 协议要求 axes 必
+                    # 须齐全才能调 attach_scene_parameters 展开 flat 字段, 否则 _apply_scene_task
+                    # 的 M 轴 block 不会执行, 缺失注入跳过. 这里补 M1 (e9 主档 UWB 5% 成簇丢包).
+                    if "M" not in axes_override and yaml_m_override is not None:
+                        axes_override = dict(axes_override)
+                        axes_override["M"] = yaml_m_override
+                    elif "M" not in axes_override:
+                        axes_override = dict(axes_override)
+                        axes_override["M"] = "M1"
+                    axes_by_seq[seq_id] = axes_override
                     continue
             except Exception:
                 pass
-        # 回退到主表欠定默认（S(A0,N0,V0,K3,M0) 与 scene_id_by_seq 的 fallback 一致）
-        axes_by_seq[seq_id] = {"A": "A0", "N": "N0", "V": "V0", "K": "K3", "M": "M0"}
+        # 回退到主表欠定默认（S(A0,N0,V0,K3,M0) 与 scene_id_by_seq 的 fallback 一致）.
+        # e9 yaml frozen_axes.M 覆盖 (M:M1) 走主表 + yaml 注入.
+        fallback_m = yaml_m_override or "M0"
+        axes_by_seq[seq_id] = {"A": "A0", "N": "N0", "V": "V0", "K": "K3", "M": fallback_m}
     return axes_by_seq
 
 _AXIS_DEFAULTS = {"A": "A0", "N": "N0", "V": "V0", "K": "K3", "M": "M0"}  # 五轴默认值，scene_id 不含 G（K 轴协议仅 K0/K1/K3）。
-_DEFAULT_CONFIG = ROOT / "configs" / "experiments" / "e1_main_table.yaml"  # 默认实验配置。
+_DEFAULT_CONFIG = None  # 实验配置必须由 --config 显式传入（不再隐式绑定默认实验）。
 _DEFAULT_OUTPUT_ROOT = ROOT / "outputs" / "extended_script_smoke"  # 默认输出目录。
 _DEFAULT_FIXTURE_ROOT = ROOT / "tests" / "fixtures" / "datasets"  # 默认 fixture 数据目录。
 _DEFAULT_CORE_SEQ_ID = "mini_seq"  # 默认冒烟序列 ID。
@@ -230,18 +279,65 @@ def _resolve_public_seq_ids(
     dataset_name: str,
     experiment_cfg: dict[str, Any],
     raw_seq_ids: list[str] | None,
+    raw_root: Path | None = None,
 ) -> list[str]:
-    """规范公开 benchmark 需要跑的序列列表。"""
-    if raw_seq_ids is None:  # 没传就用默认序列。
-        return resolve_public_eval_seq_ids(
+    """规范公开 benchmark 需要跑的序列列表。
+
+    优先级（与 B 协议 §0.2 一致）：
+    1. 命令行 --seq-ids (raw_seq_ids)
+    2. experiment_cfg['seq_ids'] (非空)
+    3. public_dataset_registry.datasets[<name>].frozen_public_eval_seq_ids (非空)
+    4. sim 数据集专属回退：从 raw_root 自动扫描所有 seed/*/*/ 序列（解决 2026-09-06
+       第 10 阶段发现：sim 真实物化目录 data/raw/sim_e9_main/seed*/<seq>/
+       有 600 文件，但 sim registry 的 frozen_public_eval_seq_ids=null, e9 yaml 的
+       seq_ids=null, 09 脚本会 raise ValueError. 现在 sim + frozen=null + raw_root 存在
+       时自动从 raw_root/seed*/*/ 扫出来.)
+    5. 仍找不到 → raise ValueError
+    """
+    if raw_seq_ids is not None:  # 优先级 1: 命令行 --seq-ids
+        normalized = [str(seq_id).strip() for seq_id in raw_seq_ids if str(seq_id).strip()]  # 去空白。
+        if not normalized:  # 空列表不允许。
+            raise ValueError("--seq-ids must be a non-empty list of non-empty strings")
+        return normalized
+    cfg_seq_ids = experiment_cfg.get("seq_ids")  # 优先级 2: yaml 配置
+    if cfg_seq_ids:
+        normalized = [str(seq_id).strip() for seq_id in cfg_seq_ids if str(seq_id).strip()]
+        if normalized:
+            return normalized
+    # 优先级 3+4: 注册表 frozen + sim 自动扫
+    try:
+        resolved = resolve_public_eval_seq_ids(
             dataset_name,
             experiment_cfg,
             str(experiment_cfg.get("mode") or "quick"),
-        )  # 默认回到配置/注册表合同，不再硬编码单个冒烟序列。
-    normalized = [str(seq_id).strip() for seq_id in raw_seq_ids if str(seq_id).strip()]  # 去掉空白和空项。
-    if not normalized:  # 空列表不允许。
-        raise ValueError("--seq-ids must be a non-empty list of non-empty strings")  # 明确报错。
-    return normalized  # 返回规范化后的序列列表。
+        )
+        if resolved:
+            return resolved
+    except (ValueError, KeyError):
+        pass  # sim 数据集 frozen_public_eval_seq_ids=null 时会 raise, 落入优先级 4
+    # 优先级 4: sim 自动从 raw_root 扫
+    if dataset_name == "sim" and raw_root is not None and raw_root.is_dir():
+        sim_seq_ids: list[str] = []
+        for seed_dir in sorted(raw_root.iterdir()):
+            if not seed_dir.is_dir() or not seed_dir.name.startswith("seed"):
+                continue
+            for seq_dir in sorted(seed_dir.iterdir()):
+                if not seq_dir.is_dir():
+                    continue
+                # BUG-010 修复 (2026-09-06 §10 阶段 12 审计): sim 序列名采用嵌套路径格式
+                # seed0/sim_curve_01 (正斜杠). 之前错误地使用 '__' 双下划线 (为绕过
+                # validate_path_component), 但 build_manifests 生成的 record.seq_id
+                # 也用正斜杠, 两者不一致导致 PreparePipeline 报 'missing from dataset manifest'.
+                # prepare_pipeline 已在 sim 路径下跳过 validate_path_component, 这里
+                # 直接用正斜杠让两边一致.
+                sim_seq_ids.append(f"{seed_dir.name}/{seq_dir.name}")
+        if sim_seq_ids:
+            return sim_seq_ids
+    raise ValueError(
+        f"public_sequence_category requires explicit seq_ids in experiment_cfg "
+        f"or frozen_public_eval_seq_ids in the public dataset registry or "
+        f"raw_root auto-scan for sim dataset (dataset_name={dataset_name!r}, raw_root={raw_root})"
+    )
 
 
 def _build_public_scene_tasks(
@@ -271,7 +367,7 @@ def _build_public_scene_tasks(
     axes_by_seq : dict[str, dict[str, str]] | None
         每个序列的实际场景轴（来自 sim_meta.json 的 axes_override）。
         若提供，则其优先级高于 frozen_axes —— 这对于 sim_e9 这类
-        数据集至关重要：sim_e9 实际为 K3，但 e5_ablation.yaml 默认 K3，
+        数据集至关重要：sim_e9 实际为 K3，但 yaml 默认可能为其他档，
         anchor_layout 与实际锚点不匹配时 NIS 爆炸触发 §19.1 拒识。
 
     返回
@@ -319,7 +415,7 @@ def _run_supplementary_public_route(
     # 仿真数据集需要从 sim_meta.json 构建 scene_id_by_seq；其他数据集可省略。
     scene_id_by_seq = None
     if dataset_name == "sim":
-        scene_id_by_seq = _build_sim_scene_id_by_seq(seq_ids, raw_root)
+        scene_id_by_seq = _build_sim_scene_id_by_seq(seq_ids, raw_root, experiment_cfg=experiment_cfg)
 
     # 读取 registry 中的仿真数据合同参数（K 档 / 锚点数），用于 prepare 阶段强校验。
     registry_cfg = load_public_dataset_registry()
@@ -334,6 +430,10 @@ def _run_supplementary_public_route(
             "seq_ids": seq_ids,
             "field_mapping": field_mapping,
             "output_root": str(prepare_output_root),
+            # 阶段 12 全面审计修复 (2026-09-06 §10): e9 yaml 声明 quick_full_rule='...'
+            # 让 PreparePipeline 跳过 B04 ≥20 硬门 (smoke 模式). 真实论文级 10 seed × 100 trajs
+            # 移除此字段即恢复硬门. 同时让 e9 quick 模式能跑 < 20 seqs 测试.
+            "quick_full_rule": experiment_cfg.get("quick_full_rule"),
             **({"scene_id_by_seq": scene_id_by_seq} if scene_id_by_seq else {}),
             **({"allowed_k_levels": allowed_k_levels} if allowed_k_levels else {}),
             **({"allowed_anchor_counts": allowed_anchor_counts} if allowed_anchor_counts else {}),
@@ -346,7 +446,7 @@ def _run_supplementary_public_route(
     # 否则 anchor_layout 与真实锚点数不匹配，NIS 会爆炸触发 §19.1 永久拒识。
     axes_by_seq = None
     if dataset_name == "sim":
-        axes_by_seq = _build_sim_axes_by_seq(seq_ids, raw_root)
+        axes_by_seq = _build_sim_axes_by_seq(seq_ids, raw_root, experiment_cfg=experiment_cfg)
     scene_tasks = _build_public_scene_tasks(
         dataset_name,
         seq_ids,
@@ -383,14 +483,19 @@ def _run_supplementary_public_route(
 
 def _resolve_core_scene_tasks(experiment_cfg: dict[str, Any]) -> list[dict[str, Any]]:
     _validate_extended_route_contract(experiment_cfg)  # 进入 scene_sampler 之前先拦住未实现的扩展主轴。
-    """根据实验配置构造核心场景任务列表。"""
-    experiment_id = str(experiment_cfg.get("experiment_id") or "").strip()  # 当前实验 ID。
-    if experiment_id in ("e5_ablation", "e5_ablation_new"):  # e5 消螗走特殊固定任务。
-        scene_tasks = copy.deepcopy(sample_scenes(experiment_cfg))  # 先走统一采样，保留 mode_overrides 中的 repeats 语义。
-        for task in scene_tasks:  # e5 仍固定最小冒烟序列，避免扩展脚本去依赖额外 fixture。
-            task.setdefault("seq_id", _DEFAULT_CORE_SEQ_ID)
-        return scene_tasks
-    return copy.deepcopy(sample_scenes(experiment_cfg))  # 其他情况直接从采样器拿任务并复制一份。
+    """根据实验配置构造核心场景任务列表。
+
+    调用 sample_scenes 前先剥离 frozen_axes 中的非场景轴键（dataset/split 等），
+    避免 scene_sampler 将其误作场景轴并覆盖方法的默认参数，
+    导致 scene_id 与配置意图不符（Fix for HIGH-24: e9 config 的 dataset: sim
+    在 frozen_axes 中被 sample_scenes 忽略，从而回退到 A0/N0/V0/K3，
+    但测试期望 S(A2,N2,V2,K3)）。
+    """
+    cfg = copy.deepcopy(experiment_cfg)
+    frozen = cfg.get("frozen_axes") or {}
+    scene_axis_keys = {"A", "N", "V", "G", "K", "M"}
+    cfg["frozen_axes"] = {k: v for k, v in frozen.items() if k in scene_axis_keys}
+    return copy.deepcopy(sample_scenes(cfg))  # 直接从采样器拿任务并复制一份。
 
 
 def _validate_extended_route_contract(experiment_cfg: dict[str, Any], *, config_path: Path | None = None) -> None:
@@ -462,12 +567,7 @@ def _run_core_route(
         "ground_truth_by_seq_id": ground_truth_by_seq_id,  # 真值数据。
         "source_report_by_seq_id": source_report_by_seq_id,  # 来源报告。
     }  # 核心输入结束。
-    experiment_id = str(experiment_cfg.get("experiment_id") or "").strip()  # 实验 ID。
-    if experiment_id == "e5_ablation":  # e5_ablation 走单场景事件输入。
-        scene_id = str(scene_tasks[0]["scene_id"])  # 取唯一场景 ID。
-        payload["events"] = _default_core_events(scene_id)  # 直接给固定事件列表。
-    else:  # 其他情况按场景分发事件。
-        payload["events_by_scene_id"] = _build_events_by_scene_id(scene_tasks)  # 组装场景到事件映射。
+    payload["events_by_scene_id"] = _build_events_by_scene_id(scene_tasks)  # 组装场景到事件映射。
 
     result = CorePipeline().run(payload)  # 执行核心流水线。
     _ensure_requested_methods_present(methods, result.metadata)  # 检查输出没有丢方法。
@@ -501,10 +601,17 @@ def _run_public_route(
         flag_name="--raw-root",  # 参数名用于报错。
         default=fallback_default,  # 使用 registry landed_raw_root 作为默认。
     )  # 原始数据目录解析结束。
+    # 第 8 阶段修复 HIGH-21: experiment_cfg['raw_root'] 优先级最高 (yaml 配置), 命令行第二, registry 第三.
+    cfg_raw_root = experiment_cfg.get('raw_root')
+    if cfg_raw_root:
+        raw_root = _resolve_path(
+            cfg_raw_root, flag_name='experiment_cfg.raw_root', default=raw_root,
+        )
     seq_ids = _resolve_public_seq_ids(  # 解析序列列表。
         dataset_name=dataset_name,
         experiment_cfg=experiment_cfg,
         raw_seq_ids=seq_ids_arg,
+        raw_root=raw_root,  # 第 10 阶段修复: sim 数据集自动扫描 raw_root 序列
     )
     if dataset_name not in _get_official_public_datasets():  # 补充公开路线不走官方 public benchmark 门控。
         return _run_supplementary_public_route(
@@ -536,7 +643,7 @@ def main(argv: list[str] | None = None) -> int:
     """脚本主入口，按实验类型选择核心或公开路线。"""
     print("[09_ext_exp] 开始 | awaiting args", flush=True)
     parser = argparse.ArgumentParser(description="Run minimal extended experiments")  # 创建参数解析器。
-    parser.add_argument("--config", default=str(_DEFAULT_CONFIG))  # 实验配置路径。
+    parser.add_argument("--config", default=None)  # 实验配置路径（必须显式指定）。
     parser.add_argument("--output-root", default=None)  # 输出目录。
     parser.add_argument("--dataset-name", default=None)  # 公开 benchmark 的数据集名。
     parser.add_argument("--raw-root", default=None)  # 公开 benchmark 的原始数据目录。
@@ -546,14 +653,15 @@ def main(argv: list[str] | None = None) -> int:
     from liquidloc.common.tee_logger import print_args, print_dict
     print_args(args, "09_run_extended_experiments")
 
-    config_path = _resolve_path(args.config, flag_name="--config", default=_DEFAULT_CONFIG)  # 解析配置路径。
+    config_path = args.config
+    if not config_path:
+        print("[09_ext_exp] 错误: 需要 --config 指定实验配置文件", flush=True)
+        return 1
     output_root = _resolve_path(args.output_root, flag_name="--output-root", default=_DEFAULT_OUTPUT_ROOT)  # 解析输出路径。
     output_root.mkdir(parents=True, exist_ok=True)  # 确保输出目录存在。
-
-    print(f"[09_ext_exp] 加载配置 | config={config_path.name}", flush=True)
     experiment_cfg = copy.deepcopy(dict(load_yaml_config(config_path)))  # 读取并复制实验配置。
     experiment_cfg["mode"] = args.mode  # 覆盖运行模式。
-    print_dict(experiment_cfg, "实验配置 (e1_main_table.yaml)")
+    print_dict(experiment_cfg, "实验配置")
     primary_axis = str(experiment_cfg.get("primary_axis") or "").strip()  # 读取主轴类型。
     print_dict(
         {

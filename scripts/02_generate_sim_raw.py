@@ -35,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     """Materialize simulation raw data and emit a structured report."""
     print("[02_sim_raw] 开始 | 生成仿真原始序列", flush=True)
     parser = argparse.ArgumentParser(description="Materialize deterministic sim raw sequences")
-    parser.add_argument("--output-root", default=str(ROOT / "data" / "raw" / "sim_e9_protocol_20260726"))
+    parser.add_argument("--output-root", default=str(ROOT / "data" / "raw" / "sim_e9_main"))
     parser.add_argument("--fixture-root", default=str(ROOT / "tests" / "fixtures" / "datasets" / "miluv"))
     parser.add_argument(
         "--sequence-profile",
