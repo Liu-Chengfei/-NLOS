@@ -567,8 +567,14 @@ def check_P30_split_before_window(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_P31_edge_cases(cfg: Mapping[str, Any]) -> CheckResult:
-    n_zero_div = int(cfg.get("n_zero_div_events", 0))
-    n_nan_after_edge = int(cfg.get("n_nan_after_edge_case", 0))
+    """P31: 边界情况无 NaN/zero-division。字段缺失视为 FAIL（避免静默通过）。"""
+    has_keys = "n_zero_div_events" in cfg and "n_nan_after_edge_case" in cfg
+    n_zero_div = int(cfg.get("n_zero_div_events", -1)) if has_keys else -1
+    n_nan_after_edge = int(cfg.get("n_nan_after_edge_case", -1)) if has_keys else -1
+    if not has_keys:
+        return _make("P31", "边界情况", False,
+                     detail="n_zero_div_events / n_nan_after_edge_case 字段缺失（必须由调用方提供实测值）",
+                     n_zero_div=n_zero_div, n_nan_after_edge=n_nan_after_edge)
     return _make("P31", "边界情况",
                  n_zero_div == 0 and n_nan_after_edge == 0,
                  detail=f"zero_div={n_zero_div}, nan_after_edge={n_nan_after_edge}")
@@ -580,8 +586,16 @@ def check_P31_edge_cases(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_P32_same_seed_init(cfg: Mapping[str, Any]) -> CheckResult:
+    """P32: 神经网络三方法用同一 init_seed。字段缺失视为 FAIL。"""
     methods = ["lnn", "lstm", "transformer"]
-    same = all(cfg.get(f"{m}_init_seed") == cfg.get("lnn_init_seed") for m in methods)
+    keys = [f"{m}_init_seed" for m in methods]
+    missing = [k for k in keys if k not in cfg]
+    if missing:
+        return _make("P32", "同seed初始化", False,
+                     detail=f"missing={missing}（必须由调用方提供实测 init_seed）",
+                     missing=missing)
+    ref = cfg.get("lnn_init_seed")
+    same = all(cfg.get(k) == ref for k in keys)
     return _make("P32", "同seed初始化", same, detail=f"all_same={same}")
 
 
@@ -601,6 +615,13 @@ def check_P34_no_overfit(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_P35_head_consistency(cfg: Mapping[str, Any]) -> CheckResult:
+    """P35: LSTM / LNN 头结构一致。字段缺失视为 FAIL。"""
+    keys = ["lstm_head_layers", "lnn_head_layers"]
+    missing = [k for k in keys if k not in cfg or cfg.get(k) is None]
+    if missing:
+        return _make("P35", "头实现一致", False,
+                     detail=f"missing={missing}（必须由调用方提供头结构实测值）",
+                     missing=missing)
     lstm_layers = dict(cfg.get("lstm_head_layers") or {})
     lnn_layers = dict(cfg.get("lnn_head_layers") or {})
     same_structure = lstm_layers == lnn_layers
@@ -709,6 +730,13 @@ def check_G1_unit_completeness(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_G2_metrics_readable(cfg: Mapping[str, Any]) -> CheckResult:
+    """G-2: 指标无 NaN / 无缺失字段。字段缺失视为 FAIL。"""
+    keys = ["n_metric_nan", "n_metric_missing_fields"]
+    missing = [k for k in keys if k not in cfg]
+    if missing:
+        return _make("G-2", "指标可读", False,
+                     detail=f"missing={missing}（必须由调用方提供实测值）",
+                     missing=missing)
     n_nan = int(cfg.get("n_metric_nan", 0))
     n_missing = int(cfg.get("n_metric_missing_fields", 0))
     return _make("G-2", "指标可读", n_nan == 0 and n_missing == 0,
@@ -716,12 +744,22 @@ def check_G2_metrics_readable(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_G3_config_data_cross(cfg: Mapping[str, Any]) -> CheckResult:
+    """G-3: 配置-数据无冲突。字段缺失视为 FAIL。"""
+    if "n_config_data_mismatch" not in cfg:
+        return _make("G-3", "配置-数据交叉", False,
+                     detail="n_config_data_mismatch 字段缺失（必须由调用方提供实测值）",
+                     missing=["n_config_data_mismatch"])
     n_mismatch = int(cfg.get("n_config_data_mismatch", 0))
     return _make("G-3", "配置-数据交叉", n_mismatch == 0,
                  detail=f"mismatch={n_mismatch}")
 
 
 def check_G4_alerts_cleared(cfg: Mapping[str, Any]) -> CheckResult:
+    """G-4: 告警清零。字段缺失视为 FAIL。"""
+    if "n_unresolved_alerts" not in cfg:
+        return _make("G-4", "告警清零", False,
+                     detail="n_unresolved_alerts 字段缺失（必须由调用方提供实测值）",
+                     missing=["n_unresolved_alerts"])
     n_alerts = int(cfg.get("n_unresolved_alerts", 0))
     return _make("G-4", "告警清零", n_alerts == 0, detail=f"unresolved={n_alerts}")
 
