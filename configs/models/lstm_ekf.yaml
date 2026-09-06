@@ -82,5 +82,5 @@ bridge_thresholds:
   vio_scaling_quality_coeff: 0.275
   vio_low_features_scaling_boost: 0.13
   vio_high_reproj_scaling_boost: 0.13
-checkpoint_path: E:\异步高NLOS\outputs\lstm_full_60ep\checkpoints\lstm_ekf_best_checkpoint.pt
+checkpoint_path: ./weights/lstm_ekf_best_checkpoint.pt  # BUG-12 修复: was 硬编码 Windows 绝对路径
 project_root: E:\异步高NLOS

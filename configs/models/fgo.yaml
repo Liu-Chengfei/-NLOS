@@ -34,9 +34,11 @@ window_length_ratio_max: 3.0  # ℓ_win / τ_filt 上界（§10.3 / B10 β=3）�
 
 # 优化器配置：当前仅支持高斯牛顿求解器。
 # max_iters 控制最大高斯牛顿迭代轮数；过小会过早收敛到次优解，过大增加延迟。
+# B13: 全员同一 EKF 迭代次数（§3.2 标准 EKF / Robust-EKF / FGO 同口径，单次线性化 update）。
+# 这里 FGO 用 max_iters=1 模拟「单次 Gauss-Newton 等价单次 EKF 线性化」，与 §3.2 公平性原则对齐。
 optimizer:
   name: gauss_newton  # 求解器类型，fgo_core 仅支持 "gauss_newton"。
-  max_iters: 10  # 最大高斯牛顿迭代轮数，默认 10。
+  max_iters: 1  # B13 公平性: 单次迭代, 与 EKF/Robust-EKF 同口径 (§3.2)。
 
 # 因子权重：各模态因子在联合优化中的相对权重（正标量）。
 # 权重越大表示越信任该模态的约束。所有权重默认 1.0，保持与 EKF 系列同口径。

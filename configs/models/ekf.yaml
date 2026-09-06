@@ -38,6 +38,10 @@ measurement_noise:
     # VIO 航向量测噪声标准差。# 值越大表示越不信任视觉航向结果。
     yaw: 0.02  # V0 健康档航向噪声
 
+# B16: 标定段冻结 (LOS 标定后禁止 R 在线缩放)。NN 头 (uwb_scaling/vio_scaling) 仍可生效。
+# §2.2 注释放宽后这里通过显式 opt-in 标定冻结满足 B16 硬门。
+calibration_frozen: true
+
 # 初始状态默认放在原点附近。# 这样表示系统启动时不强行假设偏离很大。
 # 差冷启动（§1.4 / §8.4）：均值不给真值邻域热启动；P0 故意偏大。
 # 全员同一分布（EKF / Robust-EKF / FGO 同口径）。位置 σ≈5 m、航向 σ≈1 rad。

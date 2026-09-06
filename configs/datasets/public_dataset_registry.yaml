@@ -116,8 +116,11 @@ datasets:
     download_script: null
     # 官方数据根目录，null 表示 SIM E9 无官方外部源，仿真在仓库内生成。
     official_root: null
-    # 落地原始数据目录，存放 sim_materializer 物化后的未修改仿真数据。
-    landed_raw_root: data/raw/sim_e9_protocol_20260726
+    # 落地原始数据目录，HIGH-22 修复: 原 sim_e9_protocol_20260726 不存在, 改 data/raw/sim_e9_main (实际物化目录).
+    landed_raw_root: data/raw/sim_e9_main
+    # HIGH-23 修复: 补 K 档/锚数合同, 让 prepare_pipeline 强校验 sim_e9 数据.
+    allowed_k_levels: [K0, K1, K3]
+    allowed_anchor_counts: [4]
     # 有用资产列表，SIM E9 提供 anchor_layout.json 与全套主表资产。
     # imu.json : IMU 传感器数据  uwb.json : UWB 测距数据
     # vio.json : VIO 视觉里程计数据  gt.json : 真值数据
@@ -143,7 +146,10 @@ datasets:
     benchmark_script: null
     download_script: null
     official_root: null
-    landed_raw_root: data/raw/sim_e9_protocol_20260726
+    landed_raw_root: data/raw/sim_e9_main  # HIGH-22: was sim_e9_protocol_20260726 (non-existent path)
+    # HIGH-23: added to let prepare_pipeline validate sim_e9 data contract
+    allowed_k_levels: [K0, K1, K3]
+    allowed_anchor_counts: [4]
     useful_assets: [imu.json, uwb.json, vio.json, gt.json, anchor_layout.json, sim_meta.json]
     vio_backend: json
     adapter_script: null

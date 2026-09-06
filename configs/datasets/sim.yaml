@@ -19,11 +19,14 @@ dataset_name: sim  # 仿真数据集的标准名称。
 # S3 硬约束：10 seed × 5 method = 50 单元（训练 12-15 条/seed、测试 ≥100 条/seed）。
 # P2 修复 (2026-09-02): 切换到 sim_e9_5seed_25unit_flat — 100 条序列，4 组合各 25 条。
 # S3 修复 (2026-09-02): 必须扩展到 sim_e9_10seed_40unit — 200 条序列 × 10 seed（已注册协议裁决项 PA-2026-S3-SCALE）。
-raw_root: data/raw/sim_e9_10seed_40unit
-interim_root: data/interim/sim_e9_10seed_40unit
-processed_root: data/processed/sim_e9_10seed_40unit
-manifests_root: data/manifests/sim_e9_10seed_40unit
-prepare_root: outputs/prepare_sim_e9_10seed_40unit
+raw_root: data/raw/sim_e9_main
+interim_root: data/interim/sim_e9_main
+processed_root: data/processed/sim_e9_main
+# BUG-004/010 修复 (2026-09-06 §10.2 审计): raw_root 是 sim_e9_main 但 manifests_root/prepare_root 仍写
+# sim_e9_10seed_40unit（旧注释里的旧路径），导致下游读 manifest 时路径不存在。
+# 统一为 sim_e9_main 与 raw_root 对齐。
+manifests_root: data/manifests/sim_e9_main
+prepare_root: outputs/prepare_sim_e9_main
 
 
 # 仿真数据集不需要 field_mapping，因为数据由代码生成，字段名已与统一 schema 对齐。

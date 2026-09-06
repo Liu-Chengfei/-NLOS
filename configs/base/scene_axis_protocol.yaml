@@ -137,8 +137,8 @@ axes:
     N0:
       label: nominal_nlos
       # NLOS 观测占比，所有 UWB 测距中非视距观测的比例。
-      # [0.00, 0.05] 表示在数据生成时该区间内均匀随机取值。
-      nlos_ratio: [0.00, 0.05]
+      # [0.00, 0.00] 表示无 NLOS 观测（LOS 主导）。
+      nlos_ratio: [0.00, 0.00]
       # 测距偏差强度(m)，NLOS 条件下测距的正向偏差大小。
       # [0.00, 0.00] 表示无偏差，测距值完全准确。
       bias_strength_m: [0.00, 0.00]
@@ -166,8 +166,8 @@ axes:
     # N2：中度 NLOS，半数观测受遮挡。
     N2:
       label: moderate_nlos
-      # NLOS 观测占比：25-30% 区间，生成时均匀采样。
-      nlos_ratio: [0.25, 0.30]
+      # NLOS 观测占比：25-35% 区间（B09 目标 ≈0.30-0.35），生成时均匀采样。
+      nlos_ratio: [0.25, 0.35]
       # 大脉冲幅度基准：2-3m 区间，生成时均匀采样。
       bias_strength_m: [2.0, 3.0]
       # NLOS 附加高斯噪声 σ：0.78-0.82m 区间（目标表 σ=0.8 ±0.02），生成时均匀采样。
@@ -178,8 +178,8 @@ axes:
     # N3：重度 NLOS，完全遮挡极端。
     N3:
       label: severe_nlos
-      # NLOS 观测占比：35-40% 区间，生成时均匀采样。
-      nlos_ratio: [0.35, 0.40]
+      # NLOS 观测占比：35-45% 区间（B09 上界对齐协议 0.40 + 5% 工程容差），生成时均匀采样。
+      nlos_ratio: [0.35, 0.45]
       # 大脉冲幅度基准：4-6m 区间，生成时均匀采样。
       bias_strength_m: [4.0, 6.0]
       # NLOS 附加高斯噪声 σ：1.48-1.52m 区间（目标表 σ=1.5 ±0.02），生成时均匀采样。
@@ -357,7 +357,7 @@ axes:
       anchor_count: 4
       # 几何条件数值 2.0，非对称欠定，GDOP 3-5；consumer 采样在 [1.8, 2.2] 区间内均匀采样。
       geom_condition: [1.8, 2.2]
-    # K3：4 锚近共线退化，GDOP 8-15+，3 锚近似共线 + 1 锚孤立，精度崩溃边缘。
+    # K3：4 锚近共线退化（3 共线 + 1 孤立），GDOP 8-15+，精度崩溃边缘。
     # 按「五轴档位协议定义」K 轴仅 K0/K1/K3 三档，K4 已删除（GDOP 2-4 区间由 K1 覆盖）。
     K3:
       label: anchor_count_4_collinear_degraded
@@ -460,7 +460,7 @@ sensor_frequency_diversity:
   enabled: true
   coverage_target:
     imu_hz: [100, 150, 200] # IMU 3 档 (默认 100Hz)，§26.1 r=100-200Hz，原 [50,100,200] 50Hz 低于下界，已修正为 100/150/200
-    uwb_hz: [10, 20] # UWB 2 档 (默认 20Hz)，§26.1 r=5-20Hz，原 [10,20,50] 的 50Hz 超出 §26.1 上界
+    uwb_hz: [5, 10, 20] # UWB 3 档 (默认 20Hz)，§26.1 r=5-20Hz；B28 修复：补 5Hz 下界（原 [10,20] 缺 §26.1 下界 5Hz）
     vio_hz: [10, 30] # VIO 2 档 (默认 30Hz)，§26.1 r=10-30Hz，原 [30,60] 的 60Hz 超出 §26.1 上界
   assignment_strategy: round_robin # 30 seqs 按顺序循环分配频率档位
   documentation: "Liquid 时间常数 B 在 dt=0.05s 下 t_interp 仅 1.2%/step, 在 dt=0.01s 下 t_interp=5.9%/step, 论证 Liquid 适应不同 nyquist 传感器"

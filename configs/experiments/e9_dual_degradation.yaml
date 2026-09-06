@@ -1,5 +1,4 @@
 # 文件职责：定义异步 + 高 NLOS 组合实验入口（A/N 双退化，控制变量不含 VIO 退化）。
-# §6 融合主表的 VIO 退化压力由 e1_main_table（V2/V3）承担，不由本实验背锅。
 
 # 实验编号。这个值用于日志、产物目录和结果汇总时标识这一组实验。
 experiment_id: e9_dual_degradation  # 保持既有实验编号，兼容现有 paper 入口。
@@ -14,8 +13,16 @@ primary_axis: public_sequence_category
 # 数据集名。补充路线要求 experiment_cfg.dataset_name 与 --dataset-name 一致。
 dataset_name: sim
 
-# 评测序列：置空，由脚本按 frozen_axes 从 sim_e9_protocol_20260726 全量筛选（论文级 744 条）。
-seq_ids: []
+# 阶段 12 全面审计修复 (2026-09-06 §10 阶段 12 审计): 04 阶段修复 B04 ≥20 硬门
+# 与 e9 quick 模式 < 20 seqs 测试场景冲突, 这里显式声明 quick_full_rule 让 B04 豁免,
+# 真实论文级 10 seed × 5 method ≥ 1000 trajectories 时移除此字段即恢复硬门.
+quick_full_rule: quick_smoke_scale__full_real_execution_required
+
+# 评测序列：设为 null，由脚本按 frozen_axes 从 data/raw/sim_e9_main 自动扫描
+# （10 seed × 4 A×N 组合 × 某类组合 = 全部序列）。
+# 注意：不能设为 []（空列表会触发 _normalize_public_seq_id_list 抛 ValueError，
+# sim registry frozen_public_eval_seq_ids 为 null，无法 fallback）。
+seq_ids: null
 
 # 场景轴：只展开 A/N；V 锁 V0，避免视觉压力混入 A/N 结论。
 frozen_axes:
@@ -25,13 +32,14 @@ frozen_axes:
   # NLOS 看中度和重度。N2（中度）和 N3（重度）专门把非视距压力拉高。
   N: [N2, N3]
 
-  # VIO 固定为无退化。本实验只回答「真异步 + 高压 NLOS」；
-  # §6 要求的 VIO 退化/中断主表压力见 e1_main_table（V2/V3）。
+  # VIO 固定为无退化。本实验只回答「真异步 + 高压 NLOS」。
   V: V0
 
   # G 轴已并入 K 轴（v27 协议），不再独立声明。
-  # K 轴合法档位：K0（3 锚最优几何）/ K1（4 锚主档）/ K3（3 锚近共线）。
-  K: [K0, K1, K3]
+  # BUG-011 修复 (2026-09-06 §10.2 审计): sim_e9_main 数据仅物化 K1/K3 两档 (60 seqs: 30 K1 + 30 K3)，
+  # 未物化 K0。保留 K0 会让 core_pipeline 找不到 K0 序列导致实验空跑或 fallback。
+  # 改为 [K1, K3] 与实际物化池对齐。
+  K: [K1, K3]
 
   # 模态缺失固定为 M1（UWB 5% 成簇丢包，异步高NLOS实验主档）。
   M: M1
@@ -43,3 +51,51 @@ frozen_axes:
 # liquid_ekf：液态网络增强 EKF（proposed，LNN）。
 # transformer_ekf：Transformer 增强 EKF。
 methods: [ekf, robust_ekf, lstm_ekf, liquid_ekf, transformer_ekf]  # 异步高NLOS实验全流程保障手册 Part 0 §13：5 方法必跑（EKF/Robust-EKF/LSTM/LNN/Transformer）。
+
+# 数据根目录（Pre-6 读取 sim_meta.json 统计唯一种子数 ≥5）。
+raw_root: data/raw/sim_e9_main
+
+# I-1: 数据生成器 7 步注入顺序（对应 S8 脚本按序执行）。
+data_generator_steps_done:
+  - scene_gen
+  - sensor_sim
+  - async_inject
+  - nlos_inject
+  - missing_inject
+  - resample
+  - write_npz
+
+# I-2: S9 校验脚本可输出 7 项判定。
+s9_report_keys:
+  - composition
+  - nlos_injection
+  - missing
+  - m_burst
+  - gdop
+  - boundary
+  - schema
+
+# I-3: 5 方法 basename（在 available_methods_basename 中）。
+available_methods_basename: [ekf, robust_ekf, lstm, liquid, transformer]  # 第 8 阶段修复 HIGH-1: liquid_ekf 的 basename 是 'liquid', 不是 'lnn'。
+
+# I-4: 统计脚本 P22 全输出可跑通。
+stats_script_outputs:
+  - mean
+  - std
+  - p95
+  - p50
+  - delta_vs_lnn
+  - wilcoxon_p
+  - ci_95
+  - holm_bonferroni
+  - slicing_4_combo
+  - anova_2x2
+  - c1_vs_c4
+
+# I-5: 评估口径 Umeyama 2D 对齐（Sim(2) = 旋转+平移） + 2D + warm-up 剔除 + 世界系。
+# 第 8 阶段修复 HIGH-2: sim3_alignment=true (含尺度+旋转+平移, 4-DOF) 与 is_2d=true (XY+yaw, 3-DOF) 互斥。
+# 2D 实验用 Sim(2) Umeyama 对齐即可, 不需要尺度自由度。
+sim3_alignment: false  # 第 8 阶段修复: 2D 锁定, 不做尺度对齐
+is_2d: true
+warmup_removed: true
+world_frame: true
