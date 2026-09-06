@@ -504,7 +504,7 @@ class TestStatsScaffoldingChecks:
     """P19~P23 统计脚手架"""
 
     def test_P19_pass(self):
-        r = check_P19_seed_system({"n_seeds": 5, "deterministic_mode": True, "tf32_explicit_set": True})
+        r = check_P19_seed_system({"n_seeds": 10, "deterministic_mode": True, "tf32_explicit_set": True})
         assert r.passed
 
     def test_P20_pass(self):
@@ -680,7 +680,7 @@ class TestPreSeriesChecks:
 
     def test_Pre6_pass(self):
         r = check_Pre6_seed_manifest_consistency({
-            "n_manifest_seeds": 5, "n_random_sources": 4, "deterministic_mode": True,
+            "n_manifest_seeds": 10, "n_random_sources": 4, "deterministic_mode": True,
         })
         assert r.passed
 
@@ -731,12 +731,13 @@ class TestDQQualityGates:
     """DQ-1~DQ-4"""
 
     def test_DQ1_pass(self):
-        r = check_DQ1_difficulty_gradient({"c4_mean_rmse": 5.0, "c1_mean_rmse": 2.0, "target_diff_m": 2.4})
+        # T-8 修复后 DQ-1 与 handbook_gates 同口径：相对值 target_diff_ratio（默认 0.40）。
+        r = check_DQ1_difficulty_gradient({"c4_mean_rmse": 5.0, "c1_mean_rmse": 2.0, "target_diff_ratio": 0.40})
         assert r.passed
 
     def test_DQ2_pass(self):
-        r = check_DQ2_snr({"nlos_bias_m": 5.0, "nlos_std_m": 1.5})
-        # SNR = 6.5/0.714 ≈ 9.1, > 3
+        # T-17 修复后分子取偏置幅度，分母 = los_noise_m × gdop；SNR = 5.0/(0.7×1.21) ≈ 5.9 >= 3。
+        r = check_DQ2_snr({"nlos_bias_m": 5.0, "los_noise_m": 0.7, "gdop": 1.21})
         assert r.passed
 
     def test_DQ3_pass(self):
@@ -862,8 +863,8 @@ class TestRunAllPrechecks:
             "robust_ekf_huber_applied": True, "robust_ekf_not_just_r_scaling": True,
             # P18
             "lstm_n_output_heads": 4, "transformer_n_output_heads": 4,
-            # P19
-            "n_seeds": 5, "deterministic_mode": True, "tf32_explicit_set": True,
+            # P19（T-16: N_SEED_MIN=10 与 protocol.yaml 一致）
+            "n_seeds": 10, "deterministic_mode": True, "tf32_explicit_set": True,
             # P20
             "window_size": 128, "warmup_s": 10.0, "no_window_cross_seq": True, "imu_no_cross_seq_concat": True,
             # P21
@@ -916,7 +917,7 @@ class TestRunAllPrechecks:
             "run_directories": ["run-2026-01-01-42-liquid-abcdef1234"],
             "n_files_with_sha256": 100, "n_files_total": 100,
             "gpu_model": "RTX 4090", "smoke_unit_seconds": 60.0,
-            "n_manifest_seeds": 5, "n_random_sources": 4,
+            "n_manifest_seeds": 10, "n_random_sources": 4,
             # I-1~5
             "data_generator_steps_done": [
                 "scene_gen", "sensor_sim", "async_inject", "nlos_inject",
@@ -932,9 +933,9 @@ class TestRunAllPrechecks:
                 "holm_bonferroni", "slicing_4_combo", "anova_2x2", "c1_vs_c4",
             ],
             "sim3_alignment": True, "is_2d": True, "warmup_removed": True, "world_frame": True,
-            # DQ-1~4
-            "c4_mean_rmse": 5.0, "c1_mean_rmse": 2.0, "target_diff_m": 2.4,
-            "nlos_bias_m": 5.0, "nlos_std_m": 1.5,
+            # DQ-1~4（T-8/T-17: 相对值难度梯度 + bias/(los×gdop) 信噪比）
+            "c4_mean_rmse": 5.0, "c1_mean_rmse": 2.0, "target_diff_ratio": 0.40,
+            "nlos_bias_m": 5.0, "los_noise_m": 0.7, "gdop": 1.21,
             "train_rho": 0.3, "test_rho": 0.31, "train_mu": 5.0, "test_mu": 5.1,
             "train_sigma": 1.5, "test_sigma": 1.55,
             # G-1~5

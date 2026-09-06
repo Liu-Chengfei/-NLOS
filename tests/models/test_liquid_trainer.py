@@ -370,14 +370,14 @@ def test_liquid_yaml_default_paper_grade_training_contract():
 
     assert trainer_state["optimizer"]["lr"] == pytest.approx(1.5e-4)
     assert trainer_state["optimizer"]["weight_decay"] == pytest.approx(0.0)
-    assert trainer_state["epochs"] == 60
+    assert trainer_state["epochs"] == 160
     assert trainer_state["train"]["batch_size"] == 32
     assert trainer_state["train"]["eval_batch_size"] == 128
-    assert trainer_state["epoch_candidate_stride"] == 1
+    assert trainer_state["epoch_candidate_stride"] == 10
     assert trainer_state["deterministic"] is True
     assert trainer_state["phase_schedule"] == {
-        "warmup_epochs": 0,
-        "gate_alignment_epochs": 0,
+        "warmup_epochs": 20,
+        "gate_alignment_epochs": 40,
     }
 
 
@@ -698,7 +698,7 @@ def test_liquid_semantic_loss_uses_huber_for_bias_and_log_domain_for_scaling():
     prediction = torch.tensor([[2.0, 0.7, 4.0, 2.0]], dtype=torch.float32)
     target = torch.tensor([[0.0, 0.2, 1.0, 1.0]], dtype=torch.float32)
 
-    semantic = _semantic_loss_matrix(prediction, target)
+    semantic = _semantic_loss_matrix(prediction, target, bias_huber_delta=0.5)
 
     expected_bias = F.huber_loss(
         prediction[:, 0],
@@ -756,8 +756,8 @@ def test_liquid_gate_l1_only_penalizes_enabled_gate_parameters(phase_name, expec
             parameter.zero_()
         model.bias_head.projection.bias.fill_(7.0)
         model.network.shared_projection.bias.fill_(11.0)
-        model.bias_head.temporal_context_gate.weight.fill_(2.0)
-        model.bias_head.temporal_context_gate.bias.fill_(3.0)
+        model.output_backbone.temporal_context_gate.weight.fill_(2.0)
+        model.output_backbone.temporal_context_gate.bias.fill_(3.0)
 
     auxiliary = _compute_liquid_auxiliary_loss_terms(
         model,
@@ -769,7 +769,6 @@ def test_liquid_gate_l1_only_penalizes_enabled_gate_parameters(phase_name, expec
 
     gate_parameters = [
         parameter
-        for head in model.output_heads.values()
         for attribute_name in (
             "temporal_context_gate",
             "observation_context_gate",
@@ -778,7 +777,7 @@ def test_liquid_gate_l1_only_penalizes_enabled_gate_parameters(phase_name, expec
             "uwb_branch_mix_gate",
             "vio_branch_mix_gate",
         )
-        for parameter in getattr(head, attribute_name).parameters()
+        for parameter in getattr(model.output_backbone, attribute_name).parameters()
         if parameter.requires_grad
     ]
     expected_gate_l1 = prediction.new_tensor(0.0)
@@ -1205,16 +1204,8 @@ def test_liquid_train_model_reports_epoch_phase_names(tmp_path):
         "soft_control_rollback_patience": 2,
         "soft_control_streak_length": 5,
         "soft_control_streak_lr_decay": 0.8,
-        "max_phase_shock_streak": 0,
-        "global_selection_mode": "phase_best_supervised_loss",
-        # Trainer 在 4-epoch 训练里按 phase_best_supervised_loss 全局择优；
-        # 第 12 轮硬修复（2026-04 audit Round 12）：原期望 gate_alignment 是测试 L1210-1211
-        # 注释自承诺"跟进当前 trainer dynamic, 不强制 best_phase"，但本机 PyTorch 2.10.0+cpu
-        # + seed=13 + LiquidCell 重参数化让 full_tuning epoch=4 取得更低 val_loss（实测
-        # val_epoch_losses=[0.749, 0.0814, 0.167, 0.0636]，epoch 4 full_tuning=0.0636 最低）。
-        # 按测试者承诺原则"跟进当前 trainer dynamic, 不强制 best_phase"，更新期望跟随实测，
-        # global_best_phase_name=full_tuning 不再强加 gate_alignment。这不是 §1 真违规，
-        # 是 PyTorch 版本与 trainer cell 动态的环境差异让 full_tuning 收敛更好。
+        "max_phase_shock_streak": 1,
+        "global_selection_mode": "export_score",
         "global_best_phase_name": "full_tuning",
         "diagnostics_path_exists": True,
         "epoch_predictions_path_exists": True,
@@ -1823,21 +1814,21 @@ def test_predict_batch_consumes_explicit_context_tensors_through_training_metada
     )
     model = create_model("liquid_ekf", {"feature_order": ["quality", "valid"]})
     hidden_dim = model.network.hidden_dim
-    context_dim = model.bias_head.context_dim
-    filter_context_dim = model.bias_head.filter_context_dim
+    context_dim = model.output_backbone.context_dim
+    filter_context_dim = model.output_backbone.filter_context_dim
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, hidden_dim + 2] = 1.0
@@ -1930,37 +1921,37 @@ def test_legacy_checkpoint_loaded_new_liquid_parameters_still_participate_in_tra
     }
 
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight[0, 0] = 1.0
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight[0, 0] = 1.0
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.fill_(1.0)
         model.bias_head.projection.weight[0, 0] = 1.0
         model.bias_head.residual_projection.weight.zero_()
         model.bias_head.residual_projection.bias.zero_()
 
-        model.risk_head.temporal_context_gate.weight.zero_()
-        model.risk_head.temporal_context_gate.bias.zero_()
-        model.risk_head.observation_context_gate.weight.zero_()
-        model.risk_head.observation_context_gate.bias.zero_()
-        model.risk_head.filter_context_gate.weight.zero_()
-        model.risk_head.filter_context_gate.bias.zero_()
-        model.risk_head.branch_mix_gate.weight.zero_()
-        model.risk_head.branch_mix_gate.bias.zero_()
-        model.risk_head.uwb_branch_mix_gate.weight.zero_()
-        model.risk_head.uwb_branch_mix_gate.bias.zero_()
-        model.risk_head.vio_branch_mix_gate.weight.zero_()
-        model.risk_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.risk_head.projection.weight.zero_()
         model.risk_head.projection.bias.zero_()
         model.risk_head.residual_projection.weight.zero_()
@@ -1985,8 +1976,8 @@ def test_legacy_checkpoint_loaded_new_liquid_parameters_still_participate_in_tra
     )
     loss.backward()
 
-    assert model.bias_head.filter_context_gate.weight.grad is not None
-    assert model.bias_head.filter_context_gate.weight.grad.abs().sum().item() > 0.0
+    assert model.output_backbone.filter_context_gate.weight.grad is not None
+    assert model.output_backbone.filter_context_gate.weight.grad.abs().sum().item() > 0.0
     assert model.risk_calibration.b.grad is not None
     assert model.risk_calibration.b.grad.abs().item() > 0.0
 
@@ -2035,21 +2026,21 @@ def test_predict_batch_distinguishes_zero_observed_from_missing_readout_context(
     model = create_model("liquid_ekf", {"feature_order": ["quality", "valid"]})
     hidden_dim = model.network.hidden_dim
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
-        model.bias_head.projection.weight[0, hidden_dim + model.bias_head.context_dim + 1] = 1.0
+        model.bias_head.projection.weight[0, hidden_dim + model.output_backbone.context_dim + 1] = 1.0
         model.bias_head.residual_projection.weight.zero_()
         model.bias_head.residual_projection.bias.zero_()
         model.risk_head.projection.weight.zero_()
@@ -2124,18 +2115,18 @@ def test_predict_batch_distinguishes_zero_observed_from_missing_current_feature_
     hidden_dim = model.network.hidden_dim
     valid_flag_index = 2 + (2 * 0) + 1  # valid 为 LIQUID_CONTEXT_FEATURE_KEYS[0]
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, hidden_dim + valid_flag_index] = 1.0
@@ -2223,15 +2214,16 @@ def test_predict_batch_applies_liquid_modality_contract_to_inactive_scaling_head
 
 def _head_trainability_snapshot(model):
     head = model.bias_head
+    backbone = model.output_backbone
     return {
         "projection": any(parameter.requires_grad for parameter in head.projection.parameters()),
         "residual_projection": any(parameter.requires_grad for parameter in head.residual_projection.parameters()),
-        "temporal_context_gate": any(parameter.requires_grad for parameter in head.temporal_context_gate.parameters()),
-        "observation_context_gate": any(parameter.requires_grad for parameter in head.observation_context_gate.parameters()),
-        "filter_context_gate": any(parameter.requires_grad for parameter in head.filter_context_gate.parameters()),
-        "branch_mix_gate": any(parameter.requires_grad for parameter in head.branch_mix_gate.parameters()),
-        "uwb_branch_mix_gate": any(parameter.requires_grad for parameter in head.uwb_branch_mix_gate.parameters()),
-        "vio_branch_mix_gate": any(parameter.requires_grad for parameter in head.vio_branch_mix_gate.parameters()),
+        "temporal_context_gate": any(parameter.requires_grad for parameter in backbone.temporal_context_gate.parameters()),
+        "observation_context_gate": any(parameter.requires_grad for parameter in backbone.observation_context_gate.parameters()),
+        "filter_context_gate": any(parameter.requires_grad for parameter in backbone.filter_context_gate.parameters()),
+        "branch_mix_gate": any(parameter.requires_grad for parameter in backbone.branch_mix_gate.parameters()),
+        "uwb_branch_mix_gate": any(parameter.requires_grad for parameter in backbone.uwb_branch_mix_gate.parameters()),
+        "vio_branch_mix_gate": any(parameter.requires_grad for parameter in backbone.vio_branch_mix_gate.parameters()),
     }
 
 

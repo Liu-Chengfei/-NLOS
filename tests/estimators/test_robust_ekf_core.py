@@ -889,13 +889,12 @@ class TestMeasurementControlAndBridge:
 
         low_report = low_risk_estimator.last_update_report["covariance_report"]
         high_report = high_risk_estimator.last_update_report["covariance_report"]
-        # A0 cross_modal_skew_ms=5 → async_axis_risk=5/300≈0.01667
-        # low_risk: applied_risk = max(0.0, 0.0, 0.0, 0.01667) = 0.01667
-        a0_async_risk = 5.0 / (0.30 * 1000.0)
-        assert low_report["noise_multiplier"] == pytest.approx(1.4**2 * (1.0 + a0_async_risk))  # scaling^2 * (1+applied_risk)
-        # high_risk: applied_risk = max(0.5, 0.0, 0.0, 0.01667) = 0.5
+        # 当前协议（scene_axis_protocol.yaml）A0 cross_modal_skew_ms=0、N0 nlos_ratio=[0,0]
+        # → 场景轴观测下界 axis_floor=0，low_risk 的 applied_risk=0。
+        assert low_report["noise_multiplier"] == pytest.approx(1.4**2 * 1.0)  # scaling^2 * (1+applied_risk)
+        # high_risk: applied_risk = max(0.5, 0.0, 0.0, 0.0) = 0.5
         assert high_report["noise_multiplier"] == pytest.approx(1.4**2 * 1.5)  # scaling^2 * (1+risk=0.5)
-        assert low_report["effective_cov"] == pytest.approx(0.0625 * 1.4**2 * (1.0 + a0_async_risk))  # base_var * nm
+        assert low_report["effective_cov"] == pytest.approx(0.0625 * 1.4**2 * 1.0)  # base_var * nm
         assert high_report["effective_cov"] == pytest.approx(0.0625 * 1.4**2 * 1.5)  # base_var * nm
         assert high_report["effective_cov"] > low_report["effective_cov"]
 

@@ -205,18 +205,18 @@ def test_liquid_output_head_uses_modality_aware_dynamic_branch_mixing():
     model = create_model("liquid_ekf", {})
     hidden_dim = model.network.hidden_dim
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.fill_(-10.0)
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.fill_(10.0)
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.fill_(-10.0)
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.fill_(10.0)
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, 0] = 1.0
@@ -244,8 +244,8 @@ def test_liquid_output_head_uses_modality_aware_dynamic_branch_mixing():
     vio_shared = dict(uwb_shared)
     vio_shared["current_modality"] = "vio"
 
-    uwb_output = float(model.bias_head(uwb_shared).detach().item())
-    vio_output = float(model.bias_head(vio_shared).detach().item())
+    uwb_output = float(model.bias_head.forward_legacy(uwb_shared, model.output_backbone).detach().item())
+    vio_output = float(model.bias_head.forward_legacy(vio_shared, model.output_backbone).detach().item())
 
     assert uwb_output > 0.5
     assert vio_output < -0.5
@@ -257,18 +257,18 @@ def test_liquid_output_head_uses_uwb_branch_mix_gate_for_uwb_modality():
     model = create_model("liquid_ekf", {})
     hidden_dim = model.network.hidden_dim
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.fill_(10.0)
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.fill_(-10.0)
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.fill_(10.0)
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.fill_(10.0)
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.fill_(-10.0)
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.fill_(10.0)
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, 0] = 1.0
@@ -294,7 +294,7 @@ def test_liquid_output_head_uses_uwb_branch_mix_gate_for_uwb_modality():
         },
     }
 
-    output = float(model.bias_head(shared).detach().item())
+    output = float(model.bias_head.forward_legacy(shared, model.output_backbone).detach().item())
 
     # uwb_branch_mix_gate.bias=-10 → sigmoid≈0 → fast权重≈1 → final_hidden[0]=1.0 主导
     assert output > 0.5
@@ -322,18 +322,18 @@ def test_liquid_output_head_residual_projection_can_bypass_zero_main_projection(
     model = create_model("liquid_ekf", {})
     hidden_dim = model.network.hidden_dim
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.residual_projection.weight.zero_()
@@ -363,7 +363,7 @@ def test_liquid_output_head_residual_projection_can_bypass_zero_main_projection(
         },
     }
 
-    output = float(model.bias_head(shared).detach().item())
+    output = float(model.bias_head.forward_legacy(shared, model.output_backbone).detach().item())
     assert output == pytest.approx(0.75, rel=1e-6)
 
 
@@ -373,18 +373,18 @@ def test_liquid_output_head_falls_back_to_shared_vector_when_final_and_pooled_hi
     model = create_model("liquid_ekf", {})
     hidden_dim = model.network.hidden_dim
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.fill_(-10.0)
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.fill_(-10.0)
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.fill_(-10.0)
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.fill_(-10.0)
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, 0] = 1.0
@@ -410,7 +410,7 @@ def test_liquid_output_head_falls_back_to_shared_vector_when_final_and_pooled_hi
         },
     }
 
-    output = float(model.bias_head(shared).detach().item())
+    output = float(model.bias_head.forward_legacy(shared, model.output_backbone).detach().item())
 
     assert output > 0.59
     assert output < 0.61
@@ -421,27 +421,27 @@ def test_liquid_output_head_applies_temporal_observation_and_filter_modulation_i
     """
     model = create_model("liquid_ekf", {})
     hidden_dim = model.network.hidden_dim
-    context_dim = model.bias_head.context_dim
-    filter_context_dim = model.bias_head.filter_context_dim
-    context_scale = model.bias_head._CONTEXT_MODULATION_SCALE  # A3 根因修复：从实例属性改为类常量。
-    filter_scale = model.bias_head._FILTER_CONTEXT_MODULATION_SCALE  # A3 根因修复：从实例属性改为类常量。
+    context_dim = model.output_backbone.context_dim
+    filter_context_dim = model.output_backbone.filter_context_dim
+    context_scale = model.output_backbone._CONTEXT_MODULATION_SCALE  # A3 根因修复：从实例属性改为类常量。
+    filter_scale = model.output_backbone._FILTER_CONTEXT_MODULATION_SCALE  # A3 根因修复：从实例属性改为类常量。
 
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.temporal_context_gate.bias[0] = 1.0
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.bias[0] = 1.0
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.bias[0] = 1.0
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.bias[0] = 1.0
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.bias[0] = 1.0
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.bias[0] = 1.0
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, 0] = 1.0
@@ -474,7 +474,7 @@ def test_liquid_output_head_applies_temporal_observation_and_filter_modulation_i
         },
     }
 
-    output = float(model.bias_head(shared).detach().item())
+    output = float(model.bias_head.forward_legacy(shared, model.output_backbone).detach().item())
 
     temporal_delta = float(torch.tanh(torch.tensor(1.0)).item())
     observation_delta = float(torch.tanh(torch.tensor(1.0)).item())
@@ -494,20 +494,20 @@ def test_liquid_output_head_masks_cross_modality_filter_context_features():
     last_innovation_index = 4
     last_gate_skip_index = 6
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight[0, last_innovation_index] = 1.0
-        model.bias_head.filter_context_gate.weight[1, last_gate_skip_index] = 1.0
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight[0, last_innovation_index] = 1.0
+        model.output_backbone.filter_context_gate.weight[1, last_gate_skip_index] = 1.0
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, 0] = 1.0
@@ -561,12 +561,12 @@ def test_liquid_output_head_masks_cross_modality_filter_context_features():
     vio_with_vio_filter_change["readout_context_observed_by_name"] = dict(base_shared["readout_context_observed_by_name"])
     vio_with_vio_filter_change["readout_context_observed_by_name"]["last_innovation_norm"] = True
 
-    uwb_base_output = float(model.bias_head(uwb_base).detach().item())
-    uwb_vio_only_output = float(model.bias_head(uwb_with_vio_only_filter_change).detach().item())
-    uwb_own_filter_output = float(model.bias_head(uwb_with_uwb_filter_change).detach().item())
-    vio_base_output = float(model.bias_head(vio_base).detach().item())
-    vio_uwb_only_output = float(model.bias_head(vio_with_uwb_only_filter_change).detach().item())
-    vio_own_filter_output = float(model.bias_head(vio_with_vio_filter_change).detach().item())
+    uwb_base_output = float(model.bias_head.forward_legacy(uwb_base, model.output_backbone).detach().item())
+    uwb_vio_only_output = float(model.bias_head.forward_legacy(uwb_with_vio_only_filter_change, model.output_backbone).detach().item())
+    uwb_own_filter_output = float(model.bias_head.forward_legacy(uwb_with_uwb_filter_change, model.output_backbone).detach().item())
+    vio_base_output = float(model.bias_head.forward_legacy(vio_base, model.output_backbone).detach().item())
+    vio_uwb_only_output = float(model.bias_head.forward_legacy(vio_with_uwb_only_filter_change, model.output_backbone).detach().item())
+    vio_own_filter_output = float(model.bias_head.forward_legacy(vio_with_vio_filter_change, model.output_backbone).detach().item())
 
     assert uwb_vio_only_output == pytest.approx(uwb_base_output, abs=1e-6)
     assert uwb_own_filter_output > uwb_base_output + 1e-2
@@ -579,21 +579,21 @@ def test_liquid_output_head_prefers_explicit_context_tensors_over_fallback_metad
     """
     model = create_model("liquid_ekf", {})
     hidden_dim = model.network.hidden_dim
-    context_dim = model.bias_head.context_dim
-    filter_context_dim = model.bias_head.filter_context_dim
+    context_dim = model.output_backbone.context_dim
+    filter_context_dim = model.output_backbone.filter_context_dim
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, hidden_dim + 0] = 1.0
@@ -635,7 +635,7 @@ def test_liquid_output_head_prefers_explicit_context_tensors_over_fallback_metad
         "filter_context_vector": explicit_filter_context_vector,
     }
 
-    output = float(model.bias_head(shared).detach().item())
+    output = float(model.bias_head.forward_legacy(shared, model.output_backbone).detach().item())
 
     assert output == pytest.approx(0.7, abs=1e-6)  # 只有 filter_context_vector[0]=0.7 贡献；context_vector[0] 对应模态 one-hot，UWB 分支掩码不包含模态索引，被置零。
 
@@ -646,20 +646,20 @@ def test_liquid_output_head_keeps_full_filter_context_for_unknown_modality():
     model = create_model("liquid_ekf", {})
     hidden_dim = model.network.hidden_dim
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight[0, 4] = 1.0
-        model.bias_head.filter_context_gate.weight[1, 6] = 1.0
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.fill_(-10.0)
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.fill_(-10.0)
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight[0, 4] = 1.0
+        model.output_backbone.filter_context_gate.weight[1, 6] = 1.0
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.fill_(-10.0)
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.fill_(-10.0)
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, 0] = 1.0
@@ -688,7 +688,7 @@ def test_liquid_output_head_keeps_full_filter_context_for_unknown_modality():
         },
     }
 
-    output = float(model.bias_head(shared).detach().item())
+    output = float(model.bias_head.forward_legacy(shared, model.output_backbone).detach().item())
 
     assert output > 2.0
 
@@ -701,18 +701,18 @@ def test_liquid_output_head_distinguishes_zero_observed_from_missing_observation
     # 铁律 9：探针改接 valid 观测标志位（layout: modal 0,1 | valid value 2, flag 3）。
     valid_flag_index = 2 + (2 * _LIQUID_CONTEXT_FEATURE_KEYS.index("valid")) + 1
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, hidden_dim + valid_flag_index] = 1.0
@@ -765,8 +765,8 @@ def test_liquid_output_head_distinguishes_zero_observed_from_missing_observation
         "modality_gap_dt": False,
     }
 
-    missing_output = float(model.bias_head(missing_shared).detach().item())
-    observed_zero_output = float(model.bias_head(observed_zero_shared).detach().item())
+    missing_output = float(model.bias_head.forward_legacy(missing_shared, model.output_backbone).detach().item())
+    observed_zero_output = float(model.bias_head.forward_legacy(observed_zero_shared, model.output_backbone).detach().item())
 
     assert missing_output == pytest.approx(0.0, abs=1e-6)
     assert observed_zero_output == pytest.approx(1.0, abs=1e-6)
@@ -779,21 +779,21 @@ def test_liquid_output_head_distinguishes_zero_observed_from_missing_filter_cont
     hidden_dim = model.network.hidden_dim
     state_cov_trace_flag_index = 1
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
-        model.bias_head.projection.weight[0, hidden_dim + model.bias_head.context_dim + state_cov_trace_flag_index] = 1.0
+        model.bias_head.projection.weight[0, hidden_dim + model.output_backbone.context_dim + state_cov_trace_flag_index] = 1.0
         model.bias_head.residual_projection.weight.zero_()
         model.bias_head.residual_projection.bias.zero_()
 
@@ -827,8 +827,8 @@ def test_liquid_output_head_distinguishes_zero_observed_from_missing_filter_cont
         "last_gate_skip_flag": False,
     }
 
-    missing_output = float(model.bias_head(missing_shared).detach().item())
-    observed_zero_output = float(model.bias_head(observed_zero_shared).detach().item())
+    missing_output = float(model.bias_head.forward_legacy(missing_shared, model.output_backbone).detach().item())
+    observed_zero_output = float(model.bias_head.forward_legacy(observed_zero_shared, model.output_backbone).detach().item())
 
     assert missing_output == pytest.approx(0.0, abs=1e-6)
     assert observed_zero_output == pytest.approx(1.0, abs=1e-6)

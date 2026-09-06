@@ -86,8 +86,14 @@ def test_invalid_case():
             )
         )
 
+    # 四段简写 S(A,N,V,K) 现已合法（M 缺省回退协议名义档；contract_smoke_pipeline 等
+    # 生产路径即产出该格式）。仍须拒绝的是三段残缺与遗留六段 G 轴格式。
     with pytest.raises(ValueError, match=r"must match S\(A,N,V,K,M\)"):
-        decode_scene("S(A0,N0,V0,K0)")
+        decode_scene("S(A0,N0,V0)")
+    with pytest.raises(ValueError, match=r"must match S\(A,N,V,K,M\)"):
+        decode_scene("S(A0,N0,V0,G0,K1,M0)")
+    with pytest.raises(ValueError, match=r"must match S\(A,N,V,K,M\)"):
+        decode_scene("S(A0,N0,V0,K0,")
 
 
 def test_uses_current_scene_axis_protocol(monkeypatch):

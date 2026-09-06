@@ -34,11 +34,11 @@ _PROJECT_ROOT = find_project_root()
 def _make_valid_protocol_cfg():
     """Build a complete valid experiment protocol config for testing."""
     return {
-        'protocol_version': 2,
+        'protocol_version': 27,
         'quick_full_rule': 'quick_smoke_scale__full_real_execution_required',
         'failure_sample_policy': 'retain_and_audit',
         'aggregation_order': ['single_run', 'repeat_summary', 'scene_summary', 'experiment_conclusion'],
-        'conclusion_priority': ['p95', 'failure_rate', 'rmse', 'mae'],
+        'conclusion_priority': ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'mae'],
         'public_benchmark': {
             'allowed_datasets': ['miluv', 'ntu_viral'],
             'frozen_eval_split': 'frozen_public_eval',
@@ -85,7 +85,7 @@ def test_load_experiment_protocol_rejects_mismatched_protocol_version(tmp_path):
         encoding='utf-8',
     )
 
-    with pytest.raises(ValueError, match='experiment protocol version must be 2'):
+    with pytest.raises(ValueError, match='experiment protocol version must be 27'):
         load_experiment_protocol(protocol_path)
 
 

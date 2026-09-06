@@ -1430,8 +1430,8 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
             },
             "held_out_runs": [
                 {
-                    "experiment_id": "e1_main_table",
-                    "output_root": str(output_root / "held_out_core_experiments" / "e1_main_table"),
+                    "experiment_id": "e9_dual_degradation",
+                    "output_root": str(output_root / "held_out_core_experiments" / "e9_dual_degradation"),
                     "eval_stage_name": "eval",
                     "scene_sampling_seq_ids": ["sim_line_02"],
                 }
@@ -1750,9 +1750,9 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     assert main_conclusion["public_conclusion_source"] == "public_benchmarks_skipped"
     assert main_conclusion["public_surface_status"] == "skipped"
     assert json.loads((output_root / "audits" / "seed_manifest.json").read_text(encoding="utf-8"))["locked_steps"]["training"]["seed"] == 0
-    assert captured_primary_artifact_roots["summary_eval_root"].endswith("held_out_core_experiments\\e1_main_table\\eval")
-    assert captured_primary_artifact_roots["runtime_eval_root"].endswith("held_out_core_experiments\\e1_main_table\\eval")
-    assert captured_primary_artifact_roots["consumer_input_root"].endswith("held_out_core_experiments\\e1_main_table\\core")
+    assert captured_primary_artifact_roots["summary_eval_root"].endswith("held_out_core_experiments\\e9_dual_degradation\\eval")
+    assert captured_primary_artifact_roots["runtime_eval_root"].endswith("held_out_core_experiments\\e9_dual_degradation\\eval")
+    assert captured_primary_artifact_roots["consumer_input_root"].endswith("held_out_core_experiments\\e9_dual_degradation\\core")
 
 
 @pytest.mark.xfail(reason="scripts/20_run_paper_experiments.py:93 tests target a .bak.py implementation that does not exist in the repo; xfail pending proper paper-run orchestration implementation")
@@ -2006,7 +2006,7 @@ def test_paper_run_full_surface_with_complete_training_evidence_unlocks_full_fai
                 "val_ids": ["sim_line_02"],
             },
             "held_out_runs": [
-                {"experiment_id": "e1_main_table", "output_root": str(output_root / "held_out_core_experiments" / "e1_main_table"), "eval_stage_name": "eval", "scene_sampling_seq_ids": ["sim_line_03"]},
+                {"experiment_id": "e9_dual_degradation", "output_root": str(output_root / "held_out_core_experiments" / "e9_dual_degradation"), "eval_stage_name": "eval", "scene_sampling_seq_ids": ["sim_line_03"]},
                 {"experiment_id": "e2_async", "output_root": str(output_root / "held_out_core_experiments" / "e2_async"), "eval_stage_name": "eval", "scene_sampling_seq_ids": ["sim_line_03"]},
                 {"experiment_id": "e3_nlos", "output_root": str(output_root / "held_out_core_experiments" / "e3_nlos"), "eval_stage_name": "eval", "scene_sampling_seq_ids": ["sim_line_03"]},
                 {"experiment_id": "e9_dual_degradation", "output_root": str(output_root / "held_out_core_experiments" / "e9_dual_degradation"), "eval_stage_name": "eval", "scene_sampling_seq_ids": ["sim_line_03"]},
@@ -2351,14 +2351,14 @@ def test_held_out_core_evaluation_follows_protocol_conclusion_priority_over_sear
     method_metrics = {
         "ekf": {
             "e0_safe_mode": {"p95": 1.00, "ekf_p95": 1.00, "failure_rate": 0.00, "rmse": 0.50, "mae": 0.40},
-            "e1_main_table": {"p95": 0.20, "failure_rate": 0.00, "rmse": 0.30, "mae": 0.20},
+            "e9_dual_degradation": {"p95": 0.20, "failure_rate": 0.00, "rmse": 0.30, "mae": 0.20},
             "e2_async": {"hard_p95": 0.32, "p95": 0.32, "failure_rate": 0.00, "rmse": 0.12, "mae": 0.10},
             "e3_nlos": {"hard_p95": 0.34, "p95": 0.34, "failure_rate": 0.00, "rmse": 0.13, "mae": 0.11},
             "e9_dual_degradation": {"hard_p95": 0.36, "hard_failure_rate": 0.16, "p95": 0.36, "failure_rate": 0.00, "rmse": 0.14, "mae": 0.12},
         },
         "liquid_ekf": {
             "e0_safe_mode": {"p95": 1.00, "ekf_p95": 1.00, "failure_rate": 0.00, "rmse": 0.50, "mae": 0.40},
-            "e1_main_table": {"p95": 0.70, "failure_rate": 0.12, "rmse": 0.20, "mae": 0.18},
+            "e9_dual_degradation": {"p95": 0.70, "failure_rate": 0.12, "rmse": 0.20, "mae": 0.18},
             "e2_async": {"hard_p95": 0.18, "p95": 0.18, "failure_rate": 0.12, "rmse": 0.08, "mae": 0.07},
             "e3_nlos": {"hard_p95": 0.20, "p95": 0.20, "failure_rate": 0.12, "rmse": 0.09, "mae": 0.08},
             "e9_dual_degradation": {"hard_p95": 0.22, "hard_failure_rate": 0.00, "p95": 0.24, "failure_rate": 0.16, "rmse": 0.10, "mae": 0.09},
@@ -3372,7 +3372,7 @@ def test_held_out_seq_generalization_audit_reports_single_seq_limit(tmp_path):
     """报告测试：held out seq generalization audit。\n\n验证 held out seq generalization audit 的报告生成，\n确保审计信息被正确记录。
     """
     script = _load_script()
-    metric_table_path = tmp_path / "held_out" / "e1_main_table" / "eval" / "metrics" / "metric_table.csv"
+    metric_table_path = tmp_path / "held_out" / "e9_dual_degradation" / "eval" / "metrics" / "metric_table.csv"
     metric_table_path.parent.mkdir(parents=True, exist_ok=True)
     metric_table_path.write_text(
         "\n".join(
@@ -3398,7 +3398,7 @@ def test_held_out_seq_generalization_audit_reports_single_seq_limit(tmp_path):
             "held_out_test_ids": ["sim_line_02"],
             "held_out_runs": [
                 {
-                    "experiment_id": "e1_main_table",
+                    "experiment_id": "e9_dual_degradation",
                     "output_root": str(metric_table_path.parents[2]),
                     "scene_sampling_seq_ids": ["sim_line_02"],
                 }
@@ -3417,8 +3417,8 @@ def test_held_out_seq_generalization_audit_reports_single_seq_limit(tmp_path):
 @pytest.mark.xfail(reason="scripts/20_run_paper_experiments.py:93 tests target a .bak.py implementation that does not exist in the repo; xfail pending proper paper-run orchestration implementation")
 def test_unseen_seq_generalization_audit_combines_validation_and_held_out(tmp_path):
     script = _load_script()
-    full_metric_table_path = tmp_path / "core" / "e1_main_table" / "eval" / "metrics" / "metric_table.csv"
-    held_out_metric_table_path = tmp_path / "held_out" / "e1_main_table" / "eval" / "metrics" / "metric_table.csv"
+    full_metric_table_path = tmp_path / "core" / "e9_dual_degradation" / "eval" / "metrics" / "metric_table.csv"
+    held_out_metric_table_path = tmp_path / "held_out" / "e9_dual_degradation" / "eval" / "metrics" / "metric_table.csv"
     full_metric_table_path.parent.mkdir(parents=True, exist_ok=True)
     held_out_metric_table_path.parent.mkdir(parents=True, exist_ok=True)
     header = (
@@ -3475,7 +3475,7 @@ def test_unseen_seq_generalization_audit_combines_validation_and_held_out(tmp_pa
     audit = script._build_unseen_seq_generalization_audit(
         core_runs=[
             {
-                "experiment_id": "e1_main_table",
+                "experiment_id": "e9_dual_degradation",
                 "output_root": str(full_metric_table_path.parents[2]),
                 "scene_sampling_seq_ids": ["sim_line_02", "sim_mirror_01"],
             }
@@ -3484,7 +3484,7 @@ def test_unseen_seq_generalization_audit_combines_validation_and_held_out(tmp_pa
             "held_out_test_ids": ["sim_rotate_01"],
             "held_out_runs": [
                 {
-                    "experiment_id": "e1_main_table",
+                    "experiment_id": "e9_dual_degradation",
                     "output_root": str(held_out_metric_table_path.parents[2]),
                     "scene_sampling_seq_ids": ["sim_rotate_01"],
                 }
@@ -3556,7 +3556,7 @@ def test_evaluation_coverage_audit_distinguishes_core_vs_held_out_axis_execution
 
     audit = script._build_evaluation_coverage_audit(
         core_runs=[
-            {"experiment_id": "e1_main_table"},
+            {"experiment_id": "e9_dual_degradation"},
             {"experiment_id": "e2_async"},
             {"experiment_id": "e3_nlos"},
             {"experiment_id": "e4_visual"},
@@ -3565,7 +3565,7 @@ def test_evaluation_coverage_audit_distinguishes_core_vs_held_out_axis_execution
         held_out_core_evaluation={
             "held_out_test_ids": ["sim_holdout_00", "sim_holdout_01"],
             "held_out_runs": [
-                {"experiment_id": "e1_main_table"},
+                {"experiment_id": "e9_dual_degradation"},
                 {"experiment_id": "e2_async"},
                 {"experiment_id": "e3_nlos"},
                 {"experiment_id": "e9_dual_degradation"},
@@ -3704,14 +3704,14 @@ def test_evaluation_coverage_audit_normalizes_leaderboard_method_names():
     script = _load_script()
 
     audit = script._build_evaluation_coverage_audit(
-        core_runs=[{"experiment_id": "e1_main_table"}],
+        core_runs=[{"experiment_id": "e9_dual_degradation"}],
         held_out_core_evaluation={
             "held_out_test_ids": ["sim_holdout_00"],
             "leaderboard": [
                 {"method_name": " liquid_ekf "},
                 {"method_name": "ekf"},
             ],
-            "held_out_runs": [{"experiment_id": "e1_main_table"}],
+            "held_out_runs": [{"experiment_id": "e9_dual_degradation"}],
         },
         cross_factorial_interactions={"status": "ok", "reason": None},
         requested_public_datasets=[],
@@ -5853,7 +5853,7 @@ def test_paper_run_writes_failed_final_report_when_liquid_neural_search_raises(t
                 "robust_ekf": {"name": "robust_ekf"},
                 "fgo": {"name": "fgo"},
             },
-            "selected_ekf_metrics_by_experiment": {"e1_main_table": {"p95": 1.0}},
+            "selected_ekf_metrics_by_experiment": {"e9_dual_degradation": {"p95": 1.0}},
             "search_audit": {},
         },
     )

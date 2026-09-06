@@ -78,9 +78,11 @@ def _fake_compute_metrics_with_section9_violations(*args, **kwargs):
     本 fake 直接注入违规条目, 让 eval_pipeline 的聚合逻辑被验证.
     """
     return_support = kwargs.get('return_support', False)
-    # 构造最小可用 metric_values (与 test_eval_pipeline.py 同口径)
+    # 构造最小可用 metric_values (与 test_eval_pipeline.py 同口径, 含 mean_rmse/std_rmse)
     metric_values = {
         'rmse': 0.05,
+        'mean_rmse': 0.05,
+        'std_rmse': 0.0,
         'p95': 0.05,
         'failure_rate': 0.0,
         'p99': 0.05,
@@ -242,7 +244,8 @@ def test_section9_pulse_async_no_violations_when_support_report_clean():
     def _fake_clean_compute_metrics(*args, **kwargs):
         return_support = kwargs.get('return_support', False)
         metric_values = {
-            'rmse': 0.05, 'p95': 0.05, 'failure_rate': 0.0,
+            'rmse': 0.05, 'mean_rmse': 0.05, 'std_rmse': 0.0,
+            'p95': 0.05, 'failure_rate': 0.0,
             'p99': 0.05, 'mae': 0.05, 'ate': 0.05, 'rpe': 0.05,
             'yaw_rmse': 0.05, 'yaw_p95': 0.05,
             'risk_error_corr': 0.0, 'coverage': 1.0,

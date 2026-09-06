@@ -25,10 +25,24 @@ def _load_module(script_name: str, alias: str):
     return module
 
 
+def _wrap_build_cfg_with_smoke(module):
+    """Inject smoke_mode=True into pipeline_cfg for smoke tests."""
+    original = module._build_pipeline_cfg
+    def wrapped(project_root, raw_root, output_root):
+        cfg = original(project_root, raw_root, output_root)
+        cfg['smoke_mode'] = True
+        return cfg
+    module._build_pipeline_cfg = wrapped
+
+
 def test_script_smoke(tmp_path):
-    """冒烟测试：script。\n\n快速验证 script 的基本功能可用，\n不深入检查细节，仅确认流程不崩溃。
+    """冒烟测试：script。
+
+    快速验证 script 的基本功能可用，
+    不深入检查细节，仅确认流程不崩溃。
     """
     module = _load_module("03_prepare_ntu_viral_data.py", "prepare_ntu_viral_script")
+    _wrap_build_cfg_with_smoke(module)
     project_root = tmp_path / "project"
     seq_dir = project_root / "data" / "raw" / "ntu_viral" / "mini_seq"
     seq_dir.mkdir(parents=True)

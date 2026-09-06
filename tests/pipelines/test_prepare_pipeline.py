@@ -35,6 +35,7 @@ def test_normal_case(tmp_path):
         'seq_ids': ['mini_seq'],
         'field_mapping': field_mapping,
         'output_root': tmp_path / 'prepare',
+        'smoke_mode': True,
     })
     assert result.stage_name == 'prepare_pipeline'
     assert any(path.endswith('mini_seq_events.pkl.gz') for path in result.artifacts)
@@ -59,6 +60,7 @@ def test_output_root_is_anchored_to_project_root_from_relative_cwd(monkeypatch, 
         'field_mapping': field_mapping,
         'project_root': project_root,
         'output_root': output_root,
+        'smoke_mode': True,
     })
 
     expected_root = project_root / output_root
@@ -80,6 +82,7 @@ def test_manifest_is_limited_to_selected_sequences(tmp_path):
         'seq_ids': ['mini_seq'],
         'field_mapping': field_mapping,
         'output_root': tmp_path / 'prepare',
+        'smoke_mode': True,
     })
     assert result.metadata['dataset_manifest']['sequence_count'] == 1
     assert [record['seq_id'] for record in result.metadata['dataset_manifest']['sequences']] == ['mini_seq']
@@ -123,6 +126,7 @@ def test_util_prepare_requires_flow_and_tof(tmp_path, monkeypatch):
             'seq_ids': ['util_seq'],
             'field_mapping': field_mapping,
             'output_root': tmp_path / 'prepare_util',
+            'smoke_mode': True,
         })
     except ValueError as exc:
         assert 'tof_raw' in str(exc)
@@ -204,6 +208,7 @@ def test_prepare_manifest_keeps_scene_parameters_for_whitespace_padded_scene_id(
         'seq_ids': ['mini_seq'],
         'scene_id': ' S(A0,N0,V0,K1) ',
         'output_root': tmp_path / 'prepare_sim',
+        'smoke_mode': True,
     })
 
     seq_payload = result.metadata['sequences']['mini_seq']
@@ -230,7 +235,7 @@ def test_invalid_case(tmp_path, monkeypatch):
         lambda raw_root: None,
     )
     try:
-        run({'dataset_name': 'sim', 'raw_root': tmp_path, 'seq_ids': ['mini_seq']})
+        run({'dataset_name': 'sim', 'raw_root': tmp_path, 'seq_ids': ['mini_seq'], 'smoke_mode': True})
     except ValueError as exc:
         assert 'scene_id' in str(exc)
     else:

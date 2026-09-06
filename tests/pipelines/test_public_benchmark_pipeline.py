@@ -460,11 +460,11 @@ def test_relative_registry_and_protocol_paths_are_project_root_anchored(tmp_path
     def _load_protocol(path=None):
         captured['protocol_path'] = path
         return {
-            'protocol_version': 2,
+            'protocol_version': 27,
             'quick_full_rule': 'quick_smoke_scale__full_real_execution_required',
             'failure_sample_policy': 'retain_and_audit',
             'aggregation_order': ['single_run', 'repeat_summary', 'scene_summary', 'experiment_conclusion'],
-            'conclusion_priority': ['rmse', 'p95', 'failure_rate', 'mae'],
+            'conclusion_priority': ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'mae'],
             'public_benchmark': {
                 'allowed_datasets': ['miluv', 'ntu_viral'],
                 'frozen_eval_split': 'frozen_public_eval',

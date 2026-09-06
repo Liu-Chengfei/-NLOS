@@ -33,7 +33,8 @@ def test_normal_case():
 
     result = compute_trajectory_metrics(pred_traj, gt_traj)
 
-    assert set(result) == {"rmse", "mae", "ate", "ate_degraded", "rpe"}
+    # 实现额外返回 rmse_raw/mae_raw/align_degraded 作为诊断输出（文档化的辅助键）
+    assert set(result).issuperset({"rmse", "mae", "ate", "ate_degraded", "rpe"})
     assert result["rmse"] == pytest.approx(math.sqrt((0.0**2 + 2.0**2 + 4.0**2) / 3.0))
     assert result["mae"] == pytest.approx(2.0)
     # ATE 现在做 SE3 对齐，消除全局坐标系偏移后计算 RMSE。

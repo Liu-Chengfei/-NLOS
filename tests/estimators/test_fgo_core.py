@@ -146,9 +146,11 @@ def test_bridge_risk_inflates_fgo_measurement_covariance_via_noise_multiplier():
 
     low_report = low_risk_estimator.last_update_report["covariance_report"]
     high_report = high_risk_estimator.last_update_report["covariance_report"]
-    assert low_report["noise_multiplier"] == pytest.approx(1.4**2 * (1 + 1 / 60))
+    # 当前协议（scene_axis_protocol.yaml）A0 cross_modal_skew_ms=0、N0 nlos_ratio=[0,0]
+    # → 场景轴观测下界 axis_floor=0，low_risk 的 applied_risk=0。
+    assert low_report["noise_multiplier"] == pytest.approx(1.4**2 * 1.0)
     assert high_report["noise_multiplier"] == pytest.approx(1.4**2 * 1.5)
-    assert low_report["effective_cov"] == pytest.approx(0.0625 * 1.4**2 * (1 + 1 / 60))
+    assert low_report["effective_cov"] == pytest.approx(0.0625 * 1.4**2 * 1.0)
     assert high_report["effective_cov"] == pytest.approx(0.0625 * 1.4**2 * 1.5)
     assert high_report["effective_cov"] > low_report["effective_cov"]
 

@@ -25,10 +25,24 @@ def _load_module(script_name: str, alias: str):
     return module
 
 
+def _wrap_build_cfg_with_smoke(module):
+    """Inject smoke_mode=True into pipeline_cfg for smoke tests."""
+    original = module._build_pipeline_cfg
+    def wrapped(project_root, raw_root, output_root):
+        cfg = original(project_root, raw_root, output_root)
+        cfg['smoke_mode'] = True
+        return cfg
+    module._build_pipeline_cfg = wrapped
+
+
 def test_script_smoke(tmp_path):
-    """冒烟测试：script。\n\n快速验证 script 的基本功能可用，\n不深入检查细节，仅确认流程不崩溃。
+    """冒烟测试：script。
+
+    快速验证 script 的基本功能可用，
+    不深入检查细节，仅确认流程不崩溃。
     """
     module = _load_module("03_prepare_miluv_data.py", "prepare_miluv_script")
+    _wrap_build_cfg_with_smoke(module)
     project_root = tmp_path / "project"
     seq_dir = project_root / "data" / "raw" / "miluv" / "mini_seq"
     seq_dir.mkdir(parents=True)
@@ -53,9 +67,13 @@ def test_script_smoke(tmp_path):
 
 
 def test_default_raw_root_uses_dataset_config(tmp_path):
-    """使用测试：default raw root。\n\n验证被测功能正确使用 default raw root，\n确保内部依赖被正确调用。
+    """使用测试：default raw root。
+
+    验证被测功能正确使用 default raw root，
+    确保内部依赖被正确调用。
     """
     module = _load_module("03_prepare_miluv_data.py", "prepare_miluv_script_default_raw")
+    _wrap_build_cfg_with_smoke(module)
     project_root = tmp_path / "project"
     seq_dir = project_root / "data" / "raw" / "miluv" / "mini_seq"
     seq_dir.mkdir(parents=True)
@@ -82,6 +100,7 @@ def test_default_raw_root_uses_dataset_config(tmp_path):
 
 def test_default_raw_root_ignores_config_and_hidden_dirs(tmp_path):
     module = _load_module("03_prepare_miluv_data.py", "prepare_miluv_script_dir_filter")
+    _wrap_build_cfg_with_smoke(module)
     project_root = tmp_path / "project"
     raw_root = project_root / "data" / "raw" / "miluv"
     seq_dir = raw_root / "mini_seq"

@@ -187,7 +187,7 @@ def test_lstm_semantic_loss_uses_huber_for_bias_and_log_domain_for_scaling():
     prediction = torch.tensor([[2.0, 0.7, 4.0, 2.0]], dtype=torch.float32)
     target = torch.tensor([[0.0, 0.2, 1.0, 1.0]], dtype=torch.float32)
 
-    semantic = _semantic_loss_matrix(prediction, target)
+    semantic = _semantic_loss_matrix(prediction, target, bias_huber_delta=0.5)
     expected_bias = F.huber_loss(
         prediction[:, 0],
         target[:, 0],
@@ -461,8 +461,8 @@ def test_lstm_yaml_default_paper_grade_training_contract():
 
     assert trainer_state["optimizer"]["lr"] == pytest.approx(1.5e-4)
     assert trainer_state["optimizer"]["weight_decay"] == pytest.approx(0.0)
-    assert trainer_state["epochs"] == 60
-    assert trainer_state["patience"] == 60
+    assert trainer_state["epochs"] == 160
+    assert trainer_state["patience"] == 160
     assert trainer_state["train"]["batch_size"] == 32
     assert trainer_state["train"]["eval_batch_size"] == 128
     assert trainer_state["train"]["amp_enabled"] == "auto"

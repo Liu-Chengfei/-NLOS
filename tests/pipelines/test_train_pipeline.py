@@ -85,7 +85,7 @@ def _lstm_model_cfg():
     return {
         'name': 'lstm_ekf',
         'feature_order': list(_FEATURE_ORDER),
-        'window': {'size': 20, 'step': 1},
+        'window': {'size': 20, 'step': 1, 'warmup_s': 0.0, 'allow_smoke_window': True},  # P29/P31 smoke 旁路: 单元 fixture 微型, 显式声明偏离 128 硬门
         'network': {'input_dim': 13, 'hidden_dim': 64, 'output_heads': ['bias', 'risk', 'uwb_scaling', 'vio_scaling']},
         'train': {'optimizer': 'adam', 'lr': 0.001},
     }
@@ -95,7 +95,7 @@ def _liquid_model_cfg():
     return {
         'name': 'liquid_ekf',
         'feature_order': list(_FEATURE_ORDER),
-        'window': {'size': 20, 'step': 1},
+        'window': {'size': 20, 'step': 1, 'warmup_s': 0.0, 'allow_smoke_window': True},  # P29/P31 smoke 旁路: 单元 fixture 微型, 显式声明偏离 128 硬门
         'network': {'input_dim': 13, 'hidden_dim': 64, 'output_heads': ['bias', 'risk', 'uwb_scaling', 'vio_scaling']},
         'train': {'optimizer': 'adam', 'lr': 0.001},
     }
@@ -104,38 +104,19 @@ def _liquid_model_cfg():
 def test_resolve_alignment_risk_scales_uses_protocol_default_failure_threshold(monkeypatch):
     """使用测试：resolve alignment risk scales。\n\n验证被测功能正确使用 resolve alignment risk scales，\n确保内部依赖被正确调用。
     """
-    _resolve_alignment_risk_scales.cache_clear()
+    monkeypatch.delenv('LIQUIDLOC_ALIGNMENT_POSE_FULL_SCALE_M', raising=False)
+    # v3.1：_resolve_alignment_risk_scales 自身不再 lru_cache，缓存下沉到协议层
+    # _load_default_experiment_protocol_cached；monkeypatch 目标随之迁移。
+    # 用 2.5 作区分值，证明 pose 满量程确实来自协议 evaluation.default_failure_threshold_m。
     monkeypatch.setattr(
-        'liquidloc.pipelines.train_pipeline.load_experiment_protocol',
-        lambda: {
-            'protocol_version': 1,
-            'quick_full_rule': 'quick_smoke_scale__full_real_execution_required',
-            'failure_sample_policy': 'retain_and_audit',
-            'aggregation_order': ['single_run', 'repeat_summary', 'scene_summary', 'experiment_conclusion'],
-            'conclusion_priority': ['rmse', 'p95', 'failure_rate', 'mae'],
-            'public_benchmark': {
-                'allowed_datasets': ['miluv', 'ntu_viral'],
-                'frozen_eval_split': 'frozen_public_eval',
-                'tuning_forbidden': True,
-                'shared_split_required': True,
-            },
-            'training': {
-                'allowed_split_roles': ['train', 'val'],
-                'forbidden_split_roles': ['test', 'external', 'frozen_public_eval'],
-            },
-            'evaluation': {
-                'require_prediction_bundles': True,
-                'default_failure_threshold_m': 1.0,
-                'require_ground_truth_unless_smoke': True,
-            },
-        },
+        'liquidloc.protocol.experiment_gates._load_default_experiment_protocol_cached',
+        lambda: {'evaluation': {'default_failure_threshold_m': 2.5}},
     )
 
     pose_scale_m, yaw_scale = _resolve_alignment_risk_scales()
 
-    assert pose_scale_m == pytest.approx(1.0)
+    assert pose_scale_m == pytest.approx(2.5)
     assert yaw_scale == pytest.approx(math.pi)
-    _resolve_alignment_risk_scales.cache_clear()
 
 
 def _miluv_field_mapping():
@@ -148,6 +129,8 @@ def _miluv_field_mapping():
             'dy': 'dy',
             'dyaw': 'dyaw',
             'quality': 'quality',
+            'frame_valid': 'frame_valid',  # P26 6 字段契约
+            'scaling': 'scaling',
             'tracked_features': 'tracked_features',
             'reproj_err': 'reproj_err',
         },
@@ -187,7 +170,7 @@ def _temporal_reliability_training_inputs():
             't': 0.0,
             'dt': 0.0,
             'modality': 'imu',
-            'meta': {'scene_id': 'S(A3,N3,V2,K0,M0)', 'seq_id': 'temporal_seq'},
+            'meta': {'scene_id': 'S(A3,N3,V2,K3,M0)', 'seq_id': 'temporal_seq'},
             'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0},
             'uwb_payload': None,
             'vio_payload': None,
@@ -196,7 +179,7 @@ def _temporal_reliability_training_inputs():
             't': 0.1,
             'dt': 0.1,
             'modality': 'uwb',
-            'meta': {'scene_id': 'S(A3,N3,V2,K0,M0)', 'seq_id': 'temporal_seq'},
+            'meta': {'scene_id': 'S(A3,N3,V2,K3,M0)', 'seq_id': 'temporal_seq'},
             'imu_payload': None,
             'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 0.6},
             'vio_payload': None,
@@ -205,7 +188,7 @@ def _temporal_reliability_training_inputs():
             't': 0.2,
             'dt': 0.1,
             'modality': 'imu',
-            'meta': {'scene_id': 'S(A3,N3,V2,K0,M0)', 'seq_id': 'temporal_seq'},
+            'meta': {'scene_id': 'S(A3,N3,V2,K3,M0)', 'seq_id': 'temporal_seq'},
             'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0},
             'uwb_payload': None,
             'vio_payload': None,
@@ -214,7 +197,7 @@ def _temporal_reliability_training_inputs():
             't': 0.4,
             'dt': 0.2,
             'modality': 'uwb',
-            'meta': {'scene_id': 'S(A3,N3,V2,K0,M0)', 'seq_id': 'temporal_seq'},
+            'meta': {'scene_id': 'S(A3,N3,V2,K3,M0)', 'seq_id': 'temporal_seq'},
             'imu_payload': None,
             'uwb_payload': {'anchor_id': 1, 'range': 2.2, 'valid': False, 'quality': 0.2},
             'vio_payload': None,
@@ -223,19 +206,19 @@ def _temporal_reliability_training_inputs():
             't': 0.5,
             'dt': 0.1,
             'modality': 'vio',
-            'meta': {'scene_id': 'S(A3,N3,V2,K0,M0)', 'seq_id': 'temporal_seq'},
+            'meta': {'scene_id': 'S(A3,N3,V2,K3,M0)', 'seq_id': 'temporal_seq'},
             'imu_payload': None,
             'uwb_payload': None,
-            'vio_payload': {'dx': 0.2, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.8, 'tracked_features': 40, 'reproj_err': 0.8},
+            'vio_payload': {'dx': 0.2, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.8, 'frame_valid': 1, 'scaling': 1.0},
         },
         {
             't': 0.8,
             'dt': 0.3,
             'modality': 'vio',
-            'meta': {'scene_id': 'S(A3,N3,V2,K0,M0)', 'seq_id': 'temporal_seq'},
+            'meta': {'scene_id': 'S(A3,N3,V2,K3,M0)', 'seq_id': 'temporal_seq'},
             'imu_payload': None,
             'uwb_payload': None,
-            'vio_payload': {'dx': 0.1, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.7, 'tracked_features': 20, 'reproj_err': 1.4},
+            'vio_payload': {'dx': 0.1, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.7, 'frame_valid': 1, 'scaling': 1.0},
         },
     ]
     gt_rows = [
@@ -319,7 +302,11 @@ def test_normal_case(tmp_path):
     assert result.metadata['train_report']['mode'] == 'quick'
     assert result.metadata['train_report']['closure_note']['scope'] == 'smoke-scale run label only'
     assert result.metadata['checkpoint_smoke']['status'] == 'ok'
-    assert result.metadata['protocol_gate'] == {
+    protocol_gate = dict(result.metadata['protocol_gate'])
+    # P39 持久化字段 (git commit/config hash) 为动态值, 单独断言存在性后再比较静态合同
+    assert protocol_gate.pop('p39_git_commit', None)
+    assert protocol_gate.pop('p39_config_hash', None)
+    assert protocol_gate == {
         'split_role': 'train',
         'num_split_ids': 2,
         'failure_sample_policy': 'retain_and_audit',
@@ -455,7 +442,11 @@ def test_liquid_real_smoke(tmp_path):
 
     assert result.stage_name == 'train_pipeline'
     assert result.metadata['checkpoint_smoke']['status'] == 'ok'
-    assert result.metadata['protocol_gate'] == {
+    protocol_gate = dict(result.metadata['protocol_gate'])
+    # P39 持久化字段 (git commit/config hash) 为动态值, 单独断言存在性后再比较静态合同
+    assert protocol_gate.pop('p39_git_commit', None)
+    assert protocol_gate.pop('p39_config_hash', None)
+    assert protocol_gate == {
         'split_role': 'train',
         'num_split_ids': 2,
         'failure_sample_policy': 'retain_and_audit',
@@ -1943,7 +1934,7 @@ def test_target_intermediate_uses_scene_axis_async_floor_even_without_gap_featur
         event={
             'modality': 'vio',
             'dt': 0.0,
-            'meta': {'scene_id': 'S(A3,N0,V0,K0,M0)', 'seq_id': 'axis_async_only'},
+            'meta': {'scene_id': 'S(A3,N0,V0,K3,M0)', 'seq_id': 'axis_async_only'},
             'vio_payload': {'quality': 1.0, 'tracked_features': 80, 'reproj_err': 0.1},
         },
         prediction_state={'px': 0.0, 'py': 0.0, 'yaw': 0.0},
@@ -1969,7 +1960,7 @@ def test_visual_degradation_inflates_vio_training_scaling_and_observation_risk_w
         't': 0.0,
         'dt': 0.0,
         'modality': 'vio',
-        'meta': {'scene_id': 'S(A1,N0,V0,K0,M0)', 'seq_id': 'visual_link'},
+        'meta': {'scene_id': 'S(A1,N0,V0,K3,M0)', 'seq_id': 'visual_link'},
         'imu_payload': None,
         'uwb_payload': None,
         'vio_payload': {
@@ -1977,6 +1968,8 @@ def test_visual_degradation_inflates_vio_training_scaling_and_observation_risk_w
             'dy': -0.2,
             'dyaw': 0.1,
             'quality': 0.9,
+            'frame_valid': 1,
+            'scaling': 1.0,
             'tracked_features': 150,
             'reproj_err': 0.4,
         },
@@ -2042,7 +2035,7 @@ def test_target_intermediate_uses_scene_axis_visual_floor_without_payload_degrad
         event={
             'modality': 'vio',
             'dt': 0.0,
-            'meta': {'scene_id': 'S(A0,N0,V3,K0,M0)', 'seq_id': 'axis_visual_only'},
+            'meta': {'scene_id': 'S(A0,N0,V3,K3,M0)', 'seq_id': 'axis_visual_only'},
             'vio_payload': {'quality': 1.0, 'tracked_features': 100, 'reproj_err': 0.2},
         },
         prediction_state={'px': 0.0, 'py': 0.0, 'yaw': 0.0},
@@ -2056,7 +2049,9 @@ def test_target_intermediate_uses_scene_axis_visual_floor_without_payload_degrad
     assert target_trace['axis_observation_floor'] == pytest.approx(target_trace['visual_axis_risk'])
     assert target_trace['observation_risk'] == pytest.approx(target_trace['visual_axis_risk'])
     assert target_intermediate['risk'] == pytest.approx(target_trace['alignment_risk'])
-    assert target_intermediate['vio_scaling'] > 1.0
+    # V 轴退化下界只进 observation_risk 链路（上方断言已覆盖）；
+    # scaling 标签只由 payload 质量/对齐/异步风险驱动，payload 完美时保持中性 1.0。
+    assert target_intermediate['vio_scaling'] == pytest.approx(1.0)
 
 
 def test_target_intermediate_keeps_async_and_geometry_risk_outside_base_risk():
@@ -2121,7 +2116,9 @@ def test_target_intermediate_uses_scene_axis_nlos_floor_without_event_level_qual
     assert target_trace['axis_observation_floor'] == pytest.approx(target_trace['nlos_axis_risk'])
     assert target_trace['observation_risk'] == pytest.approx(target_trace['nlos_axis_risk'])
     assert target_intermediate['risk'] == pytest.approx(target_trace['alignment_risk'])
-    assert target_intermediate['uwb_scaling'] > 1.0
+    # N 轴退化下界只进 observation_risk 链路（上方断言已覆盖）；
+    # scaling 标签只由 payload 质量/对齐/几何/异步风险驱动，payload 完美时保持中性 1.0。
+    assert target_intermediate['uwb_scaling'] == pytest.approx(1.0)
 
 
 def test_scene_code_fallback_ignores_blank_scene_id_shadow():
@@ -2136,7 +2133,9 @@ def test_scene_code_fallback_ignores_blank_scene_id_shadow():
     }
 
     assert _decode_event_scene_spec(event) is not None
-    assert _resolve_scene_axis_risk_floor(event)['async_axis_risk'] > 0.0
+    # S(A0,...) 协议定义 cross_modal_skew_ms=0 → async 轴风险下界为 0（scene_axis_protocol.yaml）；
+    # 本测试验证空白 scene_id 不遮蔽合法 scene_code（decode 成功、地板按协议取 0、场景判为 normal）。
+    assert _resolve_scene_axis_risk_floor(event)['async_axis_risk'] == pytest.approx(0.0)
     assert _is_normal_scene_for_training(event) is True
 
 
@@ -2197,7 +2196,7 @@ def test_liquid_samples_use_pre_update_state_for_current_step_geometry_features(
             't': 0.0,
             'dt': 0.0,
             'modality': 'uwb',
-            'meta': {'scene_id': 'S(A1,N0,V0,K0,M0)', 'seq_id': 'causal_seq'},
+            'meta': {'scene_id': 'S(A1,N0,V0,K1,M0)', 'seq_id': 'causal_seq'},
             'imu_payload': None,
             'uwb_payload': {'anchor_id': 0, 'range': 10.0, 'valid': True, 'quality': 1.0},
             'vio_payload': None,
@@ -2206,7 +2205,7 @@ def test_liquid_samples_use_pre_update_state_for_current_step_geometry_features(
             't': 1.0,
             'dt': 1.0,
             'modality': 'uwb',
-            'meta': {'scene_id': 'S(A1,N0,V0,K0,M0)', 'seq_id': 'causal_seq'},
+            'meta': {'scene_id': 'S(A1,N0,V0,K1,M0)', 'seq_id': 'causal_seq'},
             'imu_payload': None,
             'uwb_payload': {'anchor_id': 0, 'range': 8.0, 'valid': True, 'quality': 1.0},
             'vio_payload': None,
@@ -2231,17 +2230,20 @@ def test_liquid_samples_use_pre_update_state_for_current_step_geometry_features(
             'ground_truth_by_seq_id': {'causal_seq': gt_rows},
         },
         {
-            'feature_order': ['anchor_dx', 'anchor_dy', 'uwb_range_residual', 'px', 'py'],
-            'window': {'size': 4, 'step': 1},
+            # P11: anchor_dx/anchor_dy/uwb_range_residual 属几何泄漏禁入特征;
+            # pre-update 语义改用状态派生字段 px/py 验证 (两步 pre-update 状态均为原点)。
+            'feature_order': ['px', 'py'],
+            'window': {'size': 4, 'step': 1, 'warmup_s': 0.0, 'allow_smoke_window': True},  # P29/P31 smoke 旁路: 单元 fixture 微型, 显式声明偏离 128 硬门
         },
         estimator_cfg,
     )
 
     assert sample_report['usable_sample_count'] == 2
-    assert samples[0]['window_tensor']['feature_values'] == pytest.approx([10.0, 0.0, 0.0, 0.0, 0.0])
-    assert samples[1]['window_tensor']['feature_values'] == pytest.approx([10.0, 0.0, -2.0, 0.0, 0.0])
-    assert samples[1]['window_tensor']['missing_mask'] == [0, 0, 0, 0, 0]
-    assert samples[1]['target_trace']['prediction_state'] == pytest.approx({'px': 0.0, 'py': 0.0, 'yaw': 0.0})
+    assert samples[0]['window_tensor']['feature_values'] == pytest.approx([0.0, 0.0])
+    assert samples[1]['window_tensor']['feature_values'] == pytest.approx([0.0, 0.0])
+    assert samples[1]['window_tensor']['missing_mask'].tolist() == [0, 0]
+    # 样本级 target_trace 已瘦身为 5 键 (alignment_risk/observation_risk/quality_risk/
+    # modality_signal/current_modality_gap_dt); pre-update 状态语义已由上方 px/py 特征值覆盖。
     assert samples[1]['target_trace']['alignment_risk'] == pytest.approx(1.0)
 
 
@@ -2253,7 +2255,7 @@ def test_liquid_samples_exclude_gt_outside_events_from_history_context():
             't': 0.0,
             'dt': 0.0,
             'modality': 'uwb',
-            'meta': {'scene_id': 'S(A1,N0,V0,K0,M0)', 'seq_id': 'gt_span_seq'},
+            'meta': {'scene_id': 'S(A1,N0,V0,K1,M0)', 'seq_id': 'gt_span_seq'},
             'imu_payload': None,
             'uwb_payload': {'anchor_id': 0, 'range': 10.0, 'valid': True, 'quality': 1.0},
             'vio_payload': None,
@@ -2262,7 +2264,7 @@ def test_liquid_samples_exclude_gt_outside_events_from_history_context():
             't': 1.0,
             'dt': 1.0,
             'modality': 'uwb',
-            'meta': {'scene_id': 'S(A1,N0,V0,K0,M0)', 'seq_id': 'gt_span_seq'},
+            'meta': {'scene_id': 'S(A1,N0,V0,K1,M0)', 'seq_id': 'gt_span_seq'},
             'imu_payload': None,
             'uwb_payload': {'anchor_id': 0, 'range': 8.0, 'valid': True, 'quality': 1.0},
             'vio_payload': None,
@@ -2286,8 +2288,9 @@ def test_liquid_samples_exclude_gt_outside_events_from_history_context():
             'ground_truth_by_seq_id': {'gt_span_seq': gt_rows},
         },
         {
-            'feature_order': ['modality_gap_dt', 'anchor_dx', 'uwb_range_residual', 'px'],
-            'window': {'size': 4, 'step': 1},
+            # P11: anchor_dx/uwb_range_residual 禁入特征, 改用状态派生字段 px。
+            'feature_order': ['modality_gap_dt', 'px'],
+            'window': {'size': 4, 'step': 1, 'warmup_s': 0.0, 'allow_smoke_window': True},  # P29/P31 smoke 旁路: 单元 fixture 微型, 显式声明偏离 128 硬门
         },
         estimator_cfg,
     )
@@ -2297,8 +2300,8 @@ def test_liquid_samples_exclude_gt_outside_events_from_history_context():
     assert len(samples) == 1
     assert samples[0]['window_tensor']['event_time_window'] == pytest.approx([1.0])
     assert samples[0]['window_tensor']['window_index_map'] == [0]
-    assert samples[0]['window_tensor']['feature_values'] == pytest.approx([0.0, 10.0, -2.0, 0.0])
-    assert samples[0]['window_tensor']['missing_mask'] == [0, 0, 0, 0]
+    assert samples[0]['window_tensor']['feature_values'] == pytest.approx([0.0, 0.0])
+    assert samples[0]['window_tensor']['missing_mask'].tolist() == [0, 0]
 
 
 def test_liquid_samples_materialize_temporal_reliability_context():
@@ -2317,7 +2320,7 @@ def test_liquid_samples_materialize_temporal_reliability_context():
             # 铁律 3: VIO 紧耦合不再输出 reproj_err / tracked_features，
             # 因此 feature_order 不再包含 vio_reproj_err_slope / tracked_features_drop
             'feature_order': ['modality_gap_dt', 'uwb_quality_min', 'uwb_invalid_rate'],
-            'window': {'size': 8, 'step': 1},
+            'window': {'size': 8, 'step': 1, 'warmup_s': 0.0, 'allow_smoke_window': True},  # P29/P31 smoke 旁路: 单元 fixture 微型, 显式声明偏离 128 硬门
         },
         dict(_load_default_ekf_cfg()),
     )
@@ -2325,7 +2328,7 @@ def test_liquid_samples_materialize_temporal_reliability_context():
     assert sample_report['usable_sample_count'] == 4
     final_vio_sample = next(sample for sample in reversed(samples) if sample['modality'] == 'vio')
     assert final_vio_sample['window_tensor']['feature_values'] == pytest.approx([0.3, 0.2, 0.5])
-    assert final_vio_sample['window_tensor']['missing_mask'] == [0, 0, 0]
+    assert final_vio_sample['window_tensor']['missing_mask'].tolist() == [0, 0, 0]
     assert final_vio_sample['window_tensor']['event_time_window'] == pytest.approx([0.1, 0.2, 0.4, 0.5, 0.8])
 
 
@@ -2343,7 +2346,7 @@ def test_liquid_samples_materialize_training_readout_context_from_proxy_estimato
         },
         {
             'feature_order': ['modality_gap_dt', 'uwb_quality_min', 'uwb_invalid_rate', 'vio_reproj_err_slope', 'tracked_features_drop'],
-            'window': {'size': 8, 'step': 1},
+            'window': {'size': 8, 'step': 1, 'warmup_s': 0.0, 'allow_smoke_window': True},  # P29/P31 smoke 旁路: 单元 fixture 微型, 显式声明偏离 128 硬门
         },
         dict(_load_default_ekf_cfg()),
     )
@@ -2461,8 +2464,10 @@ def test_training_feature_window_builder_reconstructs_anchor_lookup_from_estimat
 
     window_builder = _build_feature_window_builder(
         {
-            'feature_order': ['anchor_dx', 'anchor_dy', 'uwb_range_residual'],
-            'window': {'size': 4, 'step': 1},
+            # P11: anchor 几何字段禁入特征; 本测试改验证 range + 状态字段,
+            # estimator cfg 锚点查找重建经由 estimator._anchor_lookup 断言覆盖。
+            'feature_order': ['range', 'px', 'py'],
+            'window': {'size': 4, 'step': 1, 'warmup_s': 0.0, 'allow_smoke_window': True},  # P29/P31 smoke 旁路: 单元 fixture 微型, 显式声明偏离 128 硬门
         },
         estimator,
     )
@@ -2471,7 +2476,7 @@ def test_training_feature_window_builder_reconstructs_anchor_lookup_from_estimat
         't': 0.0,
         'dt': 0.0,
         'modality': 'uwb',
-        'meta': {'scene_id': 'S(A1,N0,V0,K0,M0)', 'seq_id': 'cfg_only_seq'},
+        'meta': {'scene_id': 'S(A1,N0,V0,K1,M0)', 'seq_id': 'cfg_only_seq'},
         'imu_payload': None,
         'uwb_payload': {'anchor_id': 0, 'range': 10.0, 'valid': True, 'quality': 1.0},
         'vio_payload': None,
@@ -2483,7 +2488,7 @@ def test_training_feature_window_builder_reconstructs_anchor_lookup_from_estimat
     )
 
     assert window_tensor['feature_values'] == pytest.approx([10.0, 0.0, 0.0])
-    assert window_tensor['missing_mask'] == [0, 0, 0]
+    assert window_tensor['missing_mask'].tolist() == [0, 0, 0]
 
 
 def test_liquid_samples_missing_anchor_layout_uses_fallback_teacher_and_skips_uwb_updates():
@@ -2528,8 +2533,8 @@ def test_liquid_samples_missing_anchor_layout_uses_fallback_teacher_and_skips_uw
 
     uwb_samples = [sample for sample in samples if sample['modality'] == 'uwb']
     assert len(uwb_samples) == 2
-    assert all(sample['target_trace']['geometry_bias_teacher'] == 'unavailable_missing_anchor_layout' for sample in uwb_samples)
-    assert all(sample['target_trace']['bias_source'] == 'neutral_baseline' for sample in uwb_samples)
+    # 样本级 target_trace 已瘦身为 5 键; geometry_bias_teacher / bias_source 语义
+    # 已上移到 seq report 级 (上方 geometry_bias_teacher / bias_source_counts 断言)。
 
 
 def test_liquid_samples_teacher_quality_audit_marks_projection_required_but_unavailable():
@@ -2653,11 +2658,11 @@ def test_liquid_and_lstm_share_same_training_sample_contract_before_model_specif
         assert liquid_window['current_modality'] == lstm_window['current_modality']
         assert liquid_window['window_index_map'] == lstm_window['window_index_map']
         assert liquid_window['feature_values'] == pytest.approx(lstm_window['feature_values'])
-        assert liquid_window['missing_mask'] == lstm_window['missing_mask']
+        assert liquid_window['missing_mask'].tolist() == lstm_window['missing_mask'].tolist()
         assert len(liquid_window['feature_window']) == len(lstm_window['feature_window'])
         for liquid_row, lstm_row in zip(liquid_window['feature_window'], lstm_window['feature_window'], strict=True):
             assert liquid_row == pytest.approx(lstm_row)
-        assert liquid_window['missing_mask_window'] == lstm_window['missing_mask_window']
+        assert liquid_window['missing_mask_window'].tolist() == lstm_window['missing_mask_window'].tolist()
         assert liquid_window['event_time_window'] == pytest.approx(lstm_window['event_time_window'])
         assert liquid_window['readout_context_by_name'] == pytest.approx(lstm_window['readout_context_by_name'])
         assert liquid_window['readout_context_observed_by_name'] == lstm_window['readout_context_observed_by_name']
@@ -2687,11 +2692,12 @@ def test_liquid_and_lstm_pipeline_pass_identical_pretrainer_windows(tmp_path, mo
                         'feature_order': list(window['feature_order']),
                         'current_modality': window['current_modality'],
                         'window_index_map': list(window.get('window_index_map') or []),
-                        'feature_values': list(window['feature_values']),
-                        'missing_mask': list(window['missing_mask']),
-                        'feature_window': [list(row) for row in window['feature_window']],
-                        'missing_mask_window': [list(row) for row in window['missing_mask_window']],
-                        'event_time_window': list(window.get('event_time_window') or []),
+                        # 张量字段用 .tolist() 快照: `x or []`/list(张量) 会触发布尔真值或残留下标张量
+                        'feature_values': window['feature_values'].tolist() if window.get('feature_values') is not None else [],
+                        'missing_mask': window['missing_mask'].tolist() if window.get('missing_mask') is not None else [],
+                        'feature_window': window['feature_window'].tolist() if window.get('feature_window') is not None else [],
+                        'missing_mask_window': window['missing_mask_window'].tolist() if window.get('missing_mask_window') is not None else [],
+                        'event_time_window': window['event_time_window'].tolist() if window.get('event_time_window') is not None else [],
                         'readout_context_by_name': dict(window.get('readout_context_by_name') or {}),
                         'readout_context_observed_by_name': dict(window.get('readout_context_observed_by_name') or {}),
                     },
@@ -2797,10 +2803,11 @@ def test_split_train_and_val_samples_uses_distinct_seq_ids():
         split_ids=['seq_a', 'seq_b', 'seq_c'],
     )
 
-    assert train_ids == ['seq_a', 'seq_b']
-    assert val_ids == ['seq_c']
-    assert {sample['seq_id'] for sample in train_samples} == {'seq_a', 'seq_b'}
-    assert {sample['seq_id'] for sample in val_samples} == {'seq_c'}
+    # 手册 P33 硬约束: 每 seed 隐式切分取最后 2 条序列做 val (val_sequences_per_seed=2)。
+    assert train_ids == ['seq_a']
+    assert val_ids == ['seq_b', 'seq_c']
+    assert {sample['seq_id'] for sample in train_samples} == {'seq_a'}
+    assert {sample['seq_id'] for sample in val_samples} == {'seq_b', 'seq_c'}
 
 
 def test_run_direct_inputs_uses_top_level_events_fallback_for_single_split_id(tmp_path):
@@ -2942,7 +2949,7 @@ def test_quick_g_axis_remaps_uwb_range_without_dropping_residual():
         },
     )
     protocol = load_scene_axis_protocol()
-    anchor_layout, _ = build_anchor_layout(6, 'K3', protocol['axes']['K'])  # 五轴档位协议：G 已并入 K，K3=差几何 4 锚场景。
+    anchor_layout, _ = build_anchor_layout(6, 'K3', protocol['axes']['K'])
     uwb_event = next(event for event in events if event['modality'] == 'uwb')
     original_range = float(uwb_event['uwb_payload']['range'])
     gt_row, _ = _align_ground_truth(gt_rows, float(uwb_event['t']))

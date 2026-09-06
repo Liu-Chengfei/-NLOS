@@ -18,38 +18,52 @@ from liquidloc.protocol.risk_projection import project_risk_to_protocol_range
 
 
 # ---------------------------------------------------------------------------
-# 协议默认区间：risk_min=0.0 / risk_max=1.05 / span=1.05（非默认 0..1）。
+# 协议默认区间：risk_min=0.0 / risk_max=1.0 / span=1.0（恒等区间）。
+# P35 fix (2026-09-02) 将硬跳过阈值拆分为 UWB=0.95 / VIO=0.05 后，v3 的
+# risk_max=1.05 容器 hack 失去存在意义，风险域回归 [0, 1] 闭区间。
 # 当 span != 1.0 或 min != 0.0 时，单源做 linear 投影 risk := risk * span + min。
 # ---------------------------------------------------------------------------
 
 
-def test_default_protocol_range_is_non_identity():
-    """BRIDGE_THRESHOLDS 真实 risk_max=1.05 / risk_min=0.0 → span=1.05，非默认 0..1。
+def test_default_protocol_range_is_unit_identity():
+    """BRIDGE_THRESHOLDS 真实 risk_max=1.0 / risk_min=0.0 → span=1.0，恒等区间。
 
-    锁死 BRIDGE_THRESHOLDS 协议区间常量，禁止未来 silently 改回 [0,1]
-    （否则 protocol 单源 vs LSTM 副本公式差异从行为可观察变不可观察，审计无法察觉）。
+    锁死 BRIDGE_THRESHOLDS 协议区间常量：网络 risk 输出经 normalize_risk 后
+    本就落在 [0,1]，v3 的 1.05 容器 hack 仅服务于已废弃的 threshold=1.05 旧语义。
     """
     assert BRIDGE_THRESHOLDS["risk_min"] == 0.0
-    assert BRIDGE_THRESHOLDS["risk_max"] == pytest.approx(1.05)
+    assert BRIDGE_THRESHOLDS["risk_max"] == pytest.approx(1.0)
     span = BRIDGE_THRESHOLDS["risk_max"] - BRIDGE_THRESHOLDS["risk_min"]
-    assert span != 1.0  # 关键：span != 1 → 投影非恒等，公式副本不一致立即在数值上显形
+    assert span == pytest.approx(1.0)  # 默认区间下投影为恒等（见 identity 测试）。
 
 
-def test_protocol_singleton_maps_sigmoid_to_risk_max_range():
-    """sigmoid(1.5) ≈ 0.8176 在非默认区间下投影为 0.8176 * 1.05 = 0.8585。
+def test_protocol_singleton_linear_mapping_on_explicit_non_default_range():
+    """公式漂移检测：显式非默认区间 (0.0, 1.05) 下 sigmoid(1.5) 投影为 0.8176 * 1.05。
+
+    用显式区间保留「公式副本不一致立即在数值上显形」的锁死价值，
+    而不钉死已回归 [0,1] 的默认协议常量。
+    """
+    risk = 1.0 / (1.0 + math.exp(-1.5))  # sigmoid(1.5) ≈ 0.8175744
+    expected = risk * 1.05  # span=1.05, min=0 → risk*span+min = 0.8176*1.05
+    projected = project_risk_to_protocol_range(risk, 0.0, 1.05)
+    assert projected == pytest.approx(expected, rel=1e-6)
+    assert 0.0 <= projected <= 1.05
+
+
+def test_protocol_singleton_maps_sigmoid_identity_on_default_range():
+    """默认区间 [0,1] 下投影为恒等：sigmoid(1.5) 原样通过。
 
     这是 LSTM `test_boundary_case` 历史失败的真实数值路径——第十四轮修复后
     LSTM 路径委托 protocol 单源走同一公式，得到同一数值。
     """
     risk = 1.0 / (1.0 + math.exp(-1.5))  # sigmoid(1.5) ≈ 0.8175744
-    expected = risk * 1.05  # span=1.05, min=0 → risk*span+min = 0.8176*1.05
     projected = project_risk_to_protocol_range(
         risk,
         BRIDGE_THRESHOLDS["risk_min"],
         BRIDGE_THRESHOLDS["risk_max"],
     )
-    assert projected == pytest.approx(expected, rel=1e-6)
-    # 必须在 [0, 1.05] 内
+    assert projected == pytest.approx(risk, rel=1e-6)
+    # 必须在 [0, 1] 内
     assert BRIDGE_THRESHOLDS["risk_min"] <= projected <= BRIDGE_THRESHOLDS["risk_max"]
 
 
@@ -99,17 +113,17 @@ def test_neg_inf_risk_rejected_by_protocol_singleton():
 
 
 def test_protocol_singleton_clamps_out_of_range_to_max():
-    """risk=10 远超 risk_max=1.05 → 投影后必 clamp 回 1.05。"""
+    """risk=10 远超 risk_max=1.0 → 投影后必 clamp 回 1.0。"""
     projected = project_risk_to_protocol_range(
         10.0,
         BRIDGE_THRESHOLDS["risk_min"],
         BRIDGE_THRESHOLDS["risk_max"],
     )
-    assert projected == pytest.approx(1.05)
+    assert projected == pytest.approx(1.0)
 
 
 def test_protocol_singleton_clamps_negative_to_min():
-    """risk=-5 经 span=1.05+min=0 → -5*1.05+0=-5.25 → clamp 回 0.0。"""
+    """risk=-5 经 span=1.0+min=0 → -5.0 → clamp 回 0.0。"""
     projected = project_risk_to_protocol_range(
         -5.0,
         BRIDGE_THRESHOLDS["risk_min"],

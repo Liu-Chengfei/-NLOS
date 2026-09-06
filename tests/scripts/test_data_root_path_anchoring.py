@@ -148,6 +148,16 @@ def test_prepare_util_anchors_repo_dataset_config_to_repo_root(tmp_path, monkeyp
             {'scene_count': 0, 'scenes': []},
         )
     monkeypatch.setattr("liquidloc.pipelines.prepare_pipeline.build_manifests", _fake_build_manifests)
+    # 17_prepare_util_data.main() 内有 `from liquidloc.pipelines.prepare_pipeline import run as prepare_pipeline_run`
+    # 这个 from-import 在 main() 执行时才求值. 直接 patch `liquidloc.pipelines.prepare_pipeline.run`
+    # 使其对所有调用方（含 main() 内的 from-import）返回 smoke_mode-injected 版本.
+    import liquidloc.pipelines.prepare_pipeline as _pp
+    _orig_pp_run = _pp.run
+    def _smoke_pp_run(cfg):
+        cfg = dict(cfg)
+        cfg.setdefault('smoke_mode', True)
+        return _orig_pp_run(cfg)
+    monkeypatch.setattr(_pp, "run", _smoke_pp_run)
 
     output_root = tmp_path / "util_out"
     assert module.main(["--config", str(cfg_path), "--seq-ids", "mini_seq", "--output-root", str(output_root)]) == 0
@@ -207,6 +217,16 @@ def test_prepare_util_keeps_external_config_relative_to_config_dir(tmp_path, mon
             {'scene_count': 0, 'scenes': []},
         )
     monkeypatch.setattr("liquidloc.pipelines.prepare_pipeline.build_manifests", _fake_build_manifests)
+    # 17_prepare_util_data.main() 内有 `from liquidloc.pipelines.prepare_pipeline import run as prepare_pipeline_run`
+    # 这个 from-import 在 main() 执行时才求值. 直接 patch `liquidloc.pipelines.prepare_pipeline.run`
+    # 使其对所有调用方（含 main() 内的 from-import）返回 smoke_mode-injected 版本.
+    import liquidloc.pipelines.prepare_pipeline as _pp
+    _orig_pp_run = _pp.run
+    def _smoke_pp_run(cfg):
+        cfg = dict(cfg)
+        cfg.setdefault('smoke_mode', True)
+        return _orig_pp_run(cfg)
+    monkeypatch.setattr(_pp, "run", _smoke_pp_run)
 
     output_root = tmp_path / "util_out_external"
     assert module.main(["--config", str(cfg_path), "--seq-ids", "mini_seq", "--output-root", str(output_root)]) == 0

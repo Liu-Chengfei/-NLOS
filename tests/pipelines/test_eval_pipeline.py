@@ -570,7 +570,7 @@ def test_eval_best_method_respects_protocol_priority_not_rmse_only():
         'output_root': output_root / 'eval',
         'failure_threshold': 0.85,
     })
-    assert result.metadata['audit_report']['conclusion_priority'] == ['rmse', 'p95', 'failure_rate', 'mae']
+    assert result.metadata['audit_report']['conclusion_priority'] == ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'mae']
     assert result.metadata['audit_report']['best_method'] == 'ekf'
     assert {
         case_obj['method_name']

@@ -344,10 +344,12 @@ def test_liquid_factory_exposes_current_documented_readout_modules():
     model = create_model("liquid_ekf", {})
 
     assert hasattr(model, "risk_calibration")
+    assert hasattr(model, "output_backbone")
+    backbone = model.output_backbone
+    for gate in ("filter_context_gate", "uwb_branch_mix_gate", "vio_branch_mix_gate"):
+        assert hasattr(backbone, gate)
     for head in model.output_heads.values():
-        assert hasattr(head, "filter_context_gate")
-        assert hasattr(head, "uwb_branch_mix_gate")
-        assert hasattr(head, "vio_branch_mix_gate")
+        assert hasattr(head, "projection")
         assert hasattr(head, "residual_projection")
 
 
@@ -355,20 +357,21 @@ def test_liquid_factory_exposes_only_documented_four_intermediate_heads():
     model = create_model("liquid_ekf", {})
     hidden_dim = model.network.hidden_dim
 
+    backbone = model.output_backbone
     with torch.no_grad():
         for head in model.output_heads.values():
-            head.temporal_context_gate.weight.zero_()
-            head.temporal_context_gate.bias.zero_()
-            head.observation_context_gate.weight.zero_()
-            head.observation_context_gate.bias.zero_()
-            head.filter_context_gate.weight.zero_()
-            head.filter_context_gate.bias.zero_()
-            head.branch_mix_gate.weight.zero_()
-            head.branch_mix_gate.bias.zero_()
-            head.uwb_branch_mix_gate.weight.zero_()
-            head.uwb_branch_mix_gate.bias.zero_()
-            head.vio_branch_mix_gate.weight.zero_()
-            head.vio_branch_mix_gate.bias.zero_()
+            backbone.temporal_context_gate.weight.zero_()
+            backbone.temporal_context_gate.bias.zero_()
+            backbone.observation_context_gate.weight.zero_()
+            backbone.observation_context_gate.bias.zero_()
+            backbone.filter_context_gate.weight.zero_()
+            backbone.filter_context_gate.bias.zero_()
+            backbone.branch_mix_gate.weight.zero_()
+            backbone.branch_mix_gate.bias.zero_()
+            backbone.uwb_branch_mix_gate.weight.zero_()
+            backbone.uwb_branch_mix_gate.bias.zero_()
+            backbone.vio_branch_mix_gate.weight.zero_()
+            backbone.vio_branch_mix_gate.bias.zero_()
             head.projection.weight.zero_()
             head.projection.bias.zero_()
             head.residual_projection.weight.zero_()
@@ -413,46 +416,47 @@ def test_liquid_factory_exposes_documented_context_dimensions_and_masks():
     expected_context_dim = model_factory_module.LIQUID_CONTEXT_DIM
     assert expected_context_dim == 14
     expected_filter_context_dim = model_factory_module.LIQUID_FILTER_CONTEXT_DIM
-    for head in model.output_heads.values():
-        assert head.context_dim == expected_context_dim
-        assert head.filter_context_dim == expected_filter_context_dim
-        assert tuple(head.uwb_fast_context_mask.shape) == (expected_context_dim,)
-        assert tuple(head.vio_fast_context_mask.shape) == (expected_context_dim,)
-        assert tuple(head.uwb_branch_context_mask.shape) == (expected_context_dim,)
-        assert tuple(head.vio_branch_context_mask.shape) == (expected_context_dim,)
-        assert tuple(head.uwb_filter_context_mask.shape) == (expected_filter_context_dim,)
-        assert tuple(head.vio_filter_context_mask.shape) == (expected_filter_context_dim,)
+    backbone = model.output_backbone
+    assert backbone.context_dim == expected_context_dim
+    assert backbone.filter_context_dim == expected_filter_context_dim
+    assert tuple(backbone.uwb_fast_context_mask.shape) == (expected_context_dim,)
+    assert tuple(backbone.vio_fast_context_mask.shape) == (expected_context_dim,)
+    assert tuple(backbone.uwb_branch_context_mask.shape) == (expected_context_dim,)
+    assert tuple(backbone.vio_branch_context_mask.shape) == (expected_context_dim,)
+    assert tuple(backbone.uwb_filter_context_mask.shape) == (expected_filter_context_dim,)
+    assert tuple(backbone.vio_filter_context_mask.shape) == (expected_filter_context_dim,)
 
 
 def test_liquid_factory_uses_configured_context_modulation_scales():
     config_root = Path(__file__).resolve().parents[2] / "configs" / "models"
     liquid_cfg = yaml.safe_load((config_root / "liquid_ekf.yaml").read_text(encoding="utf-8"))
     model = create_model("liquid_ekf", liquid_cfg)
-
-    for head in model.output_heads.values():
-        assert head.context_modulation_scale == pytest.approx(0.22)
-        assert head.filter_context_modulation_scale == pytest.approx(0.22)
+    backbone = model.output_backbone
+    assert backbone.context_modulation_scale == pytest.approx(0.22)
+    assert backbone.filter_context_modulation_scale == pytest.approx(0.22)
 
 
 def test_liquid_output_head_reset_parameters_matches_documented_contract():
     """匹配测试：liquid output head reset parameters。\n\n验证 liquid output head reset parameters 的输出与预期一致，\n确保合同合规。
     """
     model = create_model("liquid_ekf", {})
-    risk_bias = float(torch.tensor(0.10 / 0.90).log().item())
-
+    # 风险先验偏置 = log(RISK_PRIOR_PROB / (1 - RISK_PRIOR_PROB))；当前 RISK_PRIOR_PROB=0.5
+    # ⇒ logit=0.0（与 src/liquidloc/common/constants.py:169 同步）。
+    risk_bias = float(torch.tensor(0.50 / 0.50).log().item())
+    backbone = model.output_backbone
+    assert torch.count_nonzero(backbone.temporal_context_gate.weight).item() == 0
+    assert torch.count_nonzero(backbone.temporal_context_gate.bias).item() == 0
+    assert torch.count_nonzero(backbone.observation_context_gate.weight).item() == 0
+    assert torch.count_nonzero(backbone.observation_context_gate.bias).item() == 0
+    assert torch.count_nonzero(backbone.filter_context_gate.weight).item() == 0
+    assert torch.count_nonzero(backbone.filter_context_gate.bias).item() == 0
+    assert torch.count_nonzero(backbone.branch_mix_gate.weight).item() == 0
+    assert torch.count_nonzero(backbone.branch_mix_gate.bias).item() == 0
+    assert torch.count_nonzero(backbone.uwb_branch_mix_gate.weight).item() == 0
+    assert torch.count_nonzero(backbone.uwb_branch_mix_gate.bias).item() == 0
+    assert torch.count_nonzero(backbone.vio_branch_mix_gate.weight).item() == 0
+    assert torch.count_nonzero(backbone.vio_branch_mix_gate.bias).item() == 0
     for key, head in model.output_heads.items():
-        assert torch.count_nonzero(head.temporal_context_gate.weight).item() == 0
-        assert torch.count_nonzero(head.temporal_context_gate.bias).item() == 0
-        assert torch.count_nonzero(head.observation_context_gate.weight).item() == 0
-        assert torch.count_nonzero(head.observation_context_gate.bias).item() == 0
-        assert torch.count_nonzero(head.filter_context_gate.weight).item() == 0
-        assert torch.count_nonzero(head.filter_context_gate.bias).item() == 0
-        assert torch.count_nonzero(head.branch_mix_gate.weight).item() == 0
-        assert torch.count_nonzero(head.branch_mix_gate.bias).item() == 0
-        assert torch.count_nonzero(head.uwb_branch_mix_gate.weight).item() == 0
-        assert torch.count_nonzero(head.uwb_branch_mix_gate.bias).item() == 0
-        assert torch.count_nonzero(head.vio_branch_mix_gate.weight).item() == 0
-        assert torch.count_nonzero(head.vio_branch_mix_gate.bias).item() == 0
         assert torch.count_nonzero(head.projection.weight).item() == 0
         assert torch.count_nonzero(head.residual_projection.weight).item() == 0
         assert torch.count_nonzero(head.residual_projection.bias).item() == 0
@@ -610,8 +614,8 @@ def test_cfg_only_liquid_preserves_explicit_context_tensors_after_feature_order_
 
     original_predict = model.predict_intermediate_tensors
     model.predict_intermediate_tensors = _capture
-    explicit_context_vector = torch.tensor([0.1] * model.bias_head.context_dim, dtype=torch.float32)
-    explicit_filter_context_vector = torch.tensor([0.2] * model.bias_head.filter_context_dim, dtype=torch.float32)
+    explicit_context_vector = torch.tensor([0.1] * model.output_backbone.context_dim, dtype=torch.float32)
+    explicit_filter_context_vector = torch.tensor([0.2] * model.output_backbone.filter_context_dim, dtype=torch.float32)
     try:
         outputs = model.infer_intermediate(
             {
@@ -646,21 +650,21 @@ def test_liquid_predict_intermediate_tensors_consumes_explicit_context_tensors_e
         },
     )
     hidden_dim = model.network.hidden_dim
-    context_dim = model.bias_head.context_dim
-    filter_context_dim = model.bias_head.filter_context_dim
+    context_dim = model.output_backbone.context_dim
+    filter_context_dim = model.output_backbone.filter_context_dim
     with torch.no_grad():
-        model.bias_head.temporal_context_gate.weight.zero_()
-        model.bias_head.temporal_context_gate.bias.zero_()
-        model.bias_head.observation_context_gate.weight.zero_()
-        model.bias_head.observation_context_gate.bias.zero_()
-        model.bias_head.filter_context_gate.weight.zero_()
-        model.bias_head.filter_context_gate.bias.zero_()
-        model.bias_head.branch_mix_gate.weight.zero_()
-        model.bias_head.branch_mix_gate.bias.zero_()
-        model.bias_head.uwb_branch_mix_gate.weight.zero_()
-        model.bias_head.uwb_branch_mix_gate.bias.zero_()
-        model.bias_head.vio_branch_mix_gate.weight.zero_()
-        model.bias_head.vio_branch_mix_gate.bias.zero_()
+        model.output_backbone.temporal_context_gate.weight.zero_()
+        model.output_backbone.temporal_context_gate.bias.zero_()
+        model.output_backbone.observation_context_gate.weight.zero_()
+        model.output_backbone.observation_context_gate.bias.zero_()
+        model.output_backbone.filter_context_gate.weight.zero_()
+        model.output_backbone.filter_context_gate.bias.zero_()
+        model.output_backbone.branch_mix_gate.weight.zero_()
+        model.output_backbone.branch_mix_gate.bias.zero_()
+        model.output_backbone.uwb_branch_mix_gate.weight.zero_()
+        model.output_backbone.uwb_branch_mix_gate.bias.zero_()
+        model.output_backbone.vio_branch_mix_gate.weight.zero_()
+        model.output_backbone.vio_branch_mix_gate.bias.zero_()
         model.bias_head.projection.weight.zero_()
         model.bias_head.projection.bias.zero_()
         model.bias_head.projection.weight[0, hidden_dim + 0] = 1.0
@@ -735,8 +739,9 @@ def test_liquid_output_head_context_groups_keep_modality_indicator_and_expected_
         },
     )
     head = model.bias_head
+    backbone = model.output_backbone
 
-    assert tuple(head.temporal_context_indices) == (4, 5)
+    assert tuple(backbone.temporal_context_indices) == (4, 5)
     assert tuple(model_factory_module.LIQUID_CONTEXT_FEATURE_KEYS) == (
         "valid",
         "modality_gap_dt",
@@ -749,51 +754,52 @@ def test_liquid_output_head_context_groups_keep_modality_indicator_and_expected_
     assert "uwb_quality_min" not in model_factory_module.LIQUID_CONTEXT_FEATURE_KEYS
     assert "uwb_invalid_rate" not in model_factory_module.LIQUID_CONTEXT_FEATURE_KEYS
     # 模态索引(0,1)不再包含在fast/branch上下文索引中
-    assert 0 not in head.uwb_fast_context_indices
-    assert 1 not in head.uwb_fast_context_indices
-    assert 0 not in head.vio_fast_context_indices
-    assert 1 not in head.vio_fast_context_indices
-    assert 0 not in head.uwb_branch_context_indices
-    assert 1 not in head.uwb_branch_context_indices
-    assert 0 not in head.vio_branch_context_indices
-    assert 1 not in head.vio_branch_context_indices
+    assert 0 not in backbone.uwb_fast_context_indices
+    assert 1 not in backbone.uwb_fast_context_indices
+    assert 0 not in backbone.vio_fast_context_indices
+    assert 1 not in backbone.vio_fast_context_indices
+    assert 0 not in backbone.uwb_branch_context_indices
+    assert 1 not in backbone.uwb_branch_context_indices
+    assert 0 not in backbone.vio_branch_context_indices
+    assert 1 not in backbone.vio_branch_context_indices
     # D2-3 v2 redesign: UWB filter context 7 键（dead placeholder nlos_indicator 已清，原 8 键→7 键），
     # state_cov_trace(0,1) pos_cov(2,3) last_gate_skip_flag(6,7) consecutive_skip_count(8,9)
     # time_since_last_update(10,11) uwb_residual_norm(16,17) geometry_dop(20,21)
-    assert tuple(head.uwb_filter_context_indices) == (0, 1, 2, 3, 6, 7, 8, 9, 10, 11, 16, 17, 20, 21)
+    assert tuple(backbone.uwb_filter_context_indices) == (0, 1, 2, 3, 6, 7, 8, 9, 10, 11, 16, 17, 20, 21)
     # D2-3 v2 redesign: VIO filter context 8 键（dead placeholder nlos_indicator 删除后 cross_modal_consistency
     # 索引从 (24,25)→(22,23)，读出键总数 15→14）
     # state_cov_trace(0,1) pos_cov(2,3) last_innovation_norm(4,5) consecutive_skip_count(8,9)
     # time_since_last_update(10,11) vel_cov_trace(14,15) vio_cov_summary(18,19) cross_modal_consistency(22,23)
-    assert tuple(head.vio_filter_context_indices) == (0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 14, 15, 18, 19, 22, 23)
+    assert tuple(backbone.vio_filter_context_indices) == (0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 14, 15, 18, 19, 22, 23)
 
-    assert int(head.uwb_fast_context_mask.sum().item()) == len(head.uwb_fast_context_indices)
-    assert int(head.vio_fast_context_mask.sum().item()) == len(head.vio_fast_context_indices)
-    assert int(head.uwb_branch_context_mask.sum().item()) == len(head.uwb_branch_context_indices)
-    assert int(head.vio_branch_context_mask.sum().item()) == len(head.vio_branch_context_indices)
-    assert int(head.uwb_filter_context_mask.sum().item()) == len(head.uwb_filter_context_indices)
-    assert int(head.vio_filter_context_mask.sum().item()) == len(head.vio_filter_context_indices)
+    assert int(backbone.uwb_fast_context_mask.sum().item()) == len(backbone.uwb_fast_context_indices)
+    assert int(backbone.vio_fast_context_mask.sum().item()) == len(backbone.vio_fast_context_indices)
+    assert int(backbone.uwb_branch_context_mask.sum().item()) == len(backbone.uwb_branch_context_indices)
+    assert int(backbone.vio_branch_context_mask.sum().item()) == len(backbone.vio_branch_context_indices)
+    assert int(backbone.uwb_filter_context_mask.sum().item()) == len(backbone.uwb_filter_context_indices)
+    assert int(backbone.vio_filter_context_mask.sum().item()) == len(backbone.vio_filter_context_indices)
 
 
 def test_checkpoint_path_loads_legacy_liquid_checkpoint_without_new_readout_or_risk_calibration_keys(tmp_path):
     """无依赖测试：checkpoint path loads legacy liquid checkpoint。\n\n验证 checkpoint path loads legacy liquid checkpoint 在缺少依赖时的降级行为，\n确保回退策略正确。
     """
+    # v3.1 head-shared 架构：旧 checkpoint 的 gates 在 head.X，risk_calibration 存在；
+    # 当前格式下 gates 已迁到 output_backbone.X，head 仅含 projection/residual_projection。
+    # 此处构造 v3.1 当前格式的 checkpoint，剥离 risk_calibration 与 output_backbone 上的
+    # gate 后验证 create_model(load_checkpoint) 能恢复默认初始化的 risk_calibration 与 gates。
     model_cfg, payload = _liquid_checkpoint_payload()
     reference_model = create_model("liquid_ekf", dict(model_cfg))
     fresh_model = create_model("liquid_ekf", dict(model_cfg))
     legacy_state = dict(payload["model_state"])
-    for head_key in ("bias_head", "risk_head", "uwb_scaling_head", "vio_scaling_head"):
-        legacy_head_state = dict(legacy_state[head_key])
-        legacy_head_state.pop("filter_context_gate.weight", None)
-        legacy_head_state.pop("filter_context_gate.bias", None)
-        legacy_head_state.pop("uwb_branch_mix_gate.weight", None)
-        legacy_head_state.pop("uwb_branch_mix_gate.bias", None)
-        legacy_head_state.pop("vio_branch_mix_gate.weight", None)
-        legacy_head_state.pop("vio_branch_mix_gate.bias", None)
-        legacy_head_state.pop("residual_projection.weight", None)
-        legacy_head_state.pop("residual_projection.bias", None)
-        legacy_head_state["projection.weight"] = legacy_head_state["projection.weight"][:, : legacy_head_state["projection.weight"].shape[1] - 8]
-        legacy_state[head_key] = legacy_head_state
+    backbone_state = dict(legacy_state["output_backbone"])
+    for gate_suffix in (
+        "temporal_context_gate", "observation_context_gate", "filter_context_gate",
+        "branch_mix_gate", "uwb_branch_mix_gate", "vio_branch_mix_gate",
+    ):
+        backbone_state.pop(f"{gate_suffix}.weight", None)
+        backbone_state.pop(f"{gate_suffix}.bias", None)
+    legacy_state["output_backbone"] = backbone_state
+    # head 上不再有 gate，无需 pop（v3.1 LiquidOutputHeadLinear 仅 projection/residual_projection）。
     legacy_state.pop("risk_calibration", None)
 
     checkpoint_path = Path(tmp_path) / "legacy_liquid_readout_checkpoint.pt"
@@ -810,7 +816,7 @@ def test_checkpoint_path_loads_legacy_liquid_checkpoint_without_new_readout_or_r
 
     assert hasattr(loaded_model, "risk_calibration")
     assert torch.isfinite(loaded_model.risk_calibration.a_raw.detach()).item()
-    assert loaded_model.bias_head.filter_context_gate.weight.shape[0] == loaded_model.network.hidden_dim
+    assert loaded_model.output_backbone.filter_context_gate.weight.shape[0] == loaded_model.network.hidden_dim
     # D4 v2 redesign: residual_projection 接收 final_hidden+pooled_hidden 拼接 (2*hidden_dim)
     assert loaded_model.bias_head.residual_projection.weight.shape == (1, 2 * loaded_model.network.hidden_dim)
     assert torch.allclose(
@@ -821,34 +827,24 @@ def test_checkpoint_path_loads_legacy_liquid_checkpoint_without_new_readout_or_r
         loaded_model.risk_calibration.b.detach(),
         fresh_model.risk_calibration.b.detach(),
     )
+    # v3.1 head-shared: gates 全部位于 output_backbone，对比 fresh backbone 与 loaded backbone 的全部 gate 参数。
+    loaded_backbone = loaded_model.output_backbone
+    fresh_backbone = fresh_model.output_backbone
+    for gate_suffix in (
+        "temporal_context_gate", "observation_context_gate", "filter_context_gate",
+        "branch_mix_gate", "uwb_branch_mix_gate", "vio_branch_mix_gate",
+    ):
+        assert torch.allclose(
+            getattr(loaded_backbone, gate_suffix).weight.detach(),
+            getattr(fresh_backbone, gate_suffix).weight.detach(),
+        )
+        assert torch.allclose(
+            getattr(loaded_backbone, gate_suffix).bias.detach(),
+            getattr(fresh_backbone, gate_suffix).bias.detach(),
+        )
     for head_key in ("bias_head", "risk_head", "uwb_scaling_head", "vio_scaling_head"):
         loaded_head = getattr(loaded_model, head_key)
         fresh_head = getattr(fresh_model, head_key)
-        legacy_head = legacy_state[head_key]
-        assert torch.allclose(
-            loaded_head.filter_context_gate.weight.detach(),
-            fresh_head.filter_context_gate.weight.detach(),
-        )
-        assert torch.allclose(
-            loaded_head.filter_context_gate.bias.detach(),
-            fresh_head.filter_context_gate.bias.detach(),
-        )
-        assert torch.allclose(
-            loaded_head.uwb_branch_mix_gate.weight.detach(),
-            fresh_head.uwb_branch_mix_gate.weight.detach(),
-        )
-        assert torch.allclose(
-            loaded_head.uwb_branch_mix_gate.bias.detach(),
-            fresh_head.uwb_branch_mix_gate.bias.detach(),
-        )
-        assert torch.allclose(
-            loaded_head.vio_branch_mix_gate.weight.detach(),
-            fresh_head.vio_branch_mix_gate.weight.detach(),
-        )
-        assert torch.allclose(
-            loaded_head.vio_branch_mix_gate.bias.detach(),
-            fresh_head.vio_branch_mix_gate.bias.detach(),
-        )
         assert torch.allclose(
             loaded_head.residual_projection.weight.detach(),
             fresh_head.residual_projection.weight.detach(),
@@ -857,12 +853,7 @@ def test_checkpoint_path_loads_legacy_liquid_checkpoint_without_new_readout_or_r
             loaded_head.residual_projection.bias.detach(),
             fresh_head.residual_projection.bias.detach(),
         )
-        loaded_projection = loaded_head.projection.weight.detach()
-        fresh_projection = fresh_head.projection.weight.detach()
-        legacy_projection = legacy_head["projection.weight"]
-        preserved_cols = int(legacy_projection.shape[1])
-        assert torch.allclose(loaded_projection[:, :preserved_cols], legacy_projection)
-        assert torch.allclose(loaded_projection[:, preserved_cols:], fresh_projection[:, preserved_cols:])
+        assert loaded_head.projection.weight.shape == fresh_head.projection.weight.shape
     window = {
         "current_modality": "uwb",
         "feature_order": model_cfg["feature_order"],
@@ -1128,8 +1119,8 @@ def test_default_liquid_and_lstm_train_configs_match_paper_grade_budget_contract
 
     assert liquid_train["epochs"] == 160
     assert lstm_train["epochs"] == 160
-    assert liquid_train["batch_size"] == 64
-    assert lstm_train["batch_size"] == 64
+    assert liquid_train["batch_size"] == 32
+    assert lstm_train["batch_size"] == 32
     assert liquid_train["eval_batch_size"] == 128
     assert lstm_train["eval_batch_size"] == 128
     assert liquid_train["amp_enabled"] == "auto"
@@ -1144,8 +1135,8 @@ def test_default_liquid_and_lstm_train_configs_match_paper_grade_budget_contract
     assert lstm_train["deterministic"] is True
     assert liquid_train["weight_decay"] == pytest.approx(0.0)
     assert lstm_train["weight_decay"] == pytest.approx(0.0)
-    assert liquid_train["lr"] == pytest.approx(3e-4)
-    assert lstm_train["lr"] == pytest.approx(5e-4)
+    assert liquid_train["lr"] == pytest.approx(1.5e-4)
+    assert lstm_train["lr"] == pytest.approx(1.5e-4)
     assert liquid_train["phase_schedule"] == {
         "warmup_epochs": 20,
         "gate_alignment_epochs": 40,

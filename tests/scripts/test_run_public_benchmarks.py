@@ -269,7 +269,7 @@ def test_script_uses_dataset_specific_config_and_raw_root(monkeypatch, tmp_path)
 
     assert captured["public"]["dataset_name"] == "miluv"
     assert captured["public"]["raw_root"] == str(ROOT / "tests" / "fixtures" / "datasets" / "miluv")
-    assert captured["public"]["methods"] == ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"]
+    assert captured["public"]["methods"] == ["ekf", "lstm_ekf", "liquid_ekf", "transformer_ekf"]
     assert captured["eval"]["ground_truth_root"] == str(ROOT / "tests" / "fixtures" / "datasets" / "miluv")
     assert captured["eval"]["output_root"] == str(output_root / "eval")
     assert captured["eval"]["mode"] == "quick"

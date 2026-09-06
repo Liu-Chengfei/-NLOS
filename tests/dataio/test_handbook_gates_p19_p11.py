@@ -199,8 +199,16 @@ class TestDQ3DistributionConsistency:
 
 
 class TestDQ4SampleSize:
-    def test_pass_at_5x60(self):
-        r = dq4_sample_size(n_seeds=5, n_test_trajs_per_seed=60)
+    def test_pass_at_10x60(self):
+        # BUG-029 修复后默认 required_min_n=600（e9 主表 10×60=600 才达 power≥0.8），
+        # 基础档 5×60=300 仅够 §0.2 B03「多种子 ≥5」，不再通过默认门。
+        r = dq4_sample_size(n_seeds=10, n_test_trajs_per_seed=60)
+        assert r.passed
+        assert r.total_n == 600
+
+    def test_pass_at_5x60_with_explicit_relaxed_floor(self):
+        # 基础档（e0 冒烟）：调用方按实验配置显式传入更低阈值时 5×60=300 可通过。
+        r = dq4_sample_size(n_seeds=5, n_test_trajs_per_seed=60, required_min_n=300)
         assert r.passed
         assert r.total_n == 300
 
@@ -219,7 +227,7 @@ class TestRunAllDQ:
             train_rho=0.30, test_rho=0.31,
             train_mu=5.0, test_mu=5.1,
             train_sigma=1.5, test_sigma=1.55,
-            n_seeds=5, n_test_trajs_per_seed=60,
+            n_seeds=10, n_test_trajs_per_seed=60,
         )
         assert result["overall_pass"] is True
         assert all(result[f"dq{i}"]["passed"] for i in range(1, 5))

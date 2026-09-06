@@ -319,7 +319,9 @@ def test_liquid_bridge_contract_vio_control_fields():
     测试场景：传入 VIO 模态的原始测量和 ModelIntermediate。
     预期行为：modality 为 vio，bias_applied 为 0.0（VIO 不施加 bias），
     scaling 等于 vio_scaling，risk 保持原值，
-    noise_multiplier 按协议公式计算，gate_action 为 vio_confidence_scale。
+    noise_multiplier 按协议公式计算；
+    applied_risk=0.6 ≥ vio_risk_hard_skip_threshold(0.05)（P35 fix 2026-09-02）
+    → gate_action 为 vio_skip_update。
     """
     control = build_measurement_control(
         {"modality": "vio", "dx": 0.1, "dy": -0.2, "dyaw": 0.05},
@@ -334,7 +336,7 @@ def test_liquid_bridge_contract_vio_control_fields():
     assert control.risk == pytest.approx(0.6)
     # noise_multiplier 按协议公式计算
     assert control.noise_multiplier == pytest.approx(5.184)
-    assert control.gate_action == "vio_confidence_scale"
+    assert control.gate_action == "vio_skip_update"
 
 
 def test_liquid_bridge_contract_pass_through_fallback():

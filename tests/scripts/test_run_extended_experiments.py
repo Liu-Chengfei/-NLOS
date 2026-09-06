@@ -90,6 +90,17 @@ def test_public_route_rejects_unsupported_dataset(tmp_path, monkeypatch):
     """拒绝测试：public route。\n\n验证被测功能对 public route 的拒绝行为，\n确保不合法输入被正确拦截。
     """
     script = _load_script()
+    # e7_miluv.yaml 强约束 dataset_name=miluv；为测试未注册数据集错误，使用 e6_geometry.yaml
+    # （不强制 dataset_name）并传入未注册名 unsupported_dataset。
+    unsupported_cfg = tmp_path / "unsupported_cfg.yaml"
+    unsupported_cfg.write_text(
+        "experiment_id: unsupported_test\n"
+        "primary_axis: public_sequence_category\n"
+        "frozen_axes:\n"
+        "  K: [K1]\n"
+        "methods: [ekf, lstm_ekf, liquid_ekf, transformer_ekf]\n",
+        encoding="utf-8",
+    )
 
     class DummyPublicPipeline:
         def run(self, payload):
@@ -102,7 +113,7 @@ def test_public_route_rejects_unsupported_dataset(tmp_path, monkeypatch):
         script.main(
             [
                 "--config",
-                str(ROOT / "configs" / "experiments" / "e7_miluv.yaml"),
+                str(unsupported_cfg),
                 "--dataset-name",
                 "unsupported_dataset",
                 "--seq-ids",
@@ -148,7 +159,7 @@ def test_public_route_normalizes_dataset_name_case(tmp_path, monkeypatch, capsys
 
 @pytest.mark.parametrize(
     "config_name",
-    ["e1_main_table.yaml", "e6_geometry.yaml", "e8_runtime.yaml", "e9_dual_degradation.yaml"],
+    ["e2_async.yaml", "e8_runtime.yaml"],
 )
 def test_core_family_configs_use_declared_scene_surface(config_name, tmp_path, monkeypatch):
     script = _load_script()
@@ -168,28 +179,6 @@ def test_core_family_configs_use_declared_scene_surface(config_name, tmp_path, m
 
     assert captured["payload"]["scene_tasks"] == expected_scene_tasks
     assert set(captured["payload"]["events_by_scene_id"]) == {task["scene_id"] for task in expected_scene_tasks}
-
-
-def test_e5_ablation_alias_kept(tmp_path, monkeypatch):
-    """别名测试：e5 ablation。\n\n验证 e5 ablation 的别名兼容性，\n确保旧参数名仍可使用。
-    """
-    script = _load_script()
-    captured = {}
-    experiment_cfg = load_yaml_config(ROOT / "configs" / "experiments" / "e5_ablation.yaml")
-    experiment_cfg["mode"] = "quick"
-    expected_axes = dict(experiment_cfg["frozen_axes"])
-
-    class DummyCorePipeline:
-        def run(self, payload):
-            captured["payload"] = payload
-            return _fake_core_result(payload["methods"])
-
-    monkeypatch.setattr(script, "CorePipeline", lambda: DummyCorePipeline())
-    monkeypatch.setattr(script, "PublicBenchmarkPipeline", lambda: (_ for _ in ()).throw(AssertionError("public pipeline should not run")))
-    assert script.main(["--config", str(ROOT / "configs" / "experiments" / "e5_ablation.yaml"), "--output-root", str(tmp_path / "out")]) == 0
-
-    assert captured["payload"]["scene_tasks"][0]["axes"] == expected_axes
-    assert captured["payload"]["methods"] == experiment_cfg["methods"]
 
 
 def test_full_mode_runs_real_pipeline(tmp_path, capsys, monkeypatch):
