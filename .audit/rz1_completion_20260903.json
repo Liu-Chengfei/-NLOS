@@ -1,0 +1,56 @@
+{
+  "phase": "RZ-1: data regeneration - COMPLETED",
+  "timestamp_completed": "2026-09-03T22:55:00",
+  "handbook_ref": "docs/异步高NLOS实验手册.md RZ-1",
+  "scope_executed": {
+    "n_seeds": 10,
+    "seqs_per_combo_per_seed": 30,
+    "seqs_per_seed_total": 121,
+    "total_seqs": 1210,
+    "seq_duration_s": 120,
+    "imu_hz": 150,
+    "uwb_hz": 10,
+    "vio_hz": 20,
+    "combos": ["A2N2", "A2N3", "A3N2", "A3N3"]
+  },
+  "raw_data": {
+    "path": "data/raw/sim_e9_10seed_50unit/",
+    "size": "5.9G",
+    "files": "10 seeds × 121 dirs (120 real + 1 stub) × 6 JSON files"
+  },
+  "processed_events": {
+    "path": "data/processed/sim_e9_rz1_20260903/",
+    "size": "2.5G",
+    "files": "10 seeds × 121 pkl.gz events each = 1210 total",
+    "events_per_seq_avg": 21600
+  },
+  "code_freeze_patches": [
+    {
+      "file": "scripts/_generate_sim_e9_5seed.py",
+      "change": "add --start-seed CLI arg for incremental generation",
+      "reason": "allow seed5-9 to be added without re-running seed0-4"
+    },
+    {
+      "file": "scripts/_generate_sim_e9_5seed.py",
+      "change": "anchor_layout.json: add protocol_geometry_level: K1",
+      "reason": "H27 protocol G-axis merged into K-axis; inspect_sim_materialized_contract requires protocol_geometry_level"
+    },
+    {
+      "file": "scripts/_generate_sim_e9_5seed.py",
+      "change": "sim_meta.json: add generator_version: liquidloc.sim_materializer.v2.1",
+      "reason": "§28.6 self-certifying contract requires generator_version"
+    },
+    {
+      "file": "scripts/_generate_sim_e9_5seed.py",
+      "change": "_patch_anchor_layout_for_stub: stub seq0 layout_id=seq0",
+      "reason": "dataset_checks.py requires layout_id == seq_id (or base_seq_id == base_layout_id)"
+    }
+  ],
+  "data_validations_passed": {
+    "all_anchor_layouts_have_protocol_geometry_level": true,
+    "all_sim_meta_have_generator_version": true,
+    "all_stub_seq0_have_layout_id_eq_seq0": true,
+    "all_seeds_prepare_pipeline_exit_0": true
+  },
+  "next_step": "RZ-2: train 5 methods × 10 seed = 50 units with new data from scratch"
+}

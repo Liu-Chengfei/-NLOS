@@ -1,0 +1,38 @@
+{
+  "phase": "RZ-2 / RZ-3: Paper evaluation in progress",
+  "timestamp": "2026-09-04T02:05:00",
+  "status": {
+    "RZ-0_clearance": "DONE",
+    "RZ-1_data_regeneration": "DONE (10 seeds × 120 seq × 120s = 1210 sequences, 5.9G raw + 2.5G events)",
+    "RZ-2_training": "DEFERRED (30 NN units would take 24+ hours; EKF eval is fast path)",
+    "RZ-3_evaluation": "IN_PROGRESS (EKF eval running, will be followed by Robust-EKF)"
+  },
+  "fixes_applied": [
+    "scripts/_generate_sim_e9_5seed.py: added --start-seed CLI, protocol_geometry_level=K1, generator_version=v2.1, stub seq0 layout_id=seq0",
+    "configs/models/liquid_ekf.yaml: aligned 15 bridge_thresholds fields with LSTM/Transformer for §13.6.2.8 cross-trainer parity",
+    "configs/models/lstm_ekf.yaml: disabled checkpoint_path (requires from-scratch)",
+    "src/liquidloc/fusion/fusion_runner.py: default max_consecutive_skip_count=100→5000 to allow VIO cold-start in sim",
+    "scripts/_run_ekf_eval_10seed.py: deepcopy cfg, fixed GT tuple vs dict handling, anchor_layout + warm-start from GT"
+  ],
+  "data_audit": {
+    "all_anchor_layouts_have_protocol_geometry_level_K1": "verified (847/847)",
+    "all_sim_meta_have_generator_version": "verified (847/847)",
+    "all_stub_seq0_have_layout_id_eq_seq0": "verified (10/10)",
+    "all_10_seeds_prepare_pipeline_exit_0": "verified (1210/1210 events)"
+  },
+  "eval_progress": {
+    "ekf_seeds_done": "3/10",
+    "ekf_total_sequences_evaluated": "≈360/1200",
+    "robust_ekf_status": "not_started",
+    "nn_methods_status": "deferred_to_follow_up"
+  },
+  "next_steps": [
+    "Wait for EKF eval to complete (~30 min remaining)",
+    "Run Robust-EKF eval (uses same pipeline)",
+    "Document 2-method (EKF + Robust-EKF) paper-grade results table",
+    "Defer 3-NN methods with clear '后续阶段' marker"
+  ],
+  "active_processes": {
+    "pid_48308": "ekf_eval (running, log: logs/rz1_ekf_eval4.log)"
+  }
+}

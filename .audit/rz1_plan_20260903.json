@@ -1,0 +1,20 @@
+{
+  "phase": "RZ-1: data regeneration",
+  "timestamp": "2026-09-03T22:25:00",
+  "handbook_ref": "docs/异步高NLOS实验手册.md RZ-1",
+  "scope": {
+    "n_seeds": 10,
+    "seqs_per_combo_per_seed": 30,
+    "seqs_per_seed_total": 120,
+    "total_seqs": 1200,
+    "seq_duration_s": 120,
+    "imu_hz": 150,
+    "uwb_hz": 10,
+    "vio_hz": 20,
+    "combos": ["A2N2", "A2N3", "A3N2", "A3N3"]
+  },
+  "output_path": "data/raw/sim_e9_10seed_50unit/",
+  "code_freeze_commit": "TBD - check git head before RZ-1 start",
+  "execution_mode": "background",
+  "status": "starting"
+}

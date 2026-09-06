@@ -1,0 +1,51 @@
+{
+  "clearance_id": "RZ-0",
+  "timestamp": "2026-09-03T22:19:16",
+  "operator": "zcode_agent",
+  "trigger": "paper_experiment_clean_start",
+  "handbook_ref": "docs/异步高NLOS实验手册.md RZ-0",
+  "archived": [
+    {
+      "source": "data/raw",
+      "content": "sim_e9_10seed_50unit",
+      "size": "105M",
+      "dest": "archive/rz0_20260903/data/raw"
+    },
+    {
+      "source": "outputs",
+      "content": "smoke_test, audit, figures, local_pytest",
+      "size": "88M",
+      "dest": "archive/rz0_20260903/outputs"
+    },
+    {
+      "source": "logs",
+      "content": "6 training logs (train_lstm, train_liquid, train_transformer, etc.)",
+      "size": "2.3M",
+      "dest": "archive/rz0_20260903/logs"
+    },
+    {
+      "source": ".audit",
+      "content": "decision_log.json, anchor_gdop_audit.json",
+      "size": "192K",
+      "dest": "archive/rz0_20260903/audit"
+    },
+    {
+      "source": "relative_train_output",
+      "content": "checkpoints, reports, audits, im_meta.json",
+      "size": "358K",
+      "dest": "archive/rz0_20260903/relative_train_output"
+    }
+  ],
+  "preserved": [
+    "configs/",
+    "src/",
+    "scripts/",
+    "tests/",
+    "docs/",
+    ".github/",
+    ".agents/",
+    "checkpoints/ (empty, verified)"
+  ],
+  "total_archived_size": "~196M",
+  "next_step": "generate sim_e9 data: 10 seed × 100+ seq × 120s per seed"
+}
