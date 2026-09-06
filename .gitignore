@@ -1,0 +1,26 @@
+# Runtime outputs and local verification artifacts
+/outputs/
+/handoff/reverify/
+/.pytest_cache/
+/.venv/
+**/.venv/
+
+# Stale file archive (round1-3 残留归档, 不跟踪)
+/.archive/
+
+# Python cache artifacts
+__pycache__/
+*.py[cod]
+
+# Docs backup (未跟踪文档临时备份)
+.docs_backup/
+
+# NH output file
+NH
+
+# Local data / cache / runtime (do not back up to git)
+/data/
+/logs/
+/checkpoints/
+/.venv-gpu/
+/.zcode/
