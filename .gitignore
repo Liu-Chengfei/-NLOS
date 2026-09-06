@@ -24,3 +24,4 @@ NH
 /checkpoints/
 /.venv-gpu/
 /.zcode/
+/relative_train_output/
