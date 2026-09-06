@@ -160,12 +160,12 @@ def test_flow_rows_as_vio_rows_preserves_source_t():
 def test_resolve_scene_id_strips_surrounding_whitespace():
     """场景 ID 测试：resolve。\n\n验证 resolve 的场景 ID 处理，\n确保归一化和解析正确。
     """
-    assert _resolve_scene_id({'scene_id': ' S(A0,N0,V0,G0,K4) '}, 'sim', 'mini_seq') == 'S(A0,N0,V0,G0,K4)'
+    assert _resolve_scene_id({'scene_id': ' S(A0,N0,V0,K1) '}, 'sim', 'mini_seq') == 'S(A0,N0,V0,K1)'
     assert _resolve_scene_id(
-        {'scene_id_by_seq': {'mini_seq': ' S(A0,N0,V0,G0,K4) '}},
+        {'scene_id_by_seq': {'mini_seq': ' S(A0,N0,V0,K1) '}},
         'sim',
         'mini_seq',
-    ) == 'S(A0,N0,V0,G0,K4)'
+    ) == 'S(A0,N0,V0,K1)'
 
 
 def test_prepare_manifest_keeps_scene_parameters_for_whitespace_padded_scene_id(tmp_path, monkeypatch):
@@ -191,7 +191,7 @@ def test_prepare_manifest_keeps_scene_parameters_for_whitespace_padded_scene_id(
         return bundle, read_report
 
     monkeypatch.setattr('liquidloc.pipelines.prepare_pipeline.read_sim_sequence', _fake_read_sim_sequence)
-    # K6/G0 物化合同对 tmp_path 内的 SIM raw 在 prepare 阶段强校验 anchor_layout.json
+    # K3 物化合同对 tmp_path 内的 SIM raw 在 prepare 阶段强校验 anchor_layout.json
     # 等文件, 此测试只关心 scene_parameters 保留语义, 直接旁路合同闸门.
     monkeypatch.setattr(
         'liquidloc.pipelines.prepare_pipeline._enforce_sim_materialized_contract',
@@ -202,7 +202,7 @@ def test_prepare_manifest_keeps_scene_parameters_for_whitespace_padded_scene_id(
         'dataset_name': 'sim',
         'raw_root': raw_root,
         'seq_ids': ['mini_seq'],
-        'scene_id': ' S(A0,N0,V0,G0,K4) ',
+        'scene_id': ' S(A0,N0,V0,K1) ',
         'output_root': tmp_path / 'prepare_sim',
     })
 
@@ -212,8 +212,8 @@ def test_prepare_manifest_keeps_scene_parameters_for_whitespace_padded_scene_id(
     import pickle
     with gzip.open(tmp_path / 'prepare_sim' / 'mini_seq_events.pkl.gz', 'rb') as f:
         events = pickle.load(f)
-    assert seq_payload['scene_id'] == 'S(A0,N0,V0,G0,K4)'
-    assert dataset_seq['scene_id'] == 'S(A0,N0,V0,G0,K4)'
+    assert seq_payload['scene_id'] == 'S(A0,N0,V0,K1)'
+    assert dataset_seq['scene_id'] == 'S(A0,N0,V0,K1)'
     assert seq_payload['scene_parameters'] == dataset_seq['scene_parameters']
     assert events[0]['meta']['scene_parameters'] == seq_payload['scene_parameters']
 
@@ -224,7 +224,7 @@ def test_invalid_case(tmp_path, monkeypatch):
     验证被测功能对无效输入的拒绝行为，
     确保缺少必要参数时抛出 ValueError。
     """
-    # 缺 scene_id 应触发 ValueError; 不应在更早的 K6/G0 物化合同上 abort.
+    # 缺 scene_id 应触发 ValueError; 不应在更早的 K3 物化合同上 abort.
     monkeypatch.setattr(
         'liquidloc.pipelines.prepare_pipeline._enforce_sim_materialized_contract',
         lambda raw_root: None,

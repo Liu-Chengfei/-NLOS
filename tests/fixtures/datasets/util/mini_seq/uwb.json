@@ -1,0 +1,5 @@
+[
+  {"timestamp": 0.05, "anchor_id": 0, "range": 2.00, "valid": true, "quality": 0.95},
+  {"timestamp": 0.10, "anchor_id": 1, "range": 2.10, "valid": true, "quality": 0.90},
+  {"timestamp": 0.15, "anchor_id": 0, "range": 1.98, "valid": true, "quality": 0.88}
+]

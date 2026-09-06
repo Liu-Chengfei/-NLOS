@@ -1202,7 +1202,7 @@ def test_assert_cold_start_x_underdetermined_geometry_soft_mode_returns_passed_f
     """§8 回归：soft mode 下 cold_start+underdet 缺失应返回 passed=False。"""
     from liquidloc.protocol.experiment_gates import assert_cold_start_x_underdetermined_geometry
     r = assert_cold_start_x_underdetermined_geometry(
-        [{'axes': {'V': 'V0', 'X': 'X0', 'G': 'G0'}, 'cold_start': True}],
+        [{'axes': {'V': 'V0', 'X': 'X0', 'K': 'K1'}, 'cold_start': True}],
         raise_on_violation=False)
     assert r.get('passed') is False
 

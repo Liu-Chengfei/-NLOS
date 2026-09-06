@@ -48,7 +48,7 @@ def _imu_event(*, t=0.05, dt=0.05):
         "t": t,
         "dt": dt,
         "modality": "imu",
-        "meta": {"scene_id": "S(A0,N0,V0,G0,K6)", "seq_id": "mini_seq"},
+        "meta": {"scene_id": "S(A0,N0,V0,K1)", "seq_id": "mini_seq"},
         "imu_payload": {"ax": 0.0, "ay": 0.0, "gz": 0.0},
         "uwb_payload": None,
         "vio_payload": None,
@@ -60,7 +60,7 @@ def _uwb_event(*, t=0.1, rng=0.8, quality=0.9):
         "t": t,
         "dt": 0.1,
         "modality": "uwb",
-        "meta": {"scene_id": "S(A0,N0,V0,G0,K6)", "seq_id": "mini_seq"},
+        "meta": {"scene_id": "S(A0,N0,V0,K1)", "seq_id": "mini_seq"},
         "imu_payload": None,
         "uwb_payload": {"anchor_id": 0, "range": rng, "valid": True, "quality": quality},
         "vio_payload": None,
@@ -72,7 +72,7 @@ def _vio_event(*, t=0.2, quality=0.9, dx=0.1, dy=0.0, dyaw=0.0):
         "t": t,
         "dt": 0.1,
         "modality": "vio",
-        "meta": {"scene_id": "S(A0,N0,V0,G0,K6)", "seq_id": "mini_seq"},
+        "meta": {"scene_id": "S(A0,N0,V0,K1)", "seq_id": "mini_seq"},
         "imu_payload": None,
         "uwb_payload": None,
         "vio_payload": {
@@ -1327,7 +1327,7 @@ class TestVioQualityNormalizationRobustEKF:
 
         result = ekf._handle_vio(
             {"t": 0.4, "dt": 0.1, "modality": "vio",
-             "meta": {"scene_id": "S(A0,N0,V0,G0,K6)", "seq_id": "mini_seq"},
+             "meta": {"scene_id": "S(A0,N0,V0,K1)", "seq_id": "mini_seq"},
              "imu_payload": None, "uwb_payload": None,
              "vio_payload": {"dx": 0.1, "dy": 0.0, "dyaw": 0.0,
                              "quality": 0.0, "tracked_features": 0, "reproj_err": 0.0}},
@@ -1354,7 +1354,7 @@ class TestVioQualityNormalizationRobustEKF:
         with pytest.raises(TypeError, match="quality must be numeric"):
             ekf._handle_vio(
                 {"t": 0.4, "dt": 0.1, "modality": "vio",
-                 "meta": {"scene_id": "S(A0,N0,V0,G0,K6)", "seq_id": "mini_seq"},
+                 "meta": {"scene_id": "S(A0,N0,V0,K1)", "seq_id": "mini_seq"},
                  "imu_payload": None, "uwb_payload": None,
                  "vio_payload": {"dx": 0.1, "dy": 0.0, "dyaw": 0.0,
                                  "quality": False, "tracked_features": 0, "reproj_err": 0.0}},

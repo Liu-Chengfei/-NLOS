@@ -1,0 +1,6 @@
+[
+  {"timestamp": 0.08, "dx": 0.030, "dy": 0.0, "dyaw": 0.0, "quality": 0.85},
+  {"timestamp": 0.13, "dx": 0.031, "dy": 0.001, "dyaw": 0.001, "quality": 0.82},
+  {"timestamp": 0.18, "dx": 0.030, "dy": 0.002, "dyaw": 0.002, "quality": 0.80},
+  {"timestamp": 0.23, "dx": 0.029, "dy": 0.002, "dyaw": 0.002, "quality": 0.81}
+]

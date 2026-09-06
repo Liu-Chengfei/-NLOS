@@ -1,0 +1,13 @@
+# Minimal split rules for sim_e9 5-seed dataset
+# 手 P22: train 6-7/seed, test ≥60/seed
+# sim_e9 has 5 seed × 4 combo × 5 seq = 100 sequences, 20/seed
+# Split: last 3/seed → val (3*5=15), rest 17/seed → train (17*5=85)
+# For quick smoke: use first 4/seed → train (4*5=20), rest 16/seed → test (16*5=80)
+split_id: sim_e9_5seed_quick
+test_fraction: 0.20
+val_fraction: 0.05
+min_train_per_seed: 4
+min_test_per_seed: 10
+min_val_per_seed: 0
+seed_offset: 0
+shuffle_within_seed: true

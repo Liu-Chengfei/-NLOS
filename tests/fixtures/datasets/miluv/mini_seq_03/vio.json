@@ -1,0 +1,20 @@
+[
+  {
+    "timestamp": 0.09,
+    "dx": 0.02,
+    "dy": 0.015,
+    "dyaw": 0.07,
+    "quality": 0.84,
+    "tracked_features": 62,
+    "reproj_err": 0.42
+  },
+  {
+    "timestamp": 0.2,
+    "dx": 0.025,
+    "dy": 0.03,
+    "dyaw": 0.18,
+    "quality": 0.79,
+    "tracked_features": 56,
+    "reproj_err": 0.54
+  }
+]

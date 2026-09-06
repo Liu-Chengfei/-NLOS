@@ -28,7 +28,7 @@ ANCHOR_POSITIONS = [
 ANCHOR_IDS = ["0", "1", "2", "3"]
 ANCHOR_INT_IDS = [0, 1, 2, 3]
 ANCHOR_COUNT = 4  # K1 档=4 锚
-N_STEPS = 4500
+N_STEPS = 18000  # S3 论文级基准 120s (150Hz × 120s)
 DT = 1 / 150
 T_END = N_STEPS * DT
 TRAJ_X_RANGE = (3.5, 16.5)
@@ -55,11 +55,10 @@ def _make_anchor_layout(seq_id: str) -> dict:
         "anchor_ids": ANCHOR_IDS,
         "anchor_positions": ANCHOR_POSITIONS,
         "anchor_count": ANCHOR_COUNT,
-        # 异步高NLOS实验主表 4 锚非对称欠定：G1（≥1 锚丢失相对 K 档欠定），
-        # K1（4 锚）；对齐 02_prepare_sim_data 的 allowed_geometry_levels={G0,G1,G2} 合同。
-        "protocol_geometry_level": "G1",
+        # 异步高NLOS实验主表 4 锚非对称欠定（K1 档：锚点分布不均、存在共线倾向）。
+        # H27 协议 (line 36): 原 G 轴并入 K 轴，统一用 K 档位描述几何约束水平。
         "protocol_k_level": "K1",
-        "source": "handbook_s2_k1_5seed",
+        "source": "handbook_s2_k1_10seed",
     }
 
 
@@ -164,7 +163,7 @@ def _make_sim_meta(seq_id: str, a_axis: str, n_axis: str) -> dict:
         "duration_s": T_END,
         "imu_steps": N_STEPS,
         "dt_imu": DT,
-        "source": "handbook_s2_k1_5seed",
+        "source": "handbook_s2_k1_10seed",
         "note": "K1=4 anchors A1-A4; K1 GDOP≈1.19 (S2 protocol arbitration registered)",
     }
 
@@ -187,12 +186,21 @@ def _write_one(out_dir: Path, seq_id: str, a_axis: str, n_axis: str) -> None:
         json.dumps(_make_sim_meta(seq_id, a_axis, n_axis), indent=2), encoding="utf-8")
 
 
+import argparse
+
 def main() -> None:
-    OUT = Path("data/raw/sim_e9_5seed_25unit")
+    parser = argparse.ArgumentParser(description="生成 sim_e9 数据集")
+    parser.add_argument("--n-seeds", type=int, default=10,
+                        help="生成 seed 数（默认 10）")
+    parser.add_argument("--seqs-per-combo", type=int, default=5,
+                        help="每个 A×N 组合生成的序列数（默认 5）")
+    args = parser.parse_args()
+
+    OUT = Path("data/raw/sim_e9_10seed_50unit")  # 10 seed × 4 combo × 5 seq = 200 seq
     OUT.mkdir(parents=True, exist_ok=True)
-    N_SEEDS = 5
+    N_SEEDS = args.n_seeds
     COMBOS = [("A2", "N2"), ("A2", "N3"), ("A3", "N2"), ("A3", "N3")]
-    SEQS_PER_COMBO = 5  # 4×5 = 20 seqs/seed
+    SEQS_PER_COMBO = args.seqs_per_combo  # 4×5 = 20 seqs/seed
     # M1 协议丢包率区间 [3%, 10%]；NLOS 区间见 _make_uwb NLOS_PROFILE
     TARGET_MISSING_RATE = (0.03 + 0.10) / 2  # 6.5% 中值
 
@@ -277,7 +285,7 @@ def main() -> None:
     print(f"Generated: {N_SEEDS} seeds × {len(COMBOS) * SEQS_PER_COMBO} seqs = {seq_total} sequences")
     print(f"Output: {OUT}")
     print(f"Anchors: K1 4-anchors A1=(2,2) A2=(18,3) A3=(6,17) A4=(16,18)")
-    print(f"Combos per seed: A2N2(5) A2N3(5) A3N2(5) A3N3(5) = 20/seed")
+    print(f"Combos per seed: A2N2({SEQS_PER_COMBO}) A2N3({SEQS_PER_COMBO}) A3N2({SEQS_PER_COMBO}) A3N3({SEQS_PER_COMBO}) = {4*SEQS_PER_COMBO}/seed, {T_END:.0f}s each")
 
 
 if __name__ == "__main__":

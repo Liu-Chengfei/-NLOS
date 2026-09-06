@@ -1,0 +1,6 @@
+{
+  "anchor_ids": [0, 1],
+  "anchor_positions": [[2.2, 0.1], [2.0, -0.1]],
+  "layout_id": "mini_seq_02_fixture_anchor_layout_v1",
+  "source": "fixture_local_anchor_layout"
+}

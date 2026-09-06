@@ -56,9 +56,9 @@ _STATE_DIM = len(_STATE_ITEMS)
 
 def _events():
     return [
-        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
-        {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 0.10}, 'vio_payload': None},
-        {'t': 0.08, 'dt': 0.03, 'modality': 'vio', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.03, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.85, 'tracked_features': 20, 'reproj_err': 1.4}},
+        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
+        {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 0.10}, 'vio_payload': None},
+        {'t': 0.08, 'dt': 0.03, 'modality': 'vio', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.03, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.85, 'tracked_features': 20, 'reproj_err': 1.4}},
     ]
 
 
@@ -237,9 +237,9 @@ def test_diagnostics_record_applied_controls_not_only_raw_model_outputs():
 
 def test_scene_default_path_keeps_applied_controls_equal_to_raw_controls():
     events = [
-        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
-        {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
-        {'t': 0.08, 'dt': 0.03, 'modality': 'vio', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.03, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.95, 'tracked_features': 150, 'reproj_err': 0.1}},
+        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
+        {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
+        {'t': 0.08, 'dt': 0.03, 'modality': 'vio', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.03, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.95, 'tracked_features': 150, 'reproj_err': 0.1}},
     ]
     estimator = create_estimator('ekf', _estimator_cfg())
 
@@ -276,8 +276,8 @@ def test_scene_default_path_keeps_applied_controls_equal_to_raw_controls():
 
 def test_run_fusion_safe_mode_cfg_can_enable_nominal_scene_convergence():
     events = [
-        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
-        {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
+        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
+        {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
     ]
     estimator = create_estimator('ekf', _estimator_cfg())
 
@@ -369,16 +369,16 @@ def test_run_fusion_updates_readout_context_cache_per_modality_without_cross_tal
     estimator = create_estimator('ekf', _estimator_cfg())
     captured_windows = []
     events = [
-        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
-        {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
+        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
+        {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
         # v3 铁律 7: 同 ±5ms 窗内 UWB/VIO 批量 step, 但 UWB 2 在 feature_window 构建后才
         # 到 flush, 之前的 UWB innovation 不可见. 在两者之间加 IMU 事件触发 IMU 路径先
         # flush pending_buffer (L759-772), UWB 1 在 UWB 2 窗口构造前 step 完成把
         # innovation_observed=True 写入 cache.
-        {'t': 0.075, 'dt': 0.025, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0}, 'uwb_payload': None, 'vio_payload': None},
-        {'t': 0.10, 'dt': 0.025, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.8, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
-        {'t': 0.20, 'dt': 0.10, 'modality': 'vio', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.03, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.85, 'tracked_features': 80, 'reproj_err': 0.2}},
-        {'t': 0.27, 'dt': 0.07, 'modality': 'vio', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.04, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.88, 'tracked_features': 90, 'reproj_err': 0.15}},
+        {'t': 0.075, 'dt': 0.025, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0}, 'uwb_payload': None, 'vio_payload': None},
+        {'t': 0.10, 'dt': 0.025, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.8, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
+        {'t': 0.20, 'dt': 0.10, 'modality': 'vio', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.03, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.85, 'tracked_features': 80, 'reproj_err': 0.2}},
+        {'t': 0.27, 'dt': 0.07, 'modality': 'vio', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.04, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.88, 'tracked_features': 90, 'reproj_err': 0.15}},
     ]
 
     class _CapturingModel:
@@ -453,12 +453,12 @@ def test_run_fusion_accepts_mapping_like_last_update_report_for_readout_context_
     wrapped_estimator = _MappingReportEstimator(estimator)
     run_fusion(
         [
-            {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
-            {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
+            {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.1, 'ay': 0.0, 'gz': 0.01}, 'uwb_payload': None, 'vio_payload': None},
+            {'t': 0.05, 'dt': 0.05, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 2.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
             # 加 IMU 事件 flush pending_buffer, 让第一个 UWB 在第二个窗口前先 step,
             # 把 innovation_observed=True 写入 cache (同 without_cross_talk 测试模式).
-            {'t': 0.075, 'dt': 0.025, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0}, 'uwb_payload': None, 'vio_payload': None},
-            {'t': 0.10, 'dt': 0.025, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,G1,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.8, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
+            {'t': 0.075, 'dt': 0.025, 'modality': 'imu', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0}, 'uwb_payload': None, 'vio_payload': None},
+            {'t': 0.10, 'dt': 0.025, 'modality': 'uwb', 'meta': {'scene_id': 'S(A2,N2,V2,K3)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.8, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
         ],
         wrapped_estimator,
         _CapturingModel(),
@@ -516,9 +516,9 @@ def test_build_readout_context_keeps_pos_cov_when_tail_covariance_entries_are_no
 
 def test_same_timestamp_events_are_consumed_in_input_order():
     events = [
-        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0}, 'uwb_payload': None, 'vio_payload': None},
-        {'t': 0.1, 'dt': 0.1, 'modality': 'vio', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.3, 'dy': 0.0, 'dyaw': 0.0, 'quality': 1.0, 'tracked_features': 120, 'reproj_err': 0.1}},
-        {'t': 0.1, 'dt': 0.0, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
+        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0}, 'uwb_payload': None, 'vio_payload': None},
+        {'t': 0.1, 'dt': 0.1, 'modality': 'vio', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.3, 'dy': 0.0, 'dyaw': 0.0, 'quality': 1.0, 'tracked_features': 120, 'reproj_err': 0.1}},
+        {'t': 0.1, 'dt': 0.0, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
     ]
 
     estimator = create_estimator('ekf', _estimator_cfg())
@@ -530,14 +530,14 @@ def test_same_timestamp_events_are_consumed_in_input_order():
 
 def test_same_timestamp_order_is_not_silently_normalized_to_fixed_modality_priority():
     uwb_then_vio = [
-        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0}, 'uwb_payload': None, 'vio_payload': None},
-        {'t': 0.1, 'dt': 0.1, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
-        {'t': 0.1, 'dt': 0.0, 'modality': 'vio', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.3, 'dy': 0.0, 'dyaw': 0.0, 'quality': 1.0, 'tracked_features': 120, 'reproj_err': 0.1}},
+        {'t': 0.0, 'dt': 0.0, 'modality': 'imu', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': {'ax': 0.0, 'ay': 0.0, 'gz': 0.0}, 'uwb_payload': None, 'vio_payload': None},
+        {'t': 0.1, 'dt': 0.1, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
+        {'t': 0.1, 'dt': 0.0, 'modality': 'vio', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.3, 'dy': 0.0, 'dyaw': 0.0, 'quality': 1.0, 'tracked_features': 120, 'reproj_err': 0.1}},
     ]
     vio_then_uwb = [
         uwb_then_vio[0],
-        {'t': 0.1, 'dt': 0.1, 'modality': 'vio', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.3, 'dy': 0.0, 'dyaw': 0.0, 'quality': 1.0, 'tracked_features': 120, 'reproj_err': 0.1}},
-        {'t': 0.1, 'dt': 0.0, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,G0,K6)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
+        {'t': 0.1, 'dt': 0.1, 'modality': 'vio', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': None, 'vio_payload': {'dx': 0.3, 'dy': 0.0, 'dyaw': 0.0, 'quality': 1.0, 'tracked_features': 120, 'reproj_err': 0.1}},
+        {'t': 0.1, 'dt': 0.0, 'modality': 'uwb', 'meta': {'scene_id': 'S(A0,N0,V0,K1)', 'seq_id': 'mini_seq'}, 'imu_payload': None, 'uwb_payload': {'anchor_id': 0, 'range': 1.0, 'valid': True, 'quality': 1.0}, 'vio_payload': None},
     ]
 
     uwb_bundle = run_fusion(uwb_then_vio, create_estimator('ekf', _estimator_cfg()), cfg={'method_name': 'ekf'})

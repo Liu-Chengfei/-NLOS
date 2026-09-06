@@ -37,7 +37,7 @@ def _build_sim_scene_id_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, 
 
     scene_id 格式必须与 encode_scene / decode_scene 的 S(A,N,V,K,M) 五轴格式一致，
     禁止包含 G 轴（几何条件由 K 轴自身编码，不单独出现在 scene_code 中）。
-    缺失时回退主表欠定默认 S(A0,N0,V0,K4,M0)。
+    缺失时回退主表欠定默认 S(A0,N0,V0,K3,M0)（K 轴协议仅 K0/K1/K3，锚数全档固定 4）。
 
     参数
     ----------
@@ -68,7 +68,7 @@ def _build_sim_scene_id_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, 
                         continue
             except Exception:
                 pass  # 解析失败时回退到主表欠定默认
-        scene_id_by_seq[seq_id] = "S(A0,N0,V0,K4,M0)"  # 主表欠定默认（与 encode_scene 五轴格式一致）
+        scene_id_by_seq[seq_id] = "S(A0,N0,V0,K3,M0)"  # 五轴档位协议：主表欠定默认 K3（K 轴仅 K0/K1/K3）
     return scene_id_by_seq
 
 
@@ -105,11 +105,11 @@ def _build_sim_axes_by_seq(seq_ids: list[str], raw_root: Path) -> dict[str, dict
                     continue
             except Exception:
                 pass
-        # 回退到主表欠定默认（S(A0,N0,V0,K4,M0) 与 scene_id_by_seq 的 fallback 一致）
-        axes_by_seq[seq_id] = {"A": "A0", "N": "N0", "V": "V0", "K": "K4", "M": "M0"}
+        # 回退到主表欠定默认（S(A0,N0,V0,K3,M0) 与 scene_id_by_seq 的 fallback 一致）
+        axes_by_seq[seq_id] = {"A": "A0", "N": "N0", "V": "V0", "K": "K3", "M": "M0"}
     return axes_by_seq
 
-_AXIS_DEFAULTS = {"A": "A0", "N": "N0", "V": "V0", "K": "K4", "M": "M0"}  # 五轴默认值，scene_id 不含 G。
+_AXIS_DEFAULTS = {"A": "A0", "N": "N0", "V": "V0", "K": "K3", "M": "M0"}  # 五轴默认值，scene_id 不含 G（K 轴协议仅 K0/K1/K3）。
 _DEFAULT_CONFIG = ROOT / "configs" / "experiments" / "e1_main_table.yaml"  # 默认实验配置。
 _DEFAULT_OUTPUT_ROOT = ROOT / "outputs" / "extended_script_smoke"  # 默认输出目录。
 _DEFAULT_FIXTURE_ROOT = ROOT / "tests" / "fixtures" / "datasets"  # 默认 fixture 数据目录。
@@ -271,9 +271,8 @@ def _build_public_scene_tasks(
     axes_by_seq : dict[str, dict[str, str]] | None
         每个序列的实际场景轴（来自 sim_meta.json 的 axes_override）。
         若提供，则其优先级高于 frozen_axes —— 这对于 sim_e9 这类
-        数据集至关重要：sim_e9 实际为 K3（3 锚点 A0/A1/A2），但
-        e5_ablation.yaml 的 frozen_axes 声明 K4，会导致 anchor_layout
-        与实际锚点不匹配，NIS 爆炸触发 §19.1 拒识。
+        数据集至关重要：sim_e9 实际为 K3，但 e5_ablation.yaml 默认 K3，
+        anchor_layout 与实际锚点不匹配时 NIS 爆炸触发 §19.1 拒识。
 
     返回
     -------
@@ -343,7 +342,7 @@ def _run_supplementary_public_route(
     prepare_manifest = load_prepare_manifest(prepare_output_root)
     # 为每个任务注入实际的场景轴：sim_e9 等仿真数据集的 scene_id（sim_curve_01_seed0）
     # 不符合 S(A,N,V,G,K) 格式，core_pipeline 无法从 scene_id 解码出轴信息；
-    # 必须从 sim_meta.json 的 axes_override 注入实际轴（如 K3 而非 e5_ablation 默认的 K4），
+    # 必须从 sim_meta.json 的 axes_override 注入实际轴（如 K3），
     # 否则 anchor_layout 与真实锚点数不匹配，NIS 会爆炸触发 §19.1 永久拒识。
     axes_by_seq = None
     if dataset_name == "sim":

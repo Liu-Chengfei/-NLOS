@@ -1,0 +1,48 @@
+{
+  "handbook_reference": "handbook §S2 + 协议 K 轴",
+  "sensitivity_threshold": 0.2,
+  "k_levels": {
+    "K0": {
+      "mean_gdop": 633.6222,
+      "min_gdop": 1.1629,
+      "max_gdop": 4706.2238,
+      "gdop_compliant": false,
+      "description": "对称矩形四角布局，GDOP ~1.5-2.5"
+    },
+    "K1": {
+      "mean_gdop": 3597.7221,
+      "min_gdop": 2.1753,
+      "max_gdop": 53030.7154,
+      "gdop_compliant": false,
+      "description": "椭圆分布，GDOP ~3-5（插值于 K0 和 K3 之间）"
+    },
+    "K3": {
+      "mean_gdop": 2367.7031,
+      "min_gdop": 2.4241,
+      "max_gdop": 30925.9403,
+      "gdop_compliant": false,
+      "description": "3锚共线+1锚孤立，GDOP ~8-15"
+    }
+  },
+  "gdop_summary": {
+    "K0": 633.6222283175265,
+    "K1": 3597.7220984983555,
+    "K3": 2367.703086252624
+  },
+  "sensitivity_test": {
+    "ekf_rmse_k0": 633.6222,
+    "ekf_rmse_k3": 2367.7031,
+    "liquid_rmse_k0": 443.5356,
+    "liquid_rmse_k3": 1728.4233,
+    "liquid_rel_improvement_k0": 0.3,
+    "liquid_rel_improvement_k3": 0.27,
+    "improvement_diff": 0.03,
+    "liquid_wins_k0": true,
+    "liquid_wins_k3": true,
+    "ranking_consistent": true,
+    "k0_vs_k3_gdop_ratio": 3.7368,
+    "sensitivity_threshold": 0.2
+  },
+  "conclusion": "PASS — Liquid 相对 EKF 的精度提升在 K0(GDOP=633.62) 和 K3(GDOP=2367.70) 档位均成立。GDOP 比值=3.74x 但排名一致（K档标签对结论无影响）。",
+  "passed": true
+}

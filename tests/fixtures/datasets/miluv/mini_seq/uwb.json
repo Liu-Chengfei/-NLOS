@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": 0.05,
+    "anchor_id": 0,
+    "range": 2.0,
+    "valid": true,
+    "quality": 0.95
+  },
+  {
+    "timestamp": 0.15,
+    "anchor_id": 1,
+    "range": 2.1,
+    "valid": true,
+    "quality": 0.9
+  }
+]

@@ -46,7 +46,7 @@ def _body_frame_delta(prev_pose: dict[str, float], curr_pose: dict[str, float]) 
 def _fake_prediction_bundle(method_name: str) -> dict:
     return {
         "seq_id": "mini_seq",
-        "scene_id": "S(A3,N3,V2,G1,K6)",
+        "scene_id": "S(A3,N3,V2,K3)",
         "method_name": method_name,
         "states": [{"px": 0.0, "py": 0.0}, {"px": 0.0, "py": 0.0}],
         "timestamps": [0.0, 0.1],
@@ -245,7 +245,7 @@ def test_baseline_script_main(tmp_path):
     assert len(prediction_index) == 3
     assert {entry["method_name"] for entry in prediction_index} == {"ekf", "robust_ekf", "fgo"}
     assert {entry["task_id"] for entry in prediction_index} == {"scene_00"}
-    assert {entry["scene_id"] for entry in prediction_index} == {"S(A3,N3,V2,G1,K4)"}
+    assert {entry["scene_id"] for entry in prediction_index} == {"S(A3,N3,V2,K1)"}
 
 
 def test_baseline_script_passes_geometry_inputs_to_core(monkeypatch, tmp_path):
@@ -333,8 +333,8 @@ def test_baseline_script_normalizes_smoke_task_bookkeeping(tmp_path, monkeypatch
         module,
         "sample_scenes",
         lambda cfg: [
-            {"task_id": "scene_00", "scene_id": "S(A3,N3,V2,G1,K4)", "axes": {"A": "A3", "N": "N3", "V": "V2", "G": "G1", "K": "K4"}},
-            {"task_id": "scene_01", "scene_id": "S(A2,N2,V2,G1,K4)", "axes": {"A": "A2", "N": "N2", "V": "V2", "G": "G1", "K": "K4"}},
+            {"task_id": "scene_00", "scene_id": "S(A3,N3,V2,K1)", "axes": {"A": "A3", "N": "N3", "V": "V2", "K": "K1"}},
+            {"task_id": "scene_01", "scene_id": "S(A2,N2,V2,K1)", "axes": {"A": "A2", "N": "N2", "V": "V2", "K": "K1"}},
         ],
     )
 
@@ -342,8 +342,8 @@ def test_baseline_script_normalizes_smoke_task_bookkeeping(tmp_path, monkeypatch
     assert captured[0]["scene_tasks"] == [
         {
             "task_id": "scene_00",
-            "scene_id": "S(A3,N3,V2,G1,K4)",
-            "axes": {"A": "A3", "N": "N3", "V": "V2", "G": "G1", "K": "K4"},
+            "scene_id": "S(A3,N3,V2,K1)",
+            "axes": {"A": "A3", "N": "N3", "V": "V2", "K": "K1"},
             "seq_id": "mini_seq",
         }
     ]
@@ -361,8 +361,7 @@ def test_baseline_script_main_with_nonmatching_config(tmp_path):
                 "  A: A1",
                 "  N: N1",
                 "  V: V1",
-                "  G: G2",
-                "  K: K4",
+                "  K: K1",
                 "  M: M0",
                 "methods: [ekf, robust_ekf, fgo]",
             ]
@@ -496,7 +495,7 @@ def test_build_manifests_script_main(tmp_path, monkeypatch, capsys):
     """
     module = _load_module("01_build_manifests.py", "build_manifests_script")
     data_root = tmp_path / "raw"
-    complete_seq = data_root / "S(A0,N0,V0,G0,K6)"
+    complete_seq = data_root / "S(A0,N0,V0,K1)"
     complete_seq.mkdir(parents=True)
     incomplete_seq = data_root / "seq_without_scene"
     incomplete_seq.mkdir()
@@ -526,7 +525,7 @@ def test_build_manifests_script_main(tmp_path, monkeypatch, capsys):
     dataset_cfg.write_text("dataset_name: miluv\nraw_root: relative/raw\n", encoding="utf-8")
     cfg_root = tmp_path / "relative" / "raw"
     cfg_root.mkdir(parents=True)
-    cfg_seq = cfg_root / "S(A1,N0,V0,G0,K6)"
+    cfg_seq = cfg_root / "S(A1,N0,V0,K1)"
     cfg_seq.mkdir()
     for filename in ("imu.json", "uwb.json", "vio.json", "gt.json"):
         _write_records(cfg_seq / filename, [])
@@ -601,7 +600,7 @@ def test_build_splits_script_main(tmp_path, monkeypatch, capsys):
         encoding="utf-8",
     )
     (manifests_root / "scene_manifest.json").write_text(
-        json.dumps({"scene_count": 1, "scenes": [{"scene_id": "S(A0,N0,V0,G0,K6)", "seq_ids": ["a", "b", "c"]}]}),
+        json.dumps({"scene_count": 1, "scenes": [{"scene_id": "S(A0,N0,V0,K1)", "seq_ids": ["a", "b", "c"]}]}),
         encoding="utf-8",
     )
     split_cfg = tmp_path / "split.yaml"
@@ -646,7 +645,7 @@ def test_build_splits_script_main(tmp_path, monkeypatch, capsys):
         encoding="utf-8",
     )
     (repo_manifests_root / "scene_manifest.json").write_text(
-        json.dumps({"scene_count": 1, "scenes": [{"scene_id": "S(A0,N0,V0,G0,K6)", "seq_ids": ["a", "b", "c"]}]}),
+        json.dumps({"scene_count": 1, "scenes": [{"scene_id": "S(A0,N0,V0,K1)", "seq_ids": ["a", "b", "c"]}]}),
         encoding="utf-8",
     )
     default_split_cfg.write_text(
@@ -949,7 +948,7 @@ def test_compute_metrics_script_main(tmp_path, capsys):
         prediction_bundle,
         {
             "seq_id": "mini_seq",
-            "scene_id": "S(A1,N0,V1,G2,K4)",
+            "scene_id": "S(A1,N0,V1,K3)",
             "method_name": "ekf",
             "states": [
                 {"timestamp": 0.0, "px": 0.0, "py": 0.0},
@@ -1004,7 +1003,7 @@ def test_compute_metrics_script_main(tmp_path, capsys):
     assert isinstance(payload["metric_table"], list)
     assert len(payload["metric_table"]) == 1
     assert payload["metric_table"][0]["seq_id"] == "mini_seq"
-    assert payload["metric_table"][0]["scene_id"] == "S(A1,N0,V1,G2,K4)"
+    assert payload["metric_table"][0]["scene_id"] == "S(A1,N0,V1,K3)"
     assert payload["metric_table"][0]["method_name"] == "ekf"
     assert payload["metric_table"][0]["failure_rate"] == 0.5
     assert payload["metric_table"][0]["corr_scaling_error"] == 1.0
@@ -1068,7 +1067,7 @@ def test_compute_metrics_script_main_rejects_non_json_safe_payload(tmp_path, mon
         prediction_bundle,
         {
             "seq_id": "mini_seq",
-            "scene_id": "S(A1,N0,V1,G2,K4)",
+            "scene_id": "S(A1,N0,V1,K3)",
             "method_name": "ekf",
             "states": [{"timestamp": 0.0, "px": 0.0, "py": 0.0}],
             "runtime_log": {"latency": [1.0], "params": 0.0, "ram_peak": 0.0},
@@ -1117,7 +1116,7 @@ def test_compute_metrics_script_main_accepts_mapping_support_report(tmp_path, mo
         prediction_bundle,
         {
             "seq_id": "mini_seq",
-            "scene_id": "S(A1,N0,V1,G2,K4)",
+            "scene_id": "S(A1,N0,V1,K3)",
             "method_name": "ekf",
             "states": [{"timestamp": 0.0, "px": 0.0, "py": 0.0}],
             "runtime_log": {"latency": [1.0], "params": 0.0, "ram_peak": 0.0},
@@ -1167,7 +1166,7 @@ def test_compute_metrics_script_main_accepts_mapping_support_report(tmp_path, mo
             {
                 "rmse": 0.0,
                 "seq_id": "mini_seq",
-                "scene_id": "S(A1,N0,V1,G2,K4)",
+                "scene_id": "S(A1,N0,V1,K3)",
                 "method_name": "ekf",
             }
         ],
@@ -1188,7 +1187,7 @@ def test_compute_metrics_script_main_defers_default_failure_threshold_to_protoco
         prediction_bundle,
         {
             "seq_id": "mini_seq",
-            "scene_id": "S(A1,N0,V1,G2,K4)",
+            "scene_id": "S(A1,N0,V1,K3)",
             "method_name": "ekf",
             "states": [{"timestamp": 0.0, "px": 0.0, "py": 0.0}],
             "runtime_log": {"latency": [1.0], "params": 0.0, "ram_peak": 0.0},
@@ -1238,7 +1237,7 @@ def test_compute_metrics_script_main_defers_default_failure_threshold_to_protoco
             {
                 "rmse": 0.0,
                 "seq_id": "mini_seq",
-                "scene_id": "S(A1,N0,V1,G2,K4)",
+                "scene_id": "S(A1,N0,V1,K3)",
                 "method_name": "ekf",
             }
         ],
@@ -1350,7 +1349,7 @@ def test_compute_metrics_script_main_default_output_path(tmp_path, monkeypatch, 
         [
             {
                 "seq_id": "mini_seq_a",
-                "scene_id": "S(A1,N0,V1,G2,K4)",
+                "scene_id": "S(A1,N0,V1,K3)",
                 "method_name": "ekf",
                 "task_id": "scene_00",
                 "states": [
@@ -1367,7 +1366,7 @@ def test_compute_metrics_script_main_default_output_path(tmp_path, monkeypatch, 
             },
             {
                 "seq_id": "mini_seq_b",
-                "scene_id": "S(A1,N0,V1,G2,K4)",
+                "scene_id": "S(A1,N0,V1,K3)",
                 "method_name": "ekf",
                 "task_id": "scene_00",
                 "states": [
@@ -1430,7 +1429,7 @@ def test_compute_metrics_script_main_default_output_path(tmp_path, monkeypatch, 
     }
     assert isinstance(payload["metric_table"], list)
     assert len(payload["metric_table"]) == 1
-    assert payload["metric_table"][0]["scene_id"] == "S(A1,N0,V1,G2,K4)"
+    assert payload["metric_table"][0]["scene_id"] == "S(A1,N0,V1,K3)"
     assert payload["metric_table"][0]["method_name"] == "ekf"
     assert payload["metric_table"][0]["task_id"] == "scene_00"
     assert "seq_id" not in payload["metric_table"][0]
@@ -1906,7 +1905,7 @@ def test_extended_script_fails_when_requested_method_surface_drops_method(tmp_pa
         lambda path: {
             "experiment_id": "e1_main_table",
             "primary_axis": "target_degradation_bundle",
-            "frozen_axes": {"A": ["A2"], "N": ["N2"], "V": "V2", "G": "G1", "K": "K6", "M": "M0"},
+            "frozen_axes": {"A": ["A2"], "N": ["N2"], "V": "V2", "K": "K3", "M": "M0"},
             "methods": ["ekf", "robust_ekf", "fgo"],
         },
     )
@@ -3049,10 +3048,10 @@ def test_high_level_consumer_script_main(tmp_path, capsys, monkeypatch):
         "\n".join(
             [
                 "case_ref,seq_id,scene_id,method_name,metric,value",
-                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,G1,K6)",robust_ekf,risk_error_corr,0.40',
-                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,G1,K6)",robust_ekf,coverage,0.85',
-                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,G1,K6)",robust_ekf,bias_alignment,0.30',
-                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,G1,K6)",robust_ekf,corr_scaling_error,0.25',
+                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,K3)",robust_ekf,risk_error_corr,0.40',
+                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,K3)",robust_ekf,coverage,0.85',
+                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,K3)",robust_ekf,bias_alignment,0.30',
+                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,K3)",robust_ekf,corr_scaling_error,0.25',
             ]
         ),
         encoding="utf-8",
@@ -3169,7 +3168,7 @@ def test_high_level_consumer_script_main_fails_with_json_summary_for_invalid_sum
             "\n".join(
                 [
                     "case_ref,seq_id,scene_id,method_name,metric,value",
-                    'case-1,mini_seq,"S(A2,N2,V2,G1,K6)",ekf,rmse,1.0',
+                    'case-1,mini_seq,"S(A2,N2,V2,K3)",ekf,rmse,1.0',
                 ]
             ),
             encoding="utf-8",
@@ -3281,7 +3280,7 @@ def test_high_level_consumer_script_main_accepts_path_like_plot_manifests_and_st
             "\n".join(
                 [
                     "case_ref,seq_id,scene_id,method_name,metric,value",
-                    'case-1,mini_seq,"S(A2,N2,V2,G1,K6)",ekf,rmse,1.0',
+                    'case-1,mini_seq,"S(A2,N2,V2,K3)",ekf,rmse,1.0',
                 ]
             ),
             encoding="utf-8",
@@ -3398,7 +3397,7 @@ def test_high_level_consumer_script_main_fails_when_plot_manifest_metrics_is_map
         "\n".join(
             [
                 "case_ref,seq_id,scene_id,method_name,metric,value",
-                'case-1,mini_seq,"S(A2,N2,V2,G1,K6)",ekf,rmse,1.0',
+                'case-1,mini_seq,"S(A2,N2,V2,K3)",ekf,rmse,1.0',
             ]
         ),
         encoding="utf-8",
@@ -3506,7 +3505,7 @@ def test_high_level_consumer_script_main_fails_when_summary_case_refs_is_mapping
         "\n".join(
             [
                 "case_ref,seq_id,scene_id,method_name,metric,value",
-                'case-1,mini_seq,"S(A2,N2,V2,G1,K6)",ekf,rmse,1.0',
+                'case-1,mini_seq,"S(A2,N2,V2,K3)",ekf,rmse,1.0',
             ]
         ),
         encoding="utf-8",
@@ -3611,7 +3610,7 @@ def test_high_level_consumer_script_main_consumes_frozen_artifacts_without_runni
         "\n".join(
             [
                 "case_ref,seq_id,scene_id,method_name,metric,value",
-                'case-1,mini_seq,"S(A2,N2,V2,G1,K6)",ekf,rmse,1.0',
+                'case-1,mini_seq,"S(A2,N2,V2,K3)",ekf,rmse,1.0',
             ]
         ),
         encoding="utf-8",
@@ -3727,8 +3726,7 @@ def test_extended_script_passes_through_e5_ablation_alias_methods(tmp_path, monk
                 "A": "A3",
                 "N": "N3",
                 "V": "V2",
-                "G": "G1",
-                "K": "K6",
+                "K": "K3",
             },
             "methods": [
                 "liquid_ekf_full",
@@ -3748,14 +3746,14 @@ def test_extended_script_passes_through_e5_ablation_alias_methods(tmp_path, monk
     assert captured[0]["experiment_cfg"]["experiment_id"] == "e5_ablation"
     scene_task = captured[0]["scene_tasks"][0]
     assert scene_task["task_id"] == "scene_0000"
-    assert scene_task["scene_id"] == "S(A3,N3,V2,G1,K6)"
+    assert scene_task["scene_id"] == "S(A3,N3,V2,K3)"
     assert scene_task["seq_id"] == "mini_seq"
-    assert scene_task["axes"] == {"A": "A3", "N": "N3", "V": "V2", "G": "G1", "K": "K6", "M": "M0"}
+    assert scene_task["axes"] == {"A": "A3", "N": "N3", "V": "V2", "K": "K3", "M": "M0"}
     assert "scene_parameters" in scene_task
-    assert captured[0]["events"] == module._default_core_events("S(A3,N3,V2,G1,K6)")
+    assert captured[0]["events"] == module._default_core_events("S(A3,N3,V2,K3)")
     assert "ground_truth_by_seq_id" in captured[0]
     assert "source_report_by_seq_id" in captured[0]
-    assert captured[0]["events"][0]["meta"]["scene_id"] == "S(A3,N3,V2,G1,K6)"
+    assert captured[0]["events"][0]["meta"]["scene_id"] == "S(A3,N3,V2,K3)"
     assert stdout_payload == {
         "route": "core",
         "stage_name": "core_pipeline",
