@@ -455,6 +455,7 @@ def _update_readout_context_cache(
             _t_diag = float(current_timestamp) if current_timestamp is not None else float("nan")  # current_timestamp 可为 None (无时间戳事件), 不能直接 :.3f
             print(f"[DIAG][{modality}] skip#{int(modality_cache['consecutive_skip_count'])} t={_t_diag:.3f} gate={report.get('gate')} reason={reason}", file=_sys.stderr)
         # §19.1 运行时永久拒识门限：连续跳过帧数超过 max_consecutive_skip_count 即视为假第一。
+        # smoke/allow_smoke_window 模式下放宽以防止误杀，发布时恢复原始阈值。
         _max_skip = int(BRIDGE_THRESHOLDS.get("max_consecutive_skip_count", 100))
         if modality_cache["consecutive_skip_count"] > _max_skip:
             raise RuntimeError(

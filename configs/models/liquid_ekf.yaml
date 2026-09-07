@@ -13,6 +13,7 @@ feature_order:
 - dyaw
 window:
   size: 20
+  allow_smoke_window: true  # 仅冒烟; 正式需 size=128 (P29)
   step: 1
 network:
   input_dim: 8

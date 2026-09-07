@@ -2222,6 +2222,25 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
         # 例外：window.allow_smoke_window=true（单元/冒烟显式声明）时保持历史行为——
         # 用现有历史填充窗口（pad-to-history），否则微型 fixture 产出的所有样本都是空窗，
         # 单元链路无法验证任何窗口语义（真实 run 不设此旗标，P31 保持 fail-loud）。
+        # smoke window 例外仅放宽 window_size=128 硬约束（P29）；
+        # 任何时候 filtered_history 为空都无法构建特征（build_feature_vector 拒绝空输入），
+        # 此时返回空窗口让 caller 丢弃样本（与 P31 精神一致）。
+        if row_count == 0:
+            empty_window = torch.zeros((0, len(feature_order)), dtype=torch.float32)
+            empty_missing = torch.zeros((0, len(feature_order)), dtype=torch.float32)
+            empty_event_t = torch.zeros((0,), dtype=torch.float32)
+            return {
+                'current_modality': event.get('modality'),
+                'feature_order': list(feature_order),
+                'feature_values': torch.zeros(len(feature_order), dtype=torch.float32),
+                'missing_mask': torch.ones(len(feature_order), dtype=torch.float32),
+                'dt': 0.0,
+                'feature_window': empty_window,
+                'missing_mask_window': empty_missing,
+                'window_index_map': [],
+                'event_time_window': empty_event_t,
+                'warmup_excluded_short_seq': True,
+            }
         if row_count < window_size and not _allow_smoke_window:
             empty_window = torch.zeros((0, len(feature_order)), dtype=torch.float32)
             empty_missing = torch.zeros((0, len(feature_order)), dtype=torch.float32)
@@ -2565,6 +2584,15 @@ def _build_liquid_samples(
 
             # 构建窗口特征张量
             window_tensor = window_builder(history, event, {'state_history': state_history})
+            # 违反项 29/31 修复：过滤 warmup_excluded_short_seq 样本（feature_window 为空）。
+            # _builder 已用 empty_window 返回标记，caller 应丢弃以免 normalization 失败。
+            if window_tensor.get('warmup_excluded_short_seq', False):
+                seq_report['skipped_warmup_excluded_short_seq'] = seq_report.get('skipped_warmup_excluded_short_seq', 0) + 1
+                # 仍需推进代理估计器，保持后续事件有状态
+                proxy_report = _advance_proxy_estimator_for_training_sample(
+                    proxy_estimator, event, allow_uwb_update=resolved_anchor_layout is not None,
+                )
+                continue
             # 构建 readout 上下文
             readout_context_by_name, readout_context_observed_by_name = _build_training_readout_context(
                 proxy_estimator,

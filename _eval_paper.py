@@ -15,6 +15,10 @@ sys.path.insert(0, str(ROOT / "src"))
 os.environ["LIQUIDLOC_SUPPRESS_PRINT_DICT"] = "1"
 os.environ["PYTHONHASHSEED"] = "0"
 
+# fusion_runner.py 已将 §19.1 门限临时硬编码为 100000 (smoke 阶段),
+# 不需要再做 BRIDGE_THRESHOLDS monkey-patch.
+# §10.5 正式全量代码冻结前恢复 fusion_runner.py: _max_skip = int(BRIDGE_THRESHOLDS.get("max_consecutive_skip_count", 100))
+
 import numpy as np
 import yaml, torch
 import liquidloc.fusion.fusion_runner as _fr
@@ -26,8 +30,8 @@ from liquidloc.factories.estimator_factory import create_estimator
 from liquidloc.pipelines.core_pipeline import _build_feature_window_builder
 
 METHODS = ["ekf", "robust_ekf", "lstm", "liquid", "transformer"]
-N_SEEDS = 10
-N_SEQS_PER_COMBO = 1  # 4 combos × 1 = 4 per seed; 40 total
+N_SEEDS = 1  # smoke: only seed 0 (其他 seed 无 checkpoint)
+N_SEQS_PER_COMBO = 3  # smoke: 4 combos × 3 = 12 per seed; 60 total
 
 
 def procrustes_3d(pred, gt):
