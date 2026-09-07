@@ -7,6 +7,7 @@
 
 # Stale file archive (round1-3 残留归档, 不跟踪)
 /.archive/
+/archive/  # 本实验旧版本/废弃文件归档物理隔离，不入 git
 
 # Python cache artifacts
 __pycache__/
