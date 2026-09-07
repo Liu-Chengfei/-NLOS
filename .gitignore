@@ -25,3 +25,7 @@ NH
 /.venv-gpu/
 /.zcode/
 /relative_train_output/
+
+# Smoke-test / scratch logs and backups
+*.log
+*.bak

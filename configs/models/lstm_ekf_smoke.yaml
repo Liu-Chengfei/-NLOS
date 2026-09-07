@@ -1,0 +1,33 @@
+name: lstm_ekf_smoke
+feature_order:
+- dt
+- ax
+- ay
+- gz
+- range
+- dx
+- dy
+- dyaw
+window:
+  size: 20
+  allow_smoke_window: true  # 仅冒烟, 正式训练需 size=128 (P29)
+network:
+  input_dim: 8
+  hidden_dim: 18
+  num_layers: 1
+  dropout: 0.0
+  output_heads:
+  - bias
+  - risk
+  - uwb_scaling
+  - vio_scaling
+train:
+  optimizer: adam
+  lr: 0.001
+  epochs: 2
+  batch_size: 16
+  loss_weights:
+    pose: 1.0
+    risk: 1.0
+    uwb_scaling: 0.5
+    vio_scaling: 0.5
