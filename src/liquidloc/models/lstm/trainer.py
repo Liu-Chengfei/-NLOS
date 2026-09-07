@@ -2560,6 +2560,8 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
                 should_save_candidate = True
         if should_save_candidate:
             candidate_path = checkpoints_dir / f'{trainer_state["model_name"]}_epoch_{epoch_index:03d}.pt'
+            # 防御性 mkdir: 训练过程中可能被外部进程 (如 RZ-0 清场归档) 删除 checkpoints 目录
+            candidate_path.parent.mkdir(parents=True, exist_ok=True)
             torch.save(checkpoint_payload, candidate_path)
             epoch_candidate_paths.append(str(candidate_path))
             epoch_candidate_epochs.append(epoch_index)
@@ -2582,6 +2584,8 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
             best_epoch = epoch_index
             checkpoint_payload["best_epoch"] = best_epoch
             checkpoint_payload["best_loss"] = best_loss
+            # 防御性 mkdir: 外部清场/归档进程可能在训练期间删除 checkpoints 目录 (race condition)
+            best_ckpt.parent.mkdir(parents=True, exist_ok=True)
             torch.save(checkpoint_payload, best_ckpt)
 
         # 偷懒审视 Round 4 真修 (用户铁律 #14) + audit #20 H2+M2 (主线程决策 2026-07):
