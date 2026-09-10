@@ -1953,6 +1953,7 @@ def _build_checkpoint_payload(
     best_loss: float,
     train_window_count: int,
     val_window_count: int,
+    config_hash: str,  # CODE-9⑦：config_hash 绑定
 ) -> dict[str, Any]:
     """构建检查点保存载荷。
 
@@ -1968,6 +1969,7 @@ def _build_checkpoint_payload(
     `best_loss` 是最佳损失值。
     `train_window_count` 是训练窗口数量。
     `val_window_count` 是验证窗口数量。
+    `config_hash` 是实验配置哈希（CODE-9⑦ 要求）。
 
     返回值:
     返回可直接传给 torch.save 的检查点字典。
@@ -1999,6 +2001,7 @@ def _build_checkpoint_payload(
         "train_window_count": int(train_window_count),
         "val_window_count": int(val_window_count),
         "model_state": _to_cpu_recursive(model.state_dict()),
+        "config_hash": config_hash,  # CODE-9⑦：config_hash 绑定
     }
 
 
@@ -2430,6 +2433,9 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
         from liquidloc.factories.model_factory import create_model as _default_create_model  # noqa: WPS433
         model_factory = _default_create_model
     model = model_factory(trainer_state["model_name"], model_cfg)
+    # CODE-9④：计算 config_hash 绑定到所有 checkpoint
+    from liquidloc.pipelines.core_pipeline import _resolve_config_hash  # 延迟导入避免循环依赖
+    _config_hash = _resolve_config_hash(train_cfg)
     # 准则 27：LSTM 模型加载后挂载激活统计 hook，训练过程持续收集 5 头统计。
     activation_collector = None
     activation_hook_handles: list[Any] = []
@@ -2583,6 +2589,7 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
             best_loss=float(val_loss),
             train_window_count=len(train_windows),
             val_window_count=len(val_windows),
+            config_hash=_config_hash,  # CODE-9⑦：绑定 config_hash
         )
         should_save_candidate = False
         if save_epoch_candidates:
