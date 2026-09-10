@@ -679,6 +679,7 @@ def _resolve_config_hash(cfg: Mapping[str, Any]) -> str:  # 计算 experiment co
         if k not in (
             'output_root', 'project_root', 'registry_path', 'experiment_protocol_path',
             'raw_root', 'field_mapping', 'seq_ids', 'dataset_name',
+            'checkpoint_path',
         )
     }
     stable_str = _json.dumps(stable_cfg, sort_keys=True, ensure_ascii=True)
