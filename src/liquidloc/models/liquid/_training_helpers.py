@@ -1553,11 +1553,11 @@ def _resolve_amp_state(train_cfg: Mapping[str, Any], runtime_device: str) -> dic
         else:
             raise ValueError(f"amp_enabled must be 'auto' or bool-like, got {amp_requested!r}")
         if not enabled:  # 不启用时直接返回。
-            return {"requested": amp_requested, "enabled": False, "dtype_name": None}  # 禁用状。
+            return {"requested": amp_requested, "enabled": False, "dtype_name": None}  # 禁用状态。
         dtype_name = "float16"  # 默认精度类型。
         if amp_dtype in {"bfloat16", "bf16"}:  # 用户请求 bfloat16。
             dtype_name = "bfloat16"  # 使用 bfloat16。
-        return {"requested": amp_requested, "enabled": True, "dtype_name": dtype_name}  # 启用状。
+        return {"requested": amp_requested, "enabled": True, "dtype_name": dtype_name}  # 启用状态。
     return {"requested": amp_requested, "enabled": False, "dtype_name": None}  # CPU 上始终禁AMP。
 
 
@@ -1576,34 +1576,22 @@ def _to_cpu_recursive(obj: Any) -> Any:
 
 
 def _build_checkpoint_payload(
-
     *,
-
     model: Any,
-
     trainer_state: dict[str, Any],
-
     optimizer: Any,
-
     seed_report: dict[str, Any],
-
     best_epoch: int,
-
     best_loss: float,
-
     train_window_count: int,
-
     val_window_count: int,
-
     current_epoch: int | None = None,
-
     lr_scheduler: Any = None,
-
 ) -> dict[str, Any]:
     """构建检查点保存的完整载荷字典。
 
-    包含模型配置、训练配置、优化器状、种子报告。
-    朢epoch/损失、窗口计数和模型参数状。
+    包含模型配置、训练配置、优化器状态、种子报告。
+    当前 epoch、损失、窗口计数和模型参数状态。
 
     所有张量强制移至 CPU 后再保存，确保与 model_factory 接口一致。
     ``weights_only=True`` 加载路径兼容。
@@ -1613,7 +1601,7 @@ def _build_checkpoint_payload(
         trainer_state: 训练器状态字典。
         optimizer: 优化器实例。
         seed_report: 种子设置报告字典。
-        best_epoch: 本€浼epoch 绱㈠紩。
+        best_epoch: 最佳 epoch 索引。
         best_loss: 最优验证损失。
         train_window_count: 训练窗口数量。
         val_window_count: 验证窗口数量。
@@ -1621,8 +1609,7 @@ def _build_checkpoint_payload(
     返回值：
         检查点载荷字典，可直接传给 torch.save。
     """
-
-    network_cfg = dict(trainer_state["network"])  # 鎷疯礉缃戠粶配置。。
+    network_cfg = dict(trainer_state["network"])  # 拷贝网络配置。
 
     network_cfg["hidden_dim"] = int(model.network.hidden_dim)  # 从模型实例读取实际隐藏维度。
 
@@ -1667,14 +1654,14 @@ def _build_checkpoint_payload(
         ),
         "seed_report": dict(seed_report),  # 种子设置报告。
         "current_epoch": None if current_epoch is None else int(current_epoch),  # 当前训练态对应的 epoch。
-        "best_epoch": int(best_epoch),  # 本€浼epoch 绱㈠紩。
-        "best_loss": coerce_finite_scalar(best_loss, name="best_loss"),  # 朢、优验证损失：写入 checkpoint 前强制有限、校验，阻断 NaN/Inf 静默穿、至 save/load 边界。
+        "best_epoch": int(best_epoch),  # 最佳 epoch 索引。
+        "best_loss": coerce_finite_scalar(best_loss, name="best_loss"),  # 最优验证损失：写入 checkpoint 前强制有限、校验，阻断 NaN/Inf 静默穿、至 save/load 边界。
 
         "train_window_count": int(train_window_count),  # 训练窗口数量。
 
         "val_window_count": int(val_window_count),  # 验证窗口数量。
 
-        "model_state": _to_cpu_recursive(model.state_dict()),  # 模型参数状、字典，张量强制 CPU。
+        "model_state": _to_cpu_recursive(model.state_dict()),  # 模型参数状态字典，张量强制 CPU。
 
     }
 
@@ -1701,12 +1688,12 @@ def train_one_epoch(train_windows, val_windows, epoch_index: int, *, model=None,
         grad_scaler: torch.amp.GradScaler 实例，amp_state 启用时必须提供。
 
     返回值：
-    ?epoch 的平均训练损失。
+    该 epoch 的平均训练损失。
 
     失败条件。
-    TypeError: ?epoch_index 不是整数时抛出。
-        ValueError: 褰epoch_index < 1。乵odel 鎴optimizer 个None。
-            或训验证窗口为空时抛出。
+    TypeError: epoch_index 不是整数时抛出。
+        ValueError: epoch_index < 1，或 model、optimizer 为 None，
+            或训练/验证窗口为空时抛出。
     """
     _amp_enabled = bool(amp_state and amp_state.get("enabled"))
     if _amp_enabled and grad_scaler is None:
