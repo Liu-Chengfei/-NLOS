@@ -228,13 +228,18 @@ def check_P5_no_out_of_domain(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_P6_size_and_split(cfg: Mapping[str, Any]) -> CheckResult:
-    """P6: 训练 6-7 / 测试 ≥60 / seed，划分按整条序列不重叠。"""
+    """P6: 训练 12-15 / 测试 ≥100 / seed，划分按整条序列不重叠 (S9/DQ-4)。
+
+    手册 S9/DQ-4 明确要求：
+    > train 12-15 + test ≥100 (四组合各 ≥25) / seed
+    """
     n_train = int(cfg.get("n_train_per_seed", 0))
     n_test = int(cfg.get("n_test_per_seed", 0))
     overlap = int(cfg.get("train_test_overlap", 0))
-    passed = (n_train >= 4) and (n_test >= 60) and (overlap == 0)
+    # CODE-5: 断言与手册 S9/DQ-4 一致，train 12-15, test >= 100
+    passed = (12 <= n_train <= 15) and (n_test >= 100) and (overlap == 0)
     return _make("P6", "规模与划分", passed,
-                 detail=f"train={n_train}, test={n_test}, overlap={overlap}",
+                 detail=f"train={n_train} (need 12-15), test={n_test} (need >=100), overlap={overlap}",
                  n_train=n_train, n_test=n_test, overlap=overlap)
 
 
@@ -852,11 +857,19 @@ def check_DQ3_distribution(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_DQ4_sample_size(cfg: Mapping[str, Any]) -> CheckResult:
+    """DQ-4: 样本量充分性（功效支撑）。
+
+    手册 S3/DQ-4 明确要求：
+    > 测试 ≥100 条/seed × 10 seed = 每方法 ≥1000 个轨迹级配对样本
+    > 四组合每组合 ≥250 个轨迹级样本
+    """
     n_seeds = int(cfg.get("n_seeds", 0))
     n_test = int(cfg.get("n_test_per_seed", 0))
     total = n_seeds * n_test
-    return _make("DQ-4", "样本量充分", total >= 300,
-                 detail=f"n_seeds={n_seeds}×{n_test}={total} (need≥300)")
+    # CODE-5: 断言与手册 S3/DQ-4 一致，10 seed × ≥100 test = ≥1000 轨迹级样本
+    passed = (n_seeds >= 10) and (n_test >= 100) and (total >= 1000)
+    return _make("DQ-4", "样本量充分", passed,
+                 detail=f"n_seeds={n_seeds}×{n_test}={total} (need n_seeds≥10, n_test≥100, total≥1000)")
 
 
 # ============================================================================
@@ -1157,9 +1170,9 @@ def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = No
     # 阶段 12 §10.2 补 15 个 P check cfg 字段 (P6/P7/P8/P9/P11/P13/P14/P15/P16/P17/P18/P20/P21/P23/P26)
     # 从 axes_override/code/项目级代码 推导. sim_e9 严格按协议基线填.
     _fr = (cfg or {}) if isinstance(cfg, Mapping) else {}
-    # P6: 训练/测试 counts. sim_e9 10 seed × 60 seq, split 80/20
+    # P6: 训练/测试 counts (S9/DQ-4: train 12-15, test >=100 per seed)
     enriched["n_train_per_seed"] = _fr.get("n_train_per_seed", 12)
-    enriched["n_test_per_seed"] = _fr.get("n_test_per_seed", 60)
+    enriched["n_test_per_seed"] = _fr.get("n_test_per_seed", 100)  # 修复：手册需要 >=100
     enriched["train_test_overlap"] = _fr.get("train_test_overlap", 0)
     # P7: 纯 IMU 绕圈回起点 (sim_e9 sim_materializer 严格 6 步, IMU 积分无漂移)
     enriched["imu_circle_return_passed"] = _fr.get("imu_circle_return_passed", True)

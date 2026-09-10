@@ -383,10 +383,12 @@ class TestDatasetCorrectnessChecks:
         assert not r.passed
 
     def test_P6_pass(self):
-        r = check_P6_size_and_split({"n_train_per_seed": 6, "n_test_per_seed": 60, "train_test_overlap": 0})
+        # 按手册 S9/DQ-4: train 12-15, test >= 100 per seed
+        r = check_P6_size_and_split({"n_train_per_seed": 12, "n_test_per_seed": 100, "train_test_overlap": 0})
         assert r.passed
 
     def test_P6_fail_too_few(self):
+        # 训练集不足 12 或 测试集不足 100 都应失败
         r = check_P6_size_and_split({"n_train_per_seed": 1, "n_test_per_seed": 10, "train_test_overlap": 0})
         assert not r.passed
 
@@ -749,10 +751,12 @@ class TestDQQualityGates:
         assert r.passed
 
     def test_DQ4_pass(self):
-        r = check_DQ4_sample_size({"n_seeds": 5, "n_test_per_seed": 60})
+        # 按手册 S3/DQ-4: 10 seed × ≥100 test = ≥1000 轨迹级样本
+        r = check_DQ4_sample_size({"n_seeds": 10, "n_test_per_seed": 100})
         assert r.passed
 
     def test_DQ4_fail(self):
+        # 训练/测试集不足都应失败
         r = check_DQ4_sample_size({"n_seeds": 2, "n_test_per_seed": 30})
         assert not r.passed
 
@@ -830,9 +834,9 @@ class TestRunAllPrechecks:
             "m1_burst_stats": {"mean_gap_s": 0.5, "max_gap_s": 1.0, "missing_rate": 0.05},
             # P4
             "measured_gdop": 1.19, "expected_gdop": 1.19, "anchor_geometry_class": "asymmetric_4",
-            # P5/P6
+            # P5/P6 (手册 S9/DQ-4: train 12-15, test >= 100 per seed)
             "boundary_violations": 0, "n_sequences": 100,
-            "n_train_per_seed": 6, "n_test_per_seed": 60, "train_test_overlap": 0,
+            "n_train_per_seed": 12, "n_test_per_seed": 100, "train_test_overlap": 0,
             # P7
             "imu_circle_return_passed": True, "yaw_direction_correct": True,
             "imu_straight_vs_turn_diff_m": 0.1,
