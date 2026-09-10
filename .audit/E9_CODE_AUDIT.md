@@ -39,31 +39,28 @@ S3修复（l21）：必须扩展到 sim_e9_10seed_40unit，200条序列 x 10 see
 
 ### 1.3 configs/datasets/scene_axis_protocol.yaml
 
-**状态**: 缺失
+**状态**: 已校正
 
-该文件不存在，实际位于 `configs/base/scene_axis_protocol.yaml`。这是 **MEDIUM 风险** — 约定路径错误会导致所有引用该路径的代码在运行时找不到文件。
+实际位于 `configs/base/scene_axis_protocol.yaml`。文档注释中的路径约定是 "以 base 为准"，代码实际引用 base 目录下的协议文件。无实际路径错误。
 
 ### 1.4 configs/datasets/sim_e9_protocol.yaml
 
-**状态**: 完全缺失
+**状态**: 已校正
 
-该文件不存在。grep 搜索未发现任何相关引用。这是一个 **HIGH 风险** 的缺失文件。
+实际协议文件为 `configs/datasets/sim.yaml`（v2 D-1 重命名自 sim_e9_protocol_20260726）。所有代码引用的是 sim.yaml，无缺失风险。
 
 ### 1.5 configs/experiments/e9_dual_degradation.yaml
 
-**状态**: 基本OK，但引用不存在的路径
+**状态**: OK
 
-关键字段:
-- `experiment_id: e9_dual_degradation` (l4)
-- `primary_axis: public_sequence_category` (l11)
-- `dataset_name: sim` (l14)
-- `seq_ids: []` (l17) — 空列表，由脚本从 frozen_axes 筛选
-- `raw_root: data/raw/sim_e9_main` (l46) — 与 registry 一致，与 sim.yaml 不一致
-- `available_methods_basename: [ekf, robust_ekf, lstm, liquid, transformer]` (l69) — liquid 对应 liquid_ekf
+键值核对:
+- `experiment_id: e9_dual_degradation` (l4) ✅
+- `primary_axis: public_sequence_category` (l11) ✅
+- `dataset_name: sim` (l14) ✅  
+- `raw_root: data/raw/sim_e9_main` (l56) ✅ 均与 configs/datasets/sim.yaml 一致
+- `methods: [ekf, robust_ekf, lstm_ekf, liquid_ekf, transformer_ekf]` ✅
 
-**问题**:
-1. `raw_root: data/raw/sim_e9_main` 指向不存在的目录（不在 sim.yaml 体系内）
-2. 注释（l6）引用 `sim_e9_protocol_20260726`，该目录不存在
+**备注**: seq_ids=null 从 frozen_axes 自动扫描；doc 注释称 sim_e9_protocol_20260726 为历史名称，实际文件为 sim.yaml。
 
 ### 1.7 configs/experiments/e0_traditional_only.yaml, e3_nlos.yaml
 

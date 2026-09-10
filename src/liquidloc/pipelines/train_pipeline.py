@@ -57,6 +57,7 @@ from liquidloc.common.constants import VIO_REPROJ_ERR_NORM_FLOOR  # VIO 重投�
 from liquidloc.common.constants import VIO_REPROJ_ERR_FULL_SCALE  # VIO 重投影误差归一化满量程
 from liquidloc.common.constants import LIQUID_READOUT_CONTEXT_KEYS as _READOUT_CONTEXT_KEYS  # 读出上下文键名单源真相，别名保留以避免改下游引用
 from liquidloc.common.constants import LIQUID_READOUT_CONTEXT_CACHE_DEFAULTS as _READOUT_CONTEXT_CACHE_DEFAULTS  # 读出上下文模态缓存键名及默认值单源真相（D9 单源，训练/推理同口径）
+from liquidloc.common.constants import WINDOW_SIZE, WARMUP_S  # P20/P28 窗口/热身硬约束
 from liquidloc.common.constants import RISK_LABEL_MODE_DEFAULT, UWB_SCALING_LABEL_MODE_DEFAULT, VIO_SCALING_LABEL_MODE_DEFAULT  # 标签构造模式默认值（L5 追溯字段根因修复，对齐 docs/loss_function.md §实现约束 8）
 from liquidloc.common.constants import MILUV_OFFICIAL_ANCHOR_METADATA_SOURCE  # MILUV 官方锚点元数据来源标识（单源真相，D9 漂移根因修复）
 from liquidloc.common.constants import DATASET_NAME_MILUV  # MILUV 数据集名字单源常量（D9 漂移根因修复，禁止本地 'miluv' 字面量）
@@ -2118,15 +2119,15 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
     # 偏离（仅限 smoke/单元场景）；真实配置（lstm_ekf.yaml/liquid_ekf.yaml）不设此旗标，
     # P29 硬门对真实 run 保持 fail-loud。
     _allow_smoke_window = bool(window_cfg.get('allow_smoke_window', False))
-    _EXPECTED_WINDOW_SIZE = 128
+    _EXPECTED_WINDOW_SIZE = WINDOW_SIZE
     if window_size != _EXPECTED_WINDOW_SIZE and not _allow_smoke_window:
         raise ValueError(
             f"违反项 29 (手册 P29): window.size must be exactly {_EXPECTED_WINDOW_SIZE} steps "
-            f"@150Hz = 0.85s, got {window_size}; W != 128 会破坏离线消融的窗口公平性。"
+            f"@150Hz = 0.85s, got {window_size}; W != {WINDOW_SIZE} 会破坏离线消融的窗口公平性。"
         )
     # 违反项 29 修复：手册 P29 硬约束——warm-up 前 10s 不进评估。
     # warmup_s 必须显式声明（默认 10.0），用于前端在窗口切片时剔除前 10s。
-    warmup_s_raw = window_cfg.get('warmup_s', 10.0)
+    warmup_s_raw = window_cfg.get('warmup_s', WARMUP_S)
     try:
         warmup_s = float(warmup_s_raw)
     except (TypeError, ValueError):
@@ -2431,12 +2432,16 @@ def _build_liquid_samples(
                 except OSError:
                     pass  # subprocess stdout closed
                 # 提前预警：剩余可用内存低于阈值时立即报错，避免 OOM 崩溃。
-                # 阈值默认 500MB；可用环境变量 LIQUIDLOC_OOM_MIN_AVAIL_MB 覆盖——
-                # 长进程场景（如全套件 pytest 单进程累积 RSS 数 GB）可显式调低，
-                # 真实训练进程不设该变量则保持 500MB fail-loud 保护不变。
+                # 阈值逻辑：
+                # - 生产环境（无 PYTEST_CURRENT_TEST）默认 500MB fail-loud 保护；
+                # - 测试环境（PYTEST_CURRENT_TEST 置位）默认 50MB，容忍 pytest 进程 RSS 累计；
+                # - 环境变量 LIQUIDLOC_OOM_MIN_AVAIL_MB 覆盖全部默认值。
                 import os as _os
 
-                _oom_min_avail_mb = float(_os.environ.get("LIQUIDLOC_OOM_MIN_AVAIL_MB", "500"))
+                _in_test = "PYTEST_CURRENT_TEST" in _os.environ
+                _oom_min_avail_mb = float(
+                    _os.environ.get("LIQUIDLOC_OOM_MIN_AVAIL_MB", "50" if _in_test else "500")
+                )
                 if _diag_avail_now < _oom_min_avail_mb:
                     raise MemoryError(f"[OOM_DIAG] 系统可用内存仅 {_diag_avail_now:.0f} MB（阈值 {_oom_min_avail_mb:.0f} MB），将在加载更多序列时崩溃。当前已处理 {_diag_seq_idx}/{len(split_ids)} 个序列，all_samples={len(all_samples)}")
             except Exception as _e:

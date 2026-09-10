@@ -326,7 +326,7 @@ class TestGitAndConfigHash:
             assert len(h) >= 7
 
     def test_config_hash_stable(self):
-        cfg = {"lr": 0.001, "epochs": 100, "batch_size": 32}
+        cfg = {"lr": 0.001, "epochs": 100, "batch_size": 16}
         h1 = compute_config_hash(cfg)
         h2 = compute_config_hash(cfg)
         assert h1 == h2

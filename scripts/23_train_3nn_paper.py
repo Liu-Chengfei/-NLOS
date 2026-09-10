@@ -64,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--n-seed", type=int, default=None, help="override n_seed (default from paper_dataset.yaml)")
     parser.add_argument("--models", type=str, nargs="+", default=["lstm_ekf", "liquid_ekf", "transformer_ekf"])
     parser.add_argument("--seq-batch-size", type=int, default=50, help="passed to LSTM/Transformer")
-    parser.add_argument("--batch-size", type=int, default=64, help="passed to Liquid/Transformer")
+    parser.add_argument("--batch-size", type=int, default=16, help="passed to Liquid/Transformer (C-1: batch=16)")
     return parser.parse_args()
 
 

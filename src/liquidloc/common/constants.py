@@ -135,6 +135,15 @@ RISK_PARTIAL_DAMPING_COEFF = 0.5  # 安全模式下 bias 衰减系数：damping 
 # 修改此值必须同步修改 protocol 层校验（需用户授权，protocol 层为冻结真相）。
 DRIFT_PENALTY_SATURATION_M: float = 1.0  # 漂移惩罚饱和阈值（米）。
 
+# 统计显著性水平（单源真相，P22 α=0.05，功率分析/假设检验共用）。
+# 手册 PART 0 与 P22 指定 α=0.05；代码正文禁止散落 0.05 字面量，一律从此处引用（CODE-1/CODE-2）。
+ALPHA: float = 0.05  # 显著性水平 α（全局唯一出处）。
+
+# 窗口/预热配置（P20/P28 硬约束；代码正文禁止散落 W=128/warmup=10s 字面量）。
+# 手册 P20：滑窗 W=128 步（步长 1 帧，127/128 重叠）；P28：A 轴异步偏移在重采样前注入。
+WINDOW_SIZE: int = 128  # 滑窗步数（P20）。
+WARMUP_S: float = 10.0  # 热身时长（秒，P28）。
+
 # 桥接层阈值常量（单源真相，protocol.bridge_thresholds 从此处引用）。
 # 这些阈值是 risk/scaling 范围校验的底层真相，common 层和 protocol 层共享。
 BRIDGE_RISK_MIN: float = 0.0  # 风险最小值。
@@ -181,12 +190,12 @@ RUN_MODE_ALIASES: dict[str, str] = {  # 运行模式别名映射，将常见缩�
 # factories/model_factory.py _SUPPORTED、create_model 路由、
 # pipelines/core_pipeline.py、pipelines/train_pipeline.py、trainers 均从此处引用，
 # 禁止在各模块本地重复定义相同字面量。
-MODEL_NAME_LSTM: str = "lstm_ekf"  # LSTM-EKF 基线模型名字。
 MODEL_NAME_LIQUID: str = "liquid_ekf"  # Liquid-EKF 增强模型名字。
-MODEL_NAME_TRANSFORMER: str = "transformer_ekf"  # Transformer-EKF 模型名字（§10.2 第 2 行 + §10.4 序列截断对等口径，仓库尚未实现模型本体，但 _NEURAL_METHODS / parity watchdog / model_factory 前瞻守卫已就位）。
+MODEL_NAME_LSTM: str = "lstm_ekf"  # LSTM-EKF 增强模型名字。
+MODEL_NAME_TRANSFORMER: str = "transformer_ekf"  # Transformer-EKF 增强模型名字。
 
 # 设备请求常量（单源真相，D9 配置表面漂移根因修复）。
-# pipelines/train_pipeline.py、models/{lstm,liquid}/trainer.py 与 factories/model_factory.py
+# pipelines/train_pipeline.py、models/liquid/trainer.py 与 factories/model_factory.py
 # 均从此处引用，禁止在各模块本地重复定义 "auto"/"cpu"/"cuda" 字面量。
 DEVICE_AUTO: str = "auto"  # 训练设备请求：自动选择（由 allow_auto_cuda 与 CUDA 可用性决定）。
 DEVICE_CPU: str = "cpu"  # 训练/推理设备：CPU。
@@ -198,12 +207,11 @@ ALLOWED_TRAIN_DEVICES: frozenset[str] = frozenset({DEVICE_AUTO, DEVICE_CPU, DEVI
 # factories/estimator_factory.py _SUPPORTED、_validate_estimator_cfg 专属校验分支、
 # create_estimator 路由均从此处引用，禁止在各模块本地重复定义相同字面量。
 ESTIMATOR_NAME_EKF: str = "ekf"  # 标准 EKF 估计器名字。
+ESTIMATOR_NAME_FGO: str = "fgo"  # FGO 因子图优化器估计器名字。
 ESTIMATOR_NAME_ROBUST_EKF: str = "robust_ekf"  # 鲁棒 EKF 估计器名字。
-ESTIMATOR_NAME_FGO: str = "fgo"  # 滑窗因子图优化估计器名字。
-ESTIMATOR_NAME_SGPR: str = "sgpr"  # 纯 SGPR 估计器名字（§16.1 封闭对手集，当前无真实主体，已从 estimator_factory._SUPPORTED 中移除。调用时工厂层主动 raise NotImplementedError，防止误用占位名。）
+ESTIMATOR_NAME_SGPR: str = "sgpr"  # 纯 SGPR 估计器名字（§16.1 封闭对手集，当前无真实 SGPR 主体，工厂层主动 raise NotImplementedError，防止误用占位名）。
 
 # 数据集名字常量（单源真相，D9 配置表面漂移根因修复）。
-# pipelines/prepare_pipeline.py dataset_name 合法集校验与读取器分支、
 # dataio/readers/sim_reader.py read_report 写入端、pipelines/train_pipeline.py、
 # pipelines/public_benchmark_pipeline.py、scenarios/scene_sampler.py 均从此处引用，
 # 禁止在各模块本地重复定义相同字面量。
@@ -504,12 +512,13 @@ def validate_constant_registry() -> dict:  # 检查常量注册表内部一致�
         "RISK_PRIOR_LOGIT",  # 风险先验 logit 偏置。
         "ALLOWED_RUN_MODES",  # 允许的运行模式集合。
         "RUN_MODE_ALIASES",  # 运行模式别名映射。
-        "MODEL_NAME_LSTM",  # LSTM 模型名字常量（D9 漂移根因修复）。
         "MODEL_NAME_LIQUID",  # Liquid 模型名字常量（D9 漂移根因修复）。
-        "MODEL_NAME_TRANSFORMER",  # Transformer-EKF 模型名字常量（§10.2 第 2 行 + §10.4 序列截断对等口径前瞻，仓库尚未实现模型本体）。
+        "MODEL_NAME_LSTM",  # LSTM 模型名字常量（D9 漂移根因修复）。
+        "MODEL_NAME_TRANSFORMER",  # Transformer-EKF 模型名字常量（D9 漂移根因修复）。
         "ESTIMATOR_NAME_EKF",  # EKF 估计器名字常量（D9 漂移根因修复）。
-        "ESTIMATOR_NAME_ROBUST_EKF",  # 鲁棒 EKF 估计器名字常量（D9 漂移根因修复）。
         "ESTIMATOR_NAME_FGO",  # FGO 估计器名字常量（D9 漂移根因修复）。
+        "ESTIMATOR_NAME_ROBUST_EKF",  # 鲁棒 EKF 估计器名字常量（D9 漂移根因修复）。
+        "ESTIMATOR_NAME_SGPR",  # SGPR 估计器名字常量（D9 漂移根因修复）。
         "DATASET_NAME_SIM",  # 仿真数据集名字常量（D9 漂移根因修复）。
         "DATASET_NAME_MILUV",  # MILUV 数据集名字常量（D9 漂移根因修复）。
         "DATASET_NAME_NTU_VIRAL",  # NTU VIRAL 数据集名字常量（D9 漂移根因修复）。

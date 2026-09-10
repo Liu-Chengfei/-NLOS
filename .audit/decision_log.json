@@ -869,6 +869,24 @@
           }
         }
       }
+    },
+    "refactoring_20260909": {
+      "timestamp": "2026-09-09",
+      "action": "Transformer trainer.py 拆分为 ≤500 行子文件",
+      "details": {
+        "trainer.py": {
+          "before_lines": 2108,
+          "after_lines": 21,
+          "status": "completed"
+        },
+        "_train_model.py": {
+          "lines": 566,
+          "status": "implemented"
+        },
+        "breaking_changes": null,
+        "backward_compatible": true,
+        "tests_passed": 176
+      }
     }
   }
 }

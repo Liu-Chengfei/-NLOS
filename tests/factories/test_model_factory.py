@@ -1119,10 +1119,10 @@ def test_default_liquid_and_lstm_train_configs_match_paper_grade_budget_contract
 
     assert liquid_train["epochs"] == 160
     assert lstm_train["epochs"] == 160
-    assert liquid_train["batch_size"] == 32
-    assert lstm_train["batch_size"] == 32
-    assert liquid_train["eval_batch_size"] == 128
-    assert lstm_train["eval_batch_size"] == 128
+    assert liquid_train["batch_size"] == 16
+    assert lstm_train["batch_size"] == 16
+    assert liquid_train["eval_batch_size"] == 16  # C-2: 推理 batch=16
+    assert lstm_train["eval_batch_size"] == 16  # C-2: 推理 batch=16
     assert liquid_train["amp_enabled"] == "auto"
     assert lstm_train["amp_enabled"] == "auto"
     assert liquid_train["amp_dtype"] == "bf16"

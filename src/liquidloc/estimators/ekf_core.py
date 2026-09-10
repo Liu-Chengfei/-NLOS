@@ -26,6 +26,7 @@ import numpy as np  # 用来做矩阵和向量运算。
 from liquidloc.common.covariance_utils import build_effective_cov  # 复用协方差缩放适配器。
 from liquidloc.common.gt_utils import resolve_anchor_position  # 锚点位置解析的规范实现
 from liquidloc.common.types import MeasurementControl, ModelIntermediate, StateEstimate  # 统一的测量控制和状态容器类型。
+from liquidloc.common.constants import ESTIMATOR_NAME_EKF  # EKF 估计器名字常量（D9 单源真相）。
 from liquidloc.common.constants import RAM_PEAK_FLOOR_MB, RAM_PEAK_PARAMS_PER_MB, VIO_REF_POSE_STALE_SECONDS  # VIO 参考位姿过时阈值；ram_peak 换算因子与下限（D9 漂移根因修复，与 model_factory 共用单源真相）。
 from liquidloc.common.validation import coerce_finite_scalar, is_bool_like, is_integer, is_real, quality_below_floor  # 集中判断 bool / np.bool_ / 实数类型，以及有限浮点转换。
 from liquidloc.estimators.predict_step import run_predict_step  # 复用 IMU 预测步骤。
@@ -313,13 +314,13 @@ class EKFCore(EstimatorAPI):
         from liquidloc.common.tee_logger import print_dict
         print_dict({
             "estimator": "EKFCore",
-            "name": (init_cfg or {}).get("name", "ekf"),
+            "name": (init_cfg or {}).get("name", ESTIMATOR_NAME_EKF),
             "cfg_keys": list(init_cfg.keys()) if isinstance(init_cfg, dict) else None,
             "measurement_noise": (init_cfg or {}).get("measurement_noise"),
             "process_noise": (init_cfg or {}).get("process_noise"),
         }, "EKFCore.__init__")
         self.cfg = copy.deepcopy(init_cfg or {})  # 深拷贝配置，防止外部修改嵌套字典污染内部状态。
-        self.name = str(self.cfg.get("name") or "ekf")  # 如果没配名字，就使用默认标识。
+        self.name = str(self.cfg.get("name") or ESTIMATOR_NAME_EKF)  # 如果没配名字，就使用默认标识。
         self.runtime_resource_meta = _build_runtime_resource_meta(self.cfg)  # 估算资源占用。
         self.params = float(self.runtime_resource_meta["params"])  # 对外展示的参数规模指标。
         self.ram_peak = float(self.runtime_resource_meta["ram_peak"])  # 保留兼容字段。

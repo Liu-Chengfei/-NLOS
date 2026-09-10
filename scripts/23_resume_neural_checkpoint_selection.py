@@ -5,6 +5,7 @@ import copy
 import importlib.util
 from pathlib import Path
 from typing import Any
+from liquidloc.common.constants import DEVICE_CPU  # 加载设备一致性
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -95,7 +96,7 @@ def _select_export_score_top_k_candidates(
             "fallback": True,
         }
         try:
-            payload = torch.load(str(path_value), map_location="cpu", weights_only=True)
+            payload = torch.load(str(path_value), map_location=DEVICE_CPU, weights_only=True)
             if isinstance(payload, dict):
                 raw_export = payload.get("export_score")
                 if raw_export is None:

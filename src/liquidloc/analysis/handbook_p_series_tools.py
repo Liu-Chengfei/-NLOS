@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from liquidloc.common.constants import ALPHA  # 显著性水平 α=0.05 单源（P22/CODE-1）
 from liquidloc.common.validation import coerce_finite_scalar
 
 
@@ -599,7 +600,7 @@ def build_unified_report(
                         ]
                         boot_stats.append(math.fsum(resample) / len(resample))
                     boot_stats.sort()
-                    alpha = 0.05 / 2.0
+                    alpha = ALPHA / 2.0  # P22 α=0.05 单源：Holm-Bonferroni 双侧置信区间
                     lower_idx = max(
                         0,
                         min(
@@ -645,7 +646,7 @@ def build_unified_report(
                             (math.fsum(resample_b) / n_b) - (math.fsum(resample_m) / n_m)
                         )
                     boot_stats.sort()
-                    alpha = 0.05 / 2.0
+                    alpha = ALPHA / 2.0  # P22 α=0.05 单源：Holm-Bonferroni 双侧置信区间
                     lower_idx = max(
                         0,
                         min(

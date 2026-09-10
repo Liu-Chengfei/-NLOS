@@ -294,8 +294,58 @@ def list_remediation_specs() -> list[dict[str, str]]:
     return P_REMEDIATION_SPECS
 
 
+def r6_check_degradation_boundary(
+    log: dict[str, Any],
+    proposed_seed_reduction: int = 0,
+    proposed_trajectory_reduction: int = 0,
+    proposed_method_reduction: int = 0,
+) -> dict[str, Any]:
+    """R-6: 降级出口边界检查 — 禁止静默降级（seed/轨迹/方法数）。
+
+    硬约束：论文级基线 = 10 seed × 5 方法 = 50 单元，每 seed 12-15 条训练轨迹 + ≥100 条测试轨迹。
+    任何降级必须：
+    1. 经用户验收裁决（R-5 兜底出口）
+    2. 记录降级原因与影响评估
+    3. 不得由执行者自行决定
+    """
+    violations = []
+    if proposed_seed_reduction > 0:
+        violations.append(f"seed 数减少 {proposed_seed_reduction}（基线 10 seed 不可降）")
+    if proposed_trajectory_reduction > 0:
+        violations.append(f"轨迹数减少 {proposed_trajectory_reduction}（基线 12-15 训练 + ≥100 测试不可降）")
+    if proposed_method_reduction > 0:
+        violations.append(f"方法数减少 {proposed_method_reduction}（基线 5 方法不可降）")
+
+    # 检查是否有用户裁决记录
+    fallback_declared = log.get("fallback_exit", {}).get("declared", False)
+    if violations and not fallback_declared:
+        violations.append("降级未获用户验收裁决（R-5 兜底出口未声明）")
+
+    log["r6_degradation_boundary"] = {
+        "violations": violations,
+        "proposed_seed_reduction": proposed_seed_reduction,
+        "proposed_trajectory_reduction": proposed_trajectory_reduction,
+        "proposed_method_reduction": proposed_method_reduction,
+        "fallback_declared": fallback_declared,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    save_decision_log(log)
+
+    return {
+        "ok": len(violations) == 0,
+        "violations": violations,
+        "baseline": {
+            "seeds": 10,
+            "methods": 5,
+            "train_trajectories_per_seed": "12-15",
+            "test_trajectories_per_seed": "≥100",
+        },
+        "notes": "R-6: 降级边界检查 — 禁止静默降级",
+    }
+
+
 def main():
-    print("[R-1..R-5] Failure attribution + remediation system ready.")
+    print("[R-1..R-6] Failure attribution + remediation system ready.")
     print(f"  decision log: {DECISION_LOG_PATH}")
     print()
     print("  R-1: classify_failure(bucket, phenomenon)")
@@ -303,6 +353,7 @@ def main():
     print("  R-3: check_rerun(attempted) — fails if attempted > 2")
     print("  R-4: declare_honest_report(in_effect, report_file)")
     print("  R-5: declare_fallback(declared, class, rationale)")
+    print("  R-6: check_degradation_boundary(proposed_seed_reduction, ...)")
     print(f"  P1..P10: record_remediation(code, audit_finding, action)")
     print()
     print("  Available classifications:")

@@ -38,6 +38,7 @@ from torch.nn import functional as F
 
 from liquidloc.common.config_utils import find_project_root
 from liquidloc.common.constants import (
+    MODEL_NAME_TRANSFORMER,
     MODALITY_UWB,
     MODALITY_VIO,
     BRIDGE_BIAS_MAX,
@@ -748,19 +749,19 @@ def _build_optimizer(
 
 def _resolve_runtime_device(device_request: str) -> tuple[torch.device, str]:
     if device_request is None or str(device_request).strip() == "":
-        return torch.device("cpu"), "cpu"
+        return torch.device(DEVICE_CPU), DEVICE_CPU
     device_request = str(device_request).strip().lower()
-    if device_request == DEVICE_AUTO or device_request == DEVICE_CUDA:
+    if device_request == DEVICE_AUTO or device_request == DEVICE_CUDA:  # C-4: 必需GPU，不可用报错
         if cuda_runtime_usable():
-            return torch.device("cuda"), "cuda"
-        return torch.device("cpu"), "cpu"
+            return torch.device(DEVICE_CUDA), DEVICE_CUDA
+        raise RuntimeError("CUDA unavailable: GPU required for training (C-4: 训练默认 GPU)")
     if device_request == DEVICE_CPU:
-        return torch.device("cpu"), "cpu"
-    if device_request.startswith(DEVICE_CUDA_PREFIX):
+        return torch.device(DEVICE_CPU), DEVICE_CPU
+    if device_request.startswith(DEVICE_CUDA_PREFIX):  # C-4: 指定cuda不适用报错
         if cuda_runtime_usable():
             idx = int(device_request.split(":")[-1])
             return torch.device(f"cuda:{idx}"), f"cuda:{idx}"
-        return torch.device("cpu"), "cpu"
+        raise RuntimeError("CUDA unavailable: GPU required for training (C-4: 训练默认 GPU)")
     try:
         return torch.device(device_request), device_request
     except RuntimeError as exc:
@@ -768,12 +769,12 @@ def _resolve_runtime_device(device_request: str) -> tuple[torch.device, str]:
 
 
 def _resolve_amp_state(train_cfg: Mapping[str, Any], runtime_device: str) -> dict[str, Any]:
-    requested = str(train_cfg.get("amp_enabled", "auto")).strip().lower()
+    requested = str(train_cfg.get("amp_enabled", DEVICE_AUTO)).strip().lower()
     enabled = False
     if requested == "true" or requested == "1":
         enabled = True
-    elif requested == "auto":
-        enabled = runtime_device == "cuda" and cuda_runtime_usable()
+    elif requested == DEVICE_AUTO:
+        enabled = runtime_device == DEVICE_CUDA and cuda_runtime_usable()
     else:
         enabled = False
     dtype_name = str(train_cfg.get("amp_dtype", "bf16")).strip().lower()
@@ -1278,7 +1279,7 @@ def _evaluate_model(
     cache_attr = "_cached_train_windows" if split == "train" else "_cached_val_windows"
     cached_windows = getattr(model, cache_attr, None)
     if cached_windows is None:
-        cache_device = torch.device("cpu")
+        cache_device = torch.device(DEVICE_CPU)
         cached_windows = _move_materialized_samples(
             _materialize_samples(
                 val_windows,
@@ -1578,6 +1579,8 @@ class TransformerTrainer:
         *,
         model=None,
         optimizer=None,
+        amp_state=None,
+        grad_scaler=None,
     ) -> float:
         return train_one_epoch(
             train_windows,
@@ -1589,6 +1592,8 @@ class TransformerTrainer:
             loss_weights=self._loss_weights,
             bias_huber_delta=self._bias_huber_delta,
             scaling_log_eps=self._scaling_log_eps,
+            amp_state=amp_state,
+            grad_scaler=grad_scaler,
         )
 
 
@@ -1633,14 +1638,14 @@ def build_trainer_state(train_cfg: dict) -> dict:
     output_root = train_cfg.get("output_root")
     if output_root is None:
         project_root = find_project_root()
-        output_root = project_root / "outputs" / "transformer_ekf"
+        output_root = project_root / "outputs" / MODEL_NAME_TRANSFORMER
     elif isinstance(output_root, str) and not output_root.strip():
         raise ValueError("train.output_root must be a non-empty string.")
     elif not isinstance(output_root, (str, Path)):
         raise TypeError(f"train.output_root must be a str or Path, got {type(output_root).__name__}")
     output_root = Path(output_root)
     return {
-        "model_name": str(train_cfg.get("name", "transformer_ekf")),
+        "model_name": str(train_cfg.get("name", MODEL_NAME_TRANSFORMER)),
         "train": train_section,
         "optimizer": {
             "name": optimizer_name,
@@ -1677,7 +1682,12 @@ def train_one_epoch(
     loss_weights: Mapping[str, float] | None = None,
     bias_huber_delta: float = _BIAS_HUBER_DELTA,
     scaling_log_eps: float = _SCALING_LOG_EPS,
+    amp_state: Mapping[str, Any] | None = None,
+    grad_scaler: Any = None,
 ) -> float:
+    _amp_enabled = bool(amp_state and amp_state.get("enabled"))
+    if _amp_enabled and grad_scaler is None:
+        raise ValueError("grad_scaler must be provided when amp_state['enabled'] is True (C-3)")
     if not is_integer(epoch_index):
         raise TypeError("epoch_index must be an integer.")
     if epoch_index < 1:
@@ -1698,7 +1708,7 @@ def train_one_epoch(
     model.train()
     cached_materialized = getattr(model, "_cached_train_windows", None)
     if not cached_materialized:
-        cache_device = torch.device("cpu")
+        cache_device = torch.device(DEVICE_CPU)
         cached_materialized = _move_materialized_samples(
             _materialize_samples(
                 train_windows,
@@ -1718,16 +1728,35 @@ def train_one_epoch(
             end_index = min(len(sequence_group), start_index + batch_size)
             batch_samples = sequence_group[start_index:end_index]
             optimizer.zero_grad(set_to_none=True)
-            loss_value = _loss_for_length_group(
-                model,
-                batch_samples,
-                loss_weights=loss_weights,
-                bias_huber_delta=bias_huber_delta,
-                scaling_log_eps=scaling_log_eps,
-            )
-            loss_value.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=gradient_clip_max_norm)
-            optimizer.step()
+            if _amp_enabled:
+                _dtype = torch.float16 if amp_state.get("dtype_name") == "float16" else torch.bfloat16
+                with torch.autocast(device_type="cuda", dtype=_dtype):
+                    loss_value = _loss_for_length_group(
+                        model,
+                        batch_samples,
+                        loss_weights=loss_weights,
+                        bias_huber_delta=bias_huber_delta,
+                        scaling_log_eps=scaling_log_eps,
+                    )
+            else:
+                loss_value = _loss_for_length_group(
+                    model,
+                    batch_samples,
+                    loss_weights=loss_weights,
+                    bias_huber_delta=bias_huber_delta,
+                    scaling_log_eps=scaling_log_eps,
+                )
+
+            if _amp_enabled:
+                grad_scaler.scale(loss_value).backward()
+                grad_scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=gradient_clip_max_norm)
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
+            else:
+                loss_value.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=gradient_clip_max_norm)
+                optimizer.step()
             loss_sum += float(loss_value.detach().item())
             loss_count += 1
     return loss_sum / float(loss_count)
@@ -1818,7 +1847,7 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
         name="tail_selection_observation_coeff",
         min_value=0.0,
     )
-    cache_device = torch.device("cpu")
+    cache_device = torch.device(DEVICE_CPU)
     model._cached_train_windows = _move_materialized_samples(
         _materialize_samples(
             train_windows,
@@ -1834,6 +1863,7 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
         cache_device,
     )
     amp_state = _resolve_amp_state(trainer_state["train"], runtime_device)
+    grad_scaler = torch.amp.GradScaler(enabled=bool(amp_state.get("enabled"))) if amp_state.get("enabled") else None  # C-3: AMP scaler
 
     output_root = Path(trainer_state["output_root"])
     checkpoints_dir = output_root / "checkpoints"
@@ -1890,6 +1920,8 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
             epoch_index,
             model=model,
             optimizer=optimizer,
+            amp_state=amp_state,
+            grad_scaler=grad_scaler,
         )
         train_eval_loss, train_batches, train_epoch_snapshot = transformer_trainer._evaluate_model(
             model,
@@ -2099,9 +2131,9 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
         }
         # 重新持久化（追加 activation_stats 后）
         report_path.write_text(dumps_json_text(train_report), encoding="utf-8")
-    model.network.to("cpu")
+    model.network.to(DEVICE_CPU)
     if hasattr(model, "risk_calibration") and hasattr(model.risk_calibration, "to"):
-        model.risk_calibration.to("cpu")
+        model.risk_calibration.to(DEVICE_CPU)
     for attr in ("_cached_train_windows", "_cached_val_windows"):
         if hasattr(model, attr):
             delattr(model, attr)

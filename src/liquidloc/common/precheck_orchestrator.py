@@ -24,12 +24,86 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from liquidloc.common.constants import WINDOW_SIZE, WARMUP_S  # P20/P28 窗口/热身硬约束
 from liquidloc.common.validation import coerce_finite_scalar
 
 
 # 误差预算常量（手册 Part 0 S4）
 LOS_NOISE_SIGMA_M: float = 0.6
 GDOP_DEFAULT: float = 1.19
+
+
+def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Andrew 单调链算法计算 2D 点集凸包（逆时针排列）。
+
+    锚点可能以任意 ID 顺序给出，必须先求凸包再做边界距离判定。
+    返回逆时针顶点列表；点数 < 3 时返回原列表。
+    """
+    pts = sorted(set(points))
+    if len(pts) <= 2:
+        return pts
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list[tuple[float, float]] = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    upper: list[tuple[float, float]] = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    # 去掉每段最后一个点（它是下一段的起点，重复）
+    return lower[:-1] + upper[:-1]
+
+
+def _point_in_convex_polygon(point: tuple[float, float], polygon: list[tuple[float, float]]) -> bool:
+    """检查点是否在（逆时针排列的）凸多边形内（含边界）。
+
+    使用叉积符号一致性：点在凸多边形内当且仅当它与所有有向边的叉积 ≥ 0（逆时针）。
+    调用方须保证 polygon 已由 _convex_hull 排好序。
+    """
+    px, py = point
+    n = len(polygon)
+    if n < 3:
+        return False
+    for i in range(n):
+        x1, y1 = polygon[i]
+        x2, y2 = polygon[(i + 1) % n]
+        cross = (x2 - x1) * (py - y1) - (y2 - y1) * (px - x1)
+        if cross < 0:  # 逆时针凸包：任一有向边叉积 < 0 → 点在外部
+            return False
+    return True
+
+
+def _point_to_convex_polygon_boundary_distance(
+    point: tuple[float, float],
+    polygon: list[tuple[float, float]]
+) -> float:
+    """计算点到凸多边形边界的最近（欧氏）距离（恒 ≥ 0）。
+
+    对每条边求点到线段距离，取最小。内部/外部都返回正的边界距离；
+    内外判定由 _point_in_convex_polygon 单独负责。
+    """
+    px, py = point
+    min_dist_sq = float('inf')
+    for i in range(len(polygon)):
+        x1, y1 = polygon[i]
+        x2, y2 = polygon[(i + 1) % len(polygon)]
+        # 点到线段最近距离
+        dx, dy = x2 - x1, y2 - y1
+        seg_len_sq = dx * dx + dy * dy
+        if seg_len_sq == 0:
+            continue
+        t = max(0, min(1, ((px - x1) * dx + (py - y1) * dy) / seg_len_sq))
+        projx = x1 + t * dx
+        projy = y1 + t * dy
+        dist_sq = (px - projx) ** 2 + (py - projy) ** 2
+        min_dist_sq = min(min_dist_sq, dist_sq)
+    return math.sqrt(min_dist_sq) if min_dist_sq != float('inf') else 0.0
 
 
 @dataclass
@@ -511,7 +585,7 @@ def check_P20_window(cfg: Mapping[str, Any]) -> CheckResult:
     warmup = float(cfg.get("warmup_s", -1.0))
     no_cross = bool(cfg.get("no_window_cross_seq", False))
     imu_no_cross = bool(cfg.get("imu_no_cross_seq_concat", False))
-    return _make("P20", "窗口化", W == 128 and warmup == 10.0 and no_cross and imu_no_cross,
+    return _make("P20", "窗口化", W == WINDOW_SIZE and warmup == WARMUP_S and no_cross and imu_no_cross,
                  detail=f"W={W}, warmup={warmup}, no_cross={no_cross}, imu_no_cross={imu_no_cross}")
 
 
@@ -955,6 +1029,26 @@ def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = No
     if composition_counts:
         enriched["composition_counts"] = composition_counts
 
+    # Pre-6: 统计有效 seed 数量（检查每个 seed 是否包含数据清单）
+    # 兼容 2 种目录约定：
+    # 1. seed 级 manifest.json（新版物化产物）
+    # 2. seq 级 sim_meta.json（旧版物化产物）
+    n_manifest_seeds = 0
+    for seed_dir in sorted(raw_root_path.iterdir()):
+        if not seed_dir.is_dir() or not seed_dir.name.startswith("seed"):
+            continue
+        # 优先检查 seed 级 manifest.json
+        has_seed_manifest = (seed_dir / "manifest.json").is_file()
+        # 否则检查 seq 级 sim_meta.json
+        has_seq_meta = any(
+            (sd / "sim_meta.json").is_file()
+            for sd in seed_dir.iterdir()
+            if sd.is_dir()
+        )
+        if has_seed_manifest or has_seq_meta:
+            n_manifest_seeds += 1
+    enriched["n_manifest_seeds"] = n_manifest_seeds
+
     # P3: M1 成簇丢包统计 (从第一个 seed 抽样)
     first_seed = next((p for p in sorted(raw_root_path.iterdir())
                        if p.is_dir() and p.name.startswith("seed")), None)
@@ -1027,7 +1121,8 @@ def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = No
             except Exception:
                 pass
 
-    # P5: 边界违规 (凸包距 < 1.5m 帧数)
+    # P5: 边界违规 (凸包距 < 1.5m 帧数) — 手册 §P5 严格实现
+    # 不再用"距最近锚点 < 1.5m"近似；改为凸包边界距离判定。
     if first_seed is not None:
         for sd in first_seed.iterdir():
             if not sd.is_dir() or not (sd / "gt.json").is_file():
@@ -1042,12 +1137,16 @@ def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = No
                 pos = al.get("anchor_positions") or []
                 if len(ids) < 3 or len(pos) < 3 or not gts:
                     continue
-                pts = [(float(p[0]), float(p[1])) for p in pos[:len(ids)]]
+                raw_pts = [(float(p[0]), float(p[1])) for p in pos[:len(ids)]]
+                # 锚点以任意 ID 顺序给出，必须先求凸包
+                hull = _convex_hull(raw_pts)
                 violations = 0
                 for r in gts:
                     px, py = float(r["px"]), float(r["py"])
-                    dmin = min(((px - ax) ** 2 + (py - ay) ** 2) ** 0.5 for ax, ay in pts)
-                    if dmin < 1.5:
+                    # 手册 §P5：轨迹必须在锚区凸包内，且距凸包边界 ≥ 1.5m
+                    hull_inside = _point_in_convex_polygon((px, py), hull)
+                    hull_dist = _point_to_convex_polygon_boundary_distance((px, py), hull)
+                    if not hull_inside or hull_dist < 1.5:
                         violations += 1
                 enriched["boundary_violations"] = enriched.get("boundary_violations", 0) + violations
                 enriched["n_sequences"] = enriched.get("n_sequences", 0) + 1
@@ -1103,8 +1202,8 @@ def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = No
     enriched["lstm_n_output_heads"] = _fr.get("lstm_n_output_heads", 4)
     enriched["transformer_n_output_heads"] = _fr.get("transformer_n_output_heads", 4)
     # P20: 窗口化
-    enriched["window_size"] = _fr.get("window_size", 128)
-    enriched["warmup_s"] = _fr.get("warmup_s", 10.0)
+    enriched["window_size"] = _fr.get("window_size", WINDOW_SIZE)
+    enriched["warmup_s"] = _fr.get("warmup_s", WARMUP_S)
     enriched["no_window_cross_seq"] = _fr.get("no_window_cross_seq", True)
     enriched["imu_no_cross_seq_concat"] = _fr.get("imu_no_cross_seq_concat", True)
     # P21: 归一化隔离

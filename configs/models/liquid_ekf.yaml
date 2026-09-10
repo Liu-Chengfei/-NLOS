@@ -52,7 +52,7 @@ train:
   weight_decay: 0.0
   epochs: 160
   batch_size: 16
-  eval_batch_size: 128
+  eval_batch_size: 16  # C-2: 推理 batch=16，轨迹间不混批
   amp_enabled: auto
   amp_dtype: bf16
   save_epoch_candidates: true

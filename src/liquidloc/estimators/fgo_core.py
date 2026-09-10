@@ -59,6 +59,7 @@ _logger = logging.getLogger(__name__)  # 模块级日志器，用于记录求解
 from liquidloc.common.angle_utils import angle_delta_rad, wrap_angle_rad  # 处理角度差和角度归一化。
 from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS  # 桥接层业务阈值常量
 from liquidloc.common.constants import DEFAULT_THRESHOLDS  # 全局默认阈值表（质量上下界单源真相）。
+from liquidloc.common.constants import ESTIMATOR_NAME_FGO  # FGO 估计器名字常量（D9 单源真相）。
 from liquidloc.common.constants import QUALITY_FLOOR_EPSILON  # 质量门槛比较浮点容差
 from liquidloc.common.constants import VIO_MEASUREMENT_ITEMS  # VIO 测量项常量（单源真相）。
 from liquidloc.common.constants import VIO_REF_POSE_STALE_SECONDS  # VIO 参考位姿过时阈值。
@@ -518,7 +519,7 @@ class FGOCore(EKFCore):
         from liquidloc.common.tee_logger import print_dict
         print_dict({
             "estimator": "FGOCore",
-            "name": (init_cfg or {}).get("name", "fgo"),
+            "name": (init_cfg or {}).get("name", ESTIMATOR_NAME_FGO),
             "cfg_keys": list(init_cfg.keys()) if isinstance(init_cfg, dict) else None,
             "window_size": (init_cfg or {}).get("window_size", _MISSING),
             "optimizer": (init_cfg or {}).get("optimizer"),
@@ -527,7 +528,7 @@ class FGOCore(EKFCore):
             "robust_weight": (init_cfg or {}).get("robust_weight"),
         }, "FGOCore.__init__")
         super().__init__(init_cfg)  # 先建立基础状态、协方差和默认配置。
-        self.name = str(self.cfg.get("name") or "fgo")  # 给上层日志用的名字。
+        self.name = str(self.cfg.get("name") or ESTIMATOR_NAME_FGO)  # 给上层日志用的名字。
         self._pose_indices_cache = tuple(state_items.index(key) for key in self._POSE_KEYS)  # 缓存位姿在完整状态里的索引。
         # §10.3 偷懒审视固化第二轮：window_size 与 τ/ratio 同属 spec 第1663行 "可复述且不可博弈"
         # 五量之一（fgo.yaml L14-24 注释明示同口径），同样强制显式写死，禁止代码默认值

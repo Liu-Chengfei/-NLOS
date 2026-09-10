@@ -645,8 +645,8 @@ def test_small_eval_neural_search_surface_is_explicitly_narrowed_for_incomplete_
     assert surface["training_budget"] == {
         "lstm_epochs": 80,
         "liquid_epochs": 80,
-        "batch_size": 64,
-        "eval_batch_size": 128,
+        "batch_size": 16,  # C-1: 训练 batch=16
+        "eval_batch_size": 16,  # C-2: 推理 batch=16
         "budget_source": "profile_default",
         "paper_grade": False,
         "diagnostic_only": True,
@@ -683,8 +683,8 @@ def test_medium_eval_neural_search_surface_restores_representative_multiseed_bud
     assert surface["training_budget"] == {
         "lstm_epochs": 120,
         "liquid_epochs": 120,
-        "batch_size": 64,
-        "eval_batch_size": 128,
+        "batch_size": 16,  # C-1: 训练 batch=16
+        "eval_batch_size": 16,  # C-2: 推理 batch=16
         "budget_source": "profile_default",
         "paper_grade": False,
         "diagnostic_only": True,
@@ -895,8 +895,8 @@ def test_resolve_training_budget_overrides_uses_profile_default_and_cli_override
     assert profile_budget == {
         "lstm_epochs": 160,
         "liquid_epochs": 160,
-        "batch_size": 64,
-        "eval_batch_size": 128,
+        "batch_size": 16,  # C-1: 训练 batch=16
+        "eval_batch_size": 16,  # C-2: 推理 batch=16
         "paper_grade": True,
         "diagnostic_only": False,
         "budget_source": "profile_default",
@@ -2546,16 +2546,16 @@ def test_fairness_audit_exposes_seed_risk_and_params(tmp_path, monkeypatch):
     assert audit["neural_budget"]["liquid_ekf"]["coupled_weight_decay_values"] == [0.0001]
     assert audit["neural_budget"]["lstm_ekf"]["resolved_training_budget"] == {
         "epochs": 160,
-        "batch_size": 64,
-        "eval_batch_size": 128,
+        "batch_size": 16,  # C-1: 训练 batch=16
+        "eval_batch_size": 16,  # C-2: 推理 batch=16
         "budget_source": "profile_default",
         "paper_grade": True,
         "diagnostic_only": False,
     }
     assert audit["neural_budget"]["liquid_ekf"]["resolved_training_budget"] == {
         "epochs": 160,
-        "batch_size": 64,
-        "eval_batch_size": 128,
+        "batch_size": 16,  # C-1: 训练 batch=16
+        "eval_batch_size": 16,  # C-2: 推理 batch=16
         "budget_source": "profile_default",
         "paper_grade": True,
         "diagnostic_only": False,

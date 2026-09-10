@@ -25,6 +25,7 @@ warnings.filterwarnings("ignore")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from liquidloc.factories.model_factory import create_model  # noqa: E402
+from liquidloc.common.constants import DEVICE_CPU  # 加载设备一致性
 
 ROOT = Path(__file__).resolve().parents[1]
 EVENTS_DIR = ROOT / "outputs" / "prepare_sim"
@@ -74,7 +75,7 @@ def _sim3_align_2d(preds: list[tuple[float, float]], gts: list[tuple[float, floa
 
 def _load_checkpoint(model, path: Path) -> bool:
     """Load checkpoint into ModelAPI wrapper."""
-    ckpt = torch.load(path, map_location="cpu", weights_only=False)
+    ckpt = torch.load(path, map_location=DEVICE_CPU, weights_only=False)
     if not isinstance(ckpt, dict):
         return False
     # Use full model_state which has {network, risk_calibration, ...}
@@ -135,7 +136,7 @@ def main():
             continue
         print(f"\n=== {method_name} ===")
         # Get full cfg (including network) from checkpoint to match trained dimensions
-        ckpt_meta = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        ckpt_meta = torch.load(ckpt_path, map_location=DEVICE_CPU, weights_only=False)
         model_cfg = ckpt_meta.get("model_cfg", {})
         network_cfg = model_cfg.get("network", {})
         feature_order = model_cfg.get("feature_order", ["dt", "ax", "ay", "gz", "range", "dx", "dy", "dyaw"])

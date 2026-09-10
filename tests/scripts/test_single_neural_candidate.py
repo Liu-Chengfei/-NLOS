@@ -148,13 +148,13 @@ def test_resolve_budget_uses_profile_specific_epoch_key():
         "training_budget": {
             "lstm_epochs": 160,
             "liquid_epochs": 160,
-            "batch_size": 64,
-            "eval_batch_size": 128,
+            "batch_size": 16,
+            "eval_batch_size": 16,  # C-1/C-2: batch=16
         }
     }
 
-    assert script._resolve_budget(surface, "lstm_ekf") == (160, 64, 128)
-    assert script._resolve_budget(surface, "liquid_ekf") == (160, 64, 128)
+    assert script._resolve_budget(surface, "lstm_ekf") == (160, 16, 16)  # C-1/C-2: batch=16
+    assert script._resolve_budget(surface, "liquid_ekf") == (160, 16, 16)  # C-1/C-2: batch=16
 
 
 def test_resolve_runtime_surface_backfills_paper_epoch_stride_when_report_is_legacy(tmp_path):
@@ -283,8 +283,8 @@ def test_main_passes_paper_baseline_metrics_to_neural_candidate_and_summary(tmp_
             "training_budget": {
                 "liquid_epochs": 160,
                 "lstm_epochs": 160,
-                "batch_size": 32,
-                "eval_batch_size": 32,
+                "batch_size": 16,
+                "eval_batch_size": 16,
             },
             "neural_grid": {
                 "liquid_ekf": {"window": [20], "hidden_dim": [44], "lr": [1e-3]},

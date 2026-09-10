@@ -93,10 +93,10 @@ class TestVerifySeedList:
 
 class TestHyperparameterTable:
     def test_serialize_basic(self):
-        cfg = {"lr": 0.001, "batch_size": 32, "epochs": 100, "optimizer": "adam"}
+        cfg = {"lr": 0.001, "batch_size": 16, "epochs": 100, "optimizer": "adam"}
         out = serialize_hyperparameters(cfg)
         assert out["lr"] == 0.001
-        assert out["batch_size"] == 32
+        assert out["batch_size"] == 16
         assert out["epochs"] == 100
         assert out["optimizer"] == "adam"
         assert "output_root" not in out  # excluded by default key list
@@ -121,7 +121,7 @@ class TestHyperparameterTable:
         assert "obj" not in out  # 'obj' not in default keys → skipped
 
     def test_hash_deterministic(self):
-        cfg = {"lr": 0.001, "batch_size": 32, "epochs": 100}
+        cfg = {"lr": 0.001, "batch_size": 16, "epochs": 100}
         h1 = compute_hyperparameter_hash(cfg)
         h2 = compute_hyperparameter_hash(cfg)
         assert h1 == h2

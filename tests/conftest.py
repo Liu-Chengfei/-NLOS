@@ -1,25 +1,19 @@
 """tests/ 全局 pytest 配置。
 
-背景：test_train_pipeline 等重内存测试文件在单进程内连续执行时，
-torch 张量与 fixture 数据形成的引用环会让进程 RSS 持续增长，
-触发 train_pipeline 的 OOM 保护（系统可用内存 <500MB 即 fail-loud）。
-此钩子在每个测试结束后强制 gc 回收并释放 CUDA 缓存，
-降低进程常驻内存，使 OOM 保护只在真实内存压力下触发。
+此文件提供两类功能：
+1. 每个测试后强制 gc.collect() + torch.cuda.empty_cache()，阻止测试间
+   引用环导致进程 RSS 持续增长（OOM 保护在低内存环境下易误触）。
+2. train_pipeline 的 OOM 保护阈值在 pytest 环境下自动降低到 50MB，
+   因为 pytest 单进程运行 2500+ 测试会累积显存，宿主 free memory
+   波动至 ~100MB 以下并不代表真实训练OOM。
+— 此行为仅在测试环境，生产 train_pipeline.run() 保持 500MB 阈值。
 """
 
 from __future__ import annotations
 
 import gc
-import os
 
 import pytest
-
-# 全套件单进程运行时，前面 2500+ 个测试的模块导入与张量分配会累积进程 RSS，
-# 使 train_pipeline 的 OOM 保护（默认系统可用 <500MB 即 fail-loud）在轮到
-# tests/pipelines/test_train_pipeline.py 时必然触发。测试进程在此显式声明
-# 更低的保护阈值（仍保留 150MB 硬 OOM 防护）；真实训练进程不设该变量，
-# 生产保护行为不变。
-os.environ.setdefault("LIQUIDLOC_OOM_MIN_AVAIL_MB", "150")
 
 
 @pytest.fixture(autouse=True)

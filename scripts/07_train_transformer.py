@@ -3,7 +3,7 @@
 设计目标：
 - 与 05_train_lstm.py / 06_train_liquid.py 完全同口径（输入输出、checkpoint 路径、流式分批逻辑）。
 - Transformer 默认使用 8 raw feature（dt/ax/ay/gz/range/dx/dy/dyaw）、window=20、单层 causal Transformer。
-- 与 LSTM / Liquid 公平比对：相同 160 epochs、相同 batch_size=64、相同 lr、相同 lr scheduler
+- 与 LSTM / Liquid 公平比对：相同 160 epochs、相同 batch_size=16、相同 lr、相同 lr scheduler
   (CosineAnnealingLR T_max=160 eta_min=5e-5)、相同 4 输出头 (bias/risk/uwb_scaling/vio_scaling)。
 
 调用示例：
@@ -66,7 +66,7 @@ def main(argv=None):
                         help="Streaming batch size: split split_ids into sub-batches of N seq each, "
                              "run train_pipeline per batch, share model/optimizer state.")
     parser.add_argument("--batch-size", type=int, default=None,
-                        help="Override model_cfg.train.batch_size (default: from transformer_ekf.yaml = 64).")
+                        help="Override model_cfg.train.batch_size (default: from transformer_ekf.yaml = 16).")
     parser.add_argument("--disable-scene-leak-check", action="store_true",
                         help="Bypass §0.2 scene_id leakage check. Required for sim_e9 single-scene protocol.")
     args = parser.parse_args(argv)

@@ -31,6 +31,7 @@ os.environ.setdefault("LIQUIDLOC_SUPPRESS_PRINT_DICT", "1")
 import torch
 import yaml
 from liquidloc.common.config_utils import load_yaml_config
+from liquidloc.common.constants import DEVICE_CPU  # 加载设备一致性
 from liquidloc.factories.model_factory import create_model
 from liquidloc.factories.estimator_factory import create_estimator
 from liquidloc.fusion.fusion_runner import run_fusion
@@ -242,7 +243,7 @@ def main() -> int:
         if ckpt_path.exists():
             try:
                 model = create_model(method, model_cfg)
-                ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+                ck = torch.load(ckpt_path, map_location=DEVICE_CPU, weights_only=False)
                 # Checkpoint stores model state under 'model_state' → load from there
                 sd = ck.get("model_state") or ck.get("state_dict") or ck
                 model.load_state_dict(sd)

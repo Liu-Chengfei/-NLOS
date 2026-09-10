@@ -463,8 +463,8 @@ def test_lstm_yaml_default_paper_grade_training_contract():
     assert trainer_state["optimizer"]["weight_decay"] == pytest.approx(0.0)
     assert trainer_state["epochs"] == 160
     assert trainer_state["patience"] == 160
-    assert trainer_state["train"]["batch_size"] == 32
-    assert trainer_state["train"]["eval_batch_size"] == 128
+    assert trainer_state["train"]["batch_size"] == 16
+    assert trainer_state["train"]["eval_batch_size"] == 16  # C-2: 推理 batch=16
     assert trainer_state["train"]["amp_enabled"] == "auto"
     assert trainer_state["train"]["amp_dtype"] == "bf16"
     assert trainer_state["train"]["save_epoch_candidates"] is True

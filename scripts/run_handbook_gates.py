@@ -234,6 +234,7 @@ def run_r_series() -> dict[str, Any]:
             R3_check_rerun_rounds,
             R4_check_honest_report,
             R5_check_fallback_exit,
+            R6_check_restart_from_aud1,
         )
         log = json.loads(log_path.read_text(encoding="utf-8"))
         return {
@@ -242,6 +243,7 @@ def run_r_series() -> dict[str, Any]:
             "R-3": R3_check_rerun_rounds(log),
             "R-4": R4_check_honest_report(log),
             "R-5": R5_check_fallback_exit(log),
+            "R-6": R6_check_restart_from_aud1(log),
         }
     except ImportError:
         # r_series 模块未实现时退化：直接读 log 字段

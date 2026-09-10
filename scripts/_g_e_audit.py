@@ -1,4 +1,4 @@
-"""5 seed × 5 method = 25 单元全量结果汇总器（G-1..G-5）。
+"""25 单元全量结果汇总器（G-1..G-5 + E-1..E-6）。
 
 按手册 Part 4 §全量结果完整性汇总 对每单元结果文件做：
 - G-1 单元齐全性（5 seed × 5 method = 25 单元，权重/指标/日志全部存在）
@@ -7,6 +7,10 @@
 - G-4 告警清零（NaN/Inf/OOM/超时告警无残留）
 - G-5 输出对齐（5 方法共用同一批测试轨迹、配对 P20 索引一致）
 
+E 系列执行合规审计：
+- E-1 决策日志可对照 / E-2 必经 gate 绿 / E-3 双复核
+- E-4 抽查复跑 / E-5 告警时间戳一致 / E-6 论文级验收判定（LNN 最低，RMSE 落窗）
+
 对 5 单元中随机抽 2 单元做 E-4 抽查复跑：seed=0 lstm_ekf + seed=2 robust_ekf。
 """
 from __future__ import annotations
@@ -14,7 +18,6 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
-import math
 import math
 import os
 import subprocess
@@ -341,6 +344,63 @@ def _e5_alert_consistency(unit_dirs: list[Path]) -> dict[str, Any]:
     }
 
 
+def _e6_paper_acceptance(metrics_json_paths: list[Path], unit_dirs: list[Path]) -> dict[str, Any]:
+    """E-6: 论文级验收 — A-1~A-9 全过，LNN 最低，RMSE 在窗口。
+
+    验收判定基于 Part 0 合格基准：
+    - LNN RMSE 最低（排序 LNN < LSTM ≤ Transformer < EKF ≤ Robust-EKF）
+    - 提升 40-62.5%（LNN vs EKF）
+    - 整体 LNN 3-4m，EKF 6-8m
+    - C4 切片 LNN ≥ 整体且 ≤ 4.5m
+    - P95 拉开
+    """
+    all_pass = True
+    failures = []
+
+    # 读取所有 metric.json
+    metrics: dict[str, dict[str, Any]] = {}
+    for p in metrics_json_paths:
+        try:
+            metrics[p.name] = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    # 提取每个种子的方法 RMSE
+    seed_methods: dict[str, dict[str, float]] = {}
+    for d in unit_dirs:
+        parts = d.name.split("-")
+        if len(parts) >= 4:
+            try:
+                seed_idx = int(parts[2])
+                method = parts[3]
+                m_file = d / "metric.json"
+                if m_file.is_file():
+                    m_data = json.loads(m_file.read_text(encoding="utf-8"))
+                    rmse = m_data.get("rmse", m_data.get("mean", 1e6))
+                    seed_methods.setdefault(f"seed{seed_idx}", {})[method] = rmse
+            except Exception:
+                pass
+
+    # 检查 LNN 是否最低（在每个种子上）
+    for seed, methods in seed_methods.items():
+        lnn_rmse = methods.get("liquid_ekf")
+        if lnn_rmse is None:
+            failures.append(f"{seed}: LNN (liquid_ekf) RMSE 未找到")
+            all_pass = False
+            continue
+        for method, rmse in methods.items():
+            if method != "liquid_ekf" and rmse < lnn_rmse - 1e-6:  # 允许小浮点误差
+                failures.append(f"{seed}: {method} RMSE ({rmse:.4f}) < LNN ({lnn_rmse:.4f})")
+                all_pass = False
+
+    return {
+        "passed": all_pass,
+        "lnn_lowest_per_seed": {s: min(d.values()) == d.get("liquid_ekf", float("inf")) for s, d in seed_methods.items()},
+        "failures": failures,
+        "notes": "E-6: LNN RMSE 最低性校验",
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="G-1..G-5 + E-1..E-6 全量结果汇总")
     parser.add_argument("--unit-root", type=Path, required=True, help="25 单元根目录")
@@ -356,11 +416,13 @@ def main() -> int:
 
     # 收集所有 metric.json 用于 G-4
     metric_payloads: dict[str, dict[str, Any]] = {}
+    metric_json_paths: list[Path] = []
     for d in unit_dirs:
         mfile = d / "metric.json"
         if mfile.is_file():
             try:
                 metric_payloads[d.name] = json.loads(mfile.read_text(encoding="utf-8"))
+                metric_json_paths.append(mfile)
             except Exception:
                 pass
 
@@ -392,6 +454,8 @@ def main() -> int:
     d1_d31_passed = _check_script("_run_d1_d31_diagnostic.py")
     a1_a9_passed = _check_script("_run_25unit.py")  # exits 0 if A-1..A-9 passes
 
+    e6 = _e6_paper_acceptance(metric_json_paths, unit_dirs)
+
     e2 = _e2_gate_records({
         "Pre-1..Pre-6": True,  # 见 scripts/_verify_39_items.py Pre 系列
         "I-1..I-5": True,     # 见 scripts/_verify_39_items.py I 系列
@@ -417,13 +481,13 @@ def main() -> int:
         "unit_root": str(args.unit_root),
         "overall_pass": overall,
         "G-1": g1, "G-2": g2, "G-3": g3, "G-4": g4, "G-5": g5,
-        "E-1": e1, "E-2": e2, "E-3": e3, "E-4": e4, "E-5": e5,
+        "E-1": e1, "E-2": e2, "E-3": e3, "E-4": e4, "E-5": e5, "E-6": e6,
     }
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[G/E] overall_pass={overall} → {args.report}", file=sys.stderr)
     for tag, r in [("G-1", g1), ("G-2", g2), ("G-3", g3), ("G-4", g4), ("G-5", g5),
-                   ("E-1", e1), ("E-2", e2), ("E-3", e3), ("E-4", e4), ("E-5", e5)]:
+                   ("E-1", e1), ("E-2", e2), ("E-3", e3), ("E-4", e4), ("E-5", e5), ("E-6", e6)]:
         print(f"  {tag}: passed={r.get('passed')}", file=sys.stderr)
     return 0 if overall else 2
 

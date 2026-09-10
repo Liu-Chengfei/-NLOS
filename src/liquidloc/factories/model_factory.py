@@ -1513,7 +1513,7 @@ def _load_checkpoint_payload(checkpoint_path: str | Path) -> Mapping[str, Any]:
     """
     path = Path(checkpoint_path)  # 确保路径对象类型。
     try:
-        payload = torch.load(path, map_location="cpu", weights_only=True)  # 强制 CPU 反序列化，禁止执行任意代码。
+        payload = torch.load(path, map_location=DEVICE_CPU, weights_only=True)  # 强制 CPU 反序列化，禁止执行任意代码。
     except Exception as exc:  # pragma: no cover - 精确的 torch 异常类型随版本变化。
         message = str(exc).lower()  # 将异常消息转小写，方便关键字匹配。
         if isinstance(exc, pickle.UnpicklingError) or "weights only load failed" in message or "unsupported global" in message:
@@ -2389,7 +2389,7 @@ class _LSTMModel(ModelAPI):
     expected_feature_order: list[str] = field(init=False, repr=False, default_factory=list)  # 期望的特征顺序。
     checkpoint_meta: dict[str, Any] = field(init=False, repr=False, default_factory=dict)  # checkpoint 元数据。
     expected_feature_order_required: bool = field(init=False, repr=False, default=False)  # 是否要求特征顺序校验。
-    runtime_device: str = field(init=False, default="cpu")  # 运行时设备，默认 CPU。
+    runtime_device: str = field(init=False, default=DEVICE_CPU)  # 运行时设备，默认 CPU。
 
     def __post_init__(self) -> None:
         """数据类初始化后处理：解析配置、加载 checkpoint 或构建网络。"""
@@ -3343,7 +3343,7 @@ class _TransformerModel(ModelAPI):
     expected_feature_order: list[str] = field(init=False, repr=False, default_factory=list)  # 期望的特征顺序。
     checkpoint_meta: dict[str, Any] = field(init=False, repr=False, default_factory=dict)  # checkpoint 元数据。
     expected_feature_order_required: bool = field(init=False, repr=False, default=False)  # 是否要求特征顺序校验。
-    runtime_device: str = field(init=False, default="cpu")  # 运行时设备，默认 CPU。
+    runtime_device: str = field(init=False, default=DEVICE_CPU)  # 运行时设备，默认 CPU。
 
     def __post_init__(self) -> None:
         """数据类初始化后处理：解析配置、加载 checkpoint 或构建网络。"""

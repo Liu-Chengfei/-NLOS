@@ -1,10 +1,11 @@
-"""R-1..R-5 失败归因与重跑决策门控（异步高NLOS实验全流程保障手册 Part 3 R 系列）。
+"""R-1..R-6 失败归因与重跑决策门控（异步高NLOS实验全流程保障手册 Part 3 R 系列）。
 
-本模块实现 5 个独立 verifier 函数，对 .audit/decision_log.json 的内容做
+本模块实现 6 个独立 verifier 函数，对 .audit/decision_log.json 的内容做
 结构化校验。每个函数返回 dict 含 passed + 详细字段，供 scripts/r_attribution.py
 和 scripts/run_handbook_gates.py 调用。
 
 六个失败分类（R-1）：①实现性 ②执行性 ③方法性 ④统计性 ⑤数据性 ⑥硬件/环境性
+六个归因决策（R-1~R-6）：分类登记 / RCA / 重跑纪律 / 诚实报告 / 兜底出口 / R-6重启
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ __all__ = [
     "R3_check_rerun_rounds",
     "R4_check_honest_report",
     "R5_check_fallback_exit",
+    "R6_check_restart_from_aud1",
 ]
 
 
@@ -177,4 +179,29 @@ def R5_check_fallback_exit(log: Mapping[str, Any]) -> dict[str, Any]:
         "class_present": bool(str(fallback.get("class") or "").strip()),
         "rationale_present": bool(str(fallback.get("rationale") or "").strip()),
         "notes": "ok" if passed else "fallback declared but class/rationale missing",
+    }
+
+
+def R6_check_restart_from_aud1(log: Mapping[str, Any]) -> dict[str, Any]:
+    """R-6: 目标未完成兜底 — AUD-1 重审机制完整。
+
+    手册 R-6：当所有 R-1~R-5 处理后仍未达标，
+    必须回到 AUD-1 完整核对（代码 vs 手册），修复/调 lr/重跑 —— 坚决不降级。
+
+    本函数检查 decision log 中是否声明了 R-6 重跑路径。
+    """
+    payload = _resolve_log_payload(log)
+    # R-6 触发条件：在所有 R-1~R-5 未通过时，是否声明了 restart_process
+    restart_process = payload.get("restart_process") or {}
+    aud1_path_ready = restart_process.get("aud1_path") is True
+    # 也接受 notes 中的 R-6 标记
+    notes = (payload.get("notes") or "") + (restart_process.get("notes") or "")
+    has_r6_note = "R-6" in notes or "restart_after_aud1" in notes
+
+    passed = bool(aud1_path_ready or has_r6_note)
+    return {
+        "passed": passed,
+        "aud1_path_ready": bool(aud1_path_ready),
+        "has_r6_note": bool(has_r6_note),
+        "notes": "R-6 restart path available" if passed else "R-6 restart path not declared",
     }

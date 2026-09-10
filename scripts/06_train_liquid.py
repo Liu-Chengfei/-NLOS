@@ -57,7 +57,7 @@ def main(argv=None):
                              "Use to avoid OOM when total seq count is large (e.g. 1860 sim seq, 8GB RAM). "
                              "Default: None = full-batch (legacy behavior).")
     parser.add_argument("--batch-size", type=int, default=None,
-                        help="Override model_cfg.train.batch_size (default: from liquid_ekf.yaml = 64). "
+                        help="Override model_cfg.train.batch_size (default: from liquid_ekf.yaml = 16). "
                              "Reduce to e.g. 16 or 32 to avoid CUDA OOM on 8GB laptop GPUs.")
     parser.add_argument("--disable-scene-leak-check", action="store_true",
                         help="Bypass §0.2 scene_id leakage check. Required for sim_e9 single-scene protocol.")

@@ -28,6 +28,7 @@ from itertools import combinations
 from statistics import NormalDist
 from typing import Any
 
+from liquidloc.common.constants import ALPHA  # 显著性水平 α=0.05 单源（P22/CODE-1）
 from liquidloc.common.validation import coerce_finite_scalar, require_not_none
 
 
@@ -152,7 +153,7 @@ def tost_equivalence_test(
     sample_b: Sequence[float],
     *,
     equivalence_bound: float,
-    alpha: float = 0.05,
+    alpha: float = ALPHA,  # 手册 P22：显著性水平 α=0.05
 ) -> dict[str, Any]:
     """Two One-Sided Tests（TOST）等效性检验（手册 §"不显著结果的正式统计出口"硬约束）。
 

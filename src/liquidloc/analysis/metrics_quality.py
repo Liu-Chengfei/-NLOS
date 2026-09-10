@@ -28,6 +28,8 @@ from typing import Any, Literal
 import numpy as np
 
 
+from liquidloc.common.constants import ALPHA  # 显著性水平 α=0.05 单源（P22/CODE-1）
+
 # ============================================================================
 # 常量
 # ============================================================================
@@ -894,7 +896,7 @@ def _get_p22():
 
 def run_holm_bonferroni(
     p_values: list[float],
-    alpha: float = 0.05,
+    alpha: float = ALPHA,
 ) -> dict[str, Any]:
     """P22: Holm-Bonferroni 逐步校正。"""
     m = _get_p22()

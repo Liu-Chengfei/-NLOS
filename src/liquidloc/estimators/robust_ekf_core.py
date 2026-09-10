@@ -23,6 +23,7 @@ from liquidloc.estimators.ekf_core import EKFCore  # 复用基础 EKF 状态管�
 from liquidloc.estimators.shared import build_controlled_measurement_cov, control_to_dict  # 共享的协方差控制和报告转换函数。
 from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS  # 桥接层业务阈值常量
 from liquidloc.common.constants import DEFAULT_THRESHOLDS  # 全局默认阈值表（质量上下界单源真相）。
+from liquidloc.common.constants import ESTIMATOR_NAME_ROBUST_EKF  # 鲁棒 EKF 估计器名字常量（D9 单源真相）。
 from liquidloc.common.constants import QUALITY_FLOOR_EPSILON  # 质量门槛比较浮点容差
 from liquidloc.common.constants import VIO_MEASUREMENT_ITEMS  # VIO 测量项常量（单源真相）。
 from liquidloc.common.constants import VIO_REF_POSE_STALE_SECONDS  # VIO 参考位姿过时阈值。
@@ -196,14 +197,14 @@ class RobustEKFCore(EKFCore):  # 在标准 EKF 基础上增加质量门控和鲁
         from liquidloc.common.tee_logger import print_dict
         print_dict({
             "estimator": "RobustEKFCore",
-            "name": (init_cfg or {}).get("name", "robust_ekf"),
+            "name": (init_cfg or {}).get("name", ESTIMATOR_NAME_ROBUST_EKF),
             "cfg_keys": list(init_cfg.keys()) if isinstance(init_cfg, dict) else None,
             "gate": (init_cfg or {}).get("gate"),
             "robust_weight": (init_cfg or {}).get("robust_weight"),
         }, "RobustEKFCore.__init__")
         super().__init__(init_cfg)  # 先让父类建立基础 EKF 状态与默认配置。
         # 默认名字和标准 EKF 不同，方便上层日志区分。
-        self.name = str(self.cfg.get("name") or "robust_ekf")  # 上层日志里使用的实例名。
+        self.name = str(self.cfg.get("name") or ESTIMATOR_NAME_ROBUST_EKF)  # 上层日志里使用的实例名。
 
     def _reject_report(  # 统一构造拒绝类报告。
         self,  # 当前实例本身。

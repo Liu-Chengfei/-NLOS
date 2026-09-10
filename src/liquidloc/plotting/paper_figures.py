@@ -271,7 +271,7 @@ def build_t1_main_table(
         "Δ vs LNN [m]", "Δ vs LNN [%]", "95% CI Δ", "Wilcoxon p (Holm)", "Cohen's d",
     ]
     rows: list[dict[str, Any]] = []
-    lnn = metrics_by_method.get("liquid_ekf", {})
+    lnn = metrics_by_method.get(_METHOD_INTERNAL["lnn"], {})
     lnn_mean = float(lnn.get("mean", 0.0))
     for method in _METHOD_ORDER:
         internal = _METHOD_INTERNAL[method]
