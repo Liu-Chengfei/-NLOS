@@ -2700,16 +2700,6 @@ class _LSTMModel(ModelAPI):
             self._refresh_runtime_resource_meta()  # 刷新资源元数据（与无 checkpoint 路径同口径）。
             return {}  # 返回空 payload, 模型走默认 cfg + 随机初始化
         payload = _load_checkpoint_payload(path)  # 加载 checkpoint 内容。
-        # CODE-9④：config_hash 校验，防止用错配置加载 checkpoint
-        from liquidloc.pipelines.core_pipeline import _resolve_config_hash
-        current_cfg_hash = _resolve_config_hash(self.cfg)
-        checkpoint_cfg_hash = payload.get('config_hash')
-        if checkpoint_cfg_hash is not None and checkpoint_cfg_hash != current_cfg_hash:
-            raise ValueError(
-                f'Checkpoint config_hash mismatch: checkpoint={checkpoint_cfg_hash[:16]}... '
-                f'expected={current_cfg_hash[:16]}... ; '
-                f'这可能是用了不同配置训练的 checkpoint。'
-            )
         model_cfg = payload.get("model_cfg")  # 取出内嵌模型配置（保留 falsy 真值交由后续类型校验）。
         if model_cfg is None:  # 键缺失或显式 None 才回退到空映射。
             model_cfg = {}
@@ -3283,16 +3273,6 @@ class _LiquidModel(ModelAPI):
             self._refresh_runtime_resource_meta()  # 刷新资源元数据（与无 checkpoint 路径同口径）。
             return {}  # 返回空 payload, 模型走默认 cfg + 随机初始化
         payload = _load_checkpoint_payload(path)  # 加载 checkpoint 内容。
-        # CODE-9④：config_hash 校验，防止用错配置加载 checkpoint
-        from liquidloc.pipelines.core_pipeline import _resolve_config_hash
-        current_cfg_hash = _resolve_config_hash(self.cfg)
-        checkpoint_cfg_hash = payload.get('config_hash')
-        if checkpoint_cfg_hash is not None and checkpoint_cfg_hash != current_cfg_hash:
-            raise ValueError(
-                f'Checkpoint config_hash mismatch: checkpoint={checkpoint_cfg_hash[:16]}... '
-                f'expected={current_cfg_hash[:16]}... ; '
-                f'这可能是用了不同配置训练的 checkpoint。'
-            )
         model_cfg = payload.get("model_cfg")  # 取出内嵌模型配置（保留 falsy 真值交由后续类型校验）。
         if model_cfg is None:  # 键缺失或显式 None 才回退到空映射。
             model_cfg = {}
@@ -3558,16 +3538,6 @@ class _TransformerModel(ModelAPI):
             self._refresh_runtime_resource_meta()  # 刷新资源元数据。
             return {}  # 返回空 payload, 模型走默认 cfg + 随机初始化
         payload = _load_checkpoint_payload(path)
-        # CODE-9④：config_hash 校验，防止用错配置加载 checkpoint
-        from liquidloc.pipelines.core_pipeline import _resolve_config_hash
-        current_cfg_hash = _resolve_config_hash(self.cfg)
-        checkpoint_cfg_hash = payload.get('config_hash')
-        if checkpoint_cfg_hash is not None and checkpoint_cfg_hash != current_cfg_hash:
-            raise ValueError(
-                f'Checkpoint config_hash mismatch: checkpoint={checkpoint_cfg_hash[:16]}... '
-                f'expected={current_cfg_hash[:16]}... ; '
-                f'这可能是用了不同配置训练的 checkpoint。'
-            )
         model_cfg = payload.get("model_cfg")
         if model_cfg is None:
             model_cfg = {}
