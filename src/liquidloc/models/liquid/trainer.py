@@ -1154,12 +1154,17 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
                         ).strip()
                         rollback_source_phase = upstream_phase_name
                 rollback_payload = _load_checkpoint_payload(Path(rollback_checkpoint_path)) if rollback_checkpoint_path else None
-                # CODE-9④ 强制校验：加载的 checkpoint 必须 config_hash 匹配当前配置
-                # 不匹配 → 禁止 restore（可能是用了不同配置/旧权重的 checkpoint）
+                # CODE-9⑦: config_hash 绑定校验（落盘细则第④条）
+                # 不匹配 → 抛出 ValueError 停止，禁止用错配置的 checkpoint
                 if rollback_payload is not None and not _validate_checkpoint_config_hash(
                     Path(rollback_checkpoint_path), _config_hash
                 ):
-                    rollback_payload = None
+                    checkpoint_cfg_hash = rollback_payload.get("config_hash", "")[:16]
+                    raise ValueError(
+                        f"Checkpoint config_hash mismatch on rollback: "
+                        f"checkpoint={checkpoint_cfg_hash}... expected={_config_hash[:16]}...; "
+                        f"这可能是用了不同配置训练的 checkpoint，禁止回滚恢复。"
+                    )
                 rollback_restored = False
                 if rollback_payload is not None:
                     rollback_phase_name = str(rollback_payload.get("phase_name") or phase_name)
