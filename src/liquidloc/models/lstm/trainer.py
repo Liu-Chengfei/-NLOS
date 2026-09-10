@@ -54,6 +54,7 @@ from liquidloc.common.types import ModelIntermediate  # 标注模型中间输出
 from liquidloc.common.validation import coerce_finite_scalar, is_bool_like, is_integer, is_numeric, is_string_like  # 统一判断数值与布尔类型，coerce_finite_scalar 为有限标量校验中心入口。
 from liquidloc.models.features.normalization import neutral_floor_softplus
 from liquidloc.models.lstm.network import build_lstm_sequence_tensor, normalize_structured_window, _OUTPUT_KEYS  # 复用 LSTM 网络的序列构造、窗口标准化和输出头协议常量。
+from liquidloc.models.liquid._checkpoint_utils import _atomic_save_checkpoint  # CODE-9⑦：原子写入检查点
 
 _ACTIVE_HEADS_BY_MODALITY = {
     MODALITY_UWB: ("bias", "risk", "uwb_scaling"),  # UWB 模态激活偏置、风险和 UWB 缩放三个头。
@@ -2593,7 +2594,7 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
             candidate_path = checkpoints_dir / f'{trainer_state["model_name"]}_epoch_{epoch_index:03d}.pt'
             # 防御性 mkdir: 训练过程中可能被外部进程 (如 RZ-0 清场归档) 删除 checkpoints 目录
             candidate_path.parent.mkdir(parents=True, exist_ok=True)
-            torch.save(checkpoint_payload, candidate_path)
+            _atomic_save_checkpoint(candidate_path, checkpoint_payload)  # CODE-9⑦ 原子写入
             epoch_candidate_paths.append(str(candidate_path))
             epoch_candidate_epochs.append(epoch_index)
 
@@ -2617,7 +2618,7 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
             checkpoint_payload["best_loss"] = best_loss
             # 防御性 mkdir: 外部清场/归档进程可能在训练期间删除 checkpoints 目录 (race condition)
             best_ckpt.parent.mkdir(parents=True, exist_ok=True)
-            torch.save(checkpoint_payload, best_ckpt)
+            _atomic_save_checkpoint(best_ckpt, checkpoint_payload)  # CODE-9⑦ 原子写入
 
         # 偷懒审视 Round 4 真修 (用户铁律 #14) + audit #20 H2+M2 (主线程决策 2026-07):
         # epoch 末 CosineAnnealingLR 调度 lr — 不需要 val_loss 参数, 直接 step() 按 T_max 退火.

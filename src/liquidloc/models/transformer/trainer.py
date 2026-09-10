@@ -67,6 +67,7 @@ from liquidloc.models.transformer.network import (
     normalize_structured_window,
     _OUTPUT_KEYS,
 )
+from liquidloc.models.liquid._checkpoint_utils import _atomic_save_checkpoint  # CODE-9⑦：原子写入检查点
 
 _ACTIVE_HEADS_BY_MODALITY = {
     MODALITY_UWB: ("bias", "risk", "uwb_scaling"),
@@ -1980,7 +1981,7 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
                 should_save_candidate = True
         if should_save_candidate:
             candidate_path = checkpoints_dir / f'{trainer_state["model_name"]}_epoch_{epoch_index:03d}.pt'
-            torch.save(checkpoint_payload, candidate_path)
+            _atomic_save_checkpoint(candidate_path, checkpoint_payload)  # CODE-9⑦ 原子写入
             epoch_candidate_paths.append(str(candidate_path))
             epoch_candidate_epochs.append(epoch_index)
 
@@ -2007,7 +2008,7 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
             best_epoch = epoch_index
             checkpoint_payload["best_epoch"] = best_epoch
             checkpoint_payload["best_loss"] = best_loss
-            torch.save(checkpoint_payload, best_ckpt)
+            _atomic_save_checkpoint(best_ckpt, checkpoint_payload)  # CODE-9⑦ 原子写入
 
         if lr_scheduler is not None:
             current_lr = optimizer.param_groups[0]["lr"]
