@@ -730,6 +730,7 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
         trainer_state=trainer_state,
         report_path=report_path,
         best_ckpt=best_ckpt,
+        config_hash=_config_hash,  # CODE-9④：校验 checkpoint config_hash 匹配
         training_best_ckpt=training_best_ckpt,
         export_best_ckpt=export_best_ckpt,
     )
@@ -1153,6 +1154,12 @@ def train_model(train_windows, val_windows, train_cfg, *, model_factory=None):
                         ).strip()
                         rollback_source_phase = upstream_phase_name
                 rollback_payload = _load_checkpoint_payload(Path(rollback_checkpoint_path)) if rollback_checkpoint_path else None
+                # CODE-9④ 强制校验：加载的 checkpoint 必须 config_hash 匹配当前配置
+                # 不匹配 → 禁止 restore（可能是用了不同配置/旧权重的 checkpoint）
+                if rollback_payload is not None and not _validate_checkpoint_config_hash(
+                    Path(rollback_checkpoint_path), _config_hash
+                ):
+                    rollback_payload = None
                 rollback_restored = False
                 if rollback_payload is not None:
                     rollback_phase_name = str(rollback_payload.get("phase_name") or phase_name)

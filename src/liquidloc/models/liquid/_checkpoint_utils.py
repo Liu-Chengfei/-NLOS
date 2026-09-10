@@ -259,6 +259,7 @@ def _try_resume_phase_scheduled_training(
     trainer_state: Mapping[str, Any],
     report_path: Path,
     best_ckpt: Path,
+    config_hash: str,  # CODE-9④：用于校验 checkpoint 配置匹配
     training_best_ckpt: Path | None = None,
     export_best_ckpt: Path | None = None,
 ) -> dict[str, Any] | None:
@@ -280,6 +281,9 @@ def _try_resume_phase_scheduled_training(
     runtime_ckpt = best_ckpt.parent / f'{trainer_state["model_name"]}_resume_checkpoint.pt'
     source_checkpoint_path = runtime_ckpt if runtime_ckpt.is_file() else best_ckpt
     if not source_checkpoint_path.is_file():
+        return None
+    # CODE-9④：加载 checkpoint 前必须校验 config_hash
+    if not _validate_checkpoint_config_hash(source_checkpoint_path, config_hash):
         return None
     try:
         checkpoint_payload = torch.load(source_checkpoint_path, map_location=DEVICE_CPU, weights_only=True)
