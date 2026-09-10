@@ -148,6 +148,7 @@ def test_resume_rejects_mixed_history_when_report_is_shorter_than_checkpoint(tmp
         },
         report_path=report_path,
         best_ckpt=best_ckpt,
+        config_hash="test-config-hash",  # CODE-9④：新增参数
     )
 
     assert result is None
@@ -222,6 +223,7 @@ def test_resume_rejects_progress_tail_selection_observation_coeff_mismatch(tmp_p
         },
         report_path=report_path,
         best_ckpt=best_ckpt,
+        config_hash="test-config-hash",  # CODE-9④：新增参数
     )
 
     assert result is None
@@ -296,6 +298,7 @@ def test_resume_rejects_checkpoint_tail_selection_observation_coeff_mismatch(tmp
         },
         report_path=report_path,
         best_ckpt=best_ckpt,
+        config_hash="test-config-hash",  # CODE-9④：新增参数
     )
 
     assert result is None
