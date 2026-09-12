@@ -57,6 +57,9 @@ def _make_anchor_layout(seq_id: str) -> dict:
         "anchor_count": ANCHOR_COUNT,
         # 异步高NLOS实验主表 4 锚非对称欠定（K1 档：锚点分布不均、存在共线倾向）。
         # H27 协议 (line 36): 原 G 轴并入 K 轴，统一用 K 档位描述几何约束水平。
+        # dataset_checks.py 契约检查同时读取 protocol_geometry_level 与 protocol_k_level
+        # （BUG-023: 之前漏写 protocol_geometry_level，导致 prep 的 inspect 契约把全部序列判为缺 K 档）。
+        "protocol_geometry_level": "K1",
         "protocol_k_level": "K1",
         "source": "handbook_s2_k1_10seed",
     }
@@ -165,6 +168,8 @@ def _make_sim_meta(seq_id: str, a_axis: str, n_axis: str) -> dict:
         "dt_imu": DT,
         "source": "handbook_s2_k1_10seed",
         "note": "K1=4 anchors A1-A4; K1 GDOP≈1.19 (S2 protocol arbitration registered)",
+        # §28.6 自证契约：此字段必须等于 SIM_GENERATOR_VERSION_CURRENT(v2.1)
+        "generator_version": "liquidloc.sim_materializer.v2.1",
     }
 
 

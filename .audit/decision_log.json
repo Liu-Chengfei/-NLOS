@@ -282,6 +282,27 @@
           "impact": "Gates now clear for RZ-1 → RZ-2 pipeline start",
           "git_commit": "pending",
           "verified": true
+        },
+        {
+          "timestamp": "2026-09-12T01:14:13.246080+00:00",
+          "batch": "s5_process_cleanup",
+          "type": "execution",
+          "severity": "hard",
+          "summary": "Cleaned stale prior-session training processes blocking RAM",
+          "detail": "PID 27656 (06_train_liquid.py, 5047MB) + PID 26676 (rz2_paper_evaluate.py, 294MB) from prior session held RAM to 590MB avail, triggering OOM_DIAG threshold (500MB). S5 3-step attribution confirmed both reference this workspace scripts. After SIGTERM: RAM avail 8.43GB (48% used).",
+          "ram_before_mb": 590,
+          "ram_after_mb": 8430,
+          "verified": true
+        },
+        {
+          "timestamp": "2026-09-12T14:35:28.805821+00:00",
+          "batch": "preparation_finalized",
+          "type": "gate_verification",
+          "severity": "hard",
+          "summary": "Preparation phase verified complete: Pre-1..6, I-1..5, S9 10/10, DQ-1..4, BLOCK-1 GDOP 1410/1410 all PASS",
+          "processed_data": "data/processed/sim_e9_paper/seed0..9 each 140 pkl.gz events (1400 total)",
+          "raw_data": "data/raw/sim_e9_10seed_50unit/seed0..9 each 140 JSON stream seqs + manifest.json",
+          "verified": true
         }
       ],
       "rerun_rounds": 0,
@@ -932,6 +953,35 @@
             "evidence": "scripts/04_build_splits.py (5801 bytes)"
           }
         }
+      },
+      "preparation_finalized": "2026-09-12T15:20:03.328434+00:00",
+      "rz2_smoke_test": {
+        "completed_at": "2026-09-12T15:20:03.328434+00:00",
+        "test_spec": {
+          "epochs": 2,
+          "seeds": 1,
+          "models": [
+            "lstm_ekf"
+          ],
+          "seqs": 2
+        },
+        "result": "PASS",
+        "config_hash_present": false,
+        "init_seed_missing": true,
+        "checkpoint_saved": true,
+        "timing": {
+          "epoch_1_sec": 22,
+          "epoch_2_sec": 27,
+          "total_sec": 49
+        },
+        "throughput": {
+          "epochs_per_min": "~2.5"
+        },
+        "estimated_160_epochs": {
+          "per_model_per_seed_min": 64.0,
+          "total_3models_10seeds": 1920.0
+        },
+        "note": "config_hash/init_seed fields expected in full RZ-2 run (via e20 config defaults)"
       }
     },
     "refactoring_20260909": {
