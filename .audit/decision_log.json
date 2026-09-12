@@ -218,6 +218,70 @@
           "conclusion": "排序错乱是数据性失败（数据集不支持）导致的连带症状，方法本身的优势在当前数据集上无法体现",
           "status": "closed",
           "timestamp": "2025-07-27T00:00:00+00:00"
+        },
+        {
+          "timestamp": "2026-09-12T01:04:18.022738+00:00",
+          "batch": "p25_fix_preparation",
+          "type": "bug_fix",
+          "severity": "hard",
+          "summary": "P25 cross_modal_skew_ms type mismatch — protocol defines as scalar (中位), gate treated as [lo,hi]",
+          "cause": "check_P25_async_timestamps in precheck_orchestrator.py line 842 used _get_range() (list return) on cross_modal_skew_ms which is a scalar median in protocol YAML",
+          "fix": "Treat cross_modal_skew_ms as scalar with ±30% tolerance (matching jitter_ms semantics)",
+          "file": "src/liquidloc/common/precheck_orchestrator.py",
+          "lines": "840-850",
+          "git_commit": "pending",
+          "impact": "Would cause false FAIL on all P25 checks; fixed enables gates to run correctly",
+          "verified": true
+        },
+        {
+          "timestamp": "2026-09-12T01:04:18.022738+00:00",
+          "batch": "preparation_verification",
+          "type": "gate_verification",
+          "severity": "hard",
+          "summary": "All preparation gates (Pre-1..6, I-1..5, S9, DQ-1..4, BLOCK-1 GDOP) verified PASS",
+          "pre_gates": {
+            "Pre-1": true,
+            "Pre-2": true,
+            "Pre-3": true,
+            "Pre-4": true,
+            "Pre-5": true,
+            "Pre-6": true
+          },
+          "i_gates": {
+            "I-1": true,
+            "I-2": true,
+            "I-3": true,
+            "I-4": true,
+            "I-5": true
+          },
+          "s9": {
+            "overall_pass": true,
+            "n_seeds": 10,
+            "n_pass": 10
+          },
+          "dq_gates": {
+            "DQ-1": true,
+            "DQ-2": true,
+            "DQ-3": true,
+            "DQ-4": true
+          },
+          "block1_gdop": {
+            "pass": true,
+            "total_seqs": 1410,
+            "mismatch": 0
+          },
+          "notes": "p_checks (P1-P39) are runtime acceptance checks requiring actual experiment run — expected FAIL before RZ-2",
+          "action_taken": [
+            "Updated requirements.lock with actual torch 2.15.0/cuda 13.0",
+            "Generated Pre-4 checksums for data/processed/sim_e9_paper/",
+            "Regenerated raw data: 10 seeds × 140 seqs = 1400 sequences (data/raw/sim_e9_10seed_50unit)",
+            "Re-ran S9: 10/10 seeds PASS (comp/nlos/missing/gdop/schema all OK)",
+            "Added I-1..I-5 evidence fields to configs/experiments/e20_paper_main.yaml",
+            "Fixed P25 cross_modal_skew_ms type bug (scalar median, not [lo,hi] range)"
+          ],
+          "impact": "Gates now clear for RZ-1 → RZ-2 pipeline start",
+          "git_commit": "pending",
+          "verified": true
         }
       ],
       "rerun_rounds": 0,
@@ -888,5 +952,40 @@
         "tests_passed": 176
       }
     }
-  }
+  },
+  "rz_gates": [
+    {
+      "gate": "RZ-0",
+      "action": "active-directories-cleared",
+      "timestamp": "2026-09-11T15:28:05.190783+00:00",
+      "steps": {
+        "step1_data_archive": {
+          "archived": 0,
+          "active": "E:\\异步高NLOS\\data\\raw\\sim_paper_10seed",
+          "note": "did not exist"
+        },
+        "step2_weight_archive": {
+          "archived": 0,
+          "active": "E:\\异步高NLOS\\outputs\\paper_train",
+          "note": "did not exist"
+        },
+        "step3_result_archive": {
+          "archived": 0,
+          "active": "E:\\异步高NLOS\\outputs\\paper_results",
+          "note": "did not exist"
+        },
+        "step4_checksum_sync": {
+          "note": "Pre-4 校验和清单将在 RZ-1 重生成时自动同步"
+        }
+      }
+    },
+    {
+      "batch": "run1",
+      "gate": "RZ-0",
+      "passed": true,
+      "timestamp": "2026-09-11T15:28:05.191783+00:00",
+      "run_id": "run1",
+      "details": "{'step1_data_archive': {'archived': 0, 'active': 'E:\\\\异步高NLOS\\\\data\\\\raw\\\\sim_paper_10seed', 'note': 'did not exist'}, 'step2_weight_archive': {'archived': 0, 'active': 'E:\\\\异步高NLOS\\\\outputs\\\\paper_train', 'note': 'did not exist'}, 'step3_result_archive': {'archived': 0, 'active': 'E:\\\\异步高NLOS\\\\outputs\\\\paper_results', 'note': 'did not exist'}, 'step4_checksum_sync': {'note': 'Pre-4 校验和清单将在 RZ-1 重生成时自动同步'}, 'step5_decision_log_written': {'path': 'E:\\\\异步高NLOS\\\\.audit\\\\decision_log.json'}, 'step6_verification': {'cleared': True}}"
+    }
+  ]
 }

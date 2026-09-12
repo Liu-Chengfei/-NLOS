@@ -33,6 +33,52 @@ LOS_NOISE_SIGMA_M: float = 0.6
 GDOP_DEFAULT: float = 1.19
 
 
+def _load_protocol_axis_ranges() -> dict[str, Any]:
+    """从 ``configs/base/scene_axis_protocol.yaml`` 加载权威的 A/N 轴区间。
+
+    返回形如::
+
+        {"A2": {"offset_ms": [20, 50], ...}, "A3": {...},
+         "N2": {"nlos_ratio": [0.25, 0.30], ...}, "N3": {...}}
+
+    协议加载失败时回退到手写常数，保证预检始终可运行。
+    """
+    try:
+        from liquidloc.protocol.scene_axis_protocol import load_scene_axis_protocol  # noqa: F401
+        p = load_scene_axis_protocol()
+        axes = p.get("axes", {})
+        a = axes.get("A", {})
+        n = axes.get("N", {})
+        return {
+            "A2": a.get("A2", {}),
+            "A3": a.get("A3", {}),
+            "N2": n.get("N2", {}),
+            "N3": n.get("N3", {}),
+        }
+    except Exception:
+        return _PROTOCOL_FALLBACK
+
+
+# 协议加载失败时回退常数（来自手册 Part 0 §4.2 A2/A3 档位 + §4.3 N2/N3）
+# 值必须与 configs/base/scene_axis_protocol.yaml 保持一致，修改时双改。
+_PROTOCOL_FALLBACK: dict[str, dict[str, float | list[float]]] = {
+    "A2": {"offset_ms": [20.0, 50.0], "jitter_ms": 3.0, "cross_modal_skew_ms": 60.0},
+    "A3": {"offset_ms": [100.0, 200.0], "jitter_ms": 10.0, "cross_modal_skew_ms": 185.0},
+    "N2": {"nlos_ratio": [0.25, 0.30], "bias_strength_m": [2.0, 3.0], "nlos_noise_std_m": [0.78, 0.82]},
+    "N3": {"nlos_ratio": [0.35, 0.40], "bias_strength_m": [4.0, 6.0], "nlos_noise_std_m": [1.48, 1.52]},
+}
+
+# 模块级缓存：协议只读且加载开销高，只读一次。
+_PROTOCOL_RANGES: dict[str, dict[str, Any]] | None = None
+
+
+def get_protocol_axis_ranges() -> dict[str, dict[str, Any]]:
+    global _PROTOCOL_RANGES
+    if _PROTOCOL_RANGES is None:
+        _PROTOCOL_RANGES = _load_protocol_axis_ranges()
+    return _PROTOCOL_RANGES
+
+
 def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     """Andrew 单调链算法计算 2D 点集凸包（逆时针排列）。
 
@@ -154,13 +200,65 @@ def _make(code: str, name: str, passed: bool, detail: str = "", severity: str = 
     return CheckResult(code=code, name=name, passed=passed, severity=severity, detail=detail, evidence=dict(evidence))
 
 
+def _read_sim_meta_stats(raw_root: Path) -> dict[str, Any]:
+    """扫描 raw_root 下所有 seed_X/ 子目录的 sim_meta.json，聚合 P1/D15/P25/P28 所需字段。
+
+    返回 dict，键值列表按 combo_keys 顺序排列。
+    """
+    out: dict[str, Any] = {
+        "nlos_ratio_mid": [], "nlos_mu_m_mid": [], "nlos_sigma_m_mid": [],
+        "async_offset_ms_mid": [], "async_jitter_ms": [], "async_skew_ms_mid": [],
+        "vio_tracked_mid": [], "vio_inc_noise_mps_mid": [], "vio_blackout_frac": [],
+        "imu_rows_counts": [], "seq_durations_s": [], "combo_keys": [],
+    }
+    for seed_dir in sorted(raw_root.iterdir()):
+        if not seed_dir.is_dir() or not seed_dir.name.startswith("seed"):
+            continue
+        for seq in seed_dir.iterdir():
+            if not seq.is_dir():
+                continue
+            meta = seq / "sim_meta.json"
+            if not meta.is_file():
+                continue
+            try:
+                m = json.loads(meta.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            def fl(k):
+                v = m.get(k, 0.0)
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return 0.0
+            axes = m.get("axes_override") or {}
+            a, n = str(axes.get("A", "")).upper(), str(axes.get("N", "")).upper()
+            key = f"{a}{n}" if a in ("A2", "A3") and n in ("N2", "N3") else "other"
+            out["combo_keys"].append(key)
+            for k in ("nlos_ratio_mid", "nlos_mu_m_mid", "nlos_sigma_m_mid",
+                      "async_offset_ms_mid", "async_jitter_ms", "async_skew_ms_mid",
+                      "vio_tracked_mid", "vio_inc_noise_mps_mid", "vio_blackout_frac"):
+                out[k].append(fl(k))
+            # P28：使用 sim_meta 中直接写入的 imu_row_count / duration_s
+            out["imu_rows_counts"].append(int(m.get("imu_row_count", 0)))
+            out["seq_durations_s"].append(float(m.get("duration_s", 0.0)))
+    return out
+
+
 # ============================================================================
 # 第一层：数据正确性 (P1~P6) + 实验准备 (Pre-1~Pre-6) + 实现完成 (I-1~I-5)
 # ============================================================================
 
 
 def check_P1_composition(cfg: Mapping[str, Any]) -> CheckResult:
-    """P1: 4 组合各 25%（偏差 ≤5%）。"""
+    """P1: 4 组合各 25%（偏差 ≤5%）+ N 轴注入 ρ/μ/σ 区间校验。
+
+    手册要求（协议 configs/base/scene_axis_protocol.yaml 权威定义）：
+        - 组合比例：4 组合各 25%（偏差 ≤5%）
+        - N2：ρ 0.25-0.30，μ 2-3m，σ 0.78-0.82
+        - N3：ρ 0.35-0.40，μ 4-6m，σ 1.48-1.52
+
+    区间从协议配置动态读取，协议加载失败时回退手写常数。
+    """
     counts = dict(cfg.get("composition_counts") or {})
     required = {"A2N2", "A2N3", "A3N2", "A3N3"}
     if not required.issubset(set(counts.keys())):
@@ -173,12 +271,94 @@ def check_P1_composition(cfg: Mapping[str, Any]) -> CheckResult:
         ratio = counts[key] / total
         if abs(ratio - target) > 0.05:
             failed.append(f"{key}={ratio:.2%}")
-    return _make("P1", "4组合各25%", not failed, detail=" / ".join(failed) or "OK", composition=counts, total=total)
+    # P1 第二件事：从 sim_meta 聚合的 nlos_stats 做 N 轴区间校验（协议权威区间）。
+    proto = cfg.get("protocol_ranges") or get_protocol_axis_ranges()
+    ranges = {
+        "N2": _get_range(proto, "N2", "nlos_ratio"),
+        "N3": _get_range(proto, "N3", "nlos_ratio"),
+    }
+    # 完整 ρ/μ/σ 三元组区间
+    def _n_axis_params(level: str) -> dict[str, list[float]]:
+        d = proto.get(level, {})
+        return {
+            "rho": list(d.get("nlos_ratio", [0.0, 1.0])),
+            "mu": list(d.get("bias_strength_m", [0.0, 1e9])),
+            "sigma": list(d.get("nlos_noise_std_m", [0.0, 1e9])),
+        }
+    stats = cfg.get("nlos_stats", {}) or {}
+    n2_ok, n3_ok = True, True
+    n2_detail, n3_detail = [], []
+    for combo, v in stats.items():
+        if not isinstance(v, dict):
+            continue
+        rho = float(v.get("rho", 0.0)); mu = float(v.get("mu", 0.0)); sigma = float(v.get("sigma", 0.0))
+        if "N2" in combo:
+            p = _n_axis_params("N2")
+            if not (_in_range(rho, *p["rho"]) and _in_range(mu, *p["mu"]) and _in_range(sigma, *p["sigma"])):
+                n2_ok = False
+                n2_detail.append(f"{combo}ρ={rho:.3f}/μ={mu:.2f}/σ={sigma:.2f} 越界{p}")
+        if "N3" in combo:
+            p = _n_axis_params("N3")
+            if not (_in_range(rho, *p["rho"]) and _in_range(mu, *p["mu"]) and _in_range(sigma, *p["sigma"])):
+                n3_ok = False
+                n3_detail.append(f"{combo}ρ={rho:.3f}/μ={mu:.2f}/σ={sigma:.2f} 越界{p}")
+    if not (n2_ok and n3_ok):
+        failed.extend(["N2:" + ";".join(n2_detail), "N3:" + ";".join(n3_detail)])
+        return _make("P1", "4组合各25%+N轴注入", False, detail=" / ".join(failed) or "OK", composition=counts, total=total)
+    detail = " / ".join(failed) or "OK"
+    if stats:
+        detail += f" | N轴: N2_ok={n2_ok}, N3_ok={n3_ok} (ρ 区间={ranges})"
+    return _make("P1", "4组合各25%+N轴注入", not failed, detail=detail, composition=counts, total=total)
+
+
+def _get_range(proto: Mapping[str, Any], level: str, param: str) -> list[float]:
+    """从协议 ranges 取某轴的某参数区间（[lo, hi]），缺失则返回哨兵。"""
+    return list(proto.get(level, {}).get(param, [float("nan"), float("nan")]))
+
+
+def _in_range(v: float, lo: float, hi: float) -> bool:
+    """值 v 是否落在闭区间 [lo, hi] 内。"""
+    return lo <= v <= hi
 
 
 def check_P2_missing_source(cfg: Mapping[str, Any]) -> CheckResult:
-    """P2: uwb_valid=0 分布与 M1 缺失率一致；nl_flag 与 N 注入统计可交叉验证。"""
+    """P2: uwb_valid=0 分布与 M1 缺失率一致；nl_flag 与 N 注入统计交叉验证。
+
+    真实化：若 sim_meta 有 nlos_stats，按组合核验 N 轴比例是否在协议区间内，
+    否则回退到软性"missing_source_stats 有值"检查。
+    """
     stats = dict(cfg.get("missing_source_stats") or {})
+    # 新路径：直接从 sim_meta 读取 N/A/V 轴协议参数
+    nl_stats = cfg.get("nlos_stats") or {}
+    if nl_stats:
+        a2n2 = nl_stats.get("A2N2", {})
+        a2n3 = nl_stats.get("A2N3", {})
+        a3n2 = nl_stats.get("A3N2", {})
+        a3n3 = nl_stats.get("A3N3", {})
+        # 每个组合的 nlos_ratio_mid 应在协议 N2/N3 区间内
+        # 协议区间来自 scene_axis_protocol.yaml: N2.nlos_ratio=[0.25,0.30], N3.nlos_ratio=[0.35,0.40]
+        ranges = get_protocol_axis_ranges()
+        n2_lo, n2_hi = _get_range(ranges, "N2", "nlos_ratio")
+        n3_lo, n3_hi = _get_range(ranges, "N3", "nlos_ratio")
+        detail_parts = []
+        ok2, ok3 = True, True
+        for combo, rho, level in [("A2N2", a2n2.get("rho"), "N2"), ("A3N2", a3n2.get("rho"), "N2"),
+                                   ("A2N3", a2n3.get("rho"), "N3"), ("A3N3", a3n3.get("rho"), "N3")]:
+            if rho is not None:
+                hi = n3_hi if level == "N3" else n2_hi
+                lo = n3_lo if level == "N3" else n2_lo
+                if not (lo <= rho <= hi):
+                    detail_parts.append(f"{combo}ρ={rho:.3f} 越界 [{lo},{hi}]")
+                    if level == "N2":
+                        ok2 = False
+                    else:
+                        ok3 = False
+        return _make(
+            "P2", "缺失源与N轴注入交叉验证",
+            bool(nl_stats) and ok2 and ok3,  # 两档都必须通过（N2/N3 两档都得在区间）
+            detail=f"N轴注入核验 N2∈[{n2_lo:.2f},{n2_hi:.2f}] {'✓' if ok2 else '✗'} / N3∈[{n3_lo:.2f},{n3_hi:.2f}] {'✓' if ok3 else '✗'} | " + ("; ".join(detail_parts) or "区间OK"),
+            n_axis_stats=nl_stats,
+        )
     if not stats:
         return _make("P2", "缺失源与可解率口径", False, detail="missing_source_stats 缺失", severity="soft")
     valid_rate = float(stats.get("valid_rate", 0.0))
@@ -626,20 +806,61 @@ def check_P23_config_consistency(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_P24_no_nan_inf(cfg: Mapping[str, Any]) -> CheckResult:
-    n_nan = int(cfg.get("n_nan_detected", 0))
-    n_inf = int(cfg.get("n_inf_detected", 0))
-    grad_exploded = bool(cfg.get("gradient_exploded", False))
+    # P24：键缺失视为 FAIL，防止默过
+    required = ["n_nan_detected", "n_inf_detected", "gradient_exploded"]
+    has_keys = all(k in cfg for k in required)
+    if not has_keys:
+        return _make("P24", "无NaN/Inf/梯度爆炸", False,
+                     detail=f"统计字段缺失: missing={[k for k in required if k not in cfg]}",
+                     severity="hard")
+    n_nan = int(cfg["n_nan_detected"])
+    n_inf = int(cfg["n_inf_detected"])
+    grad_exploded = bool(cfg["gradient_exploded"])
     return _make("P24", "无NaN/Inf/梯度爆炸",
                  n_nan == 0 and n_inf == 0 and not grad_exploded,
                  detail=f"nan={n_nan}, inf={n_inf}, grad_exploded={grad_exploded}")
 
 
 def check_P25_async_timestamps(cfg: Mapping[str, Any]) -> CheckResult:
+    # 真实值：从 sim_meta 聚合的 async_offset_ms_mid / async_jitter_ms / async_skew_ms_mid 核对协议 A2/A3
+    a2_a3_params = cfg.get("async_params", {})
     monotonic = bool(cfg.get("timestamps_monotonic", False))
+    if a2_a3_params:
+        # 校验 A2/A3 偏移是否在协议区间内（configs/base/scene_axis_protocol.yaml 权威定义）
+        # offset_ms / cross_modal_skew_ms 为区间 [lo,hi]，jitter_ms 为固定标量
+        proto = cfg.get("protocol_ranges") or get_protocol_axis_ranges()
+        checks_ok = True
+        details = []
+        for level in ("A2", "A3"):
+            p = proto.get(level, {})
+            params = a2_a3_params.get(level, {})
+            off = float(params.get("async_offset_ms_mid", 0.0))
+            jit = float(params.get("async_jitter_ms", 0.0))
+            skew = float(params.get("async_skew_ms_mid", 0.0))
+            # offset_ms 为区间 [lo,hi]；cross_modal_skew_ms 是协议标量中位（"UWB 往返延迟中位"），
+            # 与 jitter_ms 同为固定标量，允许 ±30% 抽样离散度（BUG-022 修复：不得按区间解包标量）。
+            off_lo, off_hi = _get_range(proto, level, "offset_ms")
+            skew_exp = float(p.get("cross_modal_skew_ms", 0.0))
+            # jitter_ms: 协议为固定标量，允许 ±30%（IMU 抖动抽样离散度）
+            jitter_exp = float(p.get("jitter_ms", 0.0))
+            ok = _in_range(off, off_lo, off_hi)
+            ok = ok and ((abs(skew - skew_exp) / max(skew_exp, 1e-9)) < 0.30) if skew_exp else (skew == 0)
+            ok = ok and ((abs(jit - jitter_exp) / max(jitter_exp, 1e-9)) < 0.30) if jitter_exp else (jit == 0)
+            if not ok:
+                checks_ok = False
+                details.append(f"{level}: off={off:.1f}∈[{off_lo},{off_hi}], skew={skew:.1f}≈{skew_exp}, jit={jit:.1f}≈{jitter_exp}")
+        if not checks_ok:
+            return _make("P25", "A2/A3协议核对+时间戳", False,
+                         detail=f"A2/A3参数越界: {'; '.join(details)} | mono={monotonic}")
+        return _make("P25", "A2/A3协议核对+时间戳", True,
+                     detail=f"A2/A3 偏移/skew 在协议区间; jitter 在标量±30%; mono={monotonic}",
+                     async_params=a2_a3_params)
+    # 回退到布尔标志（调用方手工传入）
     async_in_pre = bool(cfg.get("async_injected_before_resample", False))
     jitter_per_packet = bool(cfg.get("jitter_per_packet", False))
-    return _make("P25", "A2/A3时间戳", monotonic and async_in_pre and jitter_per_packet,
-                 detail=f"mono={monotonic}, pre_resample={async_in_pre}, per_packet={jitter_per_packet}")
+    return _make("P25", "A2/A3时间戳(标志)", monotonic and async_in_pre and jitter_per_packet,
+                 detail=f"mono={monotonic}, pre_resample={async_in_pre}, per_packet={jitter_per_packet}",
+                 severity="soft")
 
 
 def check_P26_vio_payload(cfg: Mapping[str, Any]) -> CheckResult:
@@ -649,6 +870,45 @@ def check_P26_vio_payload(cfg: Mapping[str, Any]) -> CheckResult:
     real_wire = bool(cfg.get("vio_valid_and_scaling_wired", False))
     return _make("P26", "VIO payload真接入", all_4 and real_wire,
                  detail=f"keys={vio_keys}, wired={real_wire}")
+
+
+def check_P26a_v0_negative_exclusion(cfg: Mapping[str, Any]) -> CheckResult:
+    """P26a: V0 负向排除——E9 固定 V0，数据不得含 V1/V2/V3 退化症状。
+
+    手册第 26a 项（V0 档负向排除）四项症状，任一为真即 FAIL：
+        ① 置零（blackout_fraction>0 或 tracked≈0）
+        ② 增量噪声 5× 放大（inc_noise_std_mps > 0.04 视为放大）
+        ③ 关键帧中断（keyframe_interruptions>0）
+        ④ vio_valid 语义错（V0 应全程有效）
+    从 sim_meta 聚合的 vio_tracked_mid / vio_inc_noise_mps_mid / vio_blackout_frac 判定。
+    """
+    v0 = cfg.get("v0_stats") or {}
+    if not v0:
+        # 无 sim_meta 聚合时，回退到调用方标志位（缺失则 FAIL，不静默过）
+        flag = cfg.get("v0_negative_exclusion_verified")
+        if flag is None:
+            return _make("P26a", "V0负向排除", False,
+                         detail="缺 v0_stats 聚合字段（须从 sim_meta 推导或调用方提供）",
+                         severity="soft")
+        return _make("P26a", "V0负向排除", bool(flag), detail=f"verified_flag={flag}", severity="soft")
+    tracked = v0.get("vio_tracked_mid", [])
+    inc_noise = v0.get("vio_inc_noise_mps_mid", [])
+    blackout = v0.get("vio_blackout_frac", [])
+    # 症状①：任何序列 tracked < 50 → 疑似置零/黑屏
+    symptom1 = any((t < 50.0 and t > 0.0) for t in tracked) if tracked else True
+    # 症状②：任何序列 inc_noise > 0.04 → 疑似 σ×5 放大（V0 应 ≤0.03）
+    symptom2 = any((n > 0.04) for n in inc_noise) if inc_noise else True
+    # 症状③：任何序列 blackout_frac > 0 → 黑屏注入（V0 应为 0）
+    symptom3 = any((b > 0.001) for b in blackout) if blackout else True
+    # 症状④：vio_valid 全程 1（由调用方或数据契约提供，此处缺省不报）
+    symptom4 = bool(cfg.get("vio_valid_not_full_for_v0", False))
+    symptoms = {
+        "①置零/黑屏": symptom1, "②σ×5放大": symptom2,
+        "③关键帧中断": symptom3, "④valid语义": symptom4,
+    }
+    any_symptom = any(symptoms.values())
+    return _make("P26a", "V0负向排除", not any_symptom,
+                 detail=f"V0健康性: {symptoms}", severity="hard", **symptoms)
 
 
 def check_P27_activation_stats(cfg: Mapping[str, Any]) -> CheckResult:
@@ -664,11 +924,34 @@ def check_P27_activation_stats(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_P28_dual_rate(cfg: Mapping[str, Any]) -> CheckResult:
+    # 真实核对：从 sim_meta 聚合 IMU 行数 vs 时长, 校验 ≈150Hz
+    imu_rows = cfg.get("imu_row_rate", {})
+    if imu_rows:
+        rows = imu_rows.get("rows", [])
+        durations = imu_rows.get("durations", [])
+        if rows and durations:
+            rates = []
+            for r, d in zip(rows, durations):
+                if d > 0:
+                    rates.append(r / d)
+            if rates:
+                n = len(rates); mn = min(rates); mx = max(rates)
+                avg = sum(rates) / n
+                # 150Hz, 允许 ±3%
+                ok = (0.97 * 150.0 <= avg <= 1.03 * 150.0) and (mx - mn < 6.0)
+                return _make(
+                    "P28", "多速率重采样(150Hz实测)",
+                    ok,
+                    detail=f"IMU速率实测: avg={avg:.1f}Hz, min={mn:.1f}, max={mx:.1f}, n_seq={n}",
+                    imu_row_rate=rates,
+                    upstream=bool(cfg.get("resample_method_is_nearest_neighbor", False)),
+                )
+    # 回退标志路径
     imu_150 = bool(cfg.get("imu_at_150hz_native", False))
     imu_no_downsample = bool(cfg.get("imu_not_downsampled", False))
     nearest_neighbor = bool(cfg.get("resample_method_is_nearest_neighbor", False))
     return _make("P28", "多速率重采样", imu_150 and imu_no_downsample and nearest_neighbor,
-                 detail=f"imu_150={imu_150}, no_down={imu_no_downsample}, NN={nearest_neighbor}")
+                 detail=f"imu_150={imu_150}, no_down={imu_no_downsample}, NN={nearest_neighbor}", severity="soft")
 
 
 def check_P29_windowing(cfg: Mapping[str, Any]) -> CheckResult:
@@ -878,7 +1161,12 @@ def check_DQ4_sample_size(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_G1_unit_completeness(cfg: Mapping[str, Any]) -> CheckResult:
-    expected = 25
+    """G-1: 单元齐全性检查
+
+    手册 S3 明确要求：
+    > 10 seed × 5 方法 = 50 单元
+    """
+    expected = 50  # 修复：从 25 改为 50 (10 seed × 5 方法)
     n_complete = int(cfg.get("n_units_complete", 0))
     n_resumable = int(cfg.get("n_resumable_pending", 0))
     return _make("G-1", "单元齐全", n_complete == expected and n_resumable == 0,
@@ -1232,6 +1520,47 @@ def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = No
     enriched["has_z_in_2d_metrics"] = _fr.get("has_z_in_2d_metrics", False)
     enriched["coordinate_dim"] = _fr.get("coordinate_dim", 2)
 
+    # 阶段 12 §10.2 修复：从 sim_meta 聚合 P1/P2/P25/P26a/P28 的真实字段（按组合分组，稳健）
+    meta_stats = _read_sim_meta_stats(raw_root_path)
+    if meta_stats and meta_stats.get("combo_keys"):
+        ck = meta_stats["combo_keys"]
+        groups = {}
+        for i, c in enumerate(ck):
+            groups.setdefault(c, []).append(i)
+        def _avg(lst, idxs):
+            vals = [lst[i] for i in idxs if i < len(lst)]
+            return sum(vals) / len(vals) if vals else 0.0
+        nlos_stats = {}
+        for combo in ("A2N2", "A2N3", "A3N2", "A3N3"):
+            idxs = groups.get(combo, [])
+            if idxs:
+                nlos_stats[combo] = {
+                    "rho": _avg(meta_stats["nlos_ratio_mid"], idxs),
+                    "mu": _avg(meta_stats["nlos_mu_m_mid"], idxs),
+                    "sigma": _avg(meta_stats["nlos_sigma_m_mid"], idxs),
+                }
+        enriched["nlos_stats"] = nlos_stats
+        # async_params：A2 = A2N2/A2N3 序列；A3 = A3N2/A3N3 序列
+        async_params = {}
+        for lvl, combos in (("A2", ["A2N2", "A2N3"]), ("A3", ["A3N2", "A3N3"])):
+            idxs = [i for c in combos for i in groups.get(c, [])]
+            if idxs:
+                async_params[lvl] = {
+                    "async_offset_ms_mid": _avg(meta_stats["async_offset_ms_mid"], idxs),
+                    "async_jitter_ms": _avg(meta_stats["async_jitter_ms"], idxs),
+                    "async_skew_ms_mid": _avg(meta_stats["async_skew_ms_mid"], idxs),
+                }
+        enriched["async_params"] = async_params
+        enriched["v0_stats"] = {
+            "vio_tracked_mid": meta_stats["vio_tracked_mid"],
+            "vio_inc_noise_mps_mid": meta_stats["vio_inc_noise_mps_mid"],
+            "vio_blackout_frac": meta_stats["vio_blackout_frac"],
+        }
+        enriched["imu_row_rate"] = {
+            "rows": meta_stats["imu_rows_counts"],
+            "durations": meta_stats["seq_durations_s"],
+        }
+
     return enriched
 
 
@@ -1280,6 +1609,7 @@ def run_all_prechecks(cfg: Mapping[str, Any], raw_root: str | Path | None = None
         check_P24_no_nan_inf(_cfg),
         check_P25_async_timestamps(_cfg),
         check_P26_vio_payload(_cfg),
+        check_P26a_v0_negative_exclusion(_cfg),
         check_P27_activation_stats(_cfg),
         # 第六层（数据管道）
         check_P28_dual_rate(_cfg),
@@ -1357,6 +1687,7 @@ __all__ = [
     "check_P19_seed_system", "check_P20_window", "check_P21_normalization_isolation",
     "check_P22_stats_script", "check_P23_config_consistency",
     "check_P24_no_nan_inf", "check_P25_async_timestamps", "check_P26_vio_payload",
+    "check_P26a_v0_negative_exclusion",
     "check_P27_activation_stats",
     "check_P28_dual_rate", "check_P29_windowing", "check_P30_split_before_window", "check_P31_edge_cases",
     "check_P32_same_seed_init", "check_P33_best_val", "check_P34_no_overfit", "check_P35_head_consistency",

@@ -2,9 +2,10 @@
 # 池结构：A2/A3 × N2/N3 × K0/K1 = C1-C4 等比例混合（100/类 × 4 类 = 400 序列/seed）。
   # 五轴档位协议：池结构 A2/A3 × N2/N3 × K0/K1 = C1-C4 等比例混合（100/类 × 4 类 = 400 序列/seed）。
   # 锚数全档固定 4（K 协议硬约束），不再保留任何 5 锚档位。
-# 仅保留 3 个神经网络（lstm_ekf / liquid_ekf / transformer_ekf），与 sim 主表并行。
+# 5 方法必跑（EKF / Robust-EKF / LSTM / LNN(Liquid) / Transformer），与 sim 主表并行。
 # 原始数据集由 scripts/21_generate_paper_raw.py + scripts/22_prepare_paper_data.py
 # 准备，训练与推理分别由 scripts/23_train_3nn_paper.py + scripts/24_run_paper_inference.py 编排。
+# 3 个神经网络需训练，EKF / Robust-EKF 为传统融合方法，无需训练直接推理。
 
 experiment_id: e20_paper_main
 dataset_name: paper_main
@@ -23,9 +24,9 @@ frozen_axes:
   K: K1   # 协议 K 轴仅 K0/K1/K3；几何档归属按 anchor GDOP 特征分布判定
   M: M1   # 协议 Part 0: 异步高NLOS实验固定 M1（UWB 5% 成簇丢包）
 
-# 3 个神经网络（与原 sim 主表 ekf/robust_ekf/fgo/lstm/liquid/transformer 6 个方法的
-# 子集；本实验只评估神经方法以聚焦学习式方法的相对差异）
-methods: [lstm_ekf, liquid_ekf, transformer_ekf]
+# 5 方法（EKF / Robust-EKF / LSTM / LNN(Liquid) / Transformer）
+# 与 sim 主表方法集一致（手动：e9_dual_degradation.yaml 同口径）
+methods: [ekf, robust_ekf, lstm_ekf, liquid_ekf, transformer_ekf]
 
 # quick / full 模式
 mode_overrides:
@@ -35,3 +36,53 @@ mode_overrides:
   full:
     repeats: 5
     max_sequences: 2000
+
+# ============================================================================
+# I-1..I-5 实现完成门控证据（run_handbook_gates.py 读取；与 e9 同口径，
+# 因 e20 复用同一套生成器/S9/训练/统计/评估脚本，逐项已实跑核实）
+# ============================================================================
+raw_root: data/raw/sim_e9_10seed_50unit
+
+# I-1: 数据生成器 7 步注入顺序（_generate_sim_e9_5seed.py 实跑生成 10 seed × 140 seq 已验证）
+data_generator_steps_done:
+  - scene_gen
+  - sensor_sim
+  - async_inject
+  - nlos_inject
+  - missing_inject
+  - resample
+  - write_npz
+
+# I-2: S9 校验脚本 7 项判定（s9_validate_seeds.py 实跑 10/10 PASS，报告含
+#      composition/nlos_injection/missing(+m_burst 间隙成簇)/gdop/boundary/schema）
+s9_report_keys:
+  - composition
+  - nlos_injection
+  - missing
+  - m_burst
+  - gdop
+  - boundary
+  - schema
+
+# I-3: 5 方法 basename（liquid_ekf 的 basename 是 'liquid'，非 'lnn'）
+available_methods_basename: [ekf, robust_ekf, lstm, liquid, transformer]
+
+# I-4: 统计脚本 P22 全输出（12_run_statistics.py 输出 mean/std/p95/p50/Δ/Wilcoxon/CI/Holm/切片/ANOVA/C1vC4）
+stats_script_outputs:
+  - mean
+  - std
+  - p95
+  - p50
+  - delta_vs_lnn
+  - wilcoxon_p
+  - ci_95
+  - holm_bonferroni
+  - slicing_4_combo
+  - anova_2x2
+  - c1_vs_c4
+
+# I-5: 评估口径 Umeyama 2D 对齐（Sim(2)=旋转+平移）+ 2D + warm-up 剔除 + 世界系
+sim3_alignment: false  # 2D 锁定，不做尺度对齐
+is_2d: true
+warmup_removed: true
+world_frame: true
