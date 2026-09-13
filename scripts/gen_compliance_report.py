@@ -143,7 +143,7 @@ def main() -> int:
     pre = g["pre_gates"]
     ig = g["i_gates"]
     dq = g["dq_gates"]
-    rs = g["r_series"]
+    rs = g.get("r_series", {})
 
     # 本会话数据层实测补充证据
     cfg = PO._build_p_checks_cfg(Path(DATA_ROOT), {})
@@ -264,6 +264,23 @@ def main() -> int:
         r = rs.get(c, {}); p = bool(r.get("passed")); a = IMPL.get(c, ("", "", ""))
         L.append(f"| **{c}** | `{a[0]}` | {a[2]} | {'✅' if p else '❌'} {str(r.get('notes',''))[:60]} |")
     L.append("")
+
+    # 7b. C 族条款静态机核（flag_zcode 新增: src/liquidloc/analysis/clause_gates.py）
+    cg = g.get("clause_gates", {})
+    if cg.get("details"):
+        L.append("## 7b. C-1~C-10 及条款子断言静态机核 [961]-[1024]")
+        L.append("")
+        L.append("由 `clause_gates.py` 静态机核（grep 断言 + 配置核验），按手册 [961] 每条条款对应一个可执行检查动作并留痕。整体 hard 门禁全过才判定通过。")
+        L.append("")
+        L.append(f"**C 族 hard 门禁**: {cg.get('hard_passed')}/{cg.get('hard_total')} 通过 → 整体 **{'✅ PASS' if cg.get('passed') else '❌ FAIL'}**。")
+        L.append("")
+        L.append("| 条款 | 名称 | 核验方式 | 证据摘要 | 状态 |")
+        L.append("|---|---|---|---|---|")
+        for code, info in sorted(cg["details"].items()):
+            sev = info.get("severity", "-")
+            stt = "✅" if info.get("passed") else ("❌" if sev == "hard" else "⚠️")
+            L.append(f"| **{code}** | {info.get('name','')} | `clause_gates.{code}`({sev}) | {str(info.get('detail',''))[:80]} | {stt} |")
+        L.append("")
 
     # 过程性条款（A/BUG/AUD/CODE/PA 等）: 由三个审计脚本承载，附运行入口
     L.append("## 8. A-1~A-9 / BUG-* / AUD-* / CODE-* / PA-* 过程性与验收条款")

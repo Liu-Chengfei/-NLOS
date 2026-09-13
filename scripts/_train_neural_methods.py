@@ -192,13 +192,8 @@ def train_one(seed: int, method: str, seq_ids: list[str], events_by_seq: dict, g
     _train_cfg["epochs"] = _epochs
     _train_cfg["patience"] = _epochs  # no early stopping
 
-    # GPU memory optimization: 7.96GB GPU (RTX 5060) -> batch_size=4 for liquid
-    # 8-step grad accum gives effective batch=32 (same as original cfg)
-    if method == "liquid_ekf":
-        _train_cfg["batch_size"] = 4
-        _train_cfg["eval_batch_size"] = 8
-    else:
-        _train_cfg["batch_size"] = _train_cfg.get("batch_size", 16)
+    # C-1: batch_size=16 globally (GPU memory issues handled via gradient accumulation in cfg)
+    _train_cfg["batch_size"] = _train_cfg.get("batch_size", 16)
 
     _lr_sched = _train_cfg.get("lr_scheduler", {})
     if isinstance(_lr_sched, dict) and _lr_sched.get("enabled"):

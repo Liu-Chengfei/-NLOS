@@ -18,6 +18,9 @@ from typing import Any  # 用于类型注解。
 from liquidloc.common.validation import coerce_finite_scalar, is_string_like, require_iterable, require_keys, require_not_none  # 复用通用输入校验工具。
 from liquidloc.protocol.metric_schema import get_metric_meta, get_metric_order  # 复用指标协议中的元信息和顺序。
 
+# 手册 P22 两步推断：全局检验先行，后者若不显著则为探索性
+from liquidloc.analysis.handbook_p22_statistics import friedman_test  # 全局检验（P22 整体-局部分层推断硬约束）
+
 # 手册 P22 硬约束：5 方法 10 对两两比较用 Holm-Bonferroni 多重比较校正。
 # BH-FDR 仍保留为 _bh_fdr_adjust_p_values 用于非 handbook P22 场景。
 from liquidloc.analysis.handbook_p22_statistics import holm_bonferroni_adjust  # 手册 P22 校正函数。
@@ -772,6 +775,25 @@ def build_statistics_table(  # 把 pairwise 检验结果打平为标准统计表
     return statistics_table  # 返回扁平化的统计表。
 
 
+def run_global_test_paired(  # P22: 整体检验（先全局后局部）
+    grouped_values: dict[str, dict[tuple, list[float]]],
+    metric_name: str,
+    method_labels: Sequence[str] | None = None,
+) -> dict[str, Any] | None:  # 返回 None 当无法配对（样本不等长）
+    """对单个指标跑 Friedman 全局检验，返回结果字典或 None（样本不齐/无法配对时不阻断）。"""
+    try:
+        per_method_vals = list(grouped_values[metric_name].values())
+        min_len = min(len(v) for v in per_method_vals)
+        if min_len < 2 or len(per_method_vals) < 2:
+            return None
+        blocks = [[per_method_vals[m][b] for m in range(len(per_method_vals))] for b in range(min_len)]
+        labels = list(grouped_values[metric_name].keys()) if method_labels is None else method_labels
+        labels = [str(lab[0]) if isinstance(lab, tuple) else str(lab) for lab in labels]
+        return friedman_test(blocks, labels)
+    except Exception:
+        return None
+
+
 def run_significance_tests(  # 对外入口：从原始表直接跑完整统计检验。
     metric_table: Any,  # 输入的指标表，支持 DataFrame、单个映射或映射序列。
     group_keys: list[str],  # 分组键列表。
@@ -830,5 +852,19 @@ def run_significance_tests(  # 对外入口：从原始表直接跑完整统计�
     p_values = [test_row["p_value"] for test_row in test_rows]  # 提取所有原始 p 值。
     # 手册 P22 硬约束：两两比较用 Holm-Bonferroni 控制 FWER。
     adjusted_p_values = holm_bonferroni_adjust(p_values)  # 做多重比较校正。
+
+    # P22: 两步推断 —— 先跑 Friedman 全局检验，若不显著（p>=0.05），所有局部分析标为 exploratory
+    alpha = 0.05  # 手册 P22/CODE-1 显著性水平
+    global_result = run_global_test_paired(grouped_values, metric_names[0] if metric_names else "rmse")
+    is_global_significant = global_result is not None and global_result.get("p_value", 1.0) < alpha
+    is_exploratory = not is_global_significant
+
     statistics_table = build_statistics_table(test_rows, adjusted_p_values, normalized_group_keys)  # 组装最终统计表。
+    # 为每行添加 exploratory 标记（CI 声明：全局检验不显著时不校正 P22 硬约束）
+    for row in statistics_table:
+        if is_exploratory:
+            row["exploratory"] = True  # 两步推断：全局不显著 → 探索性（CI 未校正）
+            row["exploratory_reason"] = "global_friedman_p >= 0.05"
+        row["global_test_p_value"] = global_result.get("p_value", None) if global_result else None
+        row["global_test_significant"] = is_global_significant
     return statistics_table  # 返回统一的统计结果。

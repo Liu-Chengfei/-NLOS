@@ -330,6 +330,27 @@ def run_s9_validation(data_root: Path) -> dict[str, Any]:
     }
 
 
+def run_clause_gates() -> dict[str, Any]:
+    """C-1..C-10 条款静态机核门禁 [961]-[1024]。
+
+    调用 clause_gates.run_all_c_gates() 返回 {code: {passed, severity, ...}}；
+    以全部 hard 门禁是否全过作为整体通过判定。
+    """
+    try:
+        from liquidloc.analysis.clause_gates import run_all_c_gates
+        res = run_all_c_gates()
+        hard_gates = {k: v for k, v in res.items() if v.get("severity") == "hard"}
+        hard_passed = sum(1 for v in hard_gates.values() if v.get("passed"))
+        return {
+            "passed": all(v.get("passed") for v in hard_gates.values()),
+            "hard_passed": hard_passed,
+            "hard_total": len(hard_gates),
+            "details": res,
+        }
+    except Exception as exc:
+        return {"passed": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
 from liquidloc.common.precheck_orchestrator import run_all_prechecks
 
 
@@ -379,6 +400,8 @@ def main() -> int:
         "s9_validation": run_s9_validation(args.data_root),
         "dq_gates": run_dq_gates(args.data_root),
         "block1_gdop": run_block1(args.data_root),
+        # 条款静态机核 [961]-[1024] — C-1..C-10、P19、P22、P23、P28 等
+        "clause_gates": run_clause_gates(),
     }
     if not args.skip_r_series:
         report["r_series"] = run_r_series()
