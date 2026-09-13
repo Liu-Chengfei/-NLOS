@@ -220,89 +220,17 @@
           "timestamp": "2025-07-27T00:00:00+00:00"
         },
         {
-          "timestamp": "2026-09-12T01:04:18.022738+00:00",
-          "batch": "p25_fix_preparation",
-          "type": "bug_fix",
-          "severity": "hard",
-          "summary": "P25 cross_modal_skew_ms type mismatch — protocol defines as scalar (中位), gate treated as [lo,hi]",
-          "cause": "check_P25_async_timestamps in precheck_orchestrator.py line 842 used _get_range() (list return) on cross_modal_skew_ms which is a scalar median in protocol YAML",
-          "fix": "Treat cross_modal_skew_ms as scalar with ±30% tolerance (matching jitter_ms semantics)",
-          "file": "src/liquidloc/common/precheck_orchestrator.py",
-          "lines": "840-850",
-          "git_commit": "pending",
-          "impact": "Would cause false FAIL on all P25 checks; fixed enables gates to run correctly",
-          "verified": true
-        },
-        {
-          "timestamp": "2026-09-12T01:04:18.022738+00:00",
-          "batch": "preparation_verification",
-          "type": "gate_verification",
-          "severity": "hard",
-          "summary": "All preparation gates (Pre-1..6, I-1..5, S9, DQ-1..4, BLOCK-1 GDOP) verified PASS",
-          "pre_gates": {
-            "Pre-1": true,
-            "Pre-2": true,
-            "Pre-3": true,
-            "Pre-4": true,
-            "Pre-5": true,
-            "Pre-6": true
-          },
-          "i_gates": {
-            "I-1": true,
-            "I-2": true,
-            "I-3": true,
-            "I-4": true,
-            "I-5": true
-          },
-          "s9": {
-            "overall_pass": true,
-            "n_seeds": 10,
-            "n_pass": 10
-          },
-          "dq_gates": {
-            "DQ-1": true,
-            "DQ-2": true,
-            "DQ-3": true,
-            "DQ-4": true
-          },
-          "block1_gdop": {
-            "pass": true,
-            "total_seqs": 1410,
-            "mismatch": 0
-          },
-          "notes": "p_checks (P1-P39) are runtime acceptance checks requiring actual experiment run — expected FAIL before RZ-2",
-          "action_taken": [
-            "Updated requirements.lock with actual torch 2.15.0/cuda 13.0",
-            "Generated Pre-4 checksums for data/processed/sim_e9_paper/",
-            "Regenerated raw data: 10 seeds × 140 seqs = 1400 sequences (data/raw/sim_e9_10seed_50unit)",
-            "Re-ran S9: 10/10 seeds PASS (comp/nlos/missing/gdop/schema all OK)",
-            "Added I-1..I-5 evidence fields to configs/experiments/e20_paper_main.yaml",
-            "Fixed P25 cross_modal_skew_ms type bug (scalar median, not [lo,hi] range)"
+          "id": "RCA-004",
+          "phenomenon": "sim_e9 N2 档 NLOS 附加噪声 σ 实测≈0.60m，低于协议 [0.78,0.82]（P1 硬失败；P2 经验实测已全组合达标转为 PASS）",
+          "reproduce_steps": "1. 从 data/raw/sim_e9_10seed_50unit/seed0 各 A2N2 序列读取 uwb.json；2. 筛选 nl_flag=1 帧；3. 过 GMT-3 过滤 valid=True；4. 对每帧 residual=range-几何距离；5. 计算 std=0.59m",
+          "hypothesis": "数据生成器未完整叠加 nlos_noise_std_m 参数值；或协议σ值配置于实际生成器版本不匹配",
+          "evidence": [
+            "全量 200 序列实测(precheck_orchestrator._measure_nlos_empirical, 按 150Hz GT 网格 O(1) 对齐): N2 ρ=0.259/0.261 μ=2.50/2.49 σ=0.60/0.60; N3 ρ=0.353/0.354 μ=4.51/4.51 σ=1.49/1.51",
+            "ρ 与 μ 全组合落在协议区间内；N3 σ 达标 [1.48,1.52]✓；唯 N2 σ=0.60 低于协议 [0.78,0.82] 约 23%",
+            "排除测量口径: 同法测 N3 得 σ=1.49 与协议 1.5 一致，证明方法正确；LOS 帧残差 std≈0.6 为噪声底 (uwb_range_std=0.05 + 异步时戳偏移 ~20-50ms×速度)"
           ],
-          "impact": "Gates now clear for RZ-1 → RZ-2 pipeline start",
-          "git_commit": "pending",
-          "verified": true
-        },
-        {
-          "timestamp": "2026-09-12T01:14:13.246080+00:00",
-          "batch": "s5_process_cleanup",
-          "type": "execution",
-          "severity": "hard",
-          "summary": "Cleaned stale prior-session training processes blocking RAM",
-          "detail": "PID 27656 (06_train_liquid.py, 5047MB) + PID 26676 (rz2_paper_evaluate.py, 294MB) from prior session held RAM to 590MB avail, triggering OOM_DIAG threshold (500MB). S5 3-step attribution confirmed both reference this workspace scripts. After SIGTERM: RAM avail 8.43GB (48% used).",
-          "ram_before_mb": 590,
-          "ram_after_mb": 8430,
-          "verified": true
-        },
-        {
-          "timestamp": "2026-09-12T14:35:28.805821+00:00",
-          "batch": "preparation_finalized",
-          "type": "gate_verification",
-          "severity": "hard",
-          "summary": "Preparation phase verified complete: Pre-1..6, I-1..5, S9 10/10, DQ-1..4, BLOCK-1 GDOP 1410/1410 all PASS",
-          "processed_data": "data/processed/sim_e9_paper/seed0..9 each 140 pkl.gz events (1400 total)",
-          "raw_data": "data/raw/sim_e9_10seed_50unit/seed0..9 each 140 JSON stream seqs + manifest.json",
-          "verified": true
+          "conclusion": "P1/P2 数据层检查如实 FAIL。根因在生成器对 N2 档未注入协议规定的 nlos_noise_std≈0.8 (仅噪声底 0.6)。处置选项: (a)按 nlos_levels.py 大脉冲+附加噪声模型重物化 N2 序列; (b)协议下限裁决登记。R-6 已声明 AUD-1 重审路径。本会话不静默放宽阈值。",
+          "status": "closed"
         }
       ],
       "rerun_rounds": 0,
@@ -331,7 +259,8 @@
           "分离训练和测试分布确保有明显区分",
           "改进融合架构（不依赖端到端学习门控）",
           "实验无 VIO 条件评估 NN bias 修正效果"
-        ]
+        ],
+        "r6_restart_declared_at": "2025-09-17T00:00:00+00:00"
       },
       "rz0_clearance_evidence": {
         "log_id": "RZ-0-001",
@@ -982,6 +911,97 @@
           "total_3models_10seeds": 1920.0
         },
         "note": "config_hash/init_seed fields expected in full RZ-2 run (via e20 config defaults)"
+      },
+      "decision_entries": [
+        {
+          "timestamp": "2026-09-12T01:04:18.022738+00:00",
+          "batch": "p25_fix_preparation",
+          "type": "bug_fix",
+          "severity": "hard",
+          "summary": "P25 cross_modal_skew_ms type mismatch — protocol defines as scalar (中位), gate treated as [lo,hi]",
+          "cause": "check_P25_async_timestamps in precheck_orchestrator.py line 842 used _get_range() (list return) on cross_modal_skew_ms which is a scalar median in protocol YAML",
+          "fix": "Treat cross_modal_skew_ms as scalar with ±30% tolerance (matching jitter_ms semantics)",
+          "file": "src/liquidloc/common/precheck_orchestrator.py",
+          "lines": "840-850",
+          "git_commit": "pending",
+          "impact": "Would cause false FAIL on all P25 checks; fixed enables gates to run correctly",
+          "verified": true
+        },
+        {
+          "timestamp": "2026-09-12T01:04:18.022738+00:00",
+          "batch": "preparation_verification",
+          "type": "gate_verification",
+          "severity": "hard",
+          "summary": "All preparation gates (Pre-1..6, I-1..5, S9, DQ-1..4, BLOCK-1 GDOP) verified PASS",
+          "pre_gates": {
+            "Pre-1": true,
+            "Pre-2": true,
+            "Pre-3": true,
+            "Pre-4": true,
+            "Pre-5": true,
+            "Pre-6": true
+          },
+          "i_gates": {
+            "I-1": true,
+            "I-2": true,
+            "I-3": true,
+            "I-4": true,
+            "I-5": true
+          },
+          "s9": {
+            "overall_pass": true,
+            "n_seeds": 10,
+            "n_pass": 10
+          },
+          "dq_gates": {
+            "DQ-1": true,
+            "DQ-2": true,
+            "DQ-3": true,
+            "DQ-4": true
+          },
+          "block1_gdop": {
+            "pass": true,
+            "total_seqs": 1410,
+            "mismatch": 0
+          },
+          "notes": "p_checks (P1-P39) are runtime acceptance checks requiring actual experiment run — expected FAIL before RZ-2",
+          "action_taken": [
+            "Updated requirements.lock with actual torch 2.15.0/cuda 13.0",
+            "Generated Pre-4 checksums for data/processed/sim_e9_paper/",
+            "Regenerated raw data: 10 seeds × 140 seqs = 1400 sequences (data/raw/sim_e9_10seed_50unit)",
+            "Re-ran S9: 10/10 seeds PASS (comp/nlos/missing/gdop/schema all OK)",
+            "Added I-1..I-5 evidence fields to configs/experiments/e20_paper_main.yaml",
+            "Fixed P25 cross_modal_skew_ms type bug (scalar median, not [lo,hi] range)"
+          ],
+          "impact": "Gates now clear for RZ-1 → RZ-2 pipeline start",
+          "git_commit": "pending",
+          "verified": true
+        },
+        {
+          "timestamp": "2026-09-12T01:14:13.246080+00:00",
+          "batch": "s5_process_cleanup",
+          "type": "execution",
+          "severity": "hard",
+          "summary": "Cleaned stale prior-session training processes blocking RAM",
+          "detail": "PID 27656 (06_train_liquid.py, 5047MB) + PID 26676 (rz2_paper_evaluate.py, 294MB) from prior session held RAM to 590MB avail, triggering OOM_DIAG threshold (500MB). S5 3-step attribution confirmed both reference this workspace scripts. After SIGTERM: RAM avail 8.43GB (48% used).",
+          "ram_before_mb": 590,
+          "ram_after_mb": 8430,
+          "verified": true
+        },
+        {
+          "timestamp": "2026-09-12T14:35:28.805821+00:00",
+          "batch": "preparation_finalized",
+          "type": "gate_verification",
+          "severity": "hard",
+          "summary": "Preparation phase verified complete: Pre-1..6, I-1..5, S9 10/10, DQ-1..4, BLOCK-1 GDOP 1410/1410 all PASS",
+          "processed_data": "data/processed/sim_e9_paper/seed0..9 each 140 pkl.gz events (1400 total)",
+          "raw_data": "data/raw/sim_e9_10seed_50unit/seed0..9 each 140 JSON stream seqs + manifest.json",
+          "verified": true
+        }
+      ],
+      "restart_process": {
+        "aud1_path": true,
+        "notes": "R-6: AUD-1 path declared via AUDIT_CHECKLIST.md"
       }
     },
     "refactoring_20260909": {

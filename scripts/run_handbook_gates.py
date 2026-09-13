@@ -104,7 +104,8 @@ def run_pre_gates(cfg: dict[str, Any]) -> dict[str, Any]:
             except Exception:
                 pass
         seeds = set()
-        for meta in data_root.rglob("sim_meta.json"):
+        # 兼容 meta.json (v2) 与 sim_meta.json (旧版)
+        for meta in list(data_root.rglob("meta.json")) + list(data_root.rglob("sim_meta.json")):
             try: seeds.add(json.loads(meta.read_text(encoding="utf-8")).get("seed"))
             except Exception: pass
         return {
