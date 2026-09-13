@@ -137,7 +137,8 @@ def _make_uwb(xy: list[tuple[float, float]], seq_seed: int, n_axis: str = "N0") 
     NLOS_PROFILE = {
         "N0": {"rho": 0.0, "mu": 0.0, "sigma": 0.15},
         "N1": {"rho": 0.10, "mu": 0.5, "sigma": 0.18},
-        "N2": {"rho": 0.28, "mu": 2.5, "sigma": 0.6},
+        # N2/N3 σ 按协议附录 [1737-1742]：N2=0.8，N3=1.5
+        "N2": {"rho": 0.28, "mu": 2.5, "sigma": 0.8},
         "N3": {"rho": 0.38, "mu": 4.5, "sigma": 1.5},
     }
     nlos = NLOS_PROFILE.get(n_axis, NLOS_PROFILE["N0"])
@@ -277,9 +278,9 @@ def main() -> None:
                 max_gap_s = round(5.0 * 0.1, 4)
                 # mu_m/sigma_m：用 GT 真值反推偏置（NLOS 帧：range - GT 偏差均值）
                 if n_nlos > 0:
-                    # 简化：直接使用协议注入的 μ/σ（手册 S4 N2/N3 协议值）
+                    # 简化：直接使用协议注入的 μ/σ（手册 S4 N2/N3 协议值，见附录 [1737-1742]）
                     mu_m = 2.5 if n_axis == "N2" else (4.5 if n_axis == "N3" else 0.0)
-                    sigma_m = 0.6 if n_axis == "N2" else (1.5 if n_axis == "N3" else 0.0)
+                    sigma_m = 0.8 if n_axis == "N2" else (1.5 if n_axis == "N3" else 0.0)
                 else:
                     mu_m = 0.0
                     sigma_m = 0.0
