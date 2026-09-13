@@ -603,7 +603,11 @@ def _resolve_scene_axis_observation_floor(event: dict[str, Any]) -> float:
                     f"VIO_REPROJ_ERR_NORM_FLOOR({VIO_REPROJ_ERR_NORM_FLOOR})"
                 )
             reproj_floor_risk = min(1.0, max(0.0, (_reproj_val - VIO_REPROJ_ERR_NORM_FLOOR) / _denom))
-        return max(async_axis_risk, feature_floor_risk, reproj_floor_risk)
+        # A 轴 cross_modal_skew_ms 是 UWB TWR 往返时延（UWB 侧时序退化），不应作为
+        # VIO 自身量测置信度的风险下界——否则在 A2/A3 场景下连 V0 健康档 VIO 也会被抬到
+        # risk≥0.20，撞上 P35 的 vio_risk_hard_skip_threshold=0.05 被 100% 硬跳过，
+        # 经典 EKF/robust_ekf 无法融合 VIO（本实验 VIO 恒为 V0 健康档，VIO 风险只应由 V 轴决定）。
+        return max(feature_floor_risk, reproj_floor_risk)
     return 0.0
 
 

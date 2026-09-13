@@ -27,13 +27,14 @@ PROJECT_ROOT_POSIX = PROJECT_ROOT.as_posix()  # 'E:/Q4 - 副本'
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--paper-config", type=str, default="configs/datasets/paper_dataset.yaml")
-    parser.add_argument("--events-root", type=str, default="outputs/prepare_paper_main_v1")
-    parser.add_argument("--raw-root", type=str, default="data/raw/paper_main_v1")
+    parser.add_argument("--events-root", type=str, default="outputs/prepare_paper_main_v2")
+    parser.add_argument("--raw-root", type=str, default="data/raw/paper_main_v2")
     parser.add_argument("--train-root", type=str, default="outputs/train_paper_main")
     parser.add_argument("--output-root", type=str, default="outputs/e20_paper_main")
     parser.add_argument("--mode", type=str, default="quick", choices=["quick", "full"])
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--methods", type=str, nargs="+", default=["lstm_ekf", "liquid_ekf", "transformer_ekf"])
+    parser.add_argument("--methods", type=str, nargs="+", default=["ekf", "robust_ekf", "lstm_ekf", "liquid_ekf", "transformer_ekf"],
+                        help="手册 Part 0 §13：5 方法必跑；ekf/robust_ekf 为传统融合无需 checkpoint，lstm/liquid/transformer 为神经网络需加载 ckpt")
     parser.add_argument("--max-sequences", type=int, default=None, help="cap on number of seq_ids to run (quick 默认 40)")
     return parser.parse_args()
 
@@ -200,14 +201,16 @@ def main() -> int:
         from liquidloc.metrics.metric_runner import compute_metrics
         from liquidloc.common.config_utils import load_yaml_config
         protocol_cfg = load_yaml_config(PROJECT_ROOT / "configs" / "base" / "experiment_protocol.yaml")
-        # paper_main_v1 是 20m×20m 物理尺寸场景，5m failure 阈值与 sim_e9 协议的 "可解率 65-74%"
+        # paper_main_v2 是 20m×20m 物理尺寸场景，5m failure 阈值与 sim_e9 协议的 "可解率 65-74%"
         # 区间一致（1m 过严，10m 过松）。每个 sim_e9 评估也用 5m threshold。
         failure_threshold = 5.0
         all_rows = []
         for bundle in bundles:
             sid = bundle.get("seq_id")
             method = bundle.get("method_name", "unknown")
-            preds = bundle.get("predictions") or []
+            # NOTE: prediction bundle uses 'states' key; compute_metrics accepts any Mapping
+            # which it wraps into a list internally, so pass bundle directly.
+            preds = bundle if isinstance(bundle, dict) else (bundle.get("predictions") or [])
             gt_seq = gt_by_seq.get(sid, [])
             if not gt_seq:
                 continue

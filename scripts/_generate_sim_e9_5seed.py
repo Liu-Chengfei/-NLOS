@@ -35,17 +35,49 @@ TRAJ_X_RANGE = (3.5, 16.5)
 TRAJ_Y_RANGE = (3.5, 16.5)
 
 
-def _hull_constrained_trajectory(n: int, seed: int) -> list[tuple[float, float]]:
+def _hull_constrained_trajectory(n: int, seed: int) -> tuple[list[tuple[float, float]], list[float], list[float]]:
+    """BUG-025: 连贯运动学模型（恒速 1.2 m/s + OU 平滑转向）。
+
+    返回 (pts, yaws, yaw_rates) — 轨迹点、航向、瞬时角速度。
+    轨迹在 3.5-16.5m 边界内弹性反射。
+    角速度 omega 由 OU 过程直接生成，IMU 用它而不做差分，避免 ±π 跳界放大误差。
+    """
     random.seed(seed)
-    x, y = random.uniform(*TRAJ_X_RANGE), random.uniform(*TRAJ_Y_RANGE)
-    pts = []
-    for _ in range(n):
-        x += random.gauss(0, 0.10)
-        y += random.gauss(0, 0.10)
-        x = max(TRAJ_X_RANGE[0], min(TRAJ_X_RANGE[1], x))
-        y = max(TRAJ_Y_RANGE[0], min(TRAJ_Y_RANGE[1], y))
+    v = 1.2  # m/s，恒定车速
+    tau = 5.0  # OU 角速度相关时间尺度 s
+    sigma_omega = 0.35  # rad/s 稳态角速度标准差
+    omega = 0.0  # 当前角速度 rad/s
+    x = random.uniform(*TRAJ_X_RANGE)
+    y = random.uniform(*TRAJ_Y_RANGE)
+    h = 0.0
+    pts: list[tuple[float, float]] = []
+    yaws: list[float] = []
+    yaws_dot: list[float] = []
+    for i in range(n):
+        # OU 过程更新角速度：d_omega = -omega/tau * dt + sigma * sqrt(2*dt/tau) * N(0,1)
+        omega += (-omega / tau) * DT + random.gauss(0.0, sigma_omega * math.sqrt(2.0 * DT / tau))
+        omega = max(-1.0, min(1.0, omega))  # 限制角速度在 ±1 rad/s ≈ ±57°/s
+        yaws_dot.append(omega)
+        h += omega * DT
+        x += v * math.cos(h) * DT
+        y += v * math.sin(h) * DT
+        # 边界反弹
+        if x < TRAJ_X_RANGE[0]:
+            x = 2 * TRAJ_X_RANGE[0] - x
+            h = math.pi - h
+        elif x > TRAJ_X_RANGE[1]:
+            x = 2 * TRAJ_X_RANGE[1] - x
+            h = math.pi - h
+        if y < TRAJ_Y_RANGE[0]:
+            y = 2 * TRAJ_Y_RANGE[0] - y
+            h = -h
+        elif y > TRAJ_Y_RANGE[1]:
+            y = 2 * TRAJ_Y_RANGE[1] - y
+            h = -h
+        h = (h + math.pi) % (2.0 * math.pi) - math.pi
         pts.append((round(x, 4), round(y, 4)))
-    return pts
+        yaws.append(h)
+    return pts, yaws, yaws_dot
 
 
 def _make_anchor_layout(seq_id: str) -> dict:
@@ -65,23 +97,29 @@ def _make_anchor_layout(seq_id: str) -> dict:
     }
 
 
-def _make_gt(xy: list[tuple[float, float]]) -> list[dict]:
+def _make_gt(xy: list[tuple[float, float]], yaws: list[float]) -> list[dict]:
     # s9 schema check expects "px"/"py" 字段名（手册 S6 数据集契约：gt_pos N×2）
-    return [{"timestamp": i * DT, "px": x, "py": y, "yaw": 0.0} for i, (x, y) in enumerate(xy)]
+    # BUG-025: GT yaw 必须是真实轨迹 heading，与 IMU gz / VIO yaw 同源。
+    return [{"timestamp": i * DT, "px": x, "py": y, "yaw": round(yaws[i], 4)} for i, (x, y) in enumerate(xy)]
 
 
-def _make_imu(xy: list[tuple[float, float]], seed: int) -> list[dict]:
+def _make_imu(xy: list[tuple[float, float]], yaws: list[float], yaw_rates: list[float], seed: int) -> list[dict]:
+    # BUG-025: IMU 与轨迹运动学同源：gz = OU 角速度（不做差分！差分在 ±π 反射处
+    # 会瞬时爆炸，旧实现 ay 冲到 -325 m/s² 被协议 clamp 拒绝），ay = v*omega（向心），
+    # ax = 0（恒速）。这样 EKF 预测步 yaw += gz*dt 与轨迹 heading 增量一致。
     random.seed(seed + 1000)
+    v = 1.2
     rows = []
     for i in range(N_STEPS):
+        omega = yaw_rates[i]
         rows.append({
             "timestamp": i * DT,
-            "ax": round(random.gauss(0, 0.2), 4),
-            "ay": round(random.gauss(0, 0.2), 4),
+            "ax": round(random.gauss(0, 0.05), 4),
+            "ay": round(v * omega + random.gauss(0, 0.05), 4),
             "az": round(random.gauss(9.8, 0.3), 4),
             "gx": round(random.gauss(0, 0.05), 4),
             "gy": round(random.gauss(0, 0.05), 4),
-            "gz": round(random.gauss(0, 0.05), 4),
+            "gz": round(omega + random.gauss(0, 0.02), 4),
         })
     return rows
 
@@ -117,40 +155,44 @@ def _make_uwb(xy: list[tuple[float, float]], seq_seed: int, n_axis: str = "N0") 
         else:
             i += 1
     # 2) 写入 UWB 行
-    for ts in [i * 0.1 for i in range(total_steps)]:
-        anchor_int_id = ANCHOR_INT_IDS[step % ANCHOR_COUNT]
+    # BUG-024: UWB 时间步索引必须与 GT / VIO 对齐 (150Hz 轨迹)，否则引入同步误差。
+    # UWB 采样 10Hz → GT 在 dt_us = 0.1s ≈ 15 个 IMU 步长 → idx = round(ts / DT)。
+    for i in range(total_steps):
+        ts = i * 0.1
+        anchor_int_id = ANCHOR_INT_IDS[i % ANCHOR_COUNT]
         ax, ay = ANCHOR_POSITIONS[anchor_int_id]
-        # 取最近的 GT 点
-        idx = min(step, len(xy) - 1)
+        # 取最近的 GT 点（对齐到 150Hz 轨迹）
+        idx = min(int(ts / DT), len(xy) - 1)
         dx = xy[idx][0] - ax
         dy = xy[idx][1] - ay
         r_true = math.sqrt(dx * dx + dy * dy)
         # NLOS 概率注入（仅当 frame 非 dropout）
-        if not dropout_mask[step] and nlos["rho"] > 0 and random.random() < nlos["rho"]:
+        if not dropout_mask[i] and nlos["rho"] > 0 and random.random() < nlos["rho"]:
             r_nlos = r_true + nlos["mu"] + random.gauss(0, nlos["sigma"])
             nl_flag = 1
         else:
-            r_nlos = r_true + random.gauss(0, nlos["sigma"] if not dropout_mask[step] else 0.15)
+            r_nlos = r_true + random.gauss(0, nlos["sigma"] if not dropout_mask[i] else 0.15)
             nl_flag = 0
         # M1 聚类丢包
-        if dropout_mask[step]:
+        if dropout_mask[i]:
             uwb_rows.append({"timestamp": round(ts, 4), "anchor_id": anchor_int_id, "range": 0.0, "valid": False, "quality": 0.0, "nl_flag": 0, "dropout": True})
         else:
             uwb_rows.append({"timestamp": round(ts, 4), "anchor_id": anchor_int_id, "range": round(max(0.1, r_nlos), 3), "valid": True, "quality": 0.95, "nl_flag": int(nl_flag)})
-        step += 1
     return uwb_rows
 
 
-def _make_vio(xy: list[tuple[float, float]], seq_seed: int) -> list[dict]:
+def _make_vio(xy: list[tuple[float, float]], yaws: list[float], seq_seed: int) -> list[dict]:
     # s9 schema check expects "vio_valid" 字段名（手册 S4.1 VIO output contract）
+    # BUG-025: VIO yaw 直接取同源轨迹 heading（+小噪声），与 GT/IMU 一致。
     random.seed(seq_seed + 3000)
     rows = []
     for i in range(int(T_END * 20)):
+        j = min(i * 5, len(xy) - 1)
         rows.append({
             "timestamp": round(i * 0.05, 4),
-            "x": round(xy[min(i * 5, len(xy) - 1)][0] + random.gauss(0, 0.015), 4),
-            "y": round(xy[min(i * 5, len(xy) - 1)][1] + random.gauss(0, 0.015), 4),
-            "yaw": round(random.gauss(0, 0.02), 4),
+            "x": round(xy[j][0] + random.gauss(0, 0.015), 4),
+            "y": round(xy[j][1] + random.gauss(0, 0.015), 4),
+            "yaw": round(yaws[j] + random.gauss(0, 0.02), 4),
             "vio_valid": True,
             "cov": 0.0004,
         })
@@ -176,18 +218,18 @@ def _make_sim_meta(seq_id: str, a_axis: str, n_axis: str) -> dict:
 def _write_one(out_dir: Path, seq_id: str, a_axis: str, n_axis: str) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     seed = hash(seq_id) & 0xFFFFFFFF
-    xy = _hull_constrained_trajectory(N_STEPS, seed)
+    xy, yaws, yaw_rates = _hull_constrained_trajectory(N_STEPS, seed)
     (out_dir / "anchor_layout.json").write_text(
         json.dumps(_make_anchor_layout(seq_id), indent=2), encoding="utf-8")
     (out_dir / "gt.json").write_text(
-        json.dumps(_make_gt(xy), indent=2), encoding="utf-8")
+        json.dumps(_make_gt(xy, yaws), indent=2), encoding="utf-8")
     (out_dir / "imu.json").write_text(
-        json.dumps(_make_imu(xy, seed), indent=2), encoding="utf-8")
+        json.dumps(_make_imu(xy, yaws, yaw_rates, seed), indent=2), encoding="utf-8")
     (out_dir / "uwb.json").write_text(
         json.dumps(_make_uwb(xy, seed, n_axis), indent=2), encoding="utf-8")
     (out_dir / "vio.json").write_text(
-        json.dumps(_make_vio(xy, seed), indent=2), encoding="utf-8")
-    (out_dir / "sim_meta.json").write_text(
+        json.dumps(_make_vio(xy, yaws, seed), indent=2), encoding="utf-8")
+    (out_dir / "meta.json").write_text(
         json.dumps(_make_sim_meta(seq_id, a_axis, n_axis), indent=2), encoding="utf-8")
 
 
@@ -270,21 +312,6 @@ def main() -> None:
         }
         (seed_root / "manifest.json").write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
-        # 同时更新 seq0/ stub（s9 读取它用于 schema 检查）
-        seq0 = seed_root / "seq0"
-        if seq0.exists():
-            shutil.rmtree(seq0)
-        src = seed_root / seq_entries[0]["seq_id"]
-        seq0.mkdir(parents=True)
-        for fname in ["imu.json", "uwb.json", "vio.json", "gt.json",
-                      "anchor_layout.json", "sim_meta.json"]:
-            if (src / fname).exists():
-                shutil.copy(src / fname, seq0 / fname)
-        # s9 还需要 seed-level seq0 manifest entry（用于 GDOP 计算时读 anchor_layout.json）
-        (seq0 / "manifest.json").write_text(
-            json.dumps({"sequences": seq_entries[:1], "n_seqs": 1}, indent=2, ensure_ascii=False),
-            encoding="utf-8"
         )
 
     print(f"Generated: {N_SEEDS} seeds × {len(COMBOS) * SEQS_PER_COMBO} seqs = {seq_total} sequences")
