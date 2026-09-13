@@ -415,6 +415,23 @@ def main() -> int:
     L.append(f"*总计 {g['p_checks']['total']} 条机器门禁: 当前通过 {g['p_checks']['n_passed']}。失败项全部属于'待实测'或上述 1 项数据真实性违规，无代码缺失项。*")
     L.append("")
     L.append("**诚实声明**: 本报告由 `run_handbook_gates.py` 实测 JSON 驱动生成，逐条映射表由人工核对代码后编写；未对任何检查器结果做手工覆写。")
+    L.append("")
+    L.append("---")
+    L.append("## 附录 D. 条款 → 代码 1:1 权威映射")
+    L.append("")
+    L.append("由 `scripts/verify_all_clauses.py` 自动生成，手册逐条核查其代码实现位置。")
+    L.append("")
+    L.append("| 条款 | 类型 | 实现文件:行号 | 说明 |")
+    L.append("|---|---|---|---|")
+    map_json = (ROOT / "outputs" / "clause_implementation_map.json")
+    if map_json.is_file():
+        m = json.loads(map_json.read_text(encoding="utf-8"))
+        for r in sorted(m, key=lambda x: x["clause"]):
+            c, fn, f, ln, kind = r.get("clause"), r.get("func"), r.get("file"), r.get("line"), r.get("kind")
+            anchor = f"{f}:{ln}" if ln else f
+            L.append(f"| **{c}** | {kind} | `{anchor}` | {fn if fn else '--'} |")
+    L.append("")
+    L.append("> 注: P15/P19/P22/P23/P28 子断言、P26a 等在 clause_gates.py 合一实现，属本库组织方式；S 族为配置+校验脚本承载。")
 
     OUT_MD.write_text("\n".join(L), encoding="utf-8")
     print(f"写入 {OUT_MD}")
