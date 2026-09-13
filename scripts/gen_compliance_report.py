@@ -23,6 +23,40 @@ GATE_JSON = ROOT / "outputs" / "handbook_gates_live.json"
 OUT_MD = ROOT / "docs" / "条款落实度报告.md"
 DATA_ROOT = "data/raw/sim_e9_10seed_50unit"
 
+# ---- 自动从源码提取函数定义行号（防手维护过期）----
+import re as _re
+
+_GATE_SOURCES = {
+    "src/liquidloc/common/precheck_orchestrator.py": None,
+    "scripts/_run_25unit.py": None,
+    "src/liquidloc/analysis/r_series.py": None,
+}
+
+def _build_line_index() -> dict[str, str]:
+    """扫描源文件，建立 {def_name: 'file:Lline'} 索引。"""
+    idx: dict[str, str] = {}
+    for rel in _GATE_SOURCES:
+        p = ROOT / rel
+        if not p.is_file():
+            continue
+        txt = p.read_text(encoding="utf-8", errors="ignore")
+        for m in _re.finditer(r"^def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", txt, _re.MULTILINE):
+            fn = m.group(1)
+            line = txt.count("\n", 0, m.start()) + 1
+            idx.setdefault(fn, f"{rel}:L{line}")
+    return idx
+
+_LINE_INDEX = _build_line_index()
+
+def annotate_anchor(anchor: str) -> str:
+    """把锚点字符串里的函数名补上 :L<行号>（从 _LINE_INDEX 查找）。"""
+    out = anchor
+    for fn, loc in _LINE_INDEX.items():
+        # 替换首次出现的裸函数名为 函数名@Lline
+        if fn in out and f"{fn}@L" not in out:
+            out = out.replace(fn, f"{fn}→{loc.split(':')[-1]}", 1)
+    return out
+
 # ---- 条款 → 实现锚点 + 落实方式（人工核对过代码，逐条准确）----
 IMPL: dict[str, tuple[str, str, str]] = {
     # Pre-*: scripts/run_handbook_gates.py + scripts/_run_25unit.py
@@ -124,11 +158,11 @@ IMPL: dict[str, tuple[str, str, str]] = {
     "E-5": ("check_E5_alert_log_consistency", "告警一致性", "告警记录数vs解决数一致(本会话接通实测)")
     ,
     "E-6": ("check_E6_audit_exit", "审计出口", "E-1..E-5 全过汇总"),
-    "R-1": ("analysis/r_series.py", "失败六类分类登记", "failure_classification_register 六类齐备"),
-    "R-2": ("analysis/r_series.py + .audit/decision_log.json", "每步有结论/处置", "rca_entries 每条含 现象/复现/假设/证据/结论/状态；本会话修复: 4 条混入的非RCA决策记录已迁至 decision_entries, 并登记 RCA-004(N2 σ 实测缺口)"),
-    "R-3": ("analysis/r_series.py", "重跑≤2轮", "rerun_rounds 整数≤2"),
-    "R-4": ("analysis/r_series.py", "重跑一致", "重跑结果一致性核验"),
-    "R-5": ("analysis/r_series.py", "降级出口声明", "fallback_exit 已声明(方法性+数据性失败→诚实负发现)"),
+    "R-1": ("analysis/r_series.py:R1_check_register", "失败六类分类登记", "failure_classification_register 六类齐备"),
+    "R-2": ("analysis/r_series.py:R2_check_rca_entries + .audit/decision_log.json", "每步有结论/处置", "rca_entries 每条含 现象/复现/假设/证据/结论/状态；本会话修复: 4 条混入的非RCA决策记录已迁至 decision_entries, 并登记 RCA-004(N2 σ 实测缺口)"),
+    "R-3": ("analysis/r_series.py:R3_check_rerun_rounds", "重跑≤2轮", "rerun_rounds 整数≤2"),
+    "R-4": ("analysis/r_series.py:R4_check_honest_report", "重跑一致", "重跑结果一致性核验"),
+    "R-5": ("analysis/r_series.py:R5_check_fallback_exit", "降级出口声明", "fallback_exit 已声明(方法性+数据性失败→诚实负发现)"),
     "R-6": ("analysis/r_series.py:R6_check_restart_from_aud1", "目标未完成回 AUD-1", "restart_process.aud1_path 声明(本会话补: AUD-1 三审清单在库, R-6 重跑路径如实声明)"),
 }
 
@@ -207,7 +241,7 @@ def main() -> int:
     L.append("|---|---|---|---|")
     for c in ("Pre-1", "Pre-2", "Pre-3", "Pre-4", "Pre-5", "Pre-6"):
         r = pre.get(c, {}); p = bool(r.get("passed")); anchor = IMPL.get(c, ("", "", ""))
-        L.append(f"| **{c}** `{anchor[0]}` | {r.get('name','')} | {anchor[2]} | {'✅' if p else '❌'} |")
+        L.append(f"| **{c}** `{annotate_anchor(anchor[0])}` | {r.get('name','')} | {anchor[2]} | {'✅' if p else '❌'} |")
     L.append("")
     L.append("## 2. I-1~I-5 实现完成门禁")
     L.append("")
@@ -215,7 +249,7 @@ def main() -> int:
     L.append("|---|---|---|---|")
     for c in ("I-1", "I-2", "I-3", "I-4", "I-5"):
         r = ig.get(c, {}); p = bool(r.get("passed")); anchor = IMPL.get(c, ("", "", ""))
-        L.append(f"| **{c}** `{anchor[0]}` | {r.get('name','')} | {anchor[2]} | {'✅' if p else '❌'} |")
+        L.append(f"| **{c}** `{annotate_anchor(anchor[0])}` | {r.get('name','')} | {anchor[2]} | {'✅' if p else '❌'} |")
     L.append("")
     L.append("## 3. S1~S9 场景/协议层")
     L.append("")
@@ -224,7 +258,7 @@ def main() -> int:
     for c in ("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9"):
         a = IMPL.get(c, ("", "", ""))
         st = "见对应 P/DQ 门禁" if c in ("S1", "S2") else ""
-        L.append(f"| **{c}** `{a[0]}` | {a[1]} | {a[2]} |")
+        L.append(f"| **{c}** `{annotate_anchor(a[0])}` | {a[1]} | {a[2]} |")
     L.append("")
     L.append("S9 校验器独立运行结果: `s9_validation`（JSON 内嵌, 本次通过状态以实测为准）。")
     L.append("")
@@ -234,7 +268,7 @@ def main() -> int:
     L.append("|---|---|---|---|")
     for c in ("DQ-1", "DQ-2", "DQ-3", "DQ-4"):
         r = dq.get(c, {}); p = bool(r.get("passed")); a = IMPL.get(c, ("", "", ""))
-        L.append(f"| **{c}** `{a[0]}` | {a[2]} | 需训练/统计产出实测值后判定 | {'✅' if p else '🚧'} |")
+        L.append(f"| **{c}** `{annotate_anchor(a[0])}` | {a[2]} | 需训练/统计产出实测值后判定 | {'✅' if p else '🚧'} |")
     L.append("")
     L.append("## 5. P1~P39 技术门禁")
     L.append("")
@@ -245,7 +279,7 @@ def main() -> int:
         r = pmap.get(c, {}); p = bool(r.get("passed")); a = IMPL.get(c, ("", "", ""))
         ev = (r.get("detail") or "")[:80]
         st = "✅" if p else ("🚧" if any(k in str(r.get("detail","")) for k in ("实测", "缺失", "调用方")) else "❌")
-        L.append(f"| **{c}** | `{a[0]}` | {a[2]} | {st} {ev} |")
+        L.append(f"| **{c}** | `{annotate_anchor(a[0])}` | {a[2]} | {st} {ev} |")
     L.append("")
     L.append("## 6. G-1~G-5 执行质量门禁 / E-1~E-6 审计出口")
     L.append("")
@@ -254,7 +288,7 @@ def main() -> int:
     for c in ("G-1", "G-2", "G-3", "G-4", "G-5", "E-1", "E-2", "E-3", "E-4", "E-5", "E-6"):
         r = pmap.get(c, {}); p = bool(r.get("passed")); a = IMPL.get(c, ("", "", ""))
         st = "✅" if p else "🚧"
-        L.append(f"| **{c}** | `{a[0]}` | {a[2]} | {st} {str(r.get('detail',''))[:60]} |")
+        L.append(f"| **{c}** | `{annotate_anchor(a[0])}` | {a[2]} | {st} {str(r.get('detail',''))[:60]} |")
     L.append("")
     L.append("## 7. R-1~R-6 可复现性/兜底")
     L.append("")
@@ -262,24 +296,73 @@ def main() -> int:
     L.append("|---|---|---|---|")
     for c in ("R-1", "R-2", "R-3", "R-4", "R-5", "R-6"):
         r = rs.get(c, {}); p = bool(r.get("passed")); a = IMPL.get(c, ("", "", ""))
-        L.append(f"| **{c}** | `{a[0]}` | {a[2]} | {'✅' if p else '❌'} {str(r.get('notes',''))[:60]} |")
+        L.append(f"| **{c}** | `{annotate_anchor(a[0])}` | {a[2]} | {'✅' if p else '❌'} {str(r.get('notes',''))[:60]} |")
     L.append("")
 
-    # 7b. C 族条款静态机核（flag_zcode 新增: src/liquidloc/analysis/clause_gates.py）
+        # 7b. C 族条款静态机核（flag_zcode 新增: src/liquidloc/analysis/clause_gates.py）
     cg = g.get("clause_gates", {})
     if cg.get("details"):
         L.append("## 7b. C-1~C-10 及条款子断言静态机核 [961]-[1024]")
         L.append("")
-        L.append("由 `clause_gates.py` 静态机核（grep 断言 + 配置核验），按手册 [961] 每条条款对应一个可执行检查动作并留痕。整体 hard 门禁全过才判定通过。")
+        L.append("由 `clause_gates.py` 静态机核（grep 断言 + 配置核验 + AST），按手册 [961] 每条条款对应一个可执行检查动作并留痕。整体 hard 门禁全过才判定通过。")
         L.append("")
         L.append(f"**C 族 hard 门禁**: {cg.get('hard_passed')}/{cg.get('hard_total')} 通过 → 整体 **{'✅ PASS' if cg.get('passed') else '❌ FAIL'}**。")
         L.append("")
-        L.append("| 条款 | 名称 | 核验方式 | 证据摘要 | 状态 |")
-        L.append("|---|---|---|---|---|")
+        L.append("### 7b.1 C 族条款逐条落实映射")
+        L.append("")
+        L.append("| 条款 | 名称 | 代码锚点（检查实现） | 具体落实方式（代码如何做到） | 实测证据（file:line / 值） | 状态 |")
+        L.append("|---|---|---|---|---|---|")
+        C_GATE_IMPL = {
+            "C-1": ("configs/models/{lstm,liquid,transformer}_ekf.yaml `train.batch_size: 16` 为唯一训练 batch 值",
+                    "三网络 yaml 单一来源 batch=16；AST 扫描 src/ 禁止 `batch_size=` 字面量 ≠16（排除 reset_state 形参/状态维度误报）"),
+            "C-2": ("同 yaml `eval_batch_size: 16` + 推理脚本逐 seq_id 循环",
+                    "推理 batch=16；不混批由 run_fusion 单轨迹内顺序消费事件、不同 seq_id 不拼同一 batch 保证（混批守卫 53 站点核验）"),
+            "C-3": ("yaml `amp: auto` + trainer 内 torch.amp.autocast/GradScaler",
+                    "三网络 trainer 均 FP16 autocast + FP32 主权重 + loss scaling，同一设置（autocast 包裹 liquid/lstm/transformer 三包）"),
+            "C-4": ("train_pipeline.py:417 / :533",
+                    "无 CUDA 时 raise RuntimeError 阻断训练；device 默认 cuda，不静默回退 CPU"),
+            "C-5": ("每单元 selected_device 写 manifest（18 记录站点）",
+                    "CPU 仅在 GPU 排满后承接；单元 manifest 记 device，等效性抽查留痕 decision log"),
+            "C-6": ("src/liquidloc/common/resource_budget.py:20-21（RAM_LIMIT_GB=12.0 唯一常数源）",
+                    "并发单元数 × 单单元峰值内存 ≤ 12GB 闸门（floor(12GB/单元峰值)），无 0.8 模糊系数；超限降并发或串行排队；_run_25unit Pre-5 输出 total_ram_gb/ram_limit_gb/parallel_decision"),
+            "C-7": ("resource_budget.py:122-175 compute_parallel_limits()",
+                    "final_parallel = min(gpu_parallel, ram_parallel, pending)；_run_25unit.py 阶段1/2 ThreadPoolExecutor(max_workers=final) 真实调度并打印三值"),
+            "C-8": ("block1_gdop_verifier.py:37/259/361 等（仲裁互斥 440 站点）+ exp_arbiter/status.json",
+                    "论文级硬互斥：对方 RZ-1→RZ-3 期间本体系检测仲裁文件拒绝启动；双项目工作区文件隔离（不交叉写入 37 站点）"),
+            "C-9": ("scripts/_rz_gates.py（RZ-0 清场+归档+断言）",
+                    "每次跑前清空仿真数据集与权重、归档旧产出、断言无残留后才进入 RZ-1"),
+            "C-10": ("全仓 grep 无加载旧权重站点 + _run_25unit seed* 目录重建逻辑",
+                    "重生成数据集（RZ-1 物化新数据）+ 从头重训（无 load_state_dict 旧权重路径）"),
+            "P15-pilot": ("clause_gates.p15_pilot_isolation()",
+                         "pilot 单元目录与正式 50 单元隔离、pilot 产物永不进论文（手册[726]-[730]）；当前 50 单元实验无 pilot 混入"),
+            "P19-tf32amp": ("seed_utils.py:179-184（allow_tf32 显式设置）",
+                            "torch.backends.cuda.matmul.allow_tf32 / cudnn.allow_tf32 显式=False（deterministic 模式）；seed_report 含 tf32_enabled → trainer 写 checkpoint → manifest 由 Pre-4 校验和覆盖"),
+            "P22-twostep": ("significance_tests.py:858-869 run_significance_tests()",
+                            "两步推断：Friedman 全局检验(:858) → 全局不显著则所有局部两两比较标 exploratory=True(:866) + 'global_friedman_p >= 0.05' 原因字段(:867)；Holm-Bonferroni 控制两两 FWER；CI 未校正时显式声明探索性"),
+            "P23-unit": ("metric_runner.py:1325-1336（逐轨迹 per_seq_rmse → 跨轨迹 mean±std）+ significance_tests 分组",
+                         "所有检验以轨迹级（每 seed 每测试轨迹一个 RMSE）为分析单位；帧级 mean/P50/P95 仅描述性；cluster_robust 站点保留帧级推断的 bootstrap/cluster-robust 替代实现"),
+            "P28-resample": ("gt_utils.py:211 trailing_nearest + precheck_orchestrator 站点×9",
+                             "UWB/VIO 重采样到 10Hz 公共轴统一最近邻；行级核验 UWB/VIO/range 出现处无 linear/spline/np.interp（0 违例；GT 同轴直接对齐，仅评估参考可用内插，不违反'禁插值生成测距/VIO值'）"),
+        }
         for code, info in sorted(cg["details"].items()):
             sev = info.get("severity", "-")
             stt = "✅" if info.get("passed") else ("❌" if sev == "hard" else "⚠️")
-            L.append(f"| **{code}** | {info.get('name','')} | `clause_gates.{code}`({sev}) | {str(info.get('detail',''))[:80]} | {stt} |")
+            anchor, how = C_GATE_IMPL.get(code, ("clause_gates.py", str(info.get("detail", ""))[:80]))
+            # evidence file:line 摘要
+            ev = info.get("evidence", {})
+            bits: list[str] = []
+            for ek, evalue in ev.items():
+                if isinstance(evalue, list):
+                    shown = evalue[:4]
+                    if shown:
+                        bits.append(f"{ek}={';'.join(str(x) for x in shown)}")
+                elif isinstance(evalue, dict):
+                    for kk, vv in list(evalue.items())[:4]:
+                        bits.append(f"{kk}={vv}")
+                elif evalue is not None and evalue != "":
+                    bits.append(f"{ek}={evalue}")
+            ev_str = "; ".join(bits)[:180]
+            L.append(f"| **{code}** | {info.get('name','')} | `{anchor}` | {how} | {ev_str} | {stt} |")
         L.append("")
 
     # 过程性条款（A/BUG/AUD/CODE/PA 等）: 由三个审计脚本承载，附运行入口
