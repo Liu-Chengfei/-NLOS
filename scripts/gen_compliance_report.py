@@ -317,6 +317,7 @@ def main() -> int:
     L.append("| 8 | decision_log.rca_entries 混入 4 条非 RCA 决策记录（batch/type/summary 结构） | 迁至 decision_entries 保历史；R-2 恢复有效（本会话） |")
     L.append("| 9 | R-6 AUD-1 重审路径未声明（AUD-1 清单三件套实际在库） | 如实声明 restart_process.aud1_path=true（本会话） |")
     L.append("| 10 | `_pre6_seed_manifest` 只扫 sim_meta.json 且返回字段不合 Pre-6 口径 | 重写为 manifest 目录+唯一 seed 双实测、返回完整字段（本会话） |")
+    L.append("| 11 | **C-6/C-7 假绿**: 门禁只 grep 到 `ram_peak` 指标管线（真 RAM 限额决策逻辑不存在）与平滑运动规划 `min()`（真并行调度不存在），检查动作与条款实际不符 | 新建 `src/liquidloc/common/resource_budget.py`（PsUtilMemoryProbe+NVMLGpuProbe+compute_parallel_limits，RAM_LIMIT_GB=12.0 唯一常数源，final_parallel=min(gpu,ram,pending)），接入 `_run_25unit.py` ThreadPoolExecutor；`clause_gates.C-6/C-7` 改查真实决策站点（commit 6cd9d7e） |")
     L.append("")
     L.append("**如实报告、未放宽的违规（1 项）**：")
     L.append("")
