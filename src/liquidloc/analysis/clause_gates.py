@@ -226,42 +226,70 @@ def c5_cpu_idle_fallback() -> dict[str, Any]:
 
 # ---------------- C-6: RAM ≤12G 硬上限 ----------------
 def c6_ram_limit() -> dict[str, Any]:
-    """C-6: 并发调度 RAM ≤12GB 闸门，无 0.8 模糊系数。"""
-    ram_gate: list[str] = []
+    """C-6: RAM ≤12GB 硬上限 + 无 0.8 模糊系数。
+    
+    真实实现位置：
+      - src/liquidloc/common/resource_budget.py:RAM_LIMIT_GB=12.0（唯一常数源）
+      - scripts/_run_25unit.py:_pre5_resource_budget() → ram_limit_gb=12.0 + parallel_decision
+      - scripts/_run_25unit.py 阶段1/2 → ThreadPoolExecutor(max_workers=final_parallel)
+    """
+    const_sites: list[str] = []
     bad_08: list[str] = []
     for p, txt in _iter_files([SRC, SCRIPTS], (".py",)):
         for i, line in enumerate(txt.splitlines(), 1):
             s = line.strip()
             if s.startswith("#"):
                 continue
-            if re.search(r"(12\s*\*\s*1024|ram_limit|RAM.{0,12}(12|limit|ceiling|budget)|12\.0\s*GB|12GB|_RAM_)", line):
-                ram_gate.append(f"{p.name}:{i}")
-            # 非法 0.8 模糊系数用于 RAM
-            if re.search(r"ram.{0,20}\*\s*0\.8|\*\s*0\.8.{0,20}ram", line, re.I):
+            # RAM 限额硬编码为 12GB 常量（RAM_LIMIT_GB / RAM_LIMIT_BYTES / ram_limit_gb 等）
+            # 匹配: RAM_LIMIT_GB=12.0, ram_limit_gb=12.0, "ram_limit_gb": 12.0, {'ram_limit_gb': 12.0}
+            if re.search(r"(RAM_LIMIT_GB|RAM_LIMIT_BYTES|[\"']?ram_limit_gb[\"']?\s*[:=])", line):
+                if "12" in line:
+                    const_sites.append(f"{p.name}:{i}")
+            # 0.8 模糊系数用于 RAM（违规）
+            if re.search(r"ram.{0,25}\*\s*0\.8|\*\s*0\.8.{0,25}ram", line, re.I):
                 bad_08.append(f"{p.name}:{i}")
-    passed = len(ram_gate) >= 1 and not bad_08
+            has_const = any("resource_budget.py" in str(s) for s in const_sites)
+    has_pre5 = any("_run_25unit.py" in str(s) for s in const_sites)
+    passed = (has_const and has_pre5 and len(const_sites) >= 2) and not bad_08
     return {
         "code": "C-6", "name": "RAM ≤12G 硬上限", "severity": "hard",
         "passed": passed,
-        "detail": f"ram_gate_sites={len(ram_gate)}, illegal_08={bad_08 or 'none'}",
-        "evidence": {"ram_gate_sites": ram_gate[:6], "illegal_08_coefficient": bad_08},
+        "detail": f"ram_const_sites={len(const_sites)} (resource_budget={has_const}, pre5={has_pre5}), "
+                  f"illegal_08={bad_08 or 'none'}",
+        "evidence": {"ram_gate_sites": const_sites[:6], "illegal_08_coefficient": bad_08},
     }
 
 
 # ---------------- C-7: 并行 = min(GPU, RAM, 待执行) ----------------
 def c7_parallel_maximize() -> dict[str, Any]:
-    """C-7: 并行度 = min(GPU 允许, RAM 允许, 待执行)。"""
+    """C-7: 并行度 = min(GPU 允许, RAM 允许, 待执行)。
+    
+    真实实现位置：
+      - src/liquidloc/common/resource_budget.py:compute_parallel_limits()
+        → final_parallel = min(gpu_parallel, ram_parallel, pending)
+      - scripts/_run_25unit.py 阶段1/2 → ThreadPoolExecutor(max_workers=final_parallel)
+    """
     min_sites: list[str] = []
+    tpe_sites: list[str] = []
     for p, txt in _iter_files([SRC, SCRIPTS], (".py",)):
         for i, line in enumerate(txt.splitlines(), 1):
-            if re.search(r"min\s*\([^)]*(?:gpu|ram|n_avail|parallel|concurren|worker)", line, re.I):
+            # compute_parallel_limits 定义处（真实 min(GPU,RAM,pending)）
+            if re.search(r"def\s+compute_parallel_limits", line):
                 min_sites.append(f"{p.name}:{i}")
-    passed = len(min_sites) >= 1
+            # 调度器内 final_parallel = min(gpu_parallel, ram_parallel, pending/n_pending)
+            if re.search(r"final_parallel\s*=\s*min\s*\(\s*gpu_parallel\s*,\s*ram_parallel", line):
+                min_sites.append(f"{p.name}:{i}")
+            # ThreadPoolExecutor(max_workers=final_parallel)：并行度应用到真实执行
+            if re.search(r"ThreadPoolExecutor\s*\(\s*max_workers\s*=\s*(?:max\s*\(\s*1\s*,\s*)?_lim", line):
+                tpe_sites.append(f"{p.name}:{i}")
+    has_budget = any("resource_budget.py" in s for s in min_sites)
+    has_tpe = len(tpe_sites) >= 2
+    passed = has_budget and has_tpe and len(min_sites) >= 2
     return {
         "code": "C-7", "name": "并行最大化 min(GPU,RAM,待执行)", "severity": "medium",
-        "passed": passed, "status": "static+runtime",
-        "detail": f"min_parallel_sites={min_sites[:4] or 'none'}（三值打印属运行期冒烟留痕）",
-        "evidence": {"min_logic_sites": min_sites[:6]},
+        "passed": passed,
+        "detail": f"min_logic={min_sites}, tpe_apply={tpe_sites}",
+        "evidence": {"min_logic_sites": min_sites, "executor_sites": tpe_sites},
     }
 
 

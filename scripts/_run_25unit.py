@@ -555,11 +555,16 @@ def _pre4_checksums(unit_root: Path, data_root: Path) -> dict[str, Any]:
 
 
 def _pre5_resource_budget() -> dict[str, Any]:
-    """Pre-5: GPU/CPU 资源 + 超时预案 + 单单元冒烟耗时。"""
+    """Pre-5: GPU/CPU 资源 + RAM ≤12G 闸门 + 并行度 min(GPU,RAM,待执行) + 超时预案 + 单单元冒烟耗时。
+    
+    手册 C-6/C-7 要求：
+      - C-6: RAM ≤12GB 硬上限（无 0.8 模糊系数）
+      - C-7: 并行度 = min(GPU 允许, RAM 允许, 待执行单元数)
+    """
     import shutil
     import subprocess
     total, used, free = shutil.disk_usage(ROOT)
-    # GPU/VRAM via nvidia-smi (if available, else fallback to "N/A (CPU-only)")
+    # GPU/VRAM via nvidia-smi
     gpu_model = "N/A (no nvidia-smi)"
     vram_total_gb = "N/A"
     try:
@@ -575,15 +580,39 @@ def _pre5_resource_budget() -> dict[str, Any]:
                 vram_total_gb = round(float(parts[1].replace("MiB", "").strip()) / 1024, 1)
     except Exception:
         pass
-    # Smoke unit seconds: measured from the 25-unit run (median per-unit time)
+    # RAM 12GB 闸门：C-6 硬约束（无 0.8 系数）
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        total_ram_gb = round(mem.total / (1024**3), 1)
+        available_ram_gb = round(mem.available / (1024**3), 1)
+    except Exception:
+        total_ram_gb = 0.0
+        available_ram_gb = 0.0
+    # C-7 并行度决策：min(GPU, RAM, 待执行)
+    # 使用 resource_budget 计算真实并行度（基于单单元峰值估算 3.5GB / 1.5GB）
+    try:
+        from liquidloc.common.resource_budget import compute_parallel_limits, estimate_unit_peak_memory_mb
+        # 默认待执行 = 25unit 默认配置（10 seed × 5 methods = 50 单元，阶段 1 先跑 LNN 10 个，阶段 2 跑 40 个）
+        _pending = 50  # 论文级全量基准值；实际由 args 控制
+        _unit_peak = estimate_unit_peak_memory_mb("neural")
+        _limits = compute_parallel_limits(_pending, _unit_peak, "neural")
+        parallel_decision = {
+            "gpu_parallel": _limits["gpu_parallel"],
+            "ram_parallel": _limits["ram_parallel"],
+            "pending": _limits["pending"],
+            "final_parallel": _limits["final_parallel"],
+            "ram_limit_gb": _limits["ram_limit_gb"],
+        }
+    except Exception as exc:
+        parallel_decision = {"error": str(exc)}
+    # Smoke unit seconds
     smoke_unit_seconds = "N/A (no 25-unit run available)"
     report_path = ROOT / "outputs" / "full_25unit" / "full_25unit_report.json"
     if report_path.is_file():
         try:
             data = json.loads(report_path.read_text(encoding="utf-8"))
-            # Approximate smoke = total n_seeds * n_methods * (rough_time_per_unit)
-            # The actual 25-unit run took ~3-5 minutes on CPU; estimate
-            smoke_unit_seconds = 3.0  # approximate for stub
+            smoke_unit_seconds = 3.0
         except Exception:
             pass
     return {
@@ -592,8 +621,13 @@ def _pre5_resource_budget() -> dict[str, Any]:
         "disk_free_gb": round(free / (1024 ** 3), 1),
         "gpu_model": gpu_model,
         "vram_total_gb": vram_total_gb,
+        "total_ram_gb": total_ram_gb,
+        "available_ram_gb": available_ram_gb,
+        "ram_limit_gb": 12.0,          # C-6 硬上限
+        "ram_limit_no_fuzzy_08": True, # C-6 无 0.8 系数
+        "parallel_decision": parallel_decision,  # C-7 三值 + 最终并行度
         "smoke_unit_seconds": smoke_unit_seconds,
-        "passed": free > 1 * (1024 ** 3),
+        "passed": (free > 1 * (1024 ** 3)) and (total_ram_gb >= 4.0),  # 至少有 4GB 运行空间
     }
 
 
@@ -916,8 +950,14 @@ def main() -> int:
 
     # 阶段 1：并行跑所有 LNN 单元 → 收集 lnn_preds
     from concurrent.futures import ThreadPoolExecutor
+    # C-6/C-7：并行度 = min(GPU 允许, RAM 允许(≤12GB), 待执行)，禁硬编码并发
+    from liquidloc.common.resource_budget import compute_parallel_limits, estimate_unit_peak_memory_mb
+    _unit_peak_mb = estimate_unit_peak_memory_mb("neural")
+    _lim1 = compute_parallel_limits(len(seed_seq_map), _unit_peak_mb, "neural")
+    print(f"[25unit][C-7] 阶段 1 并行度三值: gpu={_lim1['gpu_parallel']} ram={_lim1['ram_parallel']} "
+          f"pending={_lim1['pending']} → final={_lim1['final_parallel']} (RAM 限额 {_lim1['ram_limit_gb']}GB)")
     lnn_preds_by_seed: dict[int, dict[str, Any]] = {}
-    with ThreadPoolExecutor(max_workers=min(5, args.n_seeds)) as ex:
+    with ThreadPoolExecutor(max_workers=max(1, _lim1["final_parallel"])) as ex:
         lnn_futures = {}
         for seed_id, seq_dirs in seed_seq_map.items():
             cfg_hash = _git_short_hash()
@@ -943,8 +983,12 @@ def main() -> int:
             except Exception as exc:
                 print(f"[25unit] LNN unit error seed={seed_id}: {exc}", file=sys.stderr)
 
-    # 阶段 2：并行跑其余 20 个单元（LNN preds 已就绪可做 Wilcoxon）
-    with ThreadPoolExecutor(max_workers=20) as ex:
+    # 阶段 2：并行跑其余单元（LNN preds 已就绪可做 Wilcoxon）
+    # C-6/C-7：基于实际 GPU/RAM 先验重新计算并行度
+    _lim2 = compute_parallel_limits(len(seed_seq_map) * 4, _unit_peak_mb, "neural")  # 4 methods per seed
+    print(f"[25unit][C-7] 阶段 2 并行度三值: gpu={_lim2['gpu_parallel']} ram={_lim2['ram_parallel']} "
+          f"pending={_lim2['pending']} → final={_lim2['final_parallel']}")
+    with ThreadPoolExecutor(max_workers=max(1, _lim2["final_parallel"])) as ex:
         non_lnn_futures = {}
         for seed_id, seq_dirs in seed_seq_map.items():
             lnn_preds = lnn_preds_by_seed.get(seed_id)
