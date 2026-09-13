@@ -58,6 +58,26 @@ def _ci95(diffs: list[float]) -> tuple[float, float]:
     return (mean_d - 1.96 * se, mean_d + 1.96 * se)
 
 
+def _bootstrap_ci(diffs: list[float], n_boot: int = 2000, alpha: float = 0.05,
+                  rng_seed: int = 42) -> tuple[float, float]:
+    """手册 P22: 95% CI 使用 bootstrap 重采样 (不依赖正态假设)。"""
+    if not diffs:
+        return (0.0, 0.0)
+    import random
+    rng = random.Random(rng_seed)
+    n = len(diffs)
+    means = []
+    for _ in range(n_boot):
+        sample = [diffs[rng.randrange(n)] for _ in range(n)]
+        means.append(sum(sample) / n)
+    means.sort()
+    lo_idx = int((alpha / 2) * n_boot)
+    hi_idx = int((1 - alpha / 2) * n_boot) - 1
+    lo_idx = max(0, min(lo_idx, n_boot - 1))
+    hi_idx = max(0, min(hi_idx, n_boot - 1))
+    return (means[lo_idx], means[hi_idx])
+
+
 def main() -> int:
     units = sorted(UNIT_ROOT.glob("run-*"))
     by_method: dict[str, list[dict]] = {m: [] for m in ["ekf", "robust_ekf", "lstm_ekf", "transformer_ekf", "liquid_ekf"]}
@@ -138,20 +158,47 @@ def main() -> int:
         _, p = _paired_wilcoxon(diffs)
         d = _cohens_d(diffs_seed)  # Cohen's d uses seed-level means
         ci = _ci95(diffs_seed)      # 95% CI uses seed-level means
+        boot_ci = _bootstrap_ci(diffs)  # 手册 P22: bootstrap 95% CI（配对差值层级）
         table["paired_wilcoxon_vs_lnn"][other] = {
             "n_pairs": len(diffs),
             "n_pairs_seq": len(seq_diffs),
-            "mean_diff": round(sum(diffs) / len(diffs), 4),
+            "mean_diff": round(sum(diffs) / max(len(diffs), 1), 4) if diffs else 0.0,
             "wilcoxon_p": round(p, 6),
             "cohens_d": round(d, 4),
             "ci_95": [round(ci[0], 4), round(ci[1], 4)],
+            "bootstrap_ci_95": [round(boot_ci[0], 4), round(boot_ci[1], 4)],
         }
+
+    # Holm-Bonferroni correction across all 4 (method vs LNN) p-values
+    # (手册 Part 3 P22: paired Wilcoxon + Holm 校正). 按 p 升序, p_holm(i)=min(1,p(i)*(m-i)).
+    methods = list(table["paired_wilcoxon_vs_lnn"].keys())
+    m_hyp = len(methods)
+    sorted_ps = sorted([(mname, table["paired_wilcoxon_vs_lnn"][mname].get("wilcoxon_p", 1.0))
+                        for mname in methods], key=lambda x: x[1])
+    holm_corrected: dict[str, float] = {}
+    for rank, (mname, p_raw) in enumerate(sorted_ps):
+        holm_corrected[mname] = round(min(1.0, p_raw * (m_hyp - rank)), 6)
+    # 判定: 每个方法 vs LNN 经 Holm 校正后仍 p < 0.05（保守 FWER 控制）
+    all_holm_sig = bool(holm_corrected) and all(p < 0.05 for p in holm_corrected.values())
+
+    # 每个方法写入 holm_p，延续 CI 报告
+    for mname, m in table["paired_wilcoxon_vs_lnn"].items():
+        if isinstance(m, dict):
+            m["holm_p"] = holm_corrected.get(mname, None)
+
+    table["holm_bonferroni_corrected"] = {
+        "m_hypotheses": m_hyp,
+        "per_method": holm_corrected,
+        "all_sig_after_holm": all_holm_sig,
+        "decision": "PASS" if all_holm_sig else "FAIL",
+    }
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(table, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"[independent_stats] {OUT} (n_seeds={len(seeds)})")
+    print(f"[independent_stats] Holm 校正后全部 <0.05? {all_holm_sig}")
     for other, v in table["paired_wilcoxon_vs_lnn"].items():
-        print(f"  LNN vs {other}: p={v.get('wilcoxon_p', 'N/A')} d={v.get('cohens_d', 'N/A')}")
+        print(f"  LNN vs {other}: raw_p={v.get('wilcoxon_p','N/A')} holm_p={v.get('holm_p','N/A')} d={v.get('cohens_d','N/A')}")
     return 0
 
 

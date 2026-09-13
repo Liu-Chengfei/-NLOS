@@ -182,12 +182,15 @@ def _e1_audit_trail(unit_dirs: list[Path]) -> dict[str, Any]:
     }
 
 
-def _e2_gate_records(passed_gates: dict[str, bool]) -> dict[str, Any]:
-    """E-2: Pre-1..Pre-6 / I-1..I-5 / S9 / 冒烟 / code freeze / G-1..G-5 全部有 gate 证据。"""
-    missing = [k for k, v in passed_gates.items() if not v]
+def _check_gate(name: str, expected_files: list[Path]) -> dict[str, Any]:
+    """检查单个 gate 的文件是否存在。"""
+    found = [f for f in expected_files if f.is_file()]
+    missing = [str(f) for f in expected_files if not f.is_file()]
     return {
-        "checked_gates": list(passed_gates.keys()),
-        "missing_gates": missing,
+        "name": name,
+        "found_count": len(found),
+        "required_count": len(expected_files),
+        "missing_files": missing,
         "passed": len(missing) == 0,
     }
 
@@ -256,16 +259,16 @@ def _e3_dual_review(stat_table_path: Path) -> dict[str, Any]:
 def _e4_spot_check_rerun(unit_dirs: list[Path], samples: int = 2) -> dict[str, Any]:
     """E-4: 抽查 ≥2 个单元做复跑，对比指标末位差可接受。
 
-    通过 _simulate_method 重算 (seed, method) 的预测，
+    通过 _run_real_inference 重跑真实推理（非 _simulate_method 伪造），
     与 metric.json 中的 mean rmse 对比末位差。
     """
     import random
     try:
-        from _run_25unit import _simulate_method
+        from _run_25unit import _run_real_inference
     except Exception:
         # Fallback: import from the actual run script
         sys_mod = importlib.import_module("_run_25unit")
-        _simulate_method = sys_mod._simulate_method
+        _run_real_inference = sys_mod._run_real_inference
 
     random.seed(0)  # 复跑用同一 seed，结果应 bit 相同
     sample = random.sample(unit_dirs, min(samples, len(unit_dirs)))
@@ -282,7 +285,7 @@ def _e4_spot_check_rerun(unit_dirs: list[Path], samples: int = 2) -> dict[str, A
                 continue
             seed_id = int(parts[2])
             method = parts[3]
-            data_root = (Path(__file__).resolve().parents[1] / "data" / "raw" / "sim_e9_5seed_25unit" /
+            data_root = (Path(__file__).resolve().parents[1] / "data" / "raw" / "sim_e9_10seed_50unit" /
                          f"seed{seed_id}")
             if not data_root.is_dir():
                 rerun_results.append({
@@ -297,8 +300,8 @@ def _e4_spot_check_rerun(unit_dirs: list[Path], samples: int = 2) -> dict[str, A
                     "stable": False,
                 })
                 continue
-            # 复跑：同一 seed 同一方法重新模拟
-            preds = _simulate_method(method, seq_dirs, seed_id)
+            # 复跑：真实推理路径 _run_real_inference（与 metric.json 同一方法）
+            preds = _run_real_inference(method, seq_dirs, seed_id)
             rmses = [p["rmse"] for p in preds.values() if not math.isnan(p["rmse"])]
             if not rmses:
                 rerun_results.append({"unit": d.name, "error": "no valid rmse", "stable": False})
@@ -315,6 +318,7 @@ def _e4_spot_check_rerun(unit_dirs: list[Path], samples: int = 2) -> dict[str, A
                 "rerun_rmse": round(rerun_rmse, 4),
                 "diff_m": round(diff, 6),
                 "stable": stable,
+                "real_inference": True,  # 标记真实推理
             })
         except Exception as exc:
             rerun_results.append({"unit": d.name, "error": str(exc), "stable": False})
@@ -322,6 +326,7 @@ def _e4_spot_check_rerun(unit_dirs: list[Path], samples: int = 2) -> dict[str, A
         "samples": rerun_results,
         "all_stable": all(r.get("stable", False) for r in rerun_results),
         "passed": len(rerun_results) >= samples and all(r.get("stable", False) for r in rerun_results),
+        "method_used": "real_inference",
     }
 
 
@@ -456,20 +461,69 @@ def main() -> int:
 
     e6 = _e6_paper_acceptance(metric_json_paths, unit_dirs)
 
-    e2 = _e2_gate_records({
-        "Pre-1..Pre-6": True,  # 见 scripts/_verify_39_items.py Pre 系列
-        "I-1..I-5": True,     # 见 scripts/_verify_39_items.py I 系列
-        "S9": True,           # scripts/s9_validate_seeds.py
-        "冒烟": True,         # scripts/09_run_extended_experiments.py quick mode
-        "code freeze": True,  # 隐含在冒烟通过 + 全量启动条件
-        "G-1..G-5": g1["passed"] and g2["passed"] and g3["passed"] and g4["passed"] and g5["passed"],
-        "E-1": e1["passed"],
-        "E-3": e3["passed"],
-        "E-4": e4["passed"],
-        "E-5": e5["passed"],
-        "D-1..D-31": d1_d31_passed,  # 见 scripts/_run_d1_d31_diagnostic.py
-        "A-1..A-9": a1_a9_passed,    # 见 scripts/_run_25unit.py exit=0
-    })
+    # E-2: 必经 gate 绿 — 证据来自实际产物，不做硬编码放行：
+    #   Pre/I/S9/39项 ← outputs/handbook_gates_*.json（_verify_39_items.py 写出）
+    #   冒烟          ← outputs/smoke_test* 或 outputs/e9_smoke_2seq/
+    #   code freeze   ← 工作树相对 HEAD 干净（git status --porcelain 为空）
+    #   D-1..D-31     ← 子进程实跑 _run_d1_d31_diagnostic.py
+    #   A-1..A-9      ← 子进程实跑 _run_25unit.py
+    gates_report_path = repo_root / "outputs" / "handbook_gates_final.json"
+    gates: dict[str, bool] = {}
+    gates_source = str(gates_report_path)
+    try:
+        gr = json.loads(gates_report_path.read_text(encoding="utf-8"))
+        gates_source = gr.get("report_path", gates_source)
+        pre_gates = gr.get("pre_gates", {})
+        i_gates = gr.get("i_gates", {})
+        s9 = gr.get("s9_validation", {})
+        audit39 = gr.get("39_item_audit", {})
+        gates.update({
+            "Pre-1..Pre-6": bool(pre_gates) and all(pre_gates.values()),
+            "I-1..I-5": bool(i_gates) and all(i_gates.values()),
+            "S9": bool(s9.get("overall_pass")),
+            "39项审计": bool(audit39.get("passed")),
+        })
+    except FileNotFoundError:
+        gates["Pre-1..Pre-6"] = gates["I-1..I-5"] = gates["S9"] = gates["39项审计"] = False
+        gates_source += " (缺失)"
+    except Exception as exc:
+        gates["Pre-1..Pre-6"] = gates["I-1..I-5"] = gates["S9"] = gates["39项审计"] = False
+        gates_source += f" (解析失败: {exc})"
+
+    # 冒烟证据：smoke 产物任一存在即可
+    smoke_candidates = [
+        repo_root / "outputs" / "smoke_test.json",
+        repo_root / "outputs" / "smoke_test" / "summary.json",
+        repo_root / "outputs" / "e9_smoke_2seq" / "summary.json",
+    ]
+    gates["冒烟"] = any(p.is_file() for p in smoke_candidates)
+
+    # code freeze 证据：工作树干净（相对 HEAD 无未提交改动）
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(repo_root), "status", "--porcelain"],
+            capture_output=True, text=True, timeout=30,
+        )
+        gates["code freeze"] = cp.returncode == 0 and cp.stdout.strip() == ""
+    except Exception:
+        gates["code freeze"] = False
+
+    gates["G-1..G-5"] = g1["passed"] and g2["passed"] and g3["passed"] and g4["passed"] and g5["passed"]
+    gates["E-1"] = e1["passed"]
+    gates["E-3"] = e3["passed"]
+    gates["E-4"] = e4["passed"]
+    gates["E-5"] = e5["passed"]
+    gates["D-1..D-31"] = d1_d31_passed
+    gates["A-1..A-9"] = a1_a9_passed
+
+    missing = [k for k, v in gates.items() if not v]
+    e2 = {
+        "checked_gates": list(gates.keys()),
+        "missing_gates": missing,
+        "evidence_source": gates_source,
+        "smoke_evidence": [str(p) for p in smoke_candidates if p.is_file()],
+        "passed": not missing,
+    }
 
     overall = all([
         g1["passed"], g2["passed"], g3["passed"], g4["passed"], g5["passed"],
