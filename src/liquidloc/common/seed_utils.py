@@ -176,8 +176,10 @@ def set_global_seed(seed: int, deterministic: bool = True) -> dict:  # 设置全
 
         # P19 硬约束：TF32 开关显式设置并写入 manifest（手册 line 211）
         # 三网络与 EKF/Robust-EKF 共用同一设置（不允许 LNN FP32 + LSTM TF32 等精度不一致）
-        # 显式 False 保证跨机/跨版本浮点可复现（PyTorch 默认 Ampere+ 上 allow_tf32=True）
-        _tf32_flag = bool(deterministic)
+        # 显式 False 保证跨机/跨版本浮点可复现（PyTorch 默认 Ampere+ 上 allow_tf32=True）。
+        # 确定性模式(deterministic=True)必须关闭 TF32，否则逐bit可复现(P19/[584])被破坏；
+        # 非确定性模式允许 TF32 提速。手册[264]要求"显式设置"，两种取值均显式写入报告。
+        _tf32_flag = (not deterministic)  # deterministic=True → allow_tf32=False（可复现）
         if hasattr(torch.backends.cuda, "matmul"):
             torch.backends.cuda.matmul.allow_tf32 = _tf32_flag
         if hasattr(torch.backends.cudnn, "allow_tf32"):

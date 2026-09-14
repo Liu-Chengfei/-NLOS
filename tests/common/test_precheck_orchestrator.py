@@ -765,7 +765,7 @@ class TestGlobalSummaryChecks:
     """G-1~G-5"""
 
     def test_G1_pass(self):
-        r = check_G1_unit_completeness({"n_units_complete": 25, "n_resumable_pending": 0})
+        r = check_G1_unit_completeness({"n_units_complete": 50, "n_resumable_pending": 0})
         assert r.passed
 
     def test_G2_pass(self):
@@ -937,13 +937,19 @@ class TestRunAllPrechecks:
                 "holm_bonferroni", "slicing_4_combo", "anova_2x2", "c1_vs_c4",
             ],
             "sim3_alignment": True, "is_2d": True, "warmup_removed": True, "world_frame": True,
+            # P26a V0 负向排除：V0 档全程健康（tracked≥50 / inc_noise≤0.04 / blackout=0 / valid全1）
+            "v0_stats": {
+                "vio_tracked_mid": [120.0, 135.0],
+                "vio_inc_noise_mps_mid": [0.02, 0.025],
+                "vio_blackout_frac": [0.0, 0.0],
+            },
             # DQ-1~4（T-8/T-17: 相对值难度梯度 + bias/(los×gdop) 信噪比）
             "c4_mean_rmse": 5.0, "c1_mean_rmse": 2.0, "target_diff_ratio": 0.40,
             "nlos_bias_m": 5.0, "los_noise_m": 0.7, "gdop": 1.21,
             "train_rho": 0.3, "test_rho": 0.31, "train_mu": 5.0, "test_mu": 5.1,
             "train_sigma": 1.5, "test_sigma": 1.55,
             # G-1~5
-            "n_units_complete": 25, "n_resumable_pending": 0,
+            "n_units_complete": 50, "n_resumable_pending": 0,
             "n_metric_nan": 0, "n_metric_missing_fields": 0,
             "n_config_data_mismatch": 0, "n_unresolved_alerts": 0,
             "all_methods_same_test_set": True,
@@ -964,10 +970,9 @@ class TestRunAllPrechecks:
     def test_full_clean_run(self):
         cfg = self._build_clean_cfg()
         report = run_all_prechecks(cfg)
-        assert report.total == 65  # 39 P + 6 Pre + 5 I + 4 DQ + 5 G + 6 E = 65
-        # 39 + 6 + 5 + 4 + 5 + 6 = 65
-        assert report.total == 65
-        assert report.n_passed == 65
+        # P1-39 + P26a = 40 个 P 级；Pre 6 + I 5 + DQ 4 + G 5 + E 6 = 26 个其它；总计 66
+        assert report.total == 66
+        assert report.n_passed == 66
         assert report.n_failed == 0
         assert report.overall_pass is True
 
