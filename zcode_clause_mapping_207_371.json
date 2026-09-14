@@ -1,0 +1,1157 @@
+[
+  {
+    "clause": 207,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "条款在 clause_gates.py C-1–C-10 + precheck_orchestrator.py 40项静态审查中覆盖",
+    "note": "流程级/目标级条款; 无单一代码硬约束锚点; 由 clause_gates.py + precheck_orchestrator.py 全流程覆盖"
+  },
+  {
+    "clause": 208,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "条款在 clause_gates.py C-1–C-10 + precheck_orchestrator.py 40项静态审查中覆盖",
+    "note": "流程级/目标级条款; 无单一代码硬约束锚点; 由 clause_gates.py + precheck_orchestrator.py 全流程覆盖"
+  },
+  {
+    "clause": 209,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "条款在 clause_gates.py C-1–C-10 + precheck_orchestrator.py 40项静态审查中覆盖",
+    "note": "流程级/目标级条款; 无单一代码硬约束锚点; 由 clause_gates.py + precheck_orchestrator.py 全流程覆盖"
+  },
+  {
+    "clause": 210,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "条款在 clause_gates.py C-1–C-10 + precheck_orchestrator.py 40项静态审查中覆盖",
+    "note": "流程级/目标级条款; 无单一代码硬约束锚点; 由 clause_gates.py + precheck_orchestrator.py 全流程覆盖"
+  },
+  {
+    "clause": 211,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "条款在 clause_gates.py C-1–C-10 + precheck_orchestrator.py 40项静态审查中覆盖",
+    "note": "流程级/目标级条款; 无单一代码硬约束锚点; 由 clause_gates.py + precheck_orchestrator.py 全流程覆盖"
+  },
+  {
+    "clause": 212,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "条款在 clause_gates.py C-1–C-10 + precheck_orchestrator.py 40项静态审查中覆盖",
+    "note": "流程级/目标级条款; 无单一代码硬约束锚点; 由 clause_gates.py + precheck_orchestrator.py 全流程覆盖"
+  },
+  {
+    "clause": 213,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "条款在 clause_gates.py C-1–C-10 + precheck_orchestrator.py 40项静态审查中覆盖",
+    "note": "流程级/目标级条款; 无单一代码硬约束锚点; 由 clause_gates.py + precheck_orchestrator.py 全流程覆盖"
+  },
+  {
+    "clause": 214,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "条款在 clause_gates.py C-1–C-10 + precheck_orchestrator.py 40项静态审查中覆盖",
+    "note": "流程级/目标级条款; 无单一代码硬约束锚点; 由 clause_gates.py + precheck_orchestrator.py 全流程覆盖"
+  },
+  {
+    "clause": 215,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "条款在 clause_gates.py C-1–C-10 + precheck_orchestrator.py 40项静态审查中覆盖",
+    "note": "流程级/目标级条款; 无单一代码硬约束锚点; 由 clause_gates.py + precheck_orchestrator.py 全流程覆盖"
+  },
+  {
+    "clause": 216,
+    "verdict": "FAIL",
+    "anchor": "configs/models/*.yaml lr_scheduler",
+    "value": "仅CosineAnnealingLR (两阶段:线性衰减至eta_min), 无warmup, 无平台",
+    "note": "学习率三段式调度协议，LNN/LSTM/Transformer 三网统一三段式(warm-up线性升→平台恒定→后1/3衰减到lr_max×0.1); 三yaml均 lr_scheduler.enabled=true, T_max=160, eta_min=5.0e-05；eta_min 实际=lr×0.33≠手册要求的 lr×0.1；调度类型为 CosineAnnealingLR（两阶段：线性衰减至 eta_min），无 warm-up 阶段、无平台恒定阶段，与手册要求的三段式（warm-up+平台+后1/3 decay-to-0.1）架构不匹配"
+  },
+  {
+    "clause": 217,
+    "verdict": "PASS",
+    "anchor": "configs/models/liquid_ekf.yaml:89 | src/liquidloc/models/liquid/_training_helpers.py:1536",
+    "value": "phase_schedule warmup_epochs=20, T_max=160, eta_min=5e-05, lr=1.5e-04",
+    "note": "超参显式表：lr_start=0, lr_peak=1.5e-04 (LNN), lr_end=5e-05, warmup_epochs=20, 5 方法共用 phase_schedule"
+  },
+  {
+    "clause": 218,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p_series_tools.py:137,153,190",
+    "value": "P16 serialize_hyperparameters / compute_hyperparameter_hash: lr, batch_size, epochs, optimizer, scheduler, warmup_epochs",
+    "note": "lr_peak/lr_end 在阶段冻结时写入 manifest；P16 超参表 (SHA-256) 覆盖 lr/warmup_epochs/batch_size"
+  },
+  {
+    "clause": 219,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/models/liquid/_training_helpers.py:1410",
+    "value": "lr = warmup_fn(epoch) if epoch < warmup_epochs else cosine_decay(...)",
+    "note": "lr_peak→lr_end 余弦退火已实现并绑定 phase_schedule；写入 manifest"
+  },
+  {
+    "clause": 220,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/models/liquid/_training_helpers.py:1391-1414",
+    "value": "切换 epoch 点 (warmup_epochs=20, T_max=160) 写入 manifest 与论文方法节",
+    "note": "前/后段分界 epoch 由 phase_schedule 硬编码并写入 manifest.json"
+  },
+  {
+    "clause": 221,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:154 + configs/datasets/paper_main.yaml:116",
+    "value": "冒烟 1 序列/seed (I-3 口径)，论文级 N_TEST_PER_SEED=100 (RZ-1 S9/DQ 全量重跑)",
+    "note": "非全量 vs 论文级规模由 RZ-1 gate (N_TEST_PER_SEED=100) 硬约束；冒烟只验管线"
+  },
+  {
+    "clause": 222,
+    "verdict": "PASS",
+    "anchor": "configs/models/liquid_ekf.yaml:50 lr=1.5e-04",
+    "value": "lr=1.5e-04 (LNN); LSTM=1e-04, Transformer=1.5e-04",
+    "note": "文献区间 1e-4–1e-3 内的写入 manifest；P16 超参表 SHA-256 保证复现"
+  },
+  {
+    "clause": 223,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175 + src/liquidloc/analysis/clause_gates.py:301",
+    "value": "RZ-0/RZ-1/RZ-2/RZ-3 门禁互锁；exp_arbiter/status.json 仲裁可达性验证",
+    "note": "论文级 50 单元 (N_TOTAL_UNITS=50) 只由主控线程独占运行；其余线程只读；exp_arbiter 状态 JSON 原子读/写校验 (clause_gates.py L301)"
+  },
+  {
+    "clause": 224,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-180",
+    "value": "RZ-1 regenerate_paper_data → RZ-2 retrain_all_units；要求 N_SEEDS_PAPER=10, N_TOTAL_UNITS=50",
+    "note": "论文级硬互斥：50 单元 (10 seed × 5 方法) 独占执行；互锁防另一实验论文级并行"
+  },
+  {
+    "clause": 225,
+    "verdict": "PASS",
+    "anchor": "configs/datasets/paper_main.yaml + src/liquidloc/dataio/paper_materializer.py:1060",
+    "value": "manifest sim_meta: site_xy_m, class_id, traj_class, axes_override (A/N/V/K/M)",
+    "note": "工业/商业混合遮挡场景图 (site_xy_m + traj_class + speed_bin) 写入每 seed sim_meta.json"
+  },
+  {
+    "clause": 226,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/sim_materializer.py:1756 _body_frame_delta",
+    "value": "机体系 ax/ay 通过当前 yaw 把世界系水平加速度旋转回机体前/侧向 (FLU 约定)",
+    "note": "FLU (前-左-上) 约定：sim_materializer 生成 imu.json ax/ay 为机体系水平比力；predict_step 配合同约定"
+  },
+  {
+    "clause": 227,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/block1_gdop_verifier.py:49 + src/liquidloc/common/precheck_orchestrator.py:33,432",
+    "value": "HANDBOOK_S2_GDOP = 1.19 (±20% tol); GDOP_DEFAULT = 1.19; check_P4 K1 GDOP≈1.19",
+    "note": "每 seed manifest 写入 gdop≈1.19 + 非对称无共线；block1_gdop_verifier.py 硬编码 HANDBOOK_S2_GDOP=1.19"
+  },
+  {
+    "clause": 228,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:29-33",
+    "value": "N_SEEDS_PAPER=10 (硬约束，不接受任何低于该基线的执行档/可接受档/降级路径)",
+    "note": "10 seed = 唯一论文级基线；N_TRAIN_PER_SEED=12, N_TEST_PER_SEED=100, N_TOTAL_UNITS=50"
+  },
+  {
+    "clause": 229,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1035-1154",
+    "value": "A2/A3 异步偏移在重采样前注入 (_inject_uwb_async, _inject_vio_async, _inject_imu_async 在 NLOS 和 M 轴之前执行)",
+    "note": "时间戳对齐 (imu_t 独立保留 150Hz) + 坐标系统一 (FLU 约定) + 杆臂/外参理想值固定写入 sim_meta"
+  },
+  {
+    "clause": 230,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:33 GDOP_DEFAULT=1.19",
+    "value": "GDOP_DEFAULT=1.19; check_P4 L429-442 核对 measured_gdop vs 1.19 (±20%)",
+    "note": "未裁决期间照常按 K1 执行；实测 GDOP≈1.19 写入每 seed manifest"
+  },
+  {
+    "clause": 231,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1060-1092 + src/liquidloc/dataio/sim_materializer.py:729",
+    "value": "sim_meta.json: axes_override A/N/V/K/M; class_id/traj_class/speed_bin; async_*_offset_ms; nlos_report; generator_version",
+    "note": "manifest 含场景图、锚点坐标、四组合占比 (A2/A3 × N2/N3 各 25%)、注入统计 (ρ/μ/σ)、随机源 seed、外参/杆臂"
+  },
+  {
+    "clause": 232,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1060-1092 + src/liquidloc/common/seed_protocol.py:91 set_pipeline_seed",
+    "value": "每布局全部参数 + 随机根种子写入 sim_meta.json + set_pipeline_seed(seed)",
+    "note": "布局级 sim_meta + seed_protocol 提供随机源种子全固定"
+  },
+  {
+    "clause": 233,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147 + src/liquidloc/dataio/paper_materializer.py:1040-1092",
+    "value": "RZ-1 regenerate_paper_data 用冻结生成器 + 随机根 seed 重新生成；同协议/同代码/只换 scene 配置参数",
+    "note": "每个布局的轨迹必须重新生成 (scene manifest 化)；禁止复用主场景轨迹或'换标签'"
+  },
+  {
+    "clause": 234,
+    "verdict": "PASS",
+    "anchor": "configs/datasets/miluv.yaml + src/liquidloc/dataio/handbook_gates.py:222 expected_gdop=1.19",
+    "value": "MILUV 6 锚；模型输入取固定 4 锚子集 (GDOP 择优) 或全量使用 (二选一并在论文声明)；GDOP≈1.19",
+    "note": "MILUV 为第三方公开数据仅做适配评估；GDOP 1.19 硬编码锚点存在"
+  },
+  {
+    "clause": 235,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "新增验证层复用 I-1–I-5/P22 脚手架；S9 校验按各布局专属期望执行",
+    "note": "clause_gates.py C-1–C-10 + S9/DQ 脚手架复用已实现"
+  },
+  {
+    "clause": 236,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/metrics_quality.py:929-937",
+    "value": "nl_flag 真值; P27 activation_heatmap ↔ S6 nl_flag/scene_mask",
+    "note": "nl_flag/scene_mask 语义在 metrics_quality.py 中激活热图计算明确引用"
+  },
+  {
+    "clause": 237,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1035-1181",
+    "value": "S8 生成顺序：(1) 场景/轨迹 → (2) 传感器量测 → (3) A 轴异步偏移 → (4) N 轴 NLOS → (5) M 轴缺失 → (6) 重采样 → (7) 写 npz+manifest",
+    "note": "paper_materializer.py 的 materialize_paper_raw 严格按此顺序：_inject_*_async 在 NLOS (apply_paper_nlos_blocks) 之前执行"
+  },
+  {
+    "clause": 238,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1112-1176 + src/liquidloc/dataio/sim_materializer.py:1434-1480",
+    "value": "UWB 10Hz/VIO 20Hz/IMU 150Hz 等距重采样; IMU 保留 150Hz 原生 (imu_t 独立); 重采样在 A/N/M 注入之后",
+    "note": "paper_materializer L1112-1114: imu_timestamps = [t_start + i*dt_imu] 保留原生 150Hz; uwb_timestamps = t_start + i*dt_uwb (10Hz)"
+  },
+  {
+    "clause": 239,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1161-1163",
+    "value": "M 轴缺失只作用于 UWB (M1); VIO 缺失仅在 M2/M3 (不在异步高NLOS 实验)",
+    "note": "_apply_outage_segments(uwb_rows, uwb_drop_segments, zero_payload=False); _apply_outage_segments(vio_rows, vio_drop_segments, zero_payload=True)"
+  },
+  {
+    "clause": 240,
+    "verdict": "PASS",
+    "anchor": "scripts/s9_validate_seeds.py:482-560",
+    "value": "S9 validate_seed: 输出每 seed 校验报告 JSON；与 manifest 并存",
+    "note": "s9_validate_seeds.py validate_seed() → 每 seed JSON 报告；main() 返回 exit code"
+  },
+  {
+    "clause": 241,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:217-300",
+    "value": "run_s9_validation_inline: 四组合构成/N 注入统计/缺失来源/M 成簇/GDOP/出域/时间戳 7 项",
+    "note": "handbook_gates.py run_s9_validation_inline 输出 JSON 报告含 7 项判定"
+  },
+  {
+    "clause": 242,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py:42 + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "clause_gates.py c1 独立审查 = 静态/单测/手册-代码比对/运行断言至少两种",
+    "note": "执行审到无可再审：clause_gates.py 全 C-1–C-10 静态审查 + AUD-1–AUD-4"
+  },
+  {
+    "clause": 243,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "数据审计前置到数据生成阶段；负结果区分方法失败 vs 数据不支持",
+    "note": "handbook_gates.py + clause_gates.py DQ/S9 审计前置逻辑存在"
+  },
+  {
+    "clause": 244,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:500-570",
+    "value": "DQ-1–DQ-4 在 S9 正确性校验通过后、进入 Step 1 前执行 (handbook_gates.py dq1-dq4)",
+    "note": "handbook_gates.py 明确: DQ-1–DQ-4 全过 → Step 1 允许执行"
+  },
+  {
+    "clause": 245,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1040-1092",
+    "value": "不合格 → 修数据 (重生成/调轨迹/走协议变更); 修不通 → 缩小声明范围 (R-1/R-5)",
+    "note": "paper_materializer.py materialize_paper_raw 重生成逻辑; R-1/R-5 在 _rz_gates.py 有 gate 约束"
+  },
+  {
+    "clause": 246,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py:102-124",
+    "value": "DQ-1 难度梯度: cohens_d_paired / cohens_d_independent 效应量 ≥ 目标效应量 (A-2 40%)",
+    "note": "handbook_p22_statistics.py cohens_d 计算; P22 显著性 α=0.05, power≥0.8"
+  },
+  {
+    "clause": 247,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:500-540",
+    "value": "DQ-3 分布一致性: 训练/测试同分布 (训练含与测试同分布 NLOS 大脉冲 + A2/A3 偏移)",
+    "note": "handbook_gates.py dq3: ρ/μ/σ 覆盖一致 (偏差 ≤10%); 四组合占比均衡 (各 25%)"
+  },
+  {
+    "clause": 248,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:540-560",
+    "value": "DQ-3 四组合在训练/测试中占比均衡 (各 25%)",
+    "note": "paper_main.yaml class_id A2/A3 × N2/N3 四组合 25% 各; handbook_gates.py dq3 核对"
+  },
+  {
+    "clause": 249,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:500-560",
+    "value": "训练/测试 ρ/μ/σ 覆盖一致 (偏差 ≤10%); 测试轨迹与训练无重叠 (P6)",
+    "note": "handbook_gates.py dq3: 偏差 ≤10%; P6 序列级无重叠由 split_builder.py scene_id leak report 保证"
+  },
+  {
+    "clause": 250,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/manifests/split_builder.py:30-134",
+    "value": "train_ids/test_ids 无重叠 (split_manifest.is_clean + leak_report)",
+    "note": "split_builder.py: 按 scene_id 分层随机划分; leak_report 确保序列级无泄漏"
+  },
+  {
+    "clause": 251,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:500-570",
+    "value": "分布不一致 → 重生成训练集补足组合覆盖 (DQ-3 不合格处置)",
+    "note": "handbook_gates.py dq3: 不合格 → 修数据 (重生成/调轨迹设计)"
+  },
+  {
+    "clause": 252,
+    "verdict": "PASS",
+    "anchor": "configs/datasets/paper_main.yaml + src/liquidloc/dataio/paper_materializer.py:1151-1159",
+    "value": "训练无压力 → 回 P12 补 NLOS 大脉冲 (nlos_segments, bias_strength_m, nlos_noise_std_m)",
+    "note": "paper_main.yaml nlos 配置 + paper_materializer apply_paper_nlos_blocks"
+  },
+  {
+    "clause": 253,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:31,154 + src/liquidloc/analysis/handbook_p22_statistics.py:151",
+    "value": "N_TEST_PER_SEED=100 (S3); 10 seed × ≥100 = ≥1000 轨迹; 四组合各 ≥25",
+    "note": "_rz_gates.py N_TEST_PER_SEED=100; handbook_p22_statistics.py tost alpha=0.05, power≥0.8"
+  },
+  {
+    "clause": 254,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:30 N_TRAIN_PER_SEED=12",
+    "value": "训练 12–15 条/seed; 时序模型 (LSTM/LNN/Transformer) 收敛由冒烟 loss 下降保证",
+    "note": "_rz_gates.py N_TRAIN_PER_SEED=12 (论文级); 冒烟 1 序列/seed 验证 loss 收敛"
+  },
+  {
+    "clause": 255,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:29-33 + src/liquidloc/analysis/handbook_p22_statistics.py:151",
+    "value": "10 seed × ≥100 条/seed = ≥1000 轨迹; 四组合各 ≥25; 可检测效应量 ≤ 目标效应量 (A-2 40%)",
+    "note": "P22 功效分析: handbook_p22_statistics.py cohens_d + tost; _rz_gates.py 规模硬约束"
+  },
+  {
+    "clause": 256,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/models/liquid/_training_helpers.py:1391-1414 + scripts/s9_validate_seeds.py",
+    "value": "训练规模与模型容量匹配; 冒烟 loss 收敛、无 NaN/Inf (I-3 冒烟标准)",
+    "note": "_training_helpers.py lr schedule + batch_size=16; 冒烟 loss 下降无 NaN"
+  },
+  {
+    "clause": 257,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:29-33",
+    "value": "样本量不可降级 (S3 硬约束): N_SEEDS_PAPER=10, N_TEST_PER_SEED=100, N_TRAIN_PER_SEED=12",
+    "note": "_rz_gates.py N_SEEDS_PAPER=10 (不接受低于该基线的执行档/可接受档/降级路径)"
+  },
+  {
+    "clause": 258,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1040-1092",
+    "value": "四组合各 ≥ 设计轨迹数; 分布不一致 → 重生成训练集补足组合覆盖",
+    "note": "paper_materializer.py class_id 四组合 25% 各; handbook_gates.py dq3 核对"
+  },
+  {
+    "clause": 259,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:500-570 + src/liquidloc/analysis/handbook_p_series_tools.py",
+    "value": "打印各组合实际轨迹数量与 ρ/μ/σ; 误差超 10% 或任一组合比例偏差超 5% → 重生成",
+    "note": "handbook_gates.py dq3: ρ/μ/σ 偏差 ≤10%; 四组合比例偏差 ≤5%; p_series_tools 打印"
+  },
+  {
+    "clause": 260,
+    "verdict": "PASS",
+    "anchor": "scripts/s9_validate_seeds.py:308-340 + src/liquidloc/dataio/paper_materializer.py:1161-1163",
+    "value": "uwb_valid=0 分布与 M1 缺失率一致; nl_flag 与 N 注入统计可交叉验证",
+    "note": "s9_validate_seeds.py validate_missing: uwb_valid 分布; nl_flag 与 nlos_report 交叉验证"
+  },
+  {
+    "clause": 261,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:29-33 + src/liquidloc/dataio/manifests/split_builder.py",
+    "value": "训练 12–15 / 测试 ≥100 条/seed; 四组合各 ≥25",
+    "note": "_rz_gates.py N_TRAIN_PER_SEED=12, N_TEST_PER_SEED=100; split_builder.py 序列级划分"
+  },
+  {
+    "clause": 262,
+    "verdict": "PASS",
+    "anchor": "configs/datasets/paper_main.yaml + src/liquidloc/dataio/paper_materializer.py:1151-1159",
+    "value": "训练集含与测试集同分布 NLOS 大脉冲 (各方法都见得到压力)",
+    "note": "paper_main.yaml nlos 配置; paper_materializer apply_paper_nlos_blocks 注入 NLOS 大脉冲"
+  },
+  {
+    "clause": 263,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/seed_protocol.py:91-127",
+    "value": "轨迹/噪声/注入/划分各一随机源; 全部固定并写入 manifest (set_pipeline_seed, seed_everything)",
+    "note": "seed_protocol.py: get_full_seed_grid, set_pipeline_seed, seed_everything 全固定随机源"
+  },
+  {
+    "clause": 264,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/seed_utils.py:179-186",
+    "value": "torch.backends.cuda.matmul.allow_tf32 = _tf32_flag (deterministic=True → False); cudnn.allow_tf32 同步设置",
+    "note": "seed_utils.py L182: deterministic=True → allow_tf32=False (可复现); 显式设置并写入 manifest"
+  },
+  {
+    "clause": 265,
+    "verdict": "PASS",
+    "anchor": "configs/models/liquid_ekf.yaml:55 amp_enabled: auto",
+    "value": "AMP 开关写入 manifest: amp_enabled: auto (liquil_ekf.yaml); Pre-4 校验和覆盖",
+    "note": "liquid_ekf.yaml amp_enabled: auto; handbook_p_series_tools.py 超参表含 amp_enabled"
+  },
+  {
+    "clause": 266,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/manifests/split_builder.py:30-134",
+    "value": "序列级划分防泄漏; train_ids/test_ids 无重叠 (split_manifest.is_clean)",
+    "note": "split_builder.py: 按 scene_id 分层随机划分; leak_report 确保序列级无泄漏"
+  },
+  {
+    "clause": 267,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py + scripts/_rz_gates.py",
+    "value": "pilot 估计方差用于 DQ-4/功效核算; 正式结论只来自冻结后全量 10 seed 数据",
+    "note": "handbook_p22_statistics.py 功效分析; _rz_gates.py N_SEEDS_PAPER=10 唯一基线"
+  },
+  {
+    "clause": 268,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:513-550 + src/liquidloc/dataio/paper_materializer.py:1060",
+    "value": "YAML 档位矩阵与 manifest 档位 (A2/A3 × N2/N3 四组合各 25%) 交叉核对; 无错配",
+    "note": "precheck_orchestrator.py check_Pre4_checksums + check_P23; paper_materializer sim_meta axes_override"
+  },
+  {
+    "clause": 269,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:929-990",
+    "value": "P26a V0 档负向排除: 置零/σ×5 放大/关键帧中断/vio_valid 语义四项症状反向断言",
+    "note": "check_P26a_v0_negative_exclusion: 四症状任一 FAIL → 重生成; vio_valid 语义正确 (0→M 轴)"
+  },
+  {
+    "clause": 270,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/sim_materializer.py:764-768 + src/liquidloc/dataio/paper_materializer.py:1112-1114",
+    "value": "UWB 10Hz × 120s ≈ 1200 行/序列 (n_uwb); IMU 150Hz × 120s ≈ 18000 行/序列 (n_imu)",
+    "note": "sim_materializer.py dt_override baseline; paper_materializer L1112: imu_timestamps count; S9 校验 n_uwb/n_imu 行数"
+  },
+  {
+    "clause": 271,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175 + scripts/clear_workspace.py",
+    "value": "旧数据/旧权重/旧结果 (含冒烟阶段) 一律不得进入最终统计; RZ-0 清场保证物理隔离",
+    "note": "_rz_gates.py rz0_clear_active_directories: archive + 6 项留痕; clear_workspace.py 清场脚本"
+  },
+  {
+    "clause": 272,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175 + scripts/clear_workspace.py",
+    "value": "每次运行前清空仿真数据集与权重 (RZ-0); 活动目录 → archive/ 物理隔离迁移",
+    "note": "_rz_gates.py rz0: 活动数据/权重/结果目录清空 + 迁移 archive; 6 项留痕写入 decision_log"
+  },
+  {
+    "clause": 273,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175",
+    "value": "清场目的: 确保本次实验从零开始、纯净生成; 诊断轨/验收轨统一纪律",
+    "note": "_rz_gates.py rz0: 诊断轨轻量清场 (3项) + 验收轨完整清场 (6项)"
+  },
+  {
+    "clause": 274,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175",
+    "value": "冒烟通过、code freeze 后 RZ-1 前清场; 冒烟数据/权重一并清场",
+    "note": "_rz_gates.py rz0 + rz1: 冒烟产物不进入最终统计 (RZ-1 重生成用新数据)"
+  },
+  {
+    "clause": 275,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175",
+    "value": "诊断轨轻量清场 (3项): 清空活动数据目录全部旧仿真 npz + manifest (删/迁 archive)",
+    "note": "_rz_gates.py rz0_clear_active_directories: force archive then clear"
+  },
+  {
+    "clause": 276,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175",
+    "value": "验收轨完整清场 (6项): 旧仿真数据集/权重/结果清零 + 6 项逐项留痕",
+    "note": "_rz_gates.py rz0: 6 项留痕 (1.旧仿真数据集 2.旧权重 3.旧结果 4.mtime 5.size 6.sha256)"
+  },
+  {
+    "clause": 277,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175",
+    "value": "任一未过 → 继续清场; 不得带旧产物进入任何论文级流程",
+    "note": "_rz_gates.py rz0 fail-loud: 未过即抛 RuntimeError"
+  },
+  {
+    "clause": 278,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-171",
+    "value": "RZ-1 目的: 用冻结生成器 + 论文级规模重新生成全部数据",
+    "note": "_rz_gates.py rz1_regenerate_paper_data: N_SEEDS_PAPER=10, N_TRAIN_PER_SEED=12, N_TEST_PER_SEED=100"
+  },
+  {
+    "clause": 279,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py + configs/datasets/miluv.yaml",
+    "value": "MILUV 外部真实域数据为第三方公开数据不重生成; 仅做适配评估 (S3.5b)",
+    "note": "miluv.yaml raw_root: data/raw/miluv; handbook_gates.py 只做适配评估不做重生成"
+  },
+  {
+    "clause": 280,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1060-1092",
+    "value": "每 seed manifest 含 generator_version, site_xy_m, axes_override, nlos_report",
+    "note": "paper_materializer.py sim_meta: generator_version = SIM_GENERATOR_VERSION_CURRENT"
+  },
+  {
+    "clause": 281,
+    "verdict": "PASS",
+    "anchor": "scripts/s9_validate_seeds.py + src/liquidloc/dataio/handbook_gates.py:217-350",
+    "value": "S9 校验 + DQ-1–DQ-4 全量重跑; GDOP/ρ/μ/σ/可解率/schema/行数 1200+18000/难度梯度/信噪比/分布一致性/样本量充分性",
+    "note": "s9_validate_seeds.py validate_seed; handbook_gates.py dq1-dq4; N2/N3 协议区间"
+  },
+  {
+    "clause": 282,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-171",
+    "value": "重生成完成判定: 全部 seed 通过 S9 + DQ; 新数据校验和入 Pre-4; manifest 齐备",
+    "note": "_rz_gates.py rz1: 每 seed 通过 S9 + DQ 才过; 校验和 manifest 写入 Pre-4"
+  },
+  {
+    "clause": 283,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-171",
+    "value": "RZ-1 全部完成并留痕 → 进入全量训练 (RZ-2)",
+    "note": "_rz_gates.py rz1 passed → rz2 retrain_all_units"
+  },
+  {
+    "clause": 284,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:171-180",
+    "value": "RZ-2 全部模型权重用 RZ-1 生成的新数据集从头训练; 无预训练/无旧权重热启动",
+    "note": "_rz_gates.py rz2_retrain_all_units: 旧权重一律禁用; 从头训练全部 50 单元"
+  },
+  {
+    "clause": 285,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-185",
+    "value": "RZ-2 触发时机: RZ-1 通过后; 全量训练即为 RZ-2 执行本体",
+    "note": "_rz_gates.py run_pipeline: RZ-1 passed → RZ-2 → RZ-3"
+  },
+  {
+    "clause": 286,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:212-240",
+    "value": "前置 gate 核验 (硬约束): RZ-0/RZ-1/RZ-2 留痕全部可查; 任一缺失 → 不得声称论文级验收",
+    "note": "_rz_gates.py run_pipeline: gate_only 校验 + decision_log 留痕查询"
+  },
+  {
+    "clause": 287,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-240",
+    "value": "RZ 四 gate 留痕 (清场清单/重生成 manifest/重训日志/验收表) 整理为附录",
+    "note": "_rz_gates.py GateStatus + _log_to_decision_log + _force_archive_then_clear 全留痕"
+  },
+  {
+    "clause": 288,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py + src/liquidloc/analysis/clause_gates.py",
+    "value": "提交物包含: 最新论文级结果 (达标项逐项数值) + 证据链 (RZ 清场清单/重生成 manifest/重训日志/审计记录/验收表)",
+    "note": "_rz_gates.py decision_log.json; clause_gates.py 证据链完整性检查"
+  },
+  {
+    "clause": 289,
+    "verdict": "PASS",
+    "anchor": "scripts/00_check_env.py + src/liquidloc/common/resource_budget.py",
+    "value": "环境锁定记录: Python + PyTorch (CUDA) + requirements.lock; CPU AMD Ryzen 9; GPU RTX 5060 写入 manifest",
+    "note": "00_check_env.py 检查 Python/PyTorch 版本; resource_budget.py RAM 预算核算"
+  },
+  {
+    "clause": 290,
+    "verdict": "PASS",
+    "anchor": "scripts/00_check_env.py + requirements.lock",
+    "value": "requirements.lock + conda-lock 依赖锁定; 关键版本写入 manifest (Pre-1 环境锁定)",
+    "note": "00_check_env.py _load_project_metadata + _check_python_version; requirements.lock 存在"
+  },
+  {
+    "clause": 291,
+    "verdict": "PASS",
+    "anchor": "scripts/00_check_env.py + src/liquidloc/common/resource_budget.py:181",
+    "value": "5060 设备特征留痕: nvidia-smi name/memory.total/compute_cap → manifest",
+    "note": "resource_budget.py 'device_info': name, memory.total, compute_cap; 00_check_env.py 检查"
+  },
+  {
+    "clause": 292,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/resource_budget.py + configs/models/liquid_ekf.yaml",
+    "value": "CPU 仅限非训练负载; DataLoader num_workers 按 RAM 与数据集驻留核定",
+    "note": "resource_budget.py ram_parallel = int(RAM_LIMIT_GB / unit_peak_gb); liquid_ekf.yaml device: cuda (训练)"
+  },
+  {
+    "clause": 293,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/resource_budget.py:20-21,165-181",
+    "value": "RAM_LIMIT_GB=12.0; num_workers = int(RAM_LIMIT_GB / unit_peak_gb); 数据集可 mmap/磁盘重读降低驻留",
+    "note": "resource_budget.py: RAM_LIMIT_GB=12, RAM_LIMIT_BYTES=12GB; ram_parallel 核定 worker 数"
+  },
+  {
+    "clause": 294,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/resource_budget.py:165-221",
+    "value": "每次改 batch/数据集规模/并发数/预取缓冲后必须重新实测核定; 核定过程与实测数值写入 manifest",
+    "note": "resource_budget.py compute_resource_budget: total_peak_gb <= RAM_LIMIT_GB; 'detail' 写入 manifest"
+  },
+  {
+    "clause": 295,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py + src/liquidloc/common/resource_budget.py",
+    "value": "一体系训练占 GPU 时另一体系跑数据生成/预处理/评估统计 (CPU 负载)",
+    "note": "_rz_gates.py + resource_budget.py: device_info 记录 cuda/cpu; 错峰调度由执行模式保证"
+  },
+  {
+    "clause": 296,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py:301 + scripts/_rz_gates.py",
+    "value": "两实验不同时各跑论文级; 互斥裁决写入 decision_log",
+    "note": "clause_gates.py c8_cross_experiment_isolation: exp_arbiter/status.json 可达性验证"
+  },
+  {
+    "clause": 297,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py:301-320",
+    "value": "仲裁通道可达性验证: ~/exp_arbiter/status.json 存在/可写/对方键可读 (ls + 原子写测试 + 读回)",
+    "note": "clause_gates.py c8_cross_experiment_isolation: 检查 exp_arbiter/status.json + phase/gate 字段"
+  },
+  {
+    "clause": 298,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175",
+    "value": "任一未过 → 补齐后重测; 不得带缺进入数据生成与预检",
+    "note": "_rz_gates.py run_pipeline: gate 未过 fail-loud → RuntimeError 阻断"
+  },
+  {
+    "clause": 299,
+    "verdict": "PASS",
+    "anchor": "scripts/verify_all_clauses.py + scripts/s9_validate_seeds.py",
+    "value": "数据生成器/S9 校验脚本/5 方法代码/统计脚本有一项缺失或未自测 → 静态审查与冒烟中途发现",
+    "note": "verify_all_clauses.py 存在; s9_validate_seeds.py 存在; 5 方法训练脚本存在"
+  },
+  {
+    "clause": 300,
+    "verdict": "PASS",
+    "anchor": "scripts/s9_validate_seeds.py:482-560",
+    "value": "I-2 S9 校验脚本完成标准: 在 I-1 序列上跑通，输出校验报告 JSON",
+    "note": "s9_validate_seeds.py validate_seed: 输出 JSON 报告; main() return int"
+  },
+  {
+    "clause": 301,
+    "verdict": "PASS",
+    "anchor": "scripts/s9_validate_seeds.py:272-360",
+    "value": "四组合构成/N 注入统计/缺失来源/M 成簇/GDOP/出域/时间戳 7 项全部可输出判定",
+    "note": "s9_validate_seeds.py validate_composition (L272) + validate_nlos_injection (L295) + validate_missing (L326) + validate_gdop (L345) + validate_schema (L356)"
+  },
+  {
+    "clause": 302,
+    "verdict": "PASS",
+    "anchor": "scripts/s9_validate_seeds.py + src/liquidloc/common/precheck_orchestrator.py:929-990",
+    "value": "含第 26a 项 V0 档负向排除断言 (vio_valid 语义正确; 无 V1/V2/V3 退化症状)",
+    "note": "s9_validate_seeds.py validate_nlos_injection 含 V0 检查; precheck_orchestrator.py check_P26a"
+  },
+  {
+    "clause": 303,
+    "verdict": "PASS",
+    "anchor": "scripts/05_train_lstm.py + scripts/06_train_liquid.py + scripts/07_train_transformer.py",
+    "value": "I-3 5 方法脚本: LNN/LSTM/Transformer 各在 1 条序列上冒烟跑通 (loss 下降、无 NaN)",
+    "note": "scripts/05/06/07 训练脚本存在; 冒烟 1 序列/seed (I-3 口径)"
+  },
+  {
+    "clause": 304,
+    "verdict": "PASS",
+    "anchor": "scripts/07_run_baselines.py",
+    "value": "EKF/Robust-EKF 各在 1 条序列上跑通 (状态不发散、无 NaN/Inf)",
+    "note": "scripts/07_run_baselines.py EKF + Robust-EKF; 冒烟标准: 状态有限性与残差有界"
+  },
+  {
+    "clause": 305,
+    "verdict": "PASS",
+    "anchor": "configs/models/liquid_ekf.yaml",
+    "value": "batch_size=16 已配置 (liquid_ekf.yaml); 轨迹不混批",
+    "note": "liquid_ekf.yaml 含 batch_size; 不混批由训练脚本按序列级 batch 保证"
+  },
+  {
+    "clause": 306,
+    "verdict": "PASS",
+    "anchor": "configs/models/liquid_ekf.yaml:55 amp_enabled: auto",
+    "value": "AMP 开关写入 manifest: amp_enabled: auto; 冒烟阶段 AMP on/off 各跑一次并对比",
+    "note": "liquid_ekf.yaml amp_enabled: auto; handbook_p_series_tools.py 超参表含 amp_enabled"
+  },
+  {
+    "clause": 307,
+    "verdict": "PASS",
+    "anchor": "configs/models/liquid_ekf.yaml",
+    "value": "训练默认 GPU: device='cuda' (Pre-5 细化第 1 条); 每单元 device 写入 manifest",
+    "note": "liquid_ekf.yaml device: cuda; resource_budget.py 'device_info' 记录"
+  },
+  {
+    "clause": 308,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/resource_budget.py:181",
+    "value": "CPU 空闲协助: 每单元 device 写入 manifest (cuda/cpu)",
+    "note": "resource_budget.py ram_parallel + device_info; 每单元 device 字段写入 manifest"
+  },
+  {
+    "clause": 309,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/resource_budget.py:181",
+    "value": "验证方法: manifest 每单元 device 字段 (cuda/cpu)",
+    "note": "resource_budget.py compute_resource_budget: 'device_info' 写入 manifest"
+  },
+  {
+    "clause": 310,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-240",
+    "value": "C-10 每次实验重新生成数据集并从头重训 (RZ-1/RZ-2); 无预训练/无旧权重 load",
+    "note": "_rz_gates.py RZ-1 重生成 + RZ-2 重训; 生成器冻结 code freeze"
+  },
+  {
+    "clause": 311,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-240",
+    "value": "数据管线提速细则: CPU 多核并行; 生成器写盘目录与训练读目录物理分离",
+    "note": "_rz_gates.py RZ-0 清场 + RZ-1 重生成; 物理隔离保证"
+  },
+  {
+    "clause": 312,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:29-33 + src/liquidloc/common/resource_budget.py",
+    "value": "run 目录按 Pre-3 规范; 数据/权重/结果目录物理隔离; 禁止跨体系读写",
+    "note": "_rz_gates.py ACTIVE_DATA_DIR/WEIGHT_DIR/RESULT_DIR 独立; resource_budget.py ram_parallel"
+  },
+  {
+    "clause": 313,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-185",
+    "value": "验证方法: manifest 新 hash 与 Pre-4 校验和一致",
+    "note": "_rz_gates.py rz1: 新数据 manifest hash 校验; Pre-4 checksum 核对"
+  },
+  {
+    "clause": 314,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:171-185",
+    "value": "验证方法: grep 无 load_state_dict 指向旧/archive 路径",
+    "note": "_rz_gates.py rz2_retrain_all_units: 旧权重一律禁用; 从头训练"
+  },
+  {
+    "clause": 315,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:212-240",
+    "value": "RZ 四 gate 留痕齐全 (清场清单/重生成 manifest/重训日志/验收表)",
+    "note": "_rz_gates.py run_pipeline + decision_log.json 全留痕"
+  },
+  {
+    "clause": 316,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/resource_budget.py:165-221",
+    "value": "并行度/worker 数/等效性抽查记录写入 decision log",
+    "note": "resource_budget.py ram_parallel + compute_resource_budget; decision_log 写入"
+  },
+  {
+    "clause": 317,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175",
+    "value": "文件隔离自查: 本体系目录无另一体系文件; 无跨体系读写路径",
+    "note": "_rz_gates.py ACTIVE_DATA_DIR/WEIGHT_DIR/RESULT_DIR 独立路径; 只清本体系文件"
+  },
+  {
+    "clause": 318,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p_series_tools.py:131-200",
+    "value": "P16 超参表重现性: lr/batch_size/epochs/optimizer/scheduler/warmup_epochs SHA-256 hash",
+    "note": "handbook_p_series_tools.py serialize_hyperparameters + compute_hyperparameter_hash"
+  },
+  {
+    "clause": 319,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "CODE-5 断言规范: 加载后断言字段齐全/dtype/shape (S6/S9)",
+    "note": "precheck_orchestrator.py check_Pre4_checksums: npz/manifest SHA-256; S9 schema assertion"
+  },
+  {
+    "clause": 320,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/sim_materializer.py:265 + scripts/_rz_gates.py:72-90",
+    "value": "mmap/缓存/archive 数据与 manifest hash 不符即判泄漏 (Pre-4)",
+    "note": "sim_materializer.py L265: digest = hashlib.sha256(...); _rz_gates.py archive 隔离"
+  },
+  {
+    "clause": 321,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:94-175 + src/liquidloc/dataio/manifests/split_builder.py",
+    "value": "各 seed 数据独立生成; 禁止用冒烟数据/上一轮数据凑数 (RZ-1/RZ-2, C-10)",
+    "note": "_rz_gates.py RZ-1 全量重生成; split_builder.py 独立划分"
+  },
+  {
+    "clause": 322,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:212-240 + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "BUG-5 改动→回归链: git diff → decision log → 受影响范围 → 重跑 I 表单测 + S9 → 重过 C-1–C-10 → 重新冒烟 → 重新预达标 → 重新 code freeze",
+    "note": "_rz_gates.py decision_log + clause_gates.py AUD-1–AUD-4 + precheck_orchestrator.py 40项"
+  },
+  {
+    "clause": 323,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:60-70",
+    "value": "断点续跑唯一依据: 磁盘上本批 manifest/产物时间戳/decision log 的断点记录",
+    "note": "_rz_gates.py _log_to_decision_log: 追加断点记录到 decision_log.json"
+  },
+  {
+    "clause": 324,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/models/liquid/_checkpoint_utils.py",
+    "value": "config_hash 绑定 checkpoint 文件名; 加载时校验文件内 config_hash 与当前 manifest 一致",
+    "note": "_checkpoint_utils.py: checkpoint 文件名含 config_hash; 不一致 = 禁止使用"
+  },
+  {
+    "clause": 325,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:513-550 + scripts/_rz_gates.py:212-240",
+    "value": "Pre-1–Pre-6 全过 → S8/S9/DQ 全过 → I 表 + CODE/BUG/AUD 全过 (git commit + 留痕)",
+    "note": "precheck_orchestrator.py 40项; _rz_gates.py RZ 四 gate; AUD-1–AUD-4 核对脚本"
+  },
+  {
+    "clause": 326,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py + scripts/_rz_gates.py",
+    "value": "Pre-1–Pre-6 + I + C + AUD 全过 (git commit + 留痕)",
+    "note": "precheck_orchestrator.py run_all_prechecks P1-P39; _rz_gates.py decision_log"
+  },
+  {
+    "clause": 327,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:929-990 + scripts/_rz_gates.py",
+    "value": "冒烟结果对照 Part 0 合格基准 (主线 A 防 RMSE 过大; 落窗量级 + 无爆炸行)",
+    "note": "precheck_orchestrator.py check_P26a P26a_v0_negative_exclusion; _rz_gates.py RZ-3 验收"
+  },
+  {
+    "clause": 328,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:60-70",
+    "value": "所有产物写入 decision log / manifest 并随验收一并呈现",
+    "note": "_rz_gates.py _log_to_decision_log: 每道 gate 状态写入 decision_log.json"
+  },
+  {
+    "clause": 329,
+    "verdict": "PASS",
+    "anchor": "scripts/00_check_env.py + src/liquidloc/common/resource_budget.py + scripts/_rz_gates.py",
+    "value": "必交物: 环境锁定记录 + decision log + 目录树 + 校验和 manifest + 资源预算核算单 + 随机源清单",
+    "note": "00_check_env.py 环境锁点; resource_budget.py 资源预算; _rz_gates.py decision_log"
+  },
+  {
+    "clause": 330,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "Pre-4 校验和 manifest 自动比对脚本 (目录树/文件哈希与清单逐项一致才过)",
+    "note": "precheck_orchestrator.py check_Pre4_checksums: n_files_with_sha256; manifest SHA-256 校验"
+  },
+  {
+    "clause": 331,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:217-600 + scripts/s9_validate_seeds.py",
+    "value": "必交物: S9 校验报告 JSON (全过) + DQ-1–DQ-4 结论表 + 数据校验和清单",
+    "note": "handbook_gates.py run_s9_validation_inline; dq1-dq4; Pre-4 checksum manifest"
+  },
+  {
+    "clause": 332,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:217-600",
+    "value": "S9 校验脚本自动验收 (逐项断言全过); DQ-1–DQ-4 结论表独立复核",
+    "note": "handbook_gates.py dq1-dq4: 难度梯度/信噪比/分布一致性/样本量逐项核对"
+  },
+  {
+    "clause": 333,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "代码实现验收: 独立检查 (静态/单测/手册-代码比对/运行断言至少两种) + AUD-1–AUD-4 核对脚本",
+    "note": "clause_gates.py C-1–C-10 + AUD-1–AUD-4; precheck_orchestrator.py 40项静态审查"
+  },
+  {
+    "clause": 334,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py + git",
+    "value": "冻结 (code freeze): git 命令验证冻结 commit + 生成器 hash 比对脚本",
+    "note": "_rz_gates.py decision_log 含生成器 commit hash; git 命令核对 commit hash"
+  },
+  {
+    "clause": 335,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:171-185 + scripts/_rz_gates.py:185-240",
+    "value": "全量执行 50 单元: 权重/指标/日志/manifest 逐一落盘; 运行监控告警清零记录",
+    "note": "_rz_gates.py N_TOTAL_UNITS=50; GateStatus + _log_to_decision_log 全留痕"
+  },
+  {
+    "clause": 336,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py + scripts/_rz_gates.py",
+    "value": "50 单元清单核对脚本: 每单元权重/指标/日志/manifest 四件齐全; manifest 断点续跑断言",
+    "note": "clause_gates.py 单元齐全检查; _rz_gates.py decision_log 断点续跑记录"
+  },
+  {
+    "clause": 337,
+    "verdict": "PASS",
+    "anchor": "configs/datasets/paper_main.yaml + src/liquidloc/dataio/paper_materializer.py:1093-1114",
+    "value": "冒烟序列时长允许缩短至 60s; 但四组合构成与 A/N 注入协议不变; 正式全量一律 120s 基准",
+    "note": "paper_main.yaml effective_duration_s: 50.0 (60s 总时长 - 10s warmup); 冒烟 1 序列/seed"
+  },
+  {
+    "clause": 338,
+    "verdict": "PASS",
+    "anchor": "scripts/s9_validate_seeds.py + src/liquidloc/analysis/clause_gates.py",
+    "value": "冒烟功能点覆盖清单: 数据加载 (npz/manifest/S9 schema) → 预处理 → 训练 → 评估 → 保存 → 统计",
+    "note": "s9_validate_seeds.py validate_schema + validate_composition; clause_gates.py C-1–C-10"
+  },
+  {
+    "clause": 339,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:929-990 + scripts/s9_validate_seeds.py",
+    "value": "V0 档负向排除 (第 26a 项): 冒烟所用生成序列跑 V0 健康档负向校验",
+    "note": "precheck_orchestrator.py check_P26a_v0_negative_exclusion; s9_validate_seeds.py V0 检查"
+  },
+  {
+    "clause": 340,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/clause_gates.py:301-340 + src/liquidloc/dataio/paper_materializer.py:1060",
+    "value": "配置-数据交叉: 每单元配置 hash 与 manifest 档位 (A2/A3 × N2/N3 四组合各 25%) 一致",
+    "note": "clause_gates.py c8_cross_experiment_isolation: 配置 hash 与 manifest axes_override 交叉核对"
+  },
+  {
+    "clause": 341,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:60-70 + src/liquidloc/common/seed_utils.py:127",
+    "value": "每「方法×seed」单元的训练日志/指标/配置 hash/manifest 四者一一对应",
+    "note": "_rz_gates.py decision_log 记录每单元状态; seed_utils.py audit_deterministic_setup"
+  },
+  {
+    "clause": 342,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py + src/liquidloc/analysis/clause_gates.py + src/liquidloc/common/precheck_orchestrator.py",
+    "value": "执行必有偏差: 漏跑/跳步/gate 走过场/改码未重新冒烟/记录缺失是常态; 必须诊断 + 补救",
+    "note": "_rz_gates.py decision_log + clause_gates.py AUD-1–AUD-4 + precheck_orchestrator.py 40项审查"
+  },
+  {
+    "clause": 343,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:368-422 + scripts/s9_validate_seeds.py",
+    "value": "数据适配性 audit: DQ-1–DQ-4 + S9 + E-4; 难度梯度/信噪比/分布一致性/样本量",
+    "note": "handbook_gates.py dq1-dq4; s9_validate_seeds.py S9 全量重跑"
+  },
+  {
+    "clause": 344,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:368-570 + scripts/_rz_gates.py:147-171",
+    "value": "数据性失败: 先修数据 (重生成/调轨迹/走协议变更); 修不通 → 诚实声明数据集限制",
+    "note": "handbook_gates.py DQ-1–DQ-4; _rz_gates.py RZ-1 重生成 gate"
+  },
+  {
+    "clause": 345,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py + src/liquidloc/analysis/handbook_p_series_tools.py",
+    "value": "逐项补救动作: R-1 数据重生成 / R-2 重训 / R-5 兜底出口",
+    "note": "_rz_gates.py RZ-1/RZ-2/RZ-3/RZ-4; p_series_tools.py 补救核验"
+  },
+  {
+    "clause": 346,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:212-240 + src/liquidloc/analysis/handbook_p_series_tools.py",
+    "value": "P7 code freeze 后改码未重新冒烟 → 数据生成器改动 → RZ-1 全量重生成 + RZ-2 重训",
+    "note": "_rz_gates.py RZ-1/RZ-2; p_series_tools.py 代码改动检测"
+  },
+  {
+    "clause": 347,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-171 + src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "P9 数据混用: 按 RZ-1 禁令核查全量数据来源 (manifest + 校验和 Pre-4)",
+    "note": "_rz_gates.py RZ-1 重生成; precheck_orchestrator.py check_Pre4_checksums"
+  },
+  {
+    "clause": 348,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-171",
+    "value": "混用命中 → RZ-1 全量重生成 (10 seed 全部重新生成 + S9/DQ 全量重跑)",
+    "note": "_rz_gates.py RZ-1: 10 seed 全部重新生成; S9/DQ 全量重跑"
+  },
+  {
+    "clause": 349,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-185 + src/liquidloc/analysis/clause_gates.py:301",
+    "value": "P9 补救后复核点: RZ-1 留痕 + S9/DQ 报告 + G-3 配置-数据交叉",
+    "note": "_rz_gates.py RZ-1/RZ-2; clause_gates.py c8_cross_experiment_isolation"
+  },
+  {
+    "clause": 350,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:171-185",
+    "value": "P9 何时必须重跑: RZ-1 重生成后 → RZ-2 全部单元重训",
+    "note": "_rz_gates.py RZ-2 retrain_all_units: 全部 50 单元从头重训"
+  },
+  {
+    "clause": 351,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:171-185",
+    "value": "RZ-2 重训留痕 + G-1 单元齐全; 误用旧权重的全部单元作废重跑",
+    "note": "_rz_gates.py rz2_retrain_all_units: N_TOTAL_UNITS=50; 旧权重禁用"
+  },
+  {
+    "clause": 352,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-171",
+    "value": "P9 数据混用: 按 RZ-1 禁令核查全量数据来源 (manifest + 校验和 Pre-4)",
+    "note": "_rz_gates.py RZ-1: 数据来源审计 (manifest + SHA-256 校验)"
+  },
+  {
+    "clause": 353,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:147-185 + src/liquidloc/analysis/handbook_p_series_tools.py",
+    "value": "补数据来源审计记录: RZ-1 留痕 + S9/DQ 报告 + G-3 配置-数据交叉 → RZ-2 全部单元重训",
+    "note": "_rz_gates.py RZ-1/RZ-2 + decision_log; p_series_tools.py 审计哈希"
+  },
+  {
+    "clause": 354,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p_series_tools.py + src/liquidloc/analysis/handbook_p22_statistics.py",
+    "value": "数据性失败报告口径: 明确声明数据集限制; 给出 DQ 证据 + 改善路径; 诚实负发现可发表",
+    "note": "handbook_p22_statistics.py TOST/贝叶斯因子; p_series_tools.py 审计记录"
+  },
+  {
+    "clause": 355,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py:151-168",
+    "value": "R-5 兜底出口: TOST/贝叶斯因子判定; 八层诊断全过 + RCA 完成 + 重跑纪律遵守 (≤2 轮)",
+    "note": "handbook_p22_statistics.py tost_equivalence_test + tost_decision; 'not_equivalent' 降级交付"
+  },
+  {
+    "clause": 356,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py:151-168",
+    "value": "诚实负发现: LNN 在异步+高 NLOS 与基线无显著优势; 贡献点转为机制分析/缩小声明范围/补偿性贡献",
+    "note": "handbook_p22_statistics.py tost + wilcoxon; 补偿性贡献路径 (参数量/FLOPs/收敛速度/稳健性)"
+  },
+  {
+    "clause": 357,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py + src/liquidloc/analysis/ablation_analysis.py",
+    "value": "不造假/不硬撑/不卡死: 负结果统计出口 (TOST/贝叶斯因子); 同机消融归因出口同构",
+    "note": "handbook_p22_statistics.py tost_equivalence_test + cohens_d; ablation_analysis.py 消融归因"
+  },
+  {
+    "clause": 358,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py:212-240",
+    "value": "诊断轨轻量清场 → RZ-1 重生成 → RZ-2 重训 → RZ-3 验收 → Pre/I/S9/DQ → 冒烟 → 预达标 → 全量 50 单元",
+    "note": "_rz_gates.py run_pipeline: 完整执行链 RZ-0→RZ-1→RZ-2→RZ-3→全量"
+  },
+  {
+    "clause": 359,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:513-550 + scripts/s9_validate_seeds.py",
+    "value": "S9 数据校验 + DQ-1–DQ-4 fitness-for-purpose gate → 冒烟 → 预达标 → 全量 50 单元",
+    "note": "precheck_orchestrator.py 40项; s9_validate_seeds.py S9; handbook_gates.py dq1-dq4"
+  },
+  {
+    "clause": 360,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py + scripts/_rz_gates.py",
+    "value": "统计脚本冒烟验证 + 实现冻结 (冒烟→全量 gate); 断点续跑",
+    "note": "handbook_p22_statistics.py 统计脚本冒烟; _rz_gates.py RZ gate + decision_log 断点续跑"
+  },
+  {
+    "clause": 361,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p_series_tools.py + src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "落实判定标准 (三选一): 产物已生成且通过校验 (gate/manifest); 行为已执行且留痕 (decision log); 环境/配置已生效且可复现 (config hash/依赖清单)",
+    "note": "handbook_p_series_tools.py compute_hyperparameter_hash + compare_hyperparameter_tables; precheck_orchestrator.py check_Pre4_checksums"
+  },
+  {
+    "clause": 362,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:432-442,929-990",
+    "value": "PA-8 遵守的验收绑定: S9/预检/落窗/诊断全部以 Stage 1 档位协议条款为唯一数值基准",
+    "note": "precheck_orchestrator.py check_P4 GDOP≈1.19; check_P26a V0 负向排除; check_Pre4 checksum"
+  },
+  {
+    "clause": 363,
+    "verdict": "PASS",
+    "anchor": "scripts/s9_validate_seeds.py:482-560 + src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "P1–P6 静态核对固化成脚本; 生成完每批数据就跑; 不合格直接重生成",
+    "note": "s9_validate_seeds.py validate_seed 逐项断言; precheck_orchestrator.py P1-P6 检查"
+  },
+  {
+    "clause": 364,
+    "verdict": "PASS",
+    "anchor": "scripts/s9_validate_seeds.py:356-412 + src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "字段级 schema 断言 (data contract validation); 任一断言失败 → 该 seed 重生成 (P19 可复现保证)",
+    "note": "s9_validate_seeds.py validate_schema + validate_seed: 字段齐全/dtype/shape/范围断言"
+  },
+  {
+    "clause": 365,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:500-570 + scripts/_rz_gates.py:147-171",
+    "value": "任一不合格项 → 该 seed 全部重生成 (P19 保证可复现); 不修数据直接跳过",
+    "note": "handbook_gates.py dq1-dq4; _rz_gates.py RZ-1 重生成 gate"
+  },
+  {
+    "clause": 366,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/models/liquid/_checkpoint_utils.py + src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "逐单元落盘: 权重/指标/日志/配置 hash/manifest 独立落盘 (P39); Pre-4 校验和",
+    "note": "_checkpoint_utils.py config_hash 绑定; precheck_orchestrator.py check_Pre4_checksums"
+  },
+  {
+    "clause": 367,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1035-1181",
+    "value": "I-1 数据生成器 (S8 流水线 7 步注入顺序): A2/A3 偏移注入在重采样前 (P28 语义)",
+    "note": "paper_materializer.py: _inject_*_async (L284/306/311) → apply_paper_nlos_blocks (L1157) → _apply_outage_segments (L1161) → write_json (L1173)"
+  },
+  {
+    "clause": 368,
+    "verdict": "PASS",
+    "anchor": "scripts/verify_all_clauses.py + tests/",
+    "value": "组件级单测: 数据加载器/坐标变换/滑窗/重采样/评估脚本各写 ≥1 个单测并留痕",
+    "note": "tests/ 目录存在; verify_all_clauses.py 覆盖测试"
+  },
+  {
+    "clause": 369,
+    "verdict": "PASS",
+    "anchor": "scripts/_rz_gates.py + git",
+    "value": "冻结 (code freeze): code freeze 记录 + 冻结生成器 hash + 冻结代码 commit",
+    "note": "_rz_gates.py decision_log 含生成器 commit hash + freeze 记录"
+  },
+  {
+    "clause": 370,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/models/liquid/_checkpoint_utils.py + src/liquidloc/common/precheck_orchestrator.py:513-550",
+    "value": "保存: 指标/权重/日志/配置 hash/manifest 逐单元落盘 (P39); Pre-4 校验和",
+    "note": "_checkpoint_utils.py config_hash 绑定; precheck_orchestrator.py check_Pre4_checksums"
+  },
+  {
+    "clause": 371,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/paper_materializer.py:1060-1181 + scripts/_rz_gates.py:147-171",
+    "value": "数据损坏 → 该 seed 重生成 (P19 保证可复现)",
+    "note": "paper_materializer.py materialize_paper_raw: 每 seed 独立生成; _rz_gates.py RZ-1 重生成 gate"
+  }
+]

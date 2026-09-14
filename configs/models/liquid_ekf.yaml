@@ -12,9 +12,8 @@ feature_order:
 - dy
 - dyaw
 window:
-  size: 20
-  allow_smoke_window: true  # 仅冒烟; 正式需 size=128 (P29)
-  step: 1
+  size: 128
+  allow_smoke_window: false  # P29: W=128 是硬约束，禁止冒烟降级。
 network:
   input_dim: 8
   hidden_dim: 18

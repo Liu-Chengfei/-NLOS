@@ -1,0 +1,19 @@
+[
+{"clause":190,"verdict":"N-A","anchor":"AGENTS.md 五条铁律 + 治理层（独立检查角色分离为流程约束）","value":"独立复核为流程纪律，无单一代码载体","note":"治理/流程条款"},
+{"clause":191,"verdict":"N-A","anchor":"AGENTS.md 复核者制度（五类检查范围为流程要求）","value":"五类检查范围（契约/训练循环/数值/资源/错误处理）为流程规范","note":"部分可由 clause_gates.py 静态门覆盖，但条款本身是角色分离流程"},
+{"clause":192,"verdict":"N-A","anchor":"AGENTS.md git 备份纪律（code freeze 对齐 commit 为流程动作）","value":"代码冻结确认=git 纪律，无代码载体","note":"流程条款"},
+{"clause":193,"verdict":"FAIL","anchor":"decision_logs/（工作区已删除）","value":"decision_logs/00_governance_check.md、01_pre_self_check.md 在 git 中被标记删除，工作区无该目录 → 决策日志机制载体缺失","note":"改动记录无落盘载体，RZ-0 清场时误删，需恢复"},
+{"clause":194,"verdict":"PASS","anchor":"src/liquidloc/common/precheck_orchestrator.py:513 check_Pre4_checksums","value":"Pre-4: npz/manifest 校验和(SHA-256)记录，import hashlib 于 line 18","note":"校验和函数真实存在"},
+{"clause":195,"verdict":"PASS","anchor":"src/liquidloc/common/precheck_orchestrator.py:579-641 check_I1..check_I5","value":"I-1 数据生成器/I-2 S9脚本/I-3 五方法/I-4 统计脚本/I-5 评估管线 全为跑前第一道门","note":"I-1..I-5 检查函数已实现"},
+{"clause":196,"verdict":"PASS","anchor":"src/liquidloc/analysis/clause_gates.py:147-176 c3_amp_enabled","value":"扫描三网络 amp_enabled 同口径 + manifest/autocast 证据","note":"C-3 AMP 默认启用机器核验"},
+{"clause":197,"verdict":"PASS","anchor":"src/liquidloc/common/resource_budget.py:20-21 RAM_LIMIT_GB=12.0 + :122 compute_parallel_limits","value":"并发调度按 min(GPU,RAM,待执行) 计算，12GB 硬上限","note":"C-6 RAM 闸门代码存在"},
+{"clause":198,"verdict":"PASS","anchor":"src/liquidloc/common/resource_budget.py:122-190 compute_parallel_limits/verify_ram_budget","value":"超限降并发/串行排队：compute_parallel_limits 返回并发度上界","note":"降并发机制存在"},
+{"clause":199,"verdict":"PASS","anchor":"src/liquidloc/common/resource_budget.py:20-21","value":"全文件 grep 0.8/折扣/factor 无命中 → 无模糊折扣系数，12GB 绝对上限","note":"机器核验无折扣系数"},
+{"clause":200,"verdict":"PASS","anchor":"src/liquidloc/analysis/clause_gates.py c1..c10 + precheck_orchestrator.py check_I1..I5","value":"C-1–C-10 静态门与 I-1–I-5 实现门均有函数载体","note":"出口判据可机器核验"},
+{"clause":201,"verdict":"FAIL","anchor":".git/hooks/pre-commit（3规则：临时产物/未决标记/冗余文件名）+ sandbox/","value":"sandbox/ 目录存在承载历史代码迁移，但钩子无『注释掉的死代码』扫描规则 → 死代码禁而不查","note":"机制缺一角：无注释代码检测"},
+{"clause":202,"verdict":"N-A","anchor":"AGENTS.md/手册（查阅文档为执行动作，无代码载体）","value":"主动查阅公开文档为流程纪律","note":"流程条款"},
+{"clause":203,"verdict":"N-A","anchor":"同上（查什么清单为流程指引）","value":"接口签名/dtype/精度模式/版本兼容查阅范围","note":"流程条款"},
+{"clause":204,"verdict":"PASS","anchor":".git/hooks/pre-commit:6-10 临时产物拦截(bash_tool_/tmp_/temp_*/.bak)+ sandbox/ 目录","value":"临时脚本跑完即删/移 sandbox，钩子拦截残留","note":"与C-10配套"},
+{"clause":205,"verdict":"PASS","anchor":"src/liquidloc/models/liquid/_checkpoint_utils.py:41-52 _atomic_save_checkpoint","value":"写 <name>.pt.tmp.<pid> 后 os.replace 原子替换；CODE-9⑦ 注释明示禁止半文件","note":"落盘细则硬约束实现"},
+{"clause":206,"verdict":"PASS","anchor":"src/liquidloc/pipelines/core_pipeline.py:658-686 _resolve_git_commit/_resolve_config_hash","value":"日志写入 git commit + 配置 hash（P39）","note":"P39 持久化载体存在"}
+]

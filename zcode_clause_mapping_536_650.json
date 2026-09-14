@@ -1,0 +1,692 @@
+[
+  {
+    "clause": 536,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py:869",
+    "note": "run_p22_full_analysis implements paired Wilcoxon/Holm/2x2 ANOVA; layout-randomization is procedural"
+  },
+  {
+    "clause": 537,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1196",
+    "note": "check_DQ4_sample_size enforces n_seeds>=10, n_test>=100, total>=1000"
+  },
+  {
+    "clause": 538,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py:869",
+    "note": "delta_vs_lnn: paired bootstrap comparison LNN vs EKF (run_p22_full_analysis outputs)"
+  },
+  {
+    "clause": 539,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p_series_tools.py:279+",
+    "note": "4-combo slicing: evaluate_warmup_window_4x1 computes rmse/p95 per A2N2/A2N3/A3N2/A3N3"
+  },
+  {
+    "clause": 540,
+    "verdict": "FAIL",
+    "anchor": "N/A",
+    "note": "2x2 ANOVA exists (two_way_anova:369) but explicit C1(A2N2) vs C4(A3N3) diagonal paired-Wilcoxon is not implemented; DQ-1 only checks mean diff ratio"
+  },
+  {
+    "clause": 541,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:480",
+    "note": "check_Pre1_environment_locked(requirement_lock,cuda,torch)"
+  },
+  {
+    "clause": 542,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:480",
+    "note": "Pre-1 CheckResult records cuda_version+torch_version (toolchain lock fields)"
+  },
+  {
+    "clause": 543,
+    "verdict": "PASS",
+    "anchor": "scripts/00_check_env.py:130",
+    "note": "env check script present; driver/CUDA/PyTorch/cuDNN compatibility is operator-governed"
+  },
+  {
+    "clause": 544,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:549",
+    "note": "check_I1_data_generator required 7-step S8 order; npz schema in dataio/sim_materializer.py"
+  },
+  {
+    "clause": 545,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:597",
+    "note": "check_I4_stats_script requires mean,std,p95,p50,delta_vs_lnn,wilcoxon_p,ci_95,holm_bonferroni,slicing_4_combo,anova_2x2,c1_vs_c4"
+  },
+  {
+    "clause": 546,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:597",
+    "note": "paired index (P20) verified through run_p22_full_analysis pairing_keys + check_P20_window:822"
+  },
+  {
+    "clause": 547,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:713",
+    "note": "check_P14_shared_4_heads requires uwb_scaling/bias/vio_scaling/risk identical across lnn/lstm/transformer"
+  },
+  {
+    "clause": 548,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: do-not-carry-fail-to-precheck discipline"
+  },
+  {
+    "clause": 549,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: gate deliverable/acceptance rules"
+  },
+  {
+    "clause": 550,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: smoke deliverable checklist"
+  },
+  {
+    "clause": 551,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1122",
+    "note": "check_P39_persistence requires config_hash,seed,metrics,git_commit"
+  },
+  {
+    "clause": 552,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1265",
+    "note": "G5 all_methods_same_test_set + G4 n_unresolved_alerts==0 + I5 eval-caliber field"
+  },
+  {
+    "clause": 553,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: exec violation != method fail"
+  },
+  {
+    "clause": 554,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py:60",
+    "note": "holm_bonferroni_adjust over 5-method 10 pairs; paired Wilcoxon in significance_tests.py"
+  },
+  {
+    "clause": 555,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: forbid post-hoc power"
+  },
+  {
+    "clause": 556,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: CI too wide => insufficient evidence"
+  },
+  {
+    "clause": 557,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py:60",
+    "note": "Holm over 10 pairs; TOST/BF per-pair same 10-pair correction"
+  },
+  {
+    "clause": 558,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P1-P10 remediation"
+  },
+  {
+    "clause": 559,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: >5% rerun decision-log rule"
+  },
+  {
+    "clause": 560,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py:754",
+    "note": "kruskal_wallis_test (nonparametric fallback); segment breakdown via metrics_quality.py"
+  },
+  {
+    "clause": 561,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: hyperparam perturbation + reproducibility appendix"
+  },
+  {
+    "clause": 562,
+    "verdict": "N-A",
+    "anchor": "checklist_stage0.md",
+    "note": "governance: checklist template artifact"
+  },
+  {
+    "clause": 563,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: AUD-3 residual audit item"
+  },
+  {
+    "clause": 564,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: independent audit channel"
+  },
+  {
+    "clause": 565,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: disk-evidence-only rule"
+  },
+  {
+    "clause": 566,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: two-system RZ non-concurrency"
+  },
+  {
+    "clause": 567,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: audit thread role"
+  },
+  {
+    "clause": 568,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/analysis/handbook_p22_statistics.py:875",
+    "note": "run_p22 default sesoi_relative=0.33; 40-62.5% via preset_sesoi:823"
+  },
+  {
+    "clause": 569,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/dataio/handbook_gates.py:372",
+    "note": "target_relative_diff=0.40 in DQ-1 C4-vs-C1 gradient"
+  },
+  {
+    "clause": 570,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:426",
+    "note": "check_P4_k1_gdop; GDOP computed in analysis/block1_gdop_verifier.py"
+  },
+  {
+    "clause": 571,
+    "verdict": "N-A",
+    "anchor": "configs/base/protocol.yaml",
+    "note": "governance: PA-1 single source of truth for tier parameter values"
+  },
+  {
+    "clause": 572,
+    "verdict": "N-A",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1196",
+    "note": "governance: scale-vs-capacity no-downscale rule; overlaps DQ-4"
+  },
+  {
+    "clause": 573,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1122",
+    "note": "check_P39_persistence config_hash+seed+metrics+git_commit"
+  },
+  {
+    "clause": 574,
+    "verdict": "N-A",
+    "anchor": "clear_workspace.py",
+    "note": "governance: RZ-0..RZ-3 four hard gates (procedural)"
+  },
+  {
+    "clause": 575,
+    "verdict": "N-A",
+    "anchor": "clear_workspace.py",
+    "note": "governance: RZ entry/exit spec"
+  },
+  {
+    "clause": 576,
+    "verdict": "N-A",
+    "anchor": "clear_workspace.py",
+    "note": "governance: RZ-0 timing"
+  },
+  {
+    "clause": 577,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: diagnostic/acceptance flow"
+  },
+  {
+    "clause": 578,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: pre-acceptance sorting/window/uplift/C4 check"
+  },
+  {
+    "clause": 579,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: RZ-2 + G/E/0-V/D summary"
+  },
+  {
+    "clause": 580,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: diagnostic track non-paper rule"
+  },
+  {
+    "clause": 581,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: acceptance track paper-only rule"
+  },
+  {
+    "clause": 582,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: diagnostic clean list vs acceptance trace"
+  },
+  {
+    "clause": 583,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: no-clean-no-run"
+  },
+  {
+    "clause": 584,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: full clean before paper exec"
+  },
+  {
+    "clause": 585,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: any no-clean run invalid"
+  },
+  {
+    "clause": 586,
+    "verdict": "N-A",
+    "anchor": "clear_workspace.py",
+    "note": "governance: diagnostic clean without decision log but scripts cannot read old products"
+  },
+  {
+    "clause": 587,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: old results cleared"
+  },
+  {
+    "clause": 588,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: clean action trace to decision log"
+  },
+  {
+    "clause": 589,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: generator change -> rethaw -> resmoke -> RZ-0"
+  },
+  {
+    "clause": 590,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: unit fail -> resume not to acceptance"
+  },
+  {
+    "clause": 591,
+    "verdict": "N-A",
+    "anchor": "scripts/00_check_env.py",
+    "note": "governance: GPU hard-verify operator procedure; torch.cuda.is_available via resource_budget.py:33"
+  },
+  {
+    "clause": 592,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: three-evidence ownership"
+  },
+  {
+    "clause": 593,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: no-shrinking-clause-text rule"
+  },
+  {
+    "clause": 594,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/resource_budget.py:20",
+    "note": "RAM_LIMIT_GB=12.0 hard cap; compute_parallel_limits:122 prints gate math"
+  },
+  {
+    "clause": 595,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/resource_budget.py:122",
+    "note": "compute_parallel_limits final_parallel = min(gpu,ram,pending)"
+  },
+  {
+    "clause": 596,
+    "verdict": "PASS",
+    "anchor": "clear_workspace.py:34",
+    "note": "def _move_or_delete migrates activity dirs to archive/ timestamped subdir"
+  },
+  {
+    "clause": 597,
+    "verdict": "PASS",
+    "anchor": "clear_workspace.py:47",
+    "note": "archive isolation forbids re-migration into archive; scripts cannot read old products"
+  },
+  {
+    "clause": 598,
+    "verdict": "N-A",
+    "anchor": "src/liquidloc/common/paths.py",
+    "note": "governance: CODE-3 device-injection; no scattered .cuda/.cpu in training"
+  },
+  {
+    "clause": 599,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: CODE-4 docstring 3-element rule"
+  },
+  {
+    "clause": 600,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: paper numeric caliber consistency"
+  },
+  {
+    "clause": 601,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: full exec 50-unit G1 flow"
+  },
+  {
+    "clause": 602,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: 0-V1..0-V6 + D1..D31 closed loop"
+  },
+  {
+    "clause": 603,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: independent verifier per deliverable"
+  },
+  {
+    "clause": 604,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: checklist_pkg + git status clean"
+  },
+  {
+    "clause": 605,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: code impl I/C/CODE/BUG/AUD deliverables"
+  },
+  {
+    "clause": 606,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: exec compliance audit E1-E6"
+  },
+  {
+    "clause": 607,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: R-1..R-6 decision table"
+  },
+  {
+    "clause": 608,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: paper acceptance RZ3 + A table"
+  },
+  {
+    "clause": 609,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: A1-A9 auto-assert script"
+  },
+  {
+    "clause": 610,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: any fail redo not to diagnosis"
+  },
+  {
+    "clause": 611,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: audit trail + dual review + spot rerun"
+  },
+  {
+    "clause": 612,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1275",
+    "note": "check_E1_audit_trail requires n_decisions>0 and n_commits>0"
+  },
+  {
+    "clause": 613,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1291",
+    "note": "check_E3_dual_review; independent recompute via scripts/_independent_stats.py:23"
+  },
+  {
+    "clause": 614,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: E-3 mismatch -> check script/stat caliber"
+  },
+  {
+    "clause": 615,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1296",
+    "note": "check_E4_spot_rerun requires n_rerun>=2 and n_match==n_rerun"
+  },
+  {
+    "clause": 616,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: E-4 >=2 same-cause -> batch escalation"
+  },
+  {
+    "clause": 617,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1303",
+    "note": "check_E5_alert_log_consistency requires logged==resolved"
+  },
+  {
+    "clause": 618,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1317",
+    "note": "check_E6_audit_exit requires all(e1..e5)"
+  },
+  {
+    "clause": 619,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: E-6 forbid exec-as-method"
+  },
+  {
+    "clause": 620,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: first-question exec-bias default"
+  },
+  {
+    "clause": 621,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: when-to-use section"
+  },
+  {
+    "clause": 622,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P2 timestamp inversion -> isolate to archive"
+  },
+  {
+    "clause": 623,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P2 rebuild chain"
+  },
+  {
+    "clause": 624,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P2 recheck no-clock-skew"
+  },
+  {
+    "clause": 625,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P2 official-unit -> rerun unit"
+  },
+  {
+    "clause": 626,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P2 smoke-only rerun"
+  },
+  {
+    "clause": 627,
+    "verdict": "PASS",
+    "anchor": "scripts/_independent_stats.py:23",
+    "note": "independent paired-Wilcoxon + Cohen + 95% CI (E-3 dual-review implementation)"
+  },
+  {
+    "clause": 628,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P3 rerun all stats after fix"
+  },
+  {
+    "clause": 629,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P4 escalate batch"
+  },
+  {
+    "clause": 630,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P5 recover cleared alert"
+  },
+  {
+    "clause": 631,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: P7 resmoke after code-freeze change"
+  },
+  {
+    "clause": 632,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: premise declaration"
+  },
+  {
+    "clause": 633,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: execution failure"
+  },
+  {
+    "clause": 634,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: >25% unit -> regenerate + RCA"
+  },
+  {
+    "clause": 635,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: downgrade requires data+exec trustworthy"
+  },
+  {
+    "clause": 636,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: downgrade needs user arbitration"
+  },
+  {
+    "clause": 637,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: R-6 no-downgrade goal"
+  },
+  {
+    "clause": 638,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: compare code vs manual"
+  },
+  {
+    "clause": 639,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: full loop RZ0..RZ3"
+  },
+  {
+    "clause": 640,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: full summary G+E+0-V+D"
+  },
+  {
+    "clause": 641,
+    "verdict": "PASS",
+    "anchor": "src/liquidloc/common/precheck_orchestrator.py:1217",
+    "note": "G1 expected=50 (10 seed x 5 methods)"
+  },
+  {
+    "clause": 642,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: attribution classification"
+  },
+  {
+    "clause": 643,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: paper methods slice writing taboo"
+  },
+  {
+    "clause": 644,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: paper methods section D-10 slice declaration (not to misreport as full-space)"
+  },
+  {
+    "clause": 645,
+    "verdict": "N/A",
+    "anchor": "N/A",
+    "note": "governance: pre-flight visualization output 0-V1-0-V6"
+  },
+  {
+    "clause": 646,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: alert propagation (NaN/Inf/OOM/timeout)"
+  },
+  {
+    "clause": 647,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: spot-check rerun path"
+  },
+  {
+    "clause": 648,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: summary section formatting"
+  },
+  {
+    "clause": 649,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: clause coverage gate"
+  },
+  {
+    "clause": 650,
+    "verdict": "N-A",
+    "anchor": "N/A",
+    "note": "governance: gate checklist -> decision log"
+  }
+]
