@@ -28,11 +28,21 @@ import yaml
 
 from liquidloc.common.angle_utils import angle_delta_rad
 from liquidloc.common.config_utils import find_project_root, load_yaml_config
+from liquidloc.common.constants import (
+    DEFAULT_THRESHOLDS,  # IMU 物理范围阈值单源（与 imu_model 校验同一处）
+)
 from liquidloc.common.gt_utils import normalize_gt_rows
 from liquidloc.common.io_utils import write_json
 from liquidloc.common.validation import coerce_finite_scalar
 from liquidloc.dataio.sim_materializer import SIM_GENERATOR_VERSION_CURRENT  # §28.6 自证契约：复用 sim 版本号
 from liquidloc.scenarios.paper_nlos_injection import apply_paper_nlos_blocks
+
+
+def _clamp_sensor(value, lo, hi):
+    """IMU 传感器饱和建模：把超出物理量程的值截到量程内。"""
+    if value < lo: return lo
+    if value > hi: return hi
+    return value
 
 
 # ============================================================
@@ -120,11 +130,21 @@ def _derive_paper_imu_rows(gt_rows: list[dict[str, float]], timestamps: list[flo
             ax_w = (velocities[i + 1][0] - velocities[i - 1][0]) / dt
             ay_w = (velocities[i + 1][1] - velocities[i - 1][1]) / dt
             gz = angle_delta_rad(float(nxt["yaw_unwrapped"]), float(prv["yaw_unwrapped"])) / dt
+        # IMU 传感器饱和建模：随机游走/急转弯轨迹在 GT 节点处经两次中心差分
+        # 会产生非物理的加速度尖峰（线性内插→分段常速→节点速度不连续→差分冲激）。
+        # 真实加速度计量程有限，超出即饱和截顶。此处按 DEFAULT_THRESHOLDS 的
+        # imu_accel/gyro 区间截顶，与下游 validate_imu_event 的校验区间单源一致，
+        # 保证生成数据不会触发 §imu_model 的物理范围守卫（fail-loud）。
+        ax_b = _clamp_sensor(cos_y * ax_w + sin_y * ay_w,
+                             DEFAULT_THRESHOLDS["imu_accel_min"], DEFAULT_THRESHOLDS["imu_accel_max"])
+        ay_b = _clamp_sensor(-sin_y * ax_w + cos_y * ay_w,
+                             DEFAULT_THRESHOLDS["imu_accel_min"], DEFAULT_THRESHOLDS["imu_accel_max"])
+        gz_b = _clamp_sensor(gz, DEFAULT_THRESHOLDS["imu_gyro_min"], DEFAULT_THRESHOLDS["imu_gyro_max"])
         rows.append({
             "timestamp": float(pose["timestamp"]),
-            "ax": cos_y * ax_w + sin_y * ay_w,
-            "ay": -sin_y * ax_w + cos_y * ay_w,
-            "gz": gz,
+            "ax": ax_b,
+            "ay": ay_b,
+            "gz": gz_b,
         })
     return rows
 
@@ -382,9 +402,15 @@ def _inject_imu_noise(
         accel_rrw_x += rng_white.gauss(0.0, accel_rrw_step_sigma)
         accel_rrw_y += rng_white.gauss(0.0, accel_rrw_step_sigma)
         gyro_rrw += rng_white.gauss(0.0, gyro_rrw_step_sigma)
-        r["ax"] = float(r["ax"]) + accel_bias_x + accel_rrw_x + rng_white.gauss(0.0, accel_white_sigma)
-        r["ay"] = float(r["ay"]) + accel_bias_y + accel_rrw_y + rng_white.gauss(0.0, accel_white_sigma)
-        r["gz"] = float(r["gz"]) + gyro_bias + gyro_rrw + rng_white.gauss(0.0, gyro_white_sigma)
+        r["ax"] = _clamp_sensor(
+            float(r["ax"]) + accel_bias_x + accel_rrw_x + rng_white.gauss(0.0, accel_white_sigma),
+            DEFAULT_THRESHOLDS["imu_accel_min"], DEFAULT_THRESHOLDS["imu_accel_max"])
+        r["ay"] = _clamp_sensor(
+            float(r["ay"]) + accel_bias_y + accel_rrw_y + rng_white.gauss(0.0, accel_white_sigma),
+            DEFAULT_THRESHOLDS["imu_accel_min"], DEFAULT_THRESHOLDS["imu_accel_max"])
+        r["gz"] = _clamp_sensor(
+            float(r["gz"]) + gyro_bias + gyro_rrw + rng_white.gauss(0.0, gyro_white_sigma),
+            DEFAULT_THRESHOLDS["imu_gyro_min"], DEFAULT_THRESHOLDS["imu_gyro_max"])
 
 
 def _inject_vio_noise(

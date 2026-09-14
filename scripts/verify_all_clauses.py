@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-HANDBOOK = ROOT / "docs" / "异步高NLOS实验全流程保障手册-v50final权威.md"
+HANDBOOK = ROOT / "docs" / "zcode_异步手册_v696_20260914_最新.md"
 
 # ---------- 1) 从手册提取真实条款标识 ----------
 CLAUSE_RE = re.compile(
@@ -103,7 +103,7 @@ S_IMPL = {
     "S6": ("src/liquidloc/scenarios/nlos_levels.py + paper_nlos_injection.py", "NLOS 注入 bias+多径+噪声"),
     "S7": ("configs/base/sim_noise_spec.yaml M1", "成簇丢包 5%"),
     "S8": ("src/liquidloc/scenarios/visual_levels.py", "V0 健康档 VIO payload"),
-    "S9": ("scripts/block1_gdop_verifier.py + scripts/s9_full_validation.py", "协议一致性四重实测"),
+    "S9": ("src/liquidloc/dataio/handbook_gates.py S9ValidationReport + src/liquidloc/analysis/block1_gdop_verifier.py", "协议一致性四重实测 + schema校验"),
 }
 
 def main():

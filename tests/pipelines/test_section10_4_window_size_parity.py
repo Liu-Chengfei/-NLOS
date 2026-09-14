@@ -16,14 +16,19 @@ from liquidloc.pipelines.core_pipeline import _enforce_window_size_parity_for_ne
 
 
 def test_parity_passes_when_lstm_liquid_share_default_window_size():
-    """默认 yaml 下 LSTM/Liquid 的 window.size 均为 20，应通过且无 raise。"""
+    """默认 yaml 下 LSTM/Liquid 的 window.size 均为128（P29 硬约束值），应通过且无 raise。
+
+    P29: W=128 是论文级唯一的合法窗口值；三个 NN 方法默认 yaml 须一致为 128。
+    legacy W=20 是冒烟残留，已由"违反项29修复"清场（configs/models/*_ekf.yaml 统一
+    size=128、allow_smoke_window=false 激活 fail-loud），此处断言随之更新到 128。
+    """
     methods = [MODEL_NAME_LSTM, MODEL_NAME_LIQUID]  # 两个 NN 方法都跑。
     sizes = _enforce_window_size_parity_for_neural_methods(methods, cfg={})  # 无显式 override。
     assert sizes[MODEL_NAME_LSTM] == sizes[MODEL_NAME_LIQUID], (  # 默认必须对等。
         f"§10.4 默认 yaml 下 LSTM/Liquid window.size 必须一致，实际 {sizes}"
     )
-    assert all(v == 20 for v in sizes.values()), (  # 二者都应为 20。
-        f"§10.4 默认 yaml 下 LSTM/Liquid window.size 应为 20，实际 {sizes}"
+    assert all(v == 128 for v in sizes.values()), (  # 二者都应为 128（P29）。
+        f"§10.4 默认 yaml 下 LSTM/Liquid window.size 应为 128（P29），实际 {sizes}"
     )
 
 
