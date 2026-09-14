@@ -196,7 +196,7 @@ def _derive_paper_vio_rows(gt_rows: list[dict[str, float]], timestamps: list[flo
         dy_w = p1["py"] - p0["py"]
         dx = cy * dx_w + sy * dy_w
         dy = -sy * dx_w + cy * dy_w
-        dyaw = yaw1 - yaw0  # unwrapped 差，不会 ±2π
+        dyaw = angle_delta_rad(yaw1, yaw0)  # wrap 到 ±π：line_back_forth 每次折返 ±π，直接减会累积出 >2π 的假 delta
         rows.append({"timestamp": t, "dx": dx, "dy": dy, "dyaw": dyaw, "quality": 1.0})
     return rows
 
@@ -705,6 +705,46 @@ def build_paper_gt_rows(
 # 连续段生成器（NLOS / 丢包）
 # ============================================================
 
+def _make_nlos_segments_for_ratio(
+    rng: random.Random,
+    duration_s: float,
+    warmup_s: float,
+    target_ratio: float,
+    block_range: tuple[float, float],
+) -> list[tuple[float, float]]:
+    """生成覆盖 target_ratio 的连续 NLOS 遮挡段（不重叠，warmup 期不注入）。
+
+    段时长在 block_range 内抖动；按覆盖率需要决定段数，再均匀铺到有效区。
+    有效区 = duration_s - warmup_s。总遮挡时长 ≈ target_ratio × 有效区。
+    """
+    block_lo, block_hi = block_range
+    eff = duration_s - warmup_s
+    if eff <= 0:
+        return []
+    target_total = max(0.0, min(eff * 0.95, target_ratio * eff))
+    mean_block = 0.5 * (block_lo + block_hi)
+    n_seg = max(1, round(target_total / mean_block))
+    # 反推每段时长，使 n_seg × block_len ≈ target_total，并夹到 [block_lo, block_hi]
+    base_len = target_total / n_seg
+    segs: list[tuple[float, float]] = []
+    # 在有效区内均匀布点，留抖动
+    slot = eff / n_seg
+    placed = 0.0
+    for i in range(n_seg):
+        jitter = rng.uniform(-0.25 * slot, 0.25 * slot)
+        start = warmup_s + i * slot + jitter * 0.5
+        start = max(warmup_s, min(start, duration_s - block_hi))
+        blk = min(max(base_len * rng.uniform(0.85, 1.15), 0.3), duration_s - start)
+        blk = min(blk, block_hi * 2.0)  # 允许单段超过 block_hi 以命中覆盖率
+        end = min(start + blk, duration_s)
+        if end <= start:
+            continue
+        segs.append((start, end))
+        placed += blk
+    segs.sort(key=lambda p: p[0])
+    return segs
+
+
 def _make_continuous_occlusion_segments(
     rng: random.Random,
     duration_s: float,
@@ -846,6 +886,9 @@ def materialize_paper_raw(
     speed_range = spec["speed_range_mps"]
     block_range = tuple(spec["nlos_segment_block_s"])
     count_range = tuple(spec["nlos_segment_count_range"])
+    # N 轴覆盖率目标表（per-level），用于按协议 nlos_ratio 生成遮挡段。
+    # 缺省回退到旧 count_range（兼容老 spec）。
+    _nlos_ratio_table = spec.get("nlos_ratio") or {}
     uwb_drop_range = (spec["uwb_drop_prob_range"][0], spec["uwb_drop_prob_range"][1])
     uwb_burst_range = tuple(spec["uwb_drop_burst_range"])
     uwb_gap_range = (spec["uwb_drop_gap_s_range"][0], spec["uwb_drop_gap_s_range"][1])
@@ -941,9 +984,18 @@ def materialize_paper_raw(
 
             # 3. 构造 NLOS / 丢包段
             nlos_rng = random.Random(seed_id * 100000 + idx * 53 + 13)
-            nlos_segments = _make_continuous_occlusion_segments(
-                nlos_rng, duration_s, block_range, count_range, warmup_s
-            )
+            # 按协议 N 轴覆盖率目标生成不重叠遮挡段；缺表时回退旧 count×block 形状。
+            _ratio_rng = random.Random(seed_id * 100000 + idx * 53 + 13)
+            _ratio_range = _nlos_ratio_table.get(n_level)
+            if _ratio_range:
+                target_ratio = _ratio_rng.uniform(float(_ratio_range[0]), float(_ratio_range[1]))
+                nlos_segments = _make_nlos_segments_for_ratio(
+                    nlos_rng, duration_s, warmup_s, target_ratio, block_range
+                )
+            else:
+                nlos_segments = _make_continuous_occlusion_segments(
+                    nlos_rng, duration_s, block_range, count_range, warmup_s
+                )
             uwb_drop_rng = random.Random(seed_id * 100000 + idx * 71 + 17)
             uwb_drop_segments = _make_burst_dropout_segments(
                 uwb_drop_rng, duration_s, uwb_drop_range, uwb_burst_range, uwb_gap_range, 1.0, warmup_s
@@ -1084,7 +1136,15 @@ def materialize_paper_raw(
             _apply_outage_segments(uwb_rows, uwb_drop_segments, zero_payload=False)
             _apply_outage_segments(vio_rows, vio_drop_segments, zero_payload=True)
 
-            # 14. 写 imu/uwb/vio
+            # 14. 异步抖动按 per-packet 注入后，同一 poll 时刻的多锚点行会因独立
+            # 高斯抖动发生亚采样间隔的乱序（dataset_checks 的单调闸门会因此 fail）。
+            # 物理传感器日志本身按时间有序记录，这里对三路各自做稳定排序恢复时序，
+            # 不改变抖动量级，只固定记录顺序。
+            imu_rows.sort(key=lambda r: r["timestamp"])
+            uwb_rows.sort(key=lambda r: r["timestamp"])
+            vio_rows.sort(key=lambda r: r["timestamp"])
+
+            # 15. 写 imu/uwb/vio
             write_json(seq_root / "imu.json", imu_rows)
             write_json(seq_root / "uwb.json", uwb_rows)
             write_json(seq_root / "vio.json", vio_rows)

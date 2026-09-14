@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-HANDBOOK = ROOT / "docs" / "异步高NLOS实验全流程保障手册.md"
+HANDBOOK = ROOT / "docs" / "异步高NLOS实验全流程保障手册-v50final权威.md"
 
 # ---------- 1) 从手册提取真实条款标识 ----------
 CLAUSE_RE = re.compile(

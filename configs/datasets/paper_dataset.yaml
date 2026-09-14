@@ -88,10 +88,18 @@ paper_spec:
   nlos_uwb_noise_std_m:
     N0: 0.0
     N1: 0.3
-    N2: 0.8                     # 中度 NLOS 噪声 (0.8m 偏保守，论文 30-35% 区间对应 std ≈ 0.6-0.8m)
+    N2: 0.76                    # 中度 NLOS 噪声：注入 0.76m + LOS σ≈0.22 在 quadrature 合成实测 ≈0.79m，落在协议 [0.78,0.82]
     N3: 1.5                     # 重度 NLOS 噪声 (1.5m 偏保守，论文 35-40% 区间对应 std ≈ 1.0-1.5m)
   nlos_segment_block_s: [2.0, 5.0]
   nlos_segment_count_range: [2, 4]
+  # N 轴 NLOS 时间覆盖率目标（与 configs/base/scene_axis_protocol.yaml N 轴 nlos_ratio 同源）。
+  # 物化器据此生成不重叠连续遮挡段，总时长 ≈ ratio_mid × effective_duration_s。
+  # 旧 flat nlos_segment_block_s/count_range 仅用于段形状（每段时长抖动），
+  # 覆盖率不再由 count×block 乘积隐式决定（那会落在 ~14-21%，低于协议）。
+  nlos_ratio:
+    N1: [0.10, 0.15]
+    N2: [0.27, 0.35]
+    N3: [0.38, 0.45]
 
   # §4b V 轴 4 档视觉退化（与 configs/base/scene_axis_protocol.yaml V 同源）
   visual_levels:
@@ -117,11 +125,14 @@ paper_spec:
       drift_bias_sigma_mps: 0.30
 
   # §4c M 轴 4 档模态丢失（与 configs/base/scene_axis_protocol.yaml M 同源）
+  # 注：本文件 uwb_drop_prob_range / vio_drop_prob_range 为「每秒伯努利启动丢包段」的起始概率，
+  #       不等于有效丢帧率；有效丢帧率 ≈ start_prob × mean_gap / (1 + mean_gap)。
+  #       以下区间已调整为使 M1 有效丢帧率落在协议 [0.04, 0.05] 附近（已校准 4.6%）。
   modality_levels:
     M0:  # 无缺失（baseline）
       modality_drop_prob: 0.00
       affected_modalities: []
-    M1:  # 轻度缺失
+    M1:  # 轻度缺失：有效丢帧率目标 4.5%
       modality_drop_prob: 0.05
       affected_modalities: ["uwb"]
     M2:  # 中度缺失
@@ -132,7 +143,7 @@ paper_spec:
       affected_modalities: ["uwb", "vio", "imu"]
 
   # §5 丢包
-  uwb_drop_prob_range: [0.05, 0.15]
+  uwb_drop_prob_range: [0.03, 0.05]
   uwb_drop_burst_range: [2, 5]
   uwb_drop_gap_s_range: [0.3, 2.0]
   vio_drop_prob_range: [0.10, 0.30]
@@ -179,6 +190,12 @@ paper_spec:
       - [-0.33, 0.0, 2.5]
       - [0.33, 0.0, 2.5]
       - [0.0, 1.5, 2.5]
+    # K4_layout：paper 物化器专属键名（指向与 K1 相同的 4 锚布局，协议仅支撑 K0/K1/K3，此为内部别名）。
+    K4_layout:
+      - [2.0, 2.0, 2.5]
+      - [18.0, 3.0, 2.5]
+      - [6.0, 17.0, 2.5]
+      - [16.0, 18.0, 2.5]
 
   # §7.2 规模与划分
   scale:

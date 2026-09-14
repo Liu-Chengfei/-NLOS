@@ -240,11 +240,44 @@ def _read_sim_meta_stats(raw_root: Path) -> dict[str, Any]:
             v = m.get("V", "")
             key = f"{a}{n}" if a in ("A2", "A3") and n in ("N2", "N3") else "other"
             out["combo_keys"].append(key)
+            # v2 paper 物化（paper_materializer）字段命名与 v1 sim 不同：
+            #   async_uwb_offset_ms ↔ async_offset_ms_mid
+            #   async_uwb_jitter_ms ↔ async_jitter_ms
+            #   async_uwb_rtt_ms    ↔ async_skew_ms_mid（跨模态 skew 用 UWB RTT 实测）
+            #   nlos_uwb_bias_m     ↔ nlos_mu_m_mid
+            #   nlos_uwb_noise_std_m ↔ nlos_sigma_m_mid
+            #   （nlos_ratio_mid / vio_* 仅 v1 有，v2 由 _measure_nlos_empirical 经验覆盖）
+            _v2_async_offset = m.get("async_uwb_offset_ms")
+            _v2_async_jitter = m.get("async_uwb_jitter_ms")
+            _v2_async_skew = m.get("async_uwb_rtt_ms")
+            _v2_nlos_mu = m.get("nlos_uwb_bias_m")
+            _v2_nlos_sigma = m.get("nlos_uwb_noise_std_m")
             for k in ("nlos_ratio_mid", "nlos_mu_m_mid", "nlos_sigma_m_mid",
                       "async_offset_ms_mid", "async_jitter_ms", "async_skew_ms_mid",
                       "vio_tracked_mid", "vio_inc_noise_mps_mid", "vio_blackout_frac"):
                 out[k].append(fl(k))
-            out["imu_rows_counts"].append(int(m.get("imu_row_count", 0)))
+            # 用 v2 等价字段回填（v1 字段缺失时），保持下游按 *_mid/*_jitter 读取不变
+            if _v2_async_offset is not None and out["async_offset_ms_mid"]:
+                out["async_offset_ms_mid"][-1] = fl("async_uwb_offset_ms")
+            if _v2_async_jitter is not None and out["async_jitter_ms"]:
+                out["async_jitter_ms"][-1] = fl("async_uwb_jitter_ms")
+            if _v2_async_skew is not None and out["async_skew_ms_mid"]:
+                out["async_skew_ms_mid"][-1] = fl("async_uwb_rtt_ms")
+            if _v2_nlos_mu is not None and out["nlos_mu_m_mid"]:
+                out["nlos_mu_m_mid"][-1] = fl("nlos_uwb_bias_m")
+            if _v2_nlos_sigma is not None and out["nlos_sigma_m_mid"]:
+                out["nlos_sigma_m_mid"][-1] = fl("nlos_uwb_noise_std_m")
+            # IMU 行数：v2 不写 imu_row_count，直接数 imu.json。
+            imu_rows = int(m.get("imu_row_count", 0) or 0)
+            if imu_rows == 0:
+                imu_path = seq / "imu.json"
+                if imu_path.is_file():
+                    try:
+                        _imu = json.loads(imu_path.read_text(encoding="utf-8"))
+                        imu_rows = len(_imu) if isinstance(_imu, list) else 0
+                    except Exception:
+                        imu_rows = 0
+            out["imu_rows_counts"].append(imu_rows)
             out["seq_durations_s"].append(float(m.get("duration_s", 0.0)))
     return out
 
@@ -1317,16 +1350,29 @@ def _measure_nlos_empirical(raw_root: Path, sample_seqs: int | None = None) -> d
         n_frames = 0
         n_nl = 0
         n_seq = 0
+        n_total_frames = 0  # 所有有效 UWB 帧（含 LOS），用于 ρ = n_nl / n_total_frames
         for seed_dir in sorted(raw_root.iterdir()):
             if not seed_dir.is_dir() or not seed_dir.name.startswith("seed"):
                 continue
             for seq_dir in seed_dir.iterdir():
                 if not seq_dir.is_dir():
                     continue
-                # 匹配 A/N 档次的序列
+                # 匹配 A/N 档次的序列：v1 用目录名 s0_a2n3_00，v2 paper 用 sim_meta.axes_override
                 name = seq_dir.name
-                if f"{a.lower()}{n.lower()}" not in name.lower():
-                    continue
+                matched_by_name = f"{a.lower()}{n.lower()}" in name.lower()
+                if not matched_by_name:
+                    _meta_p = seq_dir / "sim_meta.json"
+                    if not _meta_p.is_file():
+                        _meta_p = seq_dir / "meta.json"
+                    if _meta_p.is_file():
+                        try:
+                            _ax = json.loads(_meta_p.read_text(encoding="utf-8")).get("axes_override", {}) or {}
+                        except Exception:
+                            _ax = {}
+                        if str(_ax.get("A", "")).upper() != a or str(_ax.get("N", "")).upper() != n:
+                            continue
+                    else:
+                        continue
                 if sample_seqs is not None and n_seq >= sample_seqs:
                     break
                 uwb_path = seq_dir / "uwb.json"
@@ -1342,12 +1388,45 @@ def _measure_nlos_empirical(raw_root: Path, sample_seqs: int | None = None) -> d
                         continue
                     gts = json.loads(gt_path.read_text(encoding="utf-8"))
                     al = json.loads(al_path.read_text(encoding="utf-8"))
-                    anchors = al.get("anchor_positions", [])[: len(uwb)]
+                    # 锚点 id→位置映射：v1 用整数索引，v2 paper 用 anchor_ids 字符串（A1/A2/...）
+                    _anchor_ids = al.get("anchor_ids") or []
+                    _anchor_pos = al.get("anchor_positions", [])
+                    anchors = _anchor_pos
                     if not anchors or not gts:
                         continue
+                    # v2 paper 无 nl_flag：NLOS 帧用 sim_meta.nlos_segments 时间窗判定
+                    _nl_segs: list[tuple[float, float]] = []
+                    _seq_meta_path = seq_dir / "sim_meta.json"
+                    if not _seq_meta_path.is_file():
+                        _seq_meta_path = seq_dir / "meta.json"
+                    if _seq_meta_path.is_file():
+                        try:
+                            _nl_segs = [tuple(s) for s in json.loads(
+                                _seq_meta_path.read_text(encoding="utf-8")).get("nlos_segments", [])]
+                        except Exception:
+                            _nl_segs = []
                 except Exception:
                     continue
                 n_seq += 1
+
+                def _aid_index(a):
+                    # v1: 整数或 "1".."4"；v2: "A1".."A4" 字符串
+                    if isinstance(a, str):
+                        for k, an in enumerate(_anchor_ids):
+                            if an == a:
+                                return k
+                        try:
+                            return int(a) - 1
+                        except Exception:
+                            return -1
+                    try:
+                        return int(a)
+                    except Exception:
+                        return -1
+
+                def _in_nlos(t_u: float) -> bool:
+                    return any(s <= t_u <= e for s, e in _nl_segs)
+
                 # 时间戳对齐: uwb ~10Hz, gt ~150Hz，gt 为规则 150Hz 网格 → O(1) 直接索引
                 # best_j = round(t_u / dt_gt)，dt_gt = (gt_end-gt_start)/(len-1)。
                 gt_px = [float(g.get("px", g.get("x", 0))) for g in gts]
@@ -1363,18 +1442,17 @@ def _measure_nlos_empirical(raw_root: Path, sample_seqs: int | None = None) -> d
                     best_j = int(round((t_u - t0) / dt_gt)) if dt_gt > 0 else 0
                     if not (0 <= best_j < ng):
                         continue
+                    # v1 用 nl_flag=1；v2 paper 无 flag 用 nlos_segments 时间窗
+                    has_flag = "nl_flag" in r
+                    if has_flag:
+                        if str(r.get("nl_flag", 0)) != "1":
+                            continue
+                    elif not _in_nlos(t_u):
                         continue
                     n_frames += 1
-                    nl_flag = str(r.get("nl_flag", 0))
-                    if nl_flag != "1":
-                        continue
                     n_nl += 1
                     # 该帧最近锚点 (uwb.anchor_id)
-                    aid = r.get("anchor_id", 0)
-                    try:
-                        aid_idx = int(aid) if not isinstance(aid, str) else int(aid) - 1
-                    except Exception:
-                        aid_idx = i % len(anchors)
+                    aid_idx = _aid_index(r.get("anchor_id", i))
                     if 0 <= aid_idx < len(anchors):
                         ax_, ay_ = float(anchors[aid_idx][0]), float(anchors[aid_idx][1])
                         gx = gt_px[best_j]
@@ -1382,19 +1460,22 @@ def _measure_nlos_empirical(raw_root: Path, sample_seqs: int | None = None) -> d
                         geom = ((gx - ax_) ** 2 + (gy - ay_) ** 2) ** 0.5
                         obs = float(r.get("range", r.get("distance", 0)))
                         if geom > 1e-3 and obs > 0:
-                            bias = abs(obs - geom)
+                            bias = obs - geom
                             found_biases.append(bias)
+                # 统计总 UWB 帧（所有模态帧数，用于算 ρ 比例 = NLOS / total 有效帧）
+                total_uwb_frames = sum(1 for r in uwb if r.get("valid", 1) in (1, True))
+                n_total_frames += total_uwb_frames
                 if sample_seqs is not None and n_seq >= sample_seqs:
                     break
             if sample_seqs is not None and n_seq >= sample_seqs:
                 break
-        if n_nl > 0 and found_biases:
+        if n_total_frames > 0 and found_biases:
             biases = _np.array(found_biases)
             out[combo] = {
-                "rho": n_nl / n_frames if n_frames else 0.0,
+                "rho": n_nl / n_total_frames,
                 "mu": float(biases.mean()),
                 "sigma": float(biases.std()),
-                "n_frames": n_frames,
+                "n_frames": n_total_frames,
                 "n_nl": n_nl,
                 "n_seqs": n_seq,
             }
@@ -1520,13 +1601,31 @@ def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = No
             except Exception:
                 rows = []
             if rows:
+                # UWB 行是 (timestamp, anchor) 笛卡尔展开：v2 每 poll 时刻 4 锚点各 1 行，
+                # 时间戳带独立 jitter，故不能按精确 ts 分组（会把一个 poll 拆成 4 帧）。
+                # 按 10Hz poll 周期（0.1s）分桶：同桶内任一锚点失效即记为「该 poll 丢包」。
+                import statistics as _statistics
+                POLL_DT_S = 0.1  # UWB 测距 poll 率 10Hz（手册协议）
+                bucket_invalid: dict[int, int] = {}
+                bucket_total: dict[int, int] = {}
+                for r in rows:
+                    try:
+                        ts = float(r.get("timestamp", 0.0))
+                    except (TypeError, ValueError):
+                        continue
+                    b = int(round(ts / POLL_DT_S))
+                    bucket_total[b] = bucket_total.get(b, 0) + 1
+                    if r.get("valid", 1) not in (1, True):
+                        bucket_invalid[b] = bucket_invalid.get(b, 0) + 1
+                sorted_b = sorted(bucket_total.keys())
                 gap_lengths = []
                 cur_gap = 0
-                total = len(rows)
+                total = len(sorted_b)
                 missing = 0
-                for r in rows:
-                    v = r.get("valid", 1)
-                    if v == 0:
+                for b in sorted_b:
+                    # 整 poll 视为丢包：该桶所有锚点行都失效（> 半数失效即算簇丢，更贴近 M1 语义）
+                    is_missing = bucket_invalid.get(b, 0) * 2 >= bucket_total[b]
+                    if is_missing:
                         cur_gap += 1
                         missing += 1
                     else:
@@ -1537,8 +1636,8 @@ def _build_p_checks_cfg(raw_root: str | Path, cfg: Mapping[str, Any] | None = No
                     gap_lengths.append(cur_gap)
                 if gap_lengths:
                     enriched["m1_burst_stats"] = {
-                        "mean_gap_s": sum(gap_lengths) / len(gap_lengths) * 0.1,  # 10Hz → s
-                        "max_gap_s": max(gap_lengths) * 0.1,
+                        "mean_gap_s": sum(gap_lengths) / len(gap_lengths) * POLL_DT_S,
+                        "max_gap_s": max(gap_lengths) * POLL_DT_S,
                         "missing_rate": missing / total if total > 0 else 0.0,
                     }
 

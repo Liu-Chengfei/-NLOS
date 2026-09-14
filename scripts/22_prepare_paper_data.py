@@ -15,9 +15,15 @@ import sys
 import time
 from pathlib import Path
 
+# 让脚本可以直接 python scripts/22_prepare_paper_data.py 运行
+# 注意：本项目是 src/ 布局（liquidloc 在 PROJECT_ROOT/src 下）。仅把 PROJECT_ROOT
+# 加进 sys.path 无法让 import liquidloc 命中本仓代码；而用户 site-packages 里存在
+# 一条 __editable__ .pth 指向 E:\消融实验\src，会把 import liquidloc 抢解析到另一个
+# 项目。这里把 src/ 显式置顶，保证本仓代码优先。
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 from liquidloc.common.config_utils import find_project_root, load_yaml_config
 from liquidloc.dataio.manifests.dataset_checks import inspect_sim_materialized_contract

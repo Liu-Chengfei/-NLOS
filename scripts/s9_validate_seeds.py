@@ -47,7 +47,6 @@ TARGET_COMPOSITION = {"A2N2": 0.25, "A2N3": 0.25, "A3N2": 0.25, "A3N3": 0.25}
 COMPOSITION_TOL = 0.05
 NLOS_TOL = 0.10
 NLOS_SNR_FACTOR = 3.0
-LOS_NOISE_SIGMA_M = 0.6
 # 手册 S2: 4 锚 A1(2,2)/A2(18,3)/A3(6,17)/A4(16,18) 的 GDOP 实测值。
 # 手册原文："按此坐标对'凸包内缩 1.5m 轨迹带'实测 GDOP ≈1.19（1.12–1.32）"。
 # s9 compute_gdop 2D 公式对 4 锚凸包中心 (10,10) 给出 ~1.029（1.12-1.32 范围下界，
@@ -58,8 +57,45 @@ BOUNDARY_BUFFER_M = 1.5
 MIN_TEST_TRAJS_PER_SEED = 60
 TARGET_EFFECT_RELATIVE = 0.40
 
-N2_INTERVAL = {"rho": (0.20, 0.35), "mu_m": (2.0, 3.0), "sigma_m": (0.5, 1.0)}
-N3_INTERVAL = {"rho": (0.30, 0.45), "mu_m": (4.0, 6.0), "sigma_m": (1.0, 2.0)}
+# ---------------------------------------------------------------------------
+# N2/N3 注入统计协议区间（手册 Part 0 §4.3 + configs/base/scene_axis_protocol.yaml）。
+# 权威来源是场景轴协议 YAML；此处优先经 liquidloc.protocol 加载，加载失败才回退到
+# 与协议 YAML 写死一致的常量（值必须与 scene_axis_protocol.yaml 保持同步，双改）。
+# 手册 §S9 硬约束："N 注入统计（ρ/μ/σ 落在 N2/N3 协议区间，误差 ≤10%）"。
+# ---------------------------------------------------------------------------
+_NLOS_PROTOCOL_FALLBACK = {
+    "N2": {"nlos_ratio": [0.25, 0.35], "bias_strength_m": [2.0, 3.0], "nlos_noise_std_m": [0.78, 0.82]},
+    "N3": {"nlos_ratio": [0.35, 0.45], "bias_strength_m": [4.0, 6.0], "nlos_noise_std_m": [1.48, 1.52]},
+}
+
+
+def _load_nlos_protocol() -> dict[str, dict[str, list[float]]]:
+    """从 scene_axis_protocol.yaml 加载 N2/N3 协议区间；失败回退到写死等价常量。"""
+    try:
+        from liquidloc.protocol.scene_axis_protocol import load_scene_axis_protocol  # noqa: F401
+        p = load_scene_axis_protocol()
+        n = p.get("axes", {}).get("N", {})
+        return {
+            "N2": {
+                "nlos_ratio": list(n.get("N2", {}).get("nlos_ratio", _NLOS_PROTOCOL_FALLBACK["N2"]["nlos_ratio"])),
+                "bias_strength_m": list(n.get("N2", {}).get("bias_strength_m", _NLOS_PROTOCOL_FALLBACK["N2"]["bias_strength_m"])),
+                "nlos_noise_std_m": list(n.get("N2", {}).get("nlos_noise_std_m", _NLOS_PROTOCOL_FALLBACK["N2"]["nlos_noise_std_m"])),
+            },
+            "N3": {
+                "nlos_ratio": list(n.get("N3", {}).get("nlos_ratio", _NLOS_PROTOCOL_FALLBACK["N3"]["nlos_ratio"])),
+                "bias_strength_m": list(n.get("N3", {}).get("bias_strength_m", _NLOS_PROTOCOL_FALLBACK["N3"]["bias_strength_m"])),
+                "nlos_noise_std_m": list(n.get("N3", {}).get("nlos_noise_std_m", _NLOS_PROTOCOL_FALLBACK["N3"]["nlos_noise_std_m"])),
+            },
+        }
+    except Exception:
+        return _NLOS_PROTOCOL_FALLBACK
+
+
+_NLOS_PROTOCOL = _load_nlos_protocol()
+N2_PROTOCOL = _NLOS_PROTOCOL["N2"]
+N3_PROTOCOL = _NLOS_PROTOCOL["N3"]
+N2_INTERVAL = {"rho": tuple(N2_PROTOCOL["nlos_ratio"]), "mu_m": tuple(N2_PROTOCOL["bias_strength_m"]), "sigma_m": tuple(N2_PROTOCOL["nlos_noise_std_m"])}
+N3_INTERVAL = {"rho": tuple(N3_PROTOCOL["nlos_ratio"]), "mu_m": tuple(N3_PROTOCOL["bias_strength_m"]), "sigma_m": tuple(N3_PROTOCOL["nlos_noise_std_m"])}
 
 ANCHOR_POSITIONS_DEFAULT = [
     (2.0, 2.0),

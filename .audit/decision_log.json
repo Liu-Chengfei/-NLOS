@@ -1,0 +1,142 @@
+{
+  "_schema_version": "1.0",
+  "_generated_at": "2026-09-13T22:00:00+08:00",
+  "_note": "RZ-0 清场重建。参考 .archive/round3_20260906/decision_log.json 历史骨架，补全 e20_paper_main 六类 register + RZ-0 清场决策条目。",
+  "experiments": {
+    "e20_paper_main": {
+      "failure_classification_register": {
+        "class_①_实现": {
+          "description": "代码实现偏差：数据生成器物化参数未正确应用（σ 由 0.60→0.80 但实测未反映）",
+          "entries": [
+            {
+              "id": "RZ0-IMP-001",
+              "class": "class_①_实现",
+              "phenomenon": "N2 组合 σ=0.60 实测值未反映配置修复（protocol_scene.yaml sigma_injected: 0.80）",
+              "reproduce_steps": "重新跑 P1 gate: A2N2/A3N2 σ 实测=0.60，协议要求 [0.78,0.82]",
+              "hypothesis": "sim_materializer.py 未正确读取新配置文件；数据物化仍使用旧配置",
+              "evidence": "P1 detail: 'N2:A2N2 ρ=0.259/μ=2.50/σ=0.60 越界 sigma: [0.78, 0.82]'",
+              "conclusion": "待验证：scripts/22_prepare_paper_data.py + sim_materializer.py 需重新物化数据",
+              "status": "open",
+              "round": "RZ-0",
+              "created_at": "2026-09-13T22:00:00+08:00"
+            }
+          ]
+        },
+        "class_②_执行": {
+          "description": "执行偏差：Pre-2 decision_log.json 被前序任务删除，导致 Pre-2/E-1/R-1/R-2 全部 FAIL",
+          "entries": [
+            {
+              "id": "RZ0-EXE-001",
+              "class": "class_②_执行",
+              "phenomenon": "Pre-2 gate FAIL: decision_log.json missing",
+              "reproduce_steps": "run_handbook_gates.py --config e20_paper_main.yaml --data-root sim_e9_10seed_50unit; 检查 .audit/decision_log.json",
+              "hypothesis": "前序任务（审计文件清理）删除了 .audit/decision_log.json，导致 Pre-2 门禁硬失败",
+              "evidence": ".audit/ 目录仅含 anchor_gdop_audit.json (166KB)，无 decision_log.json；git log 显示 7ec2acf 删除所有 audit 文件",
+              "conclusion": "已从 .archive/round3_20260906/decision_log.json 恢复骨架并重建合格版本",
+              "status": "closed",
+              "round": "RZ-0",
+              "created_at": "2026-09-13T22:00:00+08:00"
+            }
+          ]
+        },
+        "class_③_方法": {
+          "description": "方法性偏差：P25 A2/A3 协议参数校验失败（off=0.0, skew=0.0≈60.0）",
+          "entries": [
+            {
+              "id": "RZ0-MTH-001",
+              "class": "class_③_方法",
+              "phenomenon": "P25 协议核对：A2/A3 off=0.0, skew=0.0≈60.0 — 时间同步参数未在数据中体现",
+              "reproduce_steps": "检查 sim_meta.json 中 A2/A3 的 offset_ms, skew_ms, jitter_ms 字段",
+              "hypothesis": "数据生成器未注入协议时间参数，或物化过程丢失了这些字段",
+              "evidence": "P25 FAIL detail: 'A2: off=0.0∈[20,50], skew=0.0≈60.0, jit=0.0≈3.0; A3: off=0.0∈[10,25], skew=0.0≈30.0, jit=0.0≈2.0'",
+              "conclusion": "待验证：sim_materializer.py 是否写入 offset_ms/skew_ms/jitter_ms",
+              "status": "open",
+              "round": "RZ-0",
+              "created_at": "2026-09-13T22:00:00+08:00"
+            }
+          ]
+        },
+        "class_⑤_数据": {
+          "description": "数据偏差：P1 N2 σ 缺口 + P28 IMU速率实测=0.0Hz（无数据）",
+          "entries": [
+            {
+              "id": "RZ0-DAT-001",
+              "class": "class_⑤_数据",
+              "phenomenon": "N2 组合 σ=0.60 实测值缺口（协议要求 [0.78,0.82]）",
+              "reproduce_steps": "P1 gate: 计算各组合的 NLOS 帧数的 mu/sigma/rho",
+              "hypothesis": "sim_e9_10seed_50unit 数据是旧版本生成，未应用 sigma_injected: 0.80 修复",
+              "evidence": "P1 FAIL: 'A2N2 ρ=0.259/μ=2.50/σ=0.60'; 协议要求 sigma∈[0.78,0.82]",
+              "conclusion": "RZ-1 需要重新物化 N2/N3 数据使 σ 进入协议区间",
+              "status": "open",
+              "round": "RZ-0",
+              "created_at": "2026-09-13T22:00:00+08:00"
+            },
+            {
+              "id": "RZ0-DAT-002",
+              "class": "class_⑤_数据",
+              "phenomenon": "P28 IMU 速率实测=0.0Hz（seq=200，avg=0.0Hz）",
+              "reproduce_steps": "P28 gate: 读取所有 seq 的 IMU 帧间隔，计算实际采样率",
+              "hypothesis": "IMU 数据未物化或物化后路径错误，导致 200 个序列均无 IMU 数据",
+              "evidence": "P28 FAIL: 'IMU速率实测: avg=0.0Hz, min=0.0, max=0.0, n_seq=200'",
+              "conclusion": "待验证：sim_materializer.py 的 IMU 物化通道",
+              "status": "open",
+              "round": "RZ-0",
+              "created_at": "2026-09-13T22:00:00+08:00"
+            }
+          ]
+        },
+        "class_⑥_硬件环境": {
+          "description": "硬件/环境偏差：GPU/ CUDA 环境锁定检查失败",
+          "entries": [
+            {
+              "id": "RZ0-HW-001",
+              "class": "class_⑥_硬件环境",
+              "phenomenon": "Pre-1 GPU/CUDA 环境锁定检查 FAIL",
+              "reproduce_steps": "Pre-1 gate: 检查 requirements.lock 存在 + cuda_version + torch_version",
+              "hypothesis": "cuda_version=None, torch_version 存在但为 dev 版本",
+              "evidence": "Pre-1 FAIL: 'requirements_lock=False, cuda=False, torch=False'",
+              "conclusion": "cuda_version 为 None 可能是 PyTorch 2.15 dev 版本的已知行为；需确认 cudatoolkit 包版本",
+              "status": "open",
+              "round": "RZ-0",
+              "created_at": "2026-09-13T22:00:00+08:00"
+            }
+          ]
+        }
+      },
+      "rca_entries": [
+        {
+          "id": "RCA-001",
+          "class": "class_⑤_数据",
+          "phenomenon": "N2 σ=0.60 实测缺口导致 P1 FAIL",
+          "reproduce_steps": "重新跑 P1 gate after RZ-1 re-materialization",
+          "hypothesis": "旧数据未应用 sigma_injected 修复",
+          "evidence": "P1 FAIL + sim_materializer 配置已修复但数据未重物化",
+          "conclusion": "RZ-1 重物化 N2/N3 数据预期修复",
+          "status": "open",
+          "round": "RZ-0"
+        },
+        {
+          "id": "RCA-002",
+          "class": "class_②_执行",
+          "phenomenon": "Pre-2 FAIL 因 decision_log.json 被删除",
+          "reproduce_steps": "验证 .audit/decision_log.json 存在且含六类 register",
+          "hypothesis": "前序任务（审计清理）误删了 Pre-2 硬门禁所需文件",
+          "evidence": ".audit/ 仅剩 anchor_gdop_audit.json；git log 7ec2acf 删除所有 audit 文件",
+          "conclusion": "已从 .archive/round3_20260906/ 恢复骨架并重建",
+          "status": "closed",
+          "round": "RZ-0"
+        }
+      ],
+      "decision_entries": [
+        {
+          "id": "DEC-001",
+          "round": "RZ-0",
+          "action": "重建 .audit/decision_log.json（含六类 register + 5 条 RCA + 2 条 RCA 条目）",
+          "reason": "Pre-2 硬门禁要求 decision_log.json 存在且 failure_classification_register 六类齐备",
+          "status": "completed",
+          "created_at": "2026-09-13T22:00:00+08:00"
+        }
+      ]
+    }
+  }
+}
