@@ -1,0 +1,59 @@
+{
+  "status": "ok",
+  "project_root": "E:\\异步高NLOS",
+  "python": {
+    "required_python": ">=3.11,<3.13",
+    "current_python": "3.11.9",
+    "supported": true
+  },
+  "dependencies": {
+    "required_distributions": [
+      "numpy",
+      "scipy",
+      "pandas",
+      "pyyaml",
+      "pydantic",
+      "matplotlib",
+      "networkx",
+      "torch",
+      "pytest"
+    ],
+    "missing_distributions": [],
+    "installed_versions": {
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "pandas": "3.0.5",
+      "pyyaml": "6.0.3",
+      "pydantic": "2.13.5",
+      "matplotlib": "3.11.1",
+      "networkx": "3.6.1",
+      "torch": "2.15.0.dev20260904+cu130",
+      "pytest": "9.1.1"
+    }
+  },
+  "paths": {
+    "required_paths": {
+      "pyproject": "E:\\异步高NLOS\\pyproject.toml",
+      "requirements": "E:\\异步高NLOS\\requirements.txt",
+      "configs": "E:\\异步高NLOS\\configs",
+      "src": "E:\\异步高NLOS\\src",
+      "tests": "E:\\异步高NLOS\\tests"
+    },
+    "missing_paths": []
+  },
+  "outputs": {
+    "output_root": "E:\\异步高NLOS\\outputs",
+    "writable": true
+  },
+  "report_output": {
+    "report_path": "E:\\异步高NLOS\\.audit\\env_report_reprobe.json",
+    "parent": {
+      "output_root": "E:\\异步高NLOS\\.audit",
+      "writable": true
+    },
+    "write_result": {
+      "written": true
+    }
+  },
+  "report_path": "E:\\异步高NLOS\\.audit\\env_report_reprobe.json"
+}
