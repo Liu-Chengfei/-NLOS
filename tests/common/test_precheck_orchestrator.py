@@ -970,9 +970,9 @@ class TestRunAllPrechecks:
     def test_full_clean_run(self):
         cfg = self._build_clean_cfg()
         report = run_all_prechecks(cfg)
-        # P1-39 + P26a = 40 个 P 级；Pre 6 + I 5 + DQ 4 + G 5 + E 6 = 26 个其它；总计 66
-        assert report.total == 66
-        assert report.n_passed == 66
+        # P1-39 + P26a = 40 个 P 级；Pre 6 + Pre 7(并行等效抽查) + I 5 + DQ 4 + G 5 + E 6 = 27 个其它；总计 67
+        assert report.total == 67
+        assert report.n_passed == 67
         assert report.n_failed == 0
         assert report.overall_pass is True
 

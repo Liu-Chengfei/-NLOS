@@ -546,6 +546,29 @@ def check_Pre6_seed_manifest_consistency(cfg: Mapping[str, Any]) -> CheckResult:
                  detail=f"manifest_seeds={n_manifest_seeds}(min={N_SEED_MIN}), sources={n_random_sources}, det={deterministic}")
 
 
+def check_Pre7_parallel_equivalence_record(cfg: Mapping[str, Any]) -> CheckResult:
+    """Pre-7（手册条款 [14]）：首次放开并行前，decision log 须已有并行-串行等效性抽查记录。
+
+    落盘口径：decision log 的 experiments.e20_paper_main.decision_entries 中存在
+    action 含「等效性抽查」的条目（由 parallel_equivalence_check.record_equivalence_decision 写入）。
+    本检查只读磁盘、不跑实验（第 1 阶段禁跑实验）；抽查动作本身在第 2 阶段首次并行前执行，
+    执行后由 record_equivalence_decision 落盘，本 gate 复核留痕是否补齐。
+    """
+    round_tag = str(cfg.get("parallel_equivalence_round", "RZ-0"))
+    # 未启用并行时（并行度=1），无等效性抽查需求 → soft 通过。
+    if not bool(cfg.get("parallel_enabled", False)):
+        return _make("Pre-7", "并行等效抽查留痕", True, severity="soft",
+                     detail="parallel_enabled=False（当前串行）→ 等效性抽查不适用")
+    from liquidloc.common.parallel_equivalence_check import check_equivalence_record_exists
+    status = check_equivalence_record_exists(round_tag=round_tag)
+    return _make(
+        "Pre-7", "并行等效抽查留痕", bool(status.get("exists")),
+        detail=(f"round={round_tag}, 记录数={status.get('count')}, "
+                f"ids={status.get('entries')}; 缺则禁止放开并行（[14]）"),
+        **{k: v for k, v in status.items() if k != "entries"},
+    )
+
+
 def check_I1_data_generator(cfg: Mapping[str, Any]) -> CheckResult:
     """I-1: 数据生成器 S8 7 步注入顺序。"""
     steps_done = list(cfg.get("data_generator_steps_done") or [])
@@ -1952,6 +1975,7 @@ def run_all_prechecks(cfg: Mapping[str, Any], raw_root: str | Path | None = None
         check_Pre4_checksums(_cfg),
         check_Pre5_resource_budget(_cfg),
         check_Pre6_seed_manifest_consistency(_cfg),
+        check_Pre7_parallel_equivalence_record(_cfg),  # [14] 等效抽查留痕
         # I
         check_I1_data_generator(_cfg),
         check_I2_s9_script(_cfg),
@@ -2013,6 +2037,7 @@ __all__ = [
     "check_P36_metric_declaration", "check_P37_warmup_removed", "check_P38_world_frame", "check_P39_persistence",
     "check_Pre1_environment_locked", "check_Pre2_decision_log", "check_Pre3_directory_structure",
     "check_Pre4_checksums", "check_Pre5_resource_budget", "check_Pre6_seed_manifest_consistency",
+    "check_Pre7_parallel_equivalence_record",  # [14] 等效抽查
     "check_I1_data_generator", "check_I2_s9_script", "check_I3_5_methods", "check_I4_stats_script", "check_I5_eval_pipeline",
     "check_DQ1_difficulty_gradient", "check_DQ2_snr", "check_DQ3_distribution", "check_DQ4_sample_size",
     "check_G1_unit_completeness", "check_G2_metrics_readable", "check_G3_config_data_cross",
