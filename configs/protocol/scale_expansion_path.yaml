@@ -1,0 +1,16 @@
+# 条款 [63] 扩样路径声明配置
+# 手册原文：10 seed 不足支撑功效时如实声明并给出扩样路径（只增不减：加 seed/轨迹至功效达标，规模恒 ≥ 论文级 10 seed × ≥100/seed，S3 硬约束——不存在"收窄/降档"方向的出口）
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第338行
+
+clause_id: "63"
+clause_name: "扩样路径声明"
+
+ten_seed_insufficient_honest_declaration: true
+expansion_path_only_increase: true
+scale_floor_ge_10seed_100perseed: true
+s3_hard_constraint: true
+no_narrowing_exit: true
+
+description: "10 seed不足支撑功效时如实声明并给出扩样路径（只增不减：加seed/轨迹至功效达标，规模恒≥论文级10 seed × ≥100/seed，S3硬约束——不存在'收窄/降档'方向的出口）"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第338行"

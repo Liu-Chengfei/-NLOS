@@ -1,0 +1,36 @@
+# 条款 [64] 分析单位与样本独立性声明配置
+# 手册原文：滑窗 W=128 步（步长默认 1 帧）使相邻窗口重叠 127/128，帧级误差样本高度自相关、不满足 i.i.d. ——所有统计检验（配对 Wilcoxon、2×2 ANOVA、TOST、贝叶斯因子）必须以轨迹级为分析单位（每 seed 每测试轨迹汇总一个 RMSE 值，10 seed × ≥100 轨迹 = 每方法 ≥1000 个轨迹级样本，四组合每组合 ≥250 个）
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第340行
+# 硬约束：true
+
+clause_id: "64"
+clause_name: "分析单位与样本独立性声明"
+
+# 滑窗配置（声明轨迹级分析单位的前提）
+sliding_window_W128: true
+step_size_default_1frame: true
+overlap_ratio: "127/128"
+
+# 样本独立性声明
+frame_level_not_iid: true
+analysis_unit_trajectory_level: true
+
+# 必须以轨迹级为分析单位的统计检验方法清单
+statistics_methods:
+  - "Wilcoxon"
+  - "2x2_ANOVA"
+  - "TOST"
+  - "Bayesian_factor"
+
+# 每 seed 每测试轨迹汇总一个 RMSE 值
+per_seed_per_trajectory_rmse: true
+
+# 规模要求
+scale_requirement: "10 seed × ≥100 轨迹 = 每方法 ≥1000 个轨迹级样本，四组合每组合 ≥250 个"
+
+# 硬约束声明
+hard_constraint: true
+
+description: "滑窗W=128步（步长默认1帧）使相邻窗口重叠127/128，帧级误差样本高度自相关、不满足i.i.d. ——所有统计检验（配对Wilcoxon、2×2 ANOVA、TOST、贝叶斯因子）必须以轨迹级为分析单位（每seed每测试轨迹汇总一个RMSE值，10 seed × ≥100 轨迹 = 每方法 ≥1000 个轨迹级样本，四组合每组合 ≥250 个）"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第340行"

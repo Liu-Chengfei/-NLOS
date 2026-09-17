@@ -1,0 +1,19 @@
+# 条款 [62] 功效与样本量声明配置
+# 手册原文：功效与样本量声明（论文必报）：论文须报告目标效应量（最小可检测相对提升，按 A-2 的 40% 下限折算）、显著性水平 α=0.05、功效 power≥0.8、以及 10 seed × ≥100 测试轨迹对应的统计把握说明（含预估方差来源：冒烟/先导实验）
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第336行
+
+clause_id: "62"
+clause_name: "功效与样本量声明"
+
+target_effect_size: true
+alpha: 0.05
+power: 0.8
+sample_size_10seed_100traj: true
+statistical_power_justification: true
+variance_source:
+  - "smoke_test"
+  - "pilot_experiment"
+
+description: "论文须报告目标效应量、α=0.05、功效power≥0.8、以及10 seed × ≥100测试轨迹对应的统计把握说明（含预估方差来源：冒烟/先导实验）"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第336行"
