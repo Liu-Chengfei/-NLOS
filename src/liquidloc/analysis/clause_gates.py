@@ -6660,6 +6660,114 @@ def p65_pilot_experiment() -> dict[str, Any]:
         },
     }
 
+
+def p66_no_nan_inf_gradient() -> dict[str, Any]:
+    """条款 [66] 无 NaN/Inf/梯度爆炸 验证。
+
+    手册 [66]：无 NaN/Inf/梯度爆炸：冒烟训练时监控 loss、权重范数。
+
+    验证项：
+    1. configs/protocol/no_nan_inf_gradient.yaml 存在且能正确解析
+    2. clause_name 包含"无 NaN/Inf/梯度爆炸"
+    3. smoke_train_loss_monitor 为 true
+    4. weight_norm_monitor 为 true
+    5. no_nan 为 true
+    6. no_inf 为 true
+    7. no_gradient_explosion 为 true
+    8. monitoring_targets 包含 "loss" 和 "权重范数"
+    9. 手册真源存在
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "no_nan_inf_gradient.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P66-no-nan-inf-gradient", "name": "[66] 无NaN/Inf/梯度爆炸",
+            "severity": "hard", "passed": False,
+            "detail": "no_nan_inf_gradient.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P66-no-nan-inf-gradient", "name": "[66] 无NaN/Inf/梯度爆炸",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True, "parse_error": str(exc)},
+        }
+
+    if not isinstance(cfg, dict):
+        return {
+            "code": "P66-no-nan-inf-gradient", "name": "[66] 无NaN/Inf/梯度爆炸",
+            "severity": "hard", "passed": False,
+            "detail": "cfg is not a dict",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    checks: dict[str, Any] = {}
+    passed = True
+
+    # 1. clause_name 包含"无 NaN/Inf/梯度爆炸"
+    clause_name = str(cfg.get("clause_name", ""))
+    ok_name = "无NaN/Inf/梯度爆炸" in clause_name or "无 NaN/Inf/梯度爆炸" in clause_name
+    checks["clause_name_contains"] = ok_name
+    passed = passed and ok_name
+
+    # 2. smoke_train_loss_monitor 为 true
+    loss_mon = cfg.get("smoke_train_loss_monitor", False)
+    checks["smoke_train_loss_monitor"] = loss_mon is True
+    passed = passed and loss_mon
+
+    # 3. weight_norm_monitor 为 true
+    wn_mon = cfg.get("weight_norm_monitor", False)
+    checks["weight_norm_monitor"] = wn_mon is True
+    passed = passed and wn_mon
+
+    # 4. no_nan 为 true
+    no_nan = cfg.get("no_nan", False)
+    checks["no_nan"] = no_nan is True
+    passed = passed and no_nan
+
+    # 5. no_inf 为 true
+    no_inf = cfg.get("no_inf", False)
+    checks["no_inf"] = no_inf is True
+    passed = passed and no_inf
+
+    # 6. no_gradient_explosion 为 true
+    no_grad = cfg.get("no_gradient_explosion", False)
+    checks["no_gradient_explosion"] = no_grad is True
+    passed = passed and no_grad
+
+    # 7. monitoring_targets 包含 loss 和 权重范数
+    targets = cfg.get("monitoring_targets", [])
+    if not isinstance(targets, list):
+        targets = []
+    has_loss = "loss" in targets
+    has_wn = "权重范数" in targets
+    checks["monitoring_targets_has_loss"] = has_loss
+    checks["monitoring_targets_has_weight_norm"] = has_wn
+    passed = passed and has_loss and has_wn
+
+    # 8. 手册真源存在
+    manual_exists = manual_path.is_file()
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P66-no-nan-inf-gradient", "name": "[66] 无NaN/Inf/梯度爆炸",
+        "severity": "hard", "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "exists": cfg_exists,
+            "checks": checks,
+        },
+    }
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -6710,6 +6818,7 @@ _ALL = [
     p63_scale_expansion_path,
     p64_analysis_unit_sample_independence,
     p65_pilot_experiment,
+    p66_no_nan_inf_gradient,
 ]
 
 def run_all_c_gates() -> dict[str, dict[str, Any]]:

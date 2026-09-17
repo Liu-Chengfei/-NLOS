@@ -1,0 +1,23 @@
+# 条款 [66] 无 NaN/Inf/梯度爆炸
+# 手册原文：无 NaN/Inf/梯度爆炸：冒烟训练时监控 loss、权重范数。
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第344行
+
+clause_id: "66"
+clause_name: "无NaN/Inf/梯度爆炸"
+
+# 冒烟训练时监控 loss
+smoke_train_loss_monitor: true
+# 冒烟训练时监控权重范数
+weight_norm_monitor: true
+# 禁止 NaN
+no_nan: true
+# 禁止 Inf
+no_inf: true
+# 禁止梯度爆炸
+no_gradient_explosion: true
+
+monitoring_targets:
+  - "loss"
+  - "权重范数"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第344行"
