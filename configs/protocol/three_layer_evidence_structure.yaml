@@ -1,0 +1,40 @@
+# 条款 [52] 三层证据结构总表配置
+# 手册原文：三层证据结构总表（论文级数据架构，与 S3 轨迹规格衔接）
+# 主场景（受控）S1–S3固定布局（20m×20m、4锚、4遮挡区）10seed×5方法=50单元
+
+clause_id: "52"
+clause_name: "三层证据结构总表"
+structure_name: "三层证据结构总表（论文级数据架构，与 S3 轨迹规格衔接）"
+
+layers:
+  - layer_name: "主场景（受控）"
+    layout: "S1–S3固定布局"
+    area: "20m×20m"
+    anchors: 4
+    occlusion_zones: 4
+    seed_count: 10
+    method_count: 5
+    total_units: 50
+    data_size_role: "主场景"
+    statistical_inference: true
+    share_with_main_scene: true
+
+  - layer_name: "布局随机化泛化层"
+    data_size_role: "泛化层"
+    statistical_inference: false
+    share_with_main_scene: true
+    connection: "与主场景共享数据规模职责统计推断"
+
+  - layer_name: "统计推断与主场景共享层"
+    data_size_role: "统计推断"
+    statistical_inference: true
+    share_with_main_scene: true
+    connection: "层场景/数据规模职责统计推断与主场景共享"
+
+# 与 S3 轨迹规格衔接
+s3_trajectory_connection: true
+
+# 论文级数据架构
+paper_level_data_architecture: true
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第314行"

@@ -27,6 +27,18 @@ from typing import Any
 from liquidloc.common.constants import WINDOW_SIZE, WARMUP_S  # P20/P28 窗口/热身硬约束
 from liquidloc.common.validation import coerce_finite_scalar
 
+# 条款 [13] 违反即处置：failure_handler 可选导入（若不存在则不中断现有流程）。
+try:
+    from liquidloc.common.failure_handler import (
+        DispositionResult,
+        ViolationRecord,
+        handle_violation,
+        quarantine_paths,
+    )
+    _FAILURE_HANDLER_AVAILABLE = True
+except ImportError:
+    _FAILURE_HANDLER_AVAILABLE = False
+
 
 # 误差预算常量（手册 Part 0 S4）
 LOS_NOISE_SIGMA_M: float = 0.6
@@ -184,6 +196,7 @@ class PrecheckReport:
     n_hard_failed: int = 0
     overall_pass: bool = True
     results: list[CheckResult] = field(default_factory=list)
+    dispositions: list[DispositionResult] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -193,6 +206,7 @@ class PrecheckReport:
             "n_hard_failed": self.n_hard_failed,
             "overall_pass": self.overall_pass,
             "results": [r.to_dict() for r in self.results],
+            "dispositions": [dataclasses.asdict(d) for d in self.dispositions],
         }
 
 
@@ -697,14 +711,39 @@ def check_P10_2d_only(cfg: Mapping[str, Any]) -> CheckResult:
 
 
 def check_P11_input_isolation(cfg: Mapping[str, Any]) -> CheckResult:
-    """P11: 模型输入只含测距/IMU/VIO/时间戳，不含锚点坐标 / geom_condition。"""
-    features = list(cfg.get("input_features") or [])
-    forbidden = ["anchor_x", "anchor_y", "geom_condition", "k_level", "gdop_value"]
+    """P11: 模型输入只含测距/IMU/VIO/时间戳，不含锚点绝对坐标 / geom_condition / k_level / gdop_value。
+
+    修复 (2026-09-05): 改为读取 model_cfg.feature_order（实际模型输入特征列表），
+    而非 input_features（YAML 配置键，可能与实际特征不一致）。
+    同时验证 CONTEXT_FEATURE_KEYS 中无泄漏（仅允许 valid/modality_gap_dt/uwb_range_residual/
+    anchor_dx/anchor_dy/geom_score 等已净化特征，不含绝对坐标或 sim 派生质量标签）。
+    anchor_dx/anchor_dy 为锚点相对位移（非绝对坐标），属允许特征。
+    uwb_range_residual 为已净化距离残差（非原始测距），属允许特征。
+    """
+    # 优先读取 model_cfg.feature_order（模型实际输入特征列表）
+    features = list((cfg.get("model_cfg") or {}).get("feature_order") or cfg.get("input_features") or [])
+    # 绝对坐标 / sim 派生质量标签 / 几何条件等泄漏项
+    forbidden = ["anchor_x", "anchor_y", "anchor_pos_x", "anchor_pos_y",
+                 "geom_condition", "k_level", "gdop_value",
+                 "uwb_quality_min", "uwb_invalid_rate", "quality"]
     leaked = [f for f in features if f in forbidden]
-    has_4_required = all(f in features for f in ("range", "imu", "vio", "t"))
-    return _make("P11", "输入隔离", not leaked and has_4_required,
-                 detail=f"leaked={leaked or 'none'}, has_4_required={has_4_required}",
-                 features=features, leaked=leaked)
+    # CONTEXT_FEATURE_KEYS 中不应含绝对坐标或 sim 派生标签
+    from liquidloc.common.constants import CONTEXT_FEATURE_KEYS  # noqa: E402
+    context_leaked = [f for f in CONTEXT_FEATURE_KEYS if f in forbidden]
+    # 4 类核心输入必须存在（range/ax,ay,gz/dx,dy,dyaw/dt 为实际 feature_order 中的特征名）
+    has_4_required = (
+        "range" in features  # UWB 原始 range 残差（N×4）
+        and any(f in features for f in ("ax", "ay", "gz"))  # IMU 高频段（150Hz 原生聚合）
+        and any(f in features for f in ("dx", "dy", "dyaw"))  # VIO 相对位姿
+        and "dt" in features  # 时间戳
+    )
+    all_ok = not leaked and not context_leaked and has_4_required
+    return _make(
+        "P11", "输入隔离", all_ok,
+        detail=(f"leaked={leaked or 'none'}, context_leaked={context_leaked or 'none'}, "
+                f"has_4_required={has_4_required}, features={features}"),
+        features=features, leaked=leaked, context_leaked=context_leaked,
+    )
 
 
 def check_P12_train_test_symmetry(cfg: Mapping[str, Any]) -> CheckResult:
@@ -2004,6 +2043,31 @@ def run_all_prechecks(cfg: Mapping[str, Any], raw_root: str | Path | None = None
     n_hard_failed = sum(1 for r in checks if not r.passed and r.severity == "hard")
     n_passed = sum(1 for r in checks if r.passed)
     n_failed = sum(1 for r in checks if not r.passed)
+
+    # 条款 [13] 违反即处置：对每个未通过的 gate 自动触发 handle_violation
+    dispositions: list[Any] = []
+    if _FAILURE_HANDLER_AVAILABLE:
+        for r in checks:
+            if not r.passed:
+                violation = ViolationRecord(
+                    violation_type="gate_failed",
+                    source=f"precheck_orchestrator.{r.code}_{r.name}",
+                    affected_paths=list(r.evidence.get("affected_paths", [])),
+                    evidence={
+                        "code": r.code,
+                        "name": r.name,
+                        "severity": r.severity,
+                        "detail": r.detail,
+                        "gate_evidence": dict(r.evidence),
+                    },
+                )
+                disposition = handle_violation(
+                    violation=violation,
+                    root_cause=f"Gate {r.code} ({r.name}) 未通过: {r.detail}",
+                    regression_point=f"回到 {r.code} 对应的回归测试点重跑",
+                )
+                dispositions.append(disposition)
+
     return PrecheckReport(
         total=len(checks),
         n_passed=n_passed,
@@ -2011,6 +2075,7 @@ def run_all_prechecks(cfg: Mapping[str, Any], raw_root: str | Path | None = None
         n_hard_failed=n_hard_failed,
         overall_pass=(n_hard_failed == 0),
         results=checks,
+        dispositions=dispositions,
     )
 
 

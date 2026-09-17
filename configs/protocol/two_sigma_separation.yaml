@@ -1,0 +1,37 @@
+# 文件职责：声明两个 σ 语义分离——协议 N 轴 σ 仅指 NLOS 段附加抖动，LOS 器件噪声 σ≈0.6m 为器件级非协议参数。
+# 本文件是手册第48条的配置落点。
+# 关键约束：N 轴噪声 σ 是协议档位参数（描述 NLOS 附加抖动），LOS 器件噪声 σ 是非协议参数（描述器件级噪声）。
+# 两者语义不同，不得混淆计入同一参数体系。
+
+# 条款 [48] 原文
+separation_name: "两个 σ 语义分离"
+
+# 协议 N 轴 σ 语义：仅指 NLOS 段附加抖动
+# 来源：configs/base/scene_axis_protocol.yaml 第130-189行 N 轴档位定义中 nlos_noise_std_m 字段
+protocol_n_sigma_meaning: "仅指 NLOS 段附加抖动"
+
+# LOS 器件噪声 σ≈0.6m（来源：configs/protocol/los_noise_baseline.yaml 第7行 noise_value: 0.6）
+los_device_noise_sigma_value: 0.6
+los_device_noise_unit: "m"
+los_device_noise_nature: "器件级非协议参数"
+
+# 论文方法节两句分别写清
+# 论文方法节中须分别写清以下两句（位置：论文方法节段落）：
+# 句1：协议 N 轴 σ 仅指 NLOS 段附加抖动
+# 句2：LOS 器件噪声 σ≈0.6m 为器件级非协议参数
+paper_method_clarity: "论文方法节两句分别写清（句1：协议N轴σ仅指NLOS段附加抖动；句2：LOS器件噪声σ≈0.6m为器件级非协议参数）"
+
+# 协议 N 轴 σ 的来源声明
+sigma_values_source: "Stage 1 档位协议条款 N 轴表（configs/base/scene_axis_protocol.yaml 第130-189行 N 轴 nlos_noise_std_m 字段）"
+
+# 器件级噪声不应计入协议 σ 参数
+non_protocol_note: "器件级噪声不应计入协议 σ 参数"
+
+# 约束声明
+constraint_declaration:
+  separation_id: "clause_48"
+  clause_name: "两个 σ 语义分离"
+  two_sigma_meaning_separated: true
+  protocol_sigma_is_nlos_only: true
+  los_noise_is_non_protocol: true
+  los_noise_value_m: 0.6

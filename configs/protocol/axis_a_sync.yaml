@@ -1,0 +1,49 @@
+# 档位协议条款 · A轴 —— 同步精度
+# 对应手册第19条 (docs/异步实验_执行手册_终版v15_总纲条款版.md 第197-206行)
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+protocol_version: 27
+clause_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第197-206行"
+axis: A
+axis_name: "异步程度(Asynchrony)"
+axis_description: "传感器时间同步偏差程度"
+
+# A轴四档位定义
+A0:
+  label: "同步"
+  description: "近似同步，传感器时间戳几乎完全对齐"
+  uwb_clock_offset_ms: [0, 0]
+  uwb_round_trip_delay_ms: [0, 0]
+  imu_clock_offset_ms: [0, 0]
+  imu_sampling_jitter_ms: [0, 0]
+  vio_clock_offset_ms: [0, 0]
+  vio_processing_delay_ms: [0, 0]
+
+A1:
+  label: "轻"
+  description: "轻度异步，存在可感知但可控的时间偏差"
+  uwb_clock_offset_ms: [5, 20]
+  uwb_round_trip_delay_ms: [20, 40]
+  imu_clock_offset_ms: [1, 5]
+  imu_sampling_jitter_ms: [1, 1]
+  vio_clock_offset_ms: [5, 20]
+  vio_processing_delay_ms: [10, 30]
+
+A2:
+  label: "主"
+  description: "中度异步，时间偏差明显，需算法主动补偿"
+  uwb_clock_offset_ms: [20, 50]
+  uwb_round_trip_delay_ms: [40, 80]
+  imu_clock_offset_ms: [5, 15]
+  imu_sampling_jitter_ms: [3, 3]
+  vio_clock_offset_ms: [20, 50]
+  vio_processing_delay_ms: [30, 80]
+
+A3:
+  label: "重"
+  description: "重度异步，时间偏差严重，对算法鲁棒性构成重大挑战"
+  uwb_clock_offset_ms: [100, 200]
+  uwb_round_trip_delay_ms: [120, 250]
+  imu_clock_offset_ms: [20, 50]
+  imu_sampling_jitter_ms: [10, 10]
+  vio_clock_offset_ms: [100, 200]
+  vio_processing_delay_ms: [150, 300]

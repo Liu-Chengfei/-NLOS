@@ -1,0 +1,28 @@
+# GT 真值精度声明 — 硬约束
+# 对应手册条款 [50]
+# 本文件冻结：gt_pos / gt_yaw 为仿真数据集的无噪声理想真值，
+# GT 不确定度 = 0，误差预算（0-4）只含传感器噪声×GDOP 项，不含 GT 噪声项。
+
+statement_name: "GT 真值精度声明"
+constraint_level: "硬约束"
+
+gt_pos_nature: "无噪声理想真值"
+gt_yaw_nature: "无噪声理想真值"
+
+generation_method: "由轨迹几何精确生成"
+
+gt_uncertainty: 0
+no_gt_uncertainty_propagation: true
+
+error_budget_components: "只含传感器噪声×GDOP 项"
+no_gt_noise_in_budget: true
+
+gt_pos_field: "gt_pos"
+gt_yaw_field: "gt_yaw"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第310行"
+
+clause_id: "P50"
+clause_name: "GT 真值精度声明"
+rationale: "gt_pos/gt_yaw 作为仿真真值无噪声，误差预算（0-4）仅含传感器噪声×GDOP，GT 不确定度 = 0，评估时不引入 GT 不确定度传播。"
+effective: true

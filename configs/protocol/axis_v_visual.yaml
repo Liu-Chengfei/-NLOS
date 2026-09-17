@@ -1,0 +1,70 @@
+# 档位协议条款 · V 轴 —— 视觉退化（视觉里程计（VIO）质量退化）
+# 对应手册第21条 (docs/异步实验_执行手册_终版v15_总纲条款版.md 第217-228行)
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+#
+# V 轴描述视觉里程计（VIO）质量退化：
+#   A 轴丢帧 = 数据不在（时间戳级缺失）
+#   V1 = 数据在但置零
+#   V2 = 数据在但变糙（σ×5）
+#   V3 = 数据不在（质量触发）+ 恢复跳变
+
+protocol_version: 27
+clause_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第217-228行"
+axis: V
+axis_name: "视觉退化 (V轴)"
+axis_description: "视觉里程计（VIO）质量退化。V0健康/V1黑屏/V2特征丢失/V3关键帧中断。A轴丢帧=数据不在（时间戳级缺失）；V1=数据在但置零；V2=数据在但变糙（σ×5）；V3=数据不在（质量触发）+恢复跳变。"
+
+constraint_declaration:
+  axis_type: "视觉里程计（VIO）质量退化"
+  a_axis_frame_missing: "数据不在（时间戳级缺失）"
+  v1_definition: "数据在但置零"
+  v2_definition: "数据在但变糙（σ×5）"
+  v3_definition: "数据不在（质量触发）+ 恢复跳变"
+
+# V0：健康 — 特征 >50/frame；增量噪声 σ=0.01–0.03 m/步；帧有效 100%；无间隙
+V0:
+  name: "健康"
+  feature_count: [50, 100]
+  incremental_noise_sigma: [0.01, 0.03]
+  frame_valid_ratio: 1.0
+  gap_duration: [0.0, 0.0]
+  gap_count_per_sequence: [0, 0]
+  scaling_factor: 1.0
+  physical_description: "视觉里程计（VIO）完全健康，特征丰富（>50/frame），增量噪声极低（σ=0.01–0.03 m/步），帧有效率100%，无间隙"
+
+# V1：黑屏 — 视觉完全失效：增量在但置零（=0），scaling→0；每序列 1–2 次，单次 0.5–2 s，占轨迹 5–10%
+V1:
+  name: "黑屏"
+  feature_count: [0, 0]
+  incremental_noise_sigma: [0.0, 0.0]
+  incremental_zeroed: true
+  frame_valid_ratio: [0.05, 0.10]
+  gap_duration: [0.5, 2.0]
+  gap_count_per_sequence: [1, 2]
+  scaling_factor: 0.0
+  physical_description: "视觉完全失效：增量在但置零（=0），scaling→0；每序列 1–2 次，单次 0.5–2 s，占轨迹 5–10%。数据在但置零"
+
+# V2：特征丢失 — 特征 10–20/frame；增量噪声放大 5×（σ→0.05–0.15 m/步）；占轨迹 20–40%，连续段 1–3 s；scaling→0.3–0.7
+V2:
+  name: "特征丢失"
+  feature_count: [10, 20]
+  incremental_noise_sigma: [0.05, 0.15]
+  noise_amplification_factor: 5
+  frame_valid_ratio: [0.20, 0.40]
+  gap_duration: [1.0, 3.0]
+  gap_count_per_sequence: [0, 0]
+  scaling_factor: [0.3, 0.7]
+  physical_description: "特征 10–20/frame；增量噪声放大 5×（σ→0.05–0.15 m/步）；占轨迹 20–40%，连续段 1–3 s；scaling→0.3–0.7。数据在但变糙（σ×5）"
+
+# V3：关键帧中断 — 增量缺失（质量触发，非时间戳缺失）；每序列 2–4 次，间隙 0.5–3 s，占轨迹 10–20%；恢复后重定位跳变 0.3–1 m
+V3:
+  name: "关键帧中断"
+  feature_count: [0, 0]
+  incremental_missing: true
+  incremental_noise_sigma: [0.0, 0.0]
+  frame_valid_ratio: [0.10, 0.20]
+  gap_duration: [0.5, 3.0]
+  gap_count_per_sequence: [2, 4]
+  scaling_factor: [0.0, 0.0]
+  relocalization_jump: [0.3, 1.0]
+  physical_description: "增量缺失（质量触发，非时间戳缺失）；每序列 2–4 次，间隙 0.5–3 s，占轨迹 10–20%；恢复后重定位跳变 0.3–1 m。数据不在（质量触发）+ 恢复跳变"

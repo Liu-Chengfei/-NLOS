@@ -291,12 +291,12 @@ class SimSequenceSpec:
         axes_override: (v2 D-10/D-11/D-12) 场景轴档位覆盖, dict 形如
             {"A":"A1", "N":"N2", "V":"V1", "K":"K3"}. 默认 None 表示
             缺省时由 _resolve_spec_k_level 回落 K3（主表欠定非优几何）；axes_override 可覆盖。
-        dt_imu_override: (v2 D-13) IMU 采样周期覆盖 (秒). 默认 None 表示用 baseline dt_imu=0.01s (100Hz).
-            典型值: 0.005s (200Hz), 0.01s (100Hz), 0.02s (50Hz).
-        dt_uwb_override: (v2 D-13) UWB 采样周期覆盖 (秒). 默认 None 表示用 baseline dt_uwb=0.05s (20Hz).
+        dt_imu_override: (v2 D-13) IMU 采样周期覆盖 (秒). 默认 None 表示用 baseline dt_imu=1/150s (150Hz).
+            典型值: 0.005s (200Hz), 1/150≈0.00667s (150Hz), 0.01s (100Hz).
+        dt_uwb_override: (v2 D-13) UWB 采样周期覆盖 (秒). 默认 None 表示用 baseline dt_uwb=0.1s (10Hz).
             典型值: 0.02s (50Hz), 0.05s (20Hz), 0.1s (10Hz).
-        dt_vio_override: (v2 D-13) VIO 采样周期覆盖 (秒). 默认 None 表示用 baseline dt_vio=0.0333s (30Hz).
-            典型值: 0.0167s (60Hz), 0.0333s (30Hz).
+        dt_vio_override: (v2 D-13) VIO 采样周期覆盖 (秒). 默认 None 表示用 baseline dt_vio=0.1s (10Hz).
+            典型值: 0.0167s (60Hz), 0.0333s (30Hz), 0.1s (10Hz).
 
     异常：
         TypeError: cycle_count 不是 int、mirror_x 不是 bool、translation_xy 不是二元组时抛出。
@@ -313,7 +313,7 @@ class SimSequenceSpec:
     cycle_gap_s: float = _DEFAULT_CYCLE_GAP_S
     # v2 D-10/D-11/D-12: 场景轴档位覆盖, 让 30 seqs 跨多场景轴组合.
     axes_override: tuple[tuple[str, str], ...] = ()
-    # v2 D-13: 传感器频率覆盖, 让 IMU/UWB/VIO 取不同 nyquist 频率.
+    # v2 D-13: 传感器频率覆盖（条款 [11] 双速率契约：IMU 150Hz，UWB/VIO/GT 10Hz）。
     dt_imu_override: float | None = None
     dt_uwb_override: float | None = None
     dt_vio_override: float | None = None
@@ -706,9 +706,9 @@ def _build_default_sim_sequence_specs() -> tuple[SimSequenceSpec, ...]:
                 workspace_span_m=float(span),
                 envelope_profile="main_table",
                 allow_high_anchor_count=high_k,
-                dt_imu_override=0.01,
+                dt_imu_override=1/150,
                 dt_uwb_override=0.1,
-                dt_vio_override=0.05,
+                dt_vio_override=0.1,
             )
         )
     sequence_specs = list(lead_specs)
@@ -761,11 +761,11 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
         (("A", "A3"), ("N", "N3"), ("V", "V0"), ("K", "K3"), ("M", "M1")),  # 3 → A3N3 + M1
     ]
     dt_pool: list[tuple[float | None, float | None, float | None]] = [
-        (1/150, 0.1, 0.05),     # 150Hz IMU, 10Hz UWB, 20Hz VIO
-        (1/150, 0.05, 0.05),    # 150Hz IMU, 20Hz UWB, 20Hz VIO
-        (1/150, 0.1, 0.0333),   # 150Hz IMU, 10Hz UWB, 30Hz VIO
-        (1/150, 0.05, 0.05),    # 150Hz IMU, 20Hz UWB, 20Hz VIO
-        (1/150, 0.1, 0.05),     # 150Hz IMU, 10Hz UWB, 20Hz VIO
+        (1/150, 0.1, 0.1),     # 150Hz IMU, 10Hz UWB, 10Hz VIO (条款 [11] 双速率契约)
+        (1/150, 0.1, 0.1),     # 150Hz IMU, 10Hz UWB, 10Hz VIO
+        (1/150, 0.1, 0.1),     # 150Hz IMU, 10Hz UWB, 10Hz VIO
+        (1/150, 0.1, 0.1),     # 150Hz IMU, 10Hz UWB, 10Hz VIO
+        (1/150, 0.1, 0.1),     # 150Hz IMU, 10Hz UWB, 10Hz VIO
     ]
     # 20 lead trajectory types - 保留 e9 v3 形态
     lead_names = [
@@ -2751,12 +2751,12 @@ def materialize_sim_raw(
                 seed=int(noise.base_seed),
                 duration_s=float(spec.duration_s),
                 workspace_span_m=float(spec.workspace_span_m),
-                dt_s=float(spec.dt_imu_override or 0.05),
+                dt_s=0.1,  # GT 与 UWB/VIO 同 10Hz 公共轴（条款 [11] 双速率契约）
             )
             transformed_anchor_layout = _transform_anchor_layout(bundle["anchor_layout"], spec)
-            dt_imu = float(spec.dt_imu_override or 0.01)
+            dt_imu = float(spec.dt_imu_override or 1/150)
             dt_uwb = float(spec.dt_uwb_override or 0.1)
-            dt_vio = float(spec.dt_vio_override or 0.05)
+            dt_vio = float(spec.dt_vio_override or 0.1)
             t0 = float(transformed_gt_rows[0]["timestamp"])
             t1 = float(transformed_gt_rows[-1]["timestamp"])
             # 合成传感器时间网格（无 fixture residual；几何由 GT 推导）。

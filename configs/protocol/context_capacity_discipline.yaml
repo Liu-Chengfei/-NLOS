@@ -1,0 +1,53 @@
+# 上下文容量与分批纪律配置 · 条款 [33]
+# 对应手册位置：docs/异步实验_执行手册_终版v15_总纲条款版.md 第276行
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+#
+# [33] 上下文容量充足不改变分批纪律
+# ——容量充足只允许"手册整册只读锚点常驻"（不必反复重读），
+#   不允许一批吞下全部 50 单元（日志/中间产物挤占上下文导致后段"看不见手册原文" = 凭记忆执行）
+
+protocol_version: "v15"
+manual_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第276行"
+clause_id: "33"
+clause_name: "上下文容量充足不改变分批纪律"
+
+description: >
+  上下文容量充足不改变分批纪律。
+  容量充足只允许"手册整册只读锚点常驻"（不必反复重读），
+  不允许一批吞下全部 50 单元。
+
+# === 上下文容量规则 ===
+context_capacity:
+  capacity_sufficient_only_allows_anchor_resident: true
+  anchor_definition: "手册整册只读锚点常驻"
+  description: >
+    容量充足时，只允许"手册整册只读锚点常驻"（不必反复重读手册原文），
+    不意味着可以加大单批消耗量。
+
+# === 分批纪律（硬约束） ===
+batch_discipline:
+  max_units_per_batch: 50
+  reason: "日志/中间产物挤占上下文导致后段'看不见手册原文' = 凭记忆执行，违反唯一真源铁律"
+  description: >
+    分批纪律是上下文容量管理的硬约束。
+    即使上下文容量充足，也不允许一批吞下全部 50 单元。
+    单批日志/中间产物占用过多会导致后段执行时"看不见手册原文"，
+    从而凭记忆执行，违反"唯一真源 = 手册原文"铁律。
+
+# === 禁止项 ===
+prohibited:
+  no_full_50_in_one_batch: true
+  no_memory_based_execution: true
+  no_context_exhaustion_by_logs_and_intermediates: true
+
+# === 约束声明 ===
+constraint_declaration:
+  clause_reference: "手册第33条"
+  discipline_level: "hard"
+  capacity_sufficient_does_not_change_batch_discipline: true
+  max_batch_size_enforced: true
+  description_constraint: >
+    上下文容量充足只改变"手册整册只读锚点常驻"（不必反复重读），
+    绝不改变分批纪律上限。一批吞下全部 50 单元会导致后段
+    因日志/中间产物挤占上下文而"看不见手册原文"，凭记忆执行，
+    违反唯一真源铁律。

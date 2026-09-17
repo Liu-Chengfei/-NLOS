@@ -1,0 +1,38 @@
+# 条款 [36] 禁止单线程从头做到尾不交叉配置
+# 手册位置：docs/异步实验_执行手册_终版v15_总纲条款版.md 第282行
+# 通过标准：cross_thread_required=true 且 single_thread_linear_execution_prohibited=true
+
+# 禁止项声明
+prohibition:
+  single_thread_linear_execution_prohibited: true
+  description: >
+    禁止单线程从头做到尾不交叉。单线执行是干漏风险最高的执行形态，
+    任何环节不得以单线程串行方式贯穿整个执行流程而不与其它线程/工序交叉。
+
+# 风险定义
+risk_definition:
+  single_line_execution: "干漏风险最高形态"
+  description: >
+    单线执行（单线程从头做到尾不交叉）意味着执行过程中缺乏交叉校验、
+    缺乏并行监督、缺乏阶段性回溯，一旦发生疏漏将无法被及时发现和纠正，
+    是干漏（干了但漏了）风险最高的执行形态。
+
+# 执行要求
+enforcement:
+  cross_thread_required: true
+  description: >
+    执行时必须采用交叉线程/交叉工序方式，禁止单线贯穿。
+    任一执行环节必须与其它线程/工序形成交叉（并行、交替或互锁），
+    不允许任何线程从头到尾独自执行完整流程而无任何交叉点。
+
+# 约束声明
+constraint_declaration:
+  clause_reference: "[36]"
+  source_file: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+  source_line: 282
+  enforcement_level: "hard"
+  pass_criteria: >
+    configs/protocol/no_single_thread_linear.yaml 中
+    prohibition.single_thread_linear_execution_prohibited=true、
+    risk_definition.single_line_execution="干漏风险最高形态"、
+    enforcement.cross_thread_required=true 三项约束全部为真值。

@@ -1,0 +1,66 @@
+# 条款 [30] 断点状态读取配置
+# 手册位置：docs/异步实验_执行手册_终版v15_总纲条款版.md 第270行
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+
+protocol_version: "v15"
+manual_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第270行"
+clause_id: "30"
+
+# 断点来源
+breakpoint_source:
+  name: "decision log"
+  path: ".audit/decision_log.json"
+  description: "上一批 decision log 的断点状态，来源为 .audit/decision_log.json"
+
+# 断点内容：gate进度 + 未决项
+breakpoint_content:
+  gate_progress:
+    name: "gate进度"
+    description: "上批跑到哪个 gate、当前 gate 的完成状态"
+    required_fields:
+      - "last_completed_gate"
+      - "gate_status"
+      - "last_batch_id"
+  pending_items:
+    name: "未决项"
+    description: "上批遗留的未决项（未完成、待验证、待修复条目）"
+    required_fields:
+      - "failure_classification_register"
+      - "rca_entries"
+      - "decision_entries"
+
+# 执行前必读
+read_before_action:
+  name: "read_before_action"
+  required: true
+  description: "三样读完才允许执行本批动作"
+  three_anchors:
+    anchor_1:
+      name: "gate清单"
+      source: "阶段覆盖总表"
+      description: "阶段覆盖总表中本批涉及的 gate 清单"
+    anchor_2:
+      name: "出口判据"
+      source: "阶段覆盖总表"
+      description: "阶段覆盖总表中本批涉及的 gate 出口判据"
+    anchor_3:
+      name: "断点状态"
+      source: "decision log"
+      description: "上一批 decision log 的断点状态（上批跑到哪个 gate、留了什么未决项）"
+  read_complete_before_action: true
+  read_sequence:
+    - "anchor_1: gate清单"
+    - "anchor_2: 出口判据"
+    - "anchor_3: 断点状态"
+
+# 三样锚点：gate清单 + 出口判据 + 断点状态（详见 read_before_action.three_anchors）
+constraint_declaration:
+  clause_reference: "[30] 断点状态读取"
+  source_file: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+  source_line: 270
+  requirement: "上一批 decision log 的断点状态（上批跑到哪个 gate、留了什么未决项）——三样读完才允许执行本批动作"
+  enforcement: "hard"
+  three_things_must_read:
+    - "阶段覆盖总表中本批涉及的 gate 清单与出口判据"
+    - "上一批 decision log 的断点状态（gate进度 + 未决项）"
+    - "三样读完才允许执行本批动作（执行前强制检查）"

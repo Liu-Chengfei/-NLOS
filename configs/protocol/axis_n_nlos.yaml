@@ -1,0 +1,70 @@
+# 档位协议条款 · N轴 —— NLOS 偏差
+# 对应手册第20条 (docs/异步实验_执行手册_终版v15_总纲条款版.md 第208-215行)
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+#
+# 纯偏差定义、全档固定 4 锚、可解率 100%、不可解帧归 M 轴。
+# N 轴仅描述测距偏差（值不对）：观测占比 rho、正向偏差 mu (m)、噪声 sigma (m)。
+# 不可解 / 无测距值统一归 M 轴描述，不属于 N 轴。
+protocol_version: 27
+clause_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第208-215行"
+axis: N
+axis_name: "NLOS 偏差(Non-Line-of-Sight Bias)"
+axis_description: "UWB 信号受遮挡和反射的严重程度，纯偏差定义、全档固定 4 锚、可解率 100%、不可解帧归 M 轴"
+constraint_declaration:
+  # 手册第20条约束声明（铁律）
+  nlos_type: "pure_bias"           # 纯偏差定义（值不对），非随机丢失
+  anchor_count_fixed: 4           # 全档固定 4 锚
+  solvability: "100%"             # 可解率 100%
+  unsolvable_frames_to: "M"        # 不可解框归 M 轴
+
+# N0：LOS 主导，UWB 信号几乎全部为直射路径，测距基本无偏差。
+N0:
+  label: "理想 LOS"
+  description: "NLOS 占比 0-5%，偏差 ~0，噪声无额外贡献"
+  # NLOS 观测占比 rho（范围）
+  nlos_ratio: [0.00, 0.05]
+  # 测距正向偏差 mu (m)（范围）
+  bias_mu: [0.0, 0.0]
+  # NLOS 附加噪声标准差 sigma (m)（范围）
+  noise_sigma: [0.0, 0.0]
+  # 手册第20条物理对应
+  physical_correspondence: "理想 LOS"
+
+# N1：轻度 NLOS，门/人体遮挡为主，少量观测受影响。
+N1:
+  label: "门/人体遮挡"
+  description: "NLOS 占比 10-15%，偏差 0.5-1m，噪声 sigma 0.3m"
+  # NLOS 观测占比 rho（范围）
+  nlos_ratio: [0.10, 0.15]
+  # 测距正向偏差 mu (m)（范围）
+  bias_mu: [0.5, 1.0]
+  # NLOS 附加噪声标准差 sigma (m)（范围）
+  noise_sigma: [0.3, 0.3]
+  # 手册第20条物理对应
+  physical_correspondence: "门/人体遮挡"
+
+# N2：中度 NLOS，墙体级遮挡，约半数观测受影响。
+N2:
+  label: "墙体级遮挡"
+  description: "NLOS 占比 25-30%，偏差 2-3m，噪声 sigma 0.8m"
+  # NLOS 观测占比 rho（范围）
+  nlos_ratio: [0.25, 0.30]
+  # 测距正向偏差 mu (m)（范围）
+  bias_mu: [2.0, 3.0]
+  # NLOS 附加噪声标准差 sigma (m)（范围）
+  noise_sigma: [0.8, 0.8]
+  # 手册第20条物理对应
+  physical_correspondence: "墙体级遮挡"
+
+# N3：重度 NLOS，完全遮挡极端。
+N3:
+  label: "完全遮挡极端"
+  description: "NLOS 占比 35-40%，偏差 4-6m，噪声 sigma 1.5m"
+  # NLOS 观测占比 rho（范围）
+  nlos_ratio: [0.35, 0.40]
+  # 测距正向偏差 mu (m)（范围）
+  bias_mu: [4.0, 6.0]
+  # NLOS 附加噪声标准差 sigma (m)（范围）
+  noise_sigma: [1.5, 1.5]
+  # 手册第20条物理对应
+  physical_correspondence: "完全遮挡极端"

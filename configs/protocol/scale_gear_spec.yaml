@@ -1,0 +1,20 @@
+# 条款 [53] 规模档位配置
+# 手册原文：规模档位：入门 N_layout=6、推荐 N_layout=10（full + 2 个最强基线 LSTM/EKF × 2–3 seed 即可，泛化层只判排序不做因子推断，不需要主场景同等功效）
+
+clause_id: "53"
+clause_name: "规模档位"
+
+gear_spec:
+  entry_level:
+    name: "入门"
+    N_layout: 6
+  recommended_level:
+    name: "推荐"
+    N_layout: 10
+    config: "full + 2 个最强基线 LSTM/EKF × 2–3 seed"
+
+generalization_layer:
+  evaluation_method: "只判排序不做因子推断"
+  requirement: "不需要主场景同等功效"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第316行"

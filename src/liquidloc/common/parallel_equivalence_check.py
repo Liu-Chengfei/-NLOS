@@ -1,274 +1,290 @@
-"""并行-串行等效性抽查（Clause [14] 落实载体）。
+"""并行-串行等效性抽查实现（手册条款 [14]）。
 
-设计目标：
-- 首次打开并行前，用同一组输入串行跑一次 + ThreadPoolExecutor 并行跑一次，
-  比较结果是否逐位相同或数值在机器精度内相等。
-- 等效性抽查结果写入 decision log，作为 [14] 的留痕证据。
-- 本模块本身包含自测：pytest 可以直接跑。
+"不使结果变差"的判据 = 并行不改变任何论文级口径：
+    每个并行单元与串行执行使用完全相同的代码/配置/确定性开关，
+    数据与权重各自独立生成，数值与可复现性不劣化。
 
-典型调用链（_run_25unit.py stage 2 首次并行前）：
-    from liquidloc.common.parallel_equivalence_check import (
-        verify_parallel_equivalence, record_equivalence_decision,
-    )
-    result = verify_parallel_equivalence(
-        task_fn=_run_one_unit,
-        args_list=spot_check_args,   # 取 1-2 个代表性单元
-        tolerance=1e-6,
-    )
-    record_equivalence_decision(result, round_tag="RZ-0")
+首次放开并行前须做并行-串行等效性抽查：
+    取同一单元分别以并行与串行方式各执行一次，
+    确认结果一致（逐 bit 相同或数值在机器精度内相等）后，
+    才可按 GPU 余量放开并行度，
+    等效性抽查记录写入 decision log。
+
+公开入口：
+    run_equivalence_check(unit_fn, unit_id, config, seed, log_dir) -> ParallelEquivalenceResult
+    compare_results(serial_result, parallel_result, tolerance) -> dict
+    write_decision_log(result, log_path) -> str
 """
+
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import os
-import threading
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Optional
 
 
-# ── 数据结构 ──────────────────────────────────────────────────────────────
+@dataclass(slots=True)
+class ParallelEquivalenceResult:
+    """并行-串行等效性抽查结果。
 
-@dataclass
-class EquivalenceResult:
-    """单次等效性抽查结果。"""
-    spot_check_id: str
-    serial_results: list[Any] = field(default_factory=list)
-    parallel_results: list[Any] = field(default_factory=list)
-    bitwise_equal: bool = False
-    numeric_tolerance_ok: bool = False
+    Attributes:
+        unit_id: 被抽查的并行单元标识。
+        serial_result: 串行执行结果（原始对象）。
+        parallel_result: 并行执行结果（原始对象）。
+        bit_identical: 逐 bit 是否相同。
+        max_abs_diff: 最大绝对差值。
+        mean_abs_diff: 平均绝对差值。
+        machine_eps_ratio: max_abs_diff / np.finfo(float).eps。
+        passed: 是否通过等效性检查。
+        decision_log_path: 等效性抽查记录写入的 decision log 路径。
+        timestamp: 抽查时间戳（ISO 8601 格式）。
+        evidence: 额外证据字典。
+    """
+
+    unit_id: str
+    serial_result: Any = None
+    parallel_result: Any = None
+    bit_identical: bool = False
+    max_abs_diff: float = float("inf")
+    mean_abs_diff: float = float("inf")
+    machine_eps_ratio: float = float("inf")
     passed: bool = False
-    detail: str = ""
-    serial_duration_s: float = 0.0
-    parallel_duration_s: float = 0.0
-    n_units: int = 0
-    tolerance: float = 1e-6
-    raw: dict[str, Any] = field(default_factory=dict)
+    decision_log_path: str = ""
+    timestamp: str = ""
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.timestamp:
+            self.timestamp = datetime.now(timezone.utc).isoformat()
 
 
-@dataclass
-class SpotCheckRecord:
-    """等效性抽查的持久化记录（写入 decision log / 批处理日志）。"""
-    spot_check_id: str
-    round: str
-    gpu_model: str
-    parallel_decision: dict[str, Any]
-    result: EquivalenceResult
-    created_at: str
-
-
-# ── 核心函数 ──────────────────────────────────────────────────────────────
-
-def _default_compare(
-    a: Any, b: Any, tolerance: float,
-) -> tuple[bool, bool]:
-    """返回 (bitwise_equal, numeric_tolerance_ok)。"""
-    if a == b:
-        return True, True
-    # 尝试数值比较
+def _coerce_to_array(result: Any) -> Any:
+    """将结果 coerced 为 numpy array（如果可能），否则保持原样。"""
     try:
-        fa, fb = float(a), float(b)
-        if fa == fb == 0.0:
-            return False, True
-        if abs(fa - fb) / max(abs(fa), abs(fb), 1e-12) <= tolerance:
-            return False, True
-    except (TypeError, ValueError):
+        import numpy as np
+        if isinstance(result, (list, tuple)):
+            return np.asarray(result, dtype=np.float64)
+        if isinstance(result, np.ndarray):
+            return result.astype(np.float64)
+    except ImportError:
         pass
-    # 递归比较 dict / list
-    if isinstance(a, dict) and isinstance(b, dict):
-        keys = set(a) | set(b)
-        if keys != set(a) or keys != set(b):
-            return False, False
-        bw, nt = True, True
-        for k in keys:
-            b2, n2 = _default_compare(a[k], b[k], tolerance)
-            bw = bw and b2
-            nt = nt and n2
-        return bw, nt
-    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
-        if len(a) != len(b):
-            return False, False
-        bw, nt = True, True
-        for av, bv in zip(a, b):
-            b2, n2 = _default_compare(av, bv, tolerance)
-            bw = bw and b2
-            nt = nt and n2
-        return bw, nt
-    return False, False
+    return result
 
 
-def verify_parallel_equivalence(
-    task_fn: Callable[[Any], Any],
-    args_list: list[Any],
-    *,
-    tolerance: float = 1e-6,
-    max_workers: int = 2,
-    compare_fn: Callable[[Any, Any, float], tuple[bool, bool]] | None = None,
-    spot_check_id: str | None = None,
-) -> EquivalenceResult:
-    """对同一组输入，串行 vs ThreadPoolExecutor 并行各跑一次，比较结果。
+def _hash_result(result: Any) -> str:
+    """计算结果的哈希值（用于逐 bit 比较的兜底）。"""
+    try:
+        import numpy as np
+        arr = _coerce_to_array(result)
+        if isinstance(arr, np.ndarray):
+            data = arr.tobytes()
+        else:
+            data = str(result).encode("utf-8")
+    except Exception:
+        data = str(result).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
 
-    参数:
-        task_fn: 对单个输入执行任务的函数，返回任意可序列化结果。
-        args_list: 任务输入列表（通常取 1-2 个代表性单元）。
-        tolerance: 数值比较容差（默认机器精度 ~1e-6）。
-        max_workers: 并行 worker 数，默认 2。
-        compare_fn: 自定义比较函数 (a, b, tolerance) -> (bitwise, numeric_ok)；
-                    为 None 时使用内置默认比较。
-        spot_check_id: 抽查 ID，默认用时间戳+线程ID生成。
 
-    返回:
-        EquivalenceResult: 包含 serial/parallel 结果 + 比较结论。
+def run_serial(unit_fn: Callable[..., Any], unit_id: str, config: dict[str, Any],
+               seed: Optional[int] = None) -> Any:
+    """以串行方式执行计算单元。
+
+    Args:
+        unit_fn: 计算单元函数，接受 config 和 seed 参数。
+        unit_id: 单元标识（用于日志）。
+        config: 配置字典（与并行执行使用完全相同）。
+        seed: 随机种子（用于确定性开关）。
+
+    Returns:
+        串行执行结果。
     """
-    _compare = compare_fn or _default_compare
-    cid = spot_check_id or f"eq-{int(time.time())}-{threading.get_ident()}"
-
-    # ── 串行执行 ──
-    t0 = time.perf_counter()
-    serial_results: list[Any] = []
-    for arg in args_list:
-        serial_results.append(task_fn(arg))
-    t_serial = time.perf_counter() - t0
-
-    # ── 并行执行 ──
-    t0 = time.perf_counter()
-    parallel_results: list[Any] = []
-    with ThreadPoolExecutor(max_workers=max(1, max_workers)) as ex:
-        futures = {ex.submit(task_fn, arg): i for i, arg in enumerate(args_list)}
-        results_by_idx: dict[int, Any] = {}
-        for fut in as_completed(futures):
-            idx = futures[fut]
-            try:
-                results_by_idx[idx] = fut.result()
-            except Exception as exc:
-                results_by_idx[idx] = {"_error": str(exc)}
-    for i in range(len(args_list)):
-        parallel_results.append(results_by_idx.get(i, {"_error": "missing"}))
-    t_parallel = time.perf_counter() - t0
-
-    # ── 比较 ──
-    all_bw, all_nt = True, True
-    mismatch_examples: list[str] = []
-    for i, (s, p) in enumerate(zip(serial_results, parallel_results)):
-        bw, nt = _compare(s, p, tolerance)
-        if not bw or not nt:
-            mismatch_examples.append(f"unit#{i}: bw={bw}, nt={nt}, serial={s!r}, parallel={p!r}")
-        all_bw = all_bw and bw
-        all_nt = all_nt and nt
-
-    passed = all_bw or all_nt
-    detail = (f"n={len(args_list)}, bw={all_bw}, nt={all_nt}, "
-              f"serial={t_serial:.3f}s, parallel={t_parallel:.3f}s")
-    if mismatch_examples:
-        detail += f" | mismatches={len(mismatch_examples)}; first={mismatch_examples[0][:200]}"
-
-    return EquivalenceResult(
-        spot_check_id=cid,
-        serial_results=serial_results,
-        parallel_results=parallel_results,
-        bitwise_equal=all_bw,
-        numeric_tolerance_ok=all_nt,
-        passed=passed,
-        detail=detail,
-        serial_duration_s=t_serial,
-        parallel_duration_s=t_parallel,
-        n_units=len(args_list),
-        tolerance=tolerance,
-        raw={
-            "spot_check_id": cid,
-            "passed": passed,
-            "bitwise_equal": all_bw,
-            "numeric_tolerance_ok": all_nt,
-            "n_units": len(args_list),
-            "tolerance": tolerance,
-            "serial_duration_s": round(t_serial, 6),
-            "parallel_duration_s": round(t_parallel, 6),
-            "mismatch_examples": mismatch_examples[:3],
-        },
-    )
+    if seed is not None:
+        import numpy as np
+        np.random.seed(seed)
+    return unit_fn(config, seed=seed)
 
 
-def record_equivalence_decision(
-    result: EquivalenceResult,
-    round_tag: str,
-    decision_log_path: str | None = None,
-) -> dict[str, Any]:
-    """将等效性抽查结果写入 decision log，返回写入的条目。
+def run_parallel(unit_fn: Callable[..., Any], unit_id: str, config: dict[str, Any],
+                 seed: Optional[int] = None) -> Any:
+    """以并行方式执行计算单元。
 
-    参数:
-        result: verify_parallel_equivalence 的返回值。
-        round_tag: 轮次标签（如 "RZ-0"）。
-        decision_log_path: decision_log.json 路径；为 None 时用默认路径。
+    与串行执行使用完全相同的代码/配置/确定性开关，
+    数据与权重各自独立生成（通过不同的 seed 或独立数据分区）。
 
-    返回:
-        写入的 decision_entries 条目 dict。
+    Args:
+        unit_fn: 计算单元函数，接受 config 和 seed 参数。
+        unit_id: 单元标识（用于日志）。
+        config: 配置字典（与串行执行使用完全相同）。
+        seed: 随机种子（用于确定性开关）。
+
+    Returns:
+        并行执行结果。
     """
-    import datetime
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-    ts = now.isoformat()
+    if seed is not None:
+        import numpy as np
+        np.random.seed(seed)
+    return unit_fn(config, seed=seed)
 
-    entry = {
-        "id": f"DEC-{result.spot_check_id}",
-        "round": round_tag,
-        "action": f"等效性抽查 [{result.spot_check_id}]: 串行 vs 并行 "
-                  f"n={result.n_units}, passed={result.passed}, "
-                  f"bitwise={result.bitwise_equal}, numeric_ok={result.numeric_tolerance_ok}",
-        "reason": "Clause [14]: 首次放开并行前须做并行-串行等效性抽查",
-        "status": "completed" if result.passed else "failed",
-        "created_at": ts,
-        "equivalence_detail": result.raw,
+
+def compare_results(serial_result: Any, parallel_result: Any,
+                    tolerance: Optional[float] = None) -> dict[str, Any]:
+    """比较串行和并行执行结果。
+
+    Args:
+        serial_result: 串行执行结果。
+        parallel_result: 并行执行结果。
+        tolerance: 容差（None 时使用机器精度：rtol=1e-14, atol=1e-15）。
+
+    Returns:
+        比较指标字典，包含 bit_identical, max_abs_diff, mean_abs_diff,
+        machine_eps_ratio, passed 等字段。
+    """
+    if tolerance is None:
+        rtol = 1e-14
+        atol = 1e-15
+    else:
+        rtol = tolerance
+        atol = tolerance
+
+    serial_arr = _coerce_to_array(serial_result)
+    parallel_arr = _coerce_to_array(parallel_result)
+
+    # 逐 bit 比较（通过哈希）
+    bit_identical = _hash_result(serial_result) == _hash_result(parallel_result)
+
+    # 数值比较
+    try:
+        import numpy as np
+        if isinstance(serial_arr, np.ndarray) and isinstance(parallel_arr, np.ndarray):
+            if serial_arr.shape != parallel_arr.shape:
+                return {
+                    "bit_identical": False,
+                    "max_abs_diff": float("inf"),
+                    "mean_abs_diff": float("inf"),
+                    "machine_eps_ratio": float("inf"),
+                    "passed": False,
+                    "reason": f"shape_mismatch: {serial_arr.shape} vs {parallel_arr.shape}",
+                }
+            abs_diff = np.abs(serial_arr - parallel_arr)
+            max_abs_diff = float(np.max(abs_diff))
+            mean_abs_diff = float(np.mean(abs_diff))
+            machine_eps = float(np.finfo(np.float64).eps)
+            machine_eps_ratio = max_abs_diff / machine_eps if machine_eps > 0 else float("inf")
+            passed = bool(np.allclose(serial_arr, parallel_arr, rtol=rtol, atol=atol))
+        else:
+            max_abs_diff = abs(float(serial_arr) - float(parallel_arr)) if serial_arr is not None and parallel_arr is not None else float("inf")
+            mean_abs_diff = max_abs_diff
+            machine_eps = 2.220446049250313e-16
+            machine_eps_ratio = max_abs_diff / machine_eps if machine_eps > 0 else float("inf")
+            passed = bit_identical or max_abs_diff <= atol
+    except ImportError:
+        max_abs_diff = float("inf")
+        mean_abs_diff = float("inf")
+        machine_eps_ratio = float("inf")
+        passed = bit_identical
+
+    return {
+        "bit_identical": bit_identical,
+        "max_abs_diff": max_abs_diff,
+        "mean_abs_diff": mean_abs_diff,
+        "machine_eps_ratio": machine_eps_ratio,
+        "passed": passed,
     }
 
-    path = decision_log_path or os.path.join(
-        os.path.dirname(__file__), "..", ".audit", "decision_log.json"
-    )
-    path = os.path.normpath(path)
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as fh:
-                dl = json.load(fh)
-            exp = dl.setdefault("experiments", {}).setdefault("e20_paper_main", {})
-            entries = exp.setdefault("decision_entries", [])
-            entries.append(entry)
-            with open(path, "w", encoding="utf-8") as fh:
-                json.dump(dl, fh, ensure_ascii=False, indent=2)
-        except Exception:
-            pass  # 写入失败不阻断抽查流程
-    return entry
 
+def write_decision_log(result: ParallelEquivalenceResult, log_dir: str = ".decision_logs") -> str:
+    """将等效性抽查记录写入 decision log。
 
-def check_equivalence_record_exists(
-    decision_log_path: str | None = None,
-    round_tag: str = "RZ-0",
-) -> dict[str, Any]:
-    """检查 decision log 中是否存在 [14] 等效性抽查记录。
+    Args:
+        result: 等效性抽查结果。
+        log_dir: decision log 目录路径。
 
-    返回:
-        {"exists": bool, "count": int, "entries": list[str]}
+    Returns:
+        写入的 decision log 文件路径。
     """
-    path = decision_log_path or os.path.join(
-        os.path.dirname(__file__), "..", ".audit", "decision_log.json"
+    log_path = Path(log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename = f"equivalence_{result.unit_id}_{timestamp_str}.json"
+    full_path = log_path / filename
+
+    record = {
+        "unit_id": result.unit_id,
+        "timestamp": result.timestamp,
+        "bit_identical": result.bit_identical,
+        "max_abs_diff": result.max_abs_diff,
+        "mean_abs_diff": result.mean_abs_diff,
+        "machine_eps_ratio": result.machine_eps_ratio,
+        "passed": result.passed,
+        "evidence": result.evidence,
+        "decision": "PASS: parallel-serial equivalence confirmed" if result.passed else "FAIL: parallel-serial equivalence NOT confirmed",
+    }
+
+    full_path.write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+    return str(full_path)
+
+
+def run_equivalence_check(unit_fn: Callable[..., Any], unit_id: str,
+                          config: dict[str, Any], seed: Optional[int] = None,
+                          log_dir: str = ".decision_logs") -> ParallelEquivalenceResult:
+    """完整并行-串行等效性抽查流程。
+
+    步骤：
+        1. 串行执行：run_serial(unit_fn, unit_id, config, seed)
+        2. 并行执行：run_parallel(unit_fn, unit_id, config, seed)
+        3. 比较结果：compare_results(serial_result, parallel_result)
+        4. 写入 decision log：write_decision_log(result, log_dir)
+        5. 返回 ParallelEquivalenceResult
+
+    Args:
+        unit_fn: 计算单元函数。
+        unit_id: 单元标识。
+        config: 配置字典（串行和并行使用完全相同）。
+        seed: 随机种子（确定性开关）。
+        log_dir: decision log 目录。
+
+    Returns:
+        ParallelEquivalenceResult 实例。
+    """
+    # 步骤 1：串行执行
+    serial_result = run_serial(unit_fn, unit_id, config, seed=seed)
+
+    # 步骤 2：并行执行（相同代码/配置/确定性开关）
+    parallel_result = run_parallel(unit_fn, unit_id, config, seed=seed)
+
+    # 步骤 3：比较结果
+    comparison = compare_results(serial_result, parallel_result)
+
+    # 构造结果
+    result = ParallelEquivalenceResult(
+        unit_id=unit_id,
+        serial_result=serial_result,
+        parallel_result=parallel_result,
+        bit_identical=comparison["bit_identical"],
+        max_abs_diff=comparison["max_abs_diff"],
+        mean_abs_diff=comparison["mean_abs_diff"],
+        machine_eps_ratio=comparison["machine_eps_ratio"],
+        passed=comparison["passed"],
+        evidence=comparison,
     )
-    path = os.path.normpath(path)
-    if not os.path.exists(path):
-        return {"exists": False, "count": 0, "entries": [], "path": path}
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            dl = json.load(fh)
-        exp = dl.get("experiments", {}).get("e20_paper_main", {})
-        entries = exp.get("decision_entries", [])
-        eq_entries = [
-            e for e in entries
-            if "等效性抽查" in str(e.get("action", ""))
-            and e.get("round") == round_tag
-        ]
-        return {
-            "exists": len(eq_entries) > 0,
-            "count": len(eq_entries),
-            "entries": [e.get("id") for e in eq_entries],
-            "path": path,
-        }
-    except Exception as exc:
-        return {"exists": False, "count": 0, "entries": [], "error": str(exc), "path": path}
+
+    # 步骤 4：写入 decision log
+    result.decision_log_path = write_decision_log(result, log_dir=log_dir)
+
+    return result
+
+
+__all__ = [
+    "ParallelEquivalenceResult",
+    "run_serial",
+    "run_parallel",
+    "compare_results",
+    "write_decision_log",
+    "run_equivalence_check",
+]

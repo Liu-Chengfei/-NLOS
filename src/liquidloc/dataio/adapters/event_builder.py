@@ -26,6 +26,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 from copy import deepcopy
 from math import isfinite
 from collections.abc import Iterable
@@ -51,6 +52,8 @@ __all__ = (
     "build_flow_events",
     "build_tof_events",
     "merge_and_finalize_events",
+    "nearest_neighbor_resample_events",
+    "build_unified_timeline",
 )
 
 # 模块加载时断言：event_builder 中硬编码的字段名必须与 sensor_contract 冻结合同一致。
@@ -405,6 +408,132 @@ def build_tof_events(
         }
         tof_events.append(event)
     return tof_events
+
+
+def nearest_neighbor_resample_events(
+    events: list[dict[str, Any]],
+    target_timestamps: list[float],
+    *,
+    modality_filter: str | None = None,
+) -> list[dict[str, Any]]:
+    """对指定模态事件做最近邻重采样，禁止插值抹平 NLOS 跳变。
+
+    条款[12] 核心要求：UWB/VIO 对齐到统一时间线时，对每个目标时间戳
+    取**绝对时间差最小**的原值（nearest-neighbor），不做任何线性/样条
+    插值，确保 NLOS 跳变被保留而非平滑掉。
+
+    参数:
+        events: 已排序的源事件列表（含 uwb/vio 模态）。
+        target_timestamps: 统一目标时间戳序列（等间隔或由较密传感器决定）。
+        modality_filter: 只重采样此模态；None 时对所有非 imu 模态生效。
+
+    返回:
+        重采样后的事件列表，每个目标时间戳对应一条事件，含 resampled 标记。
+
+    设计说明:
+        - 对每个 target_t，在源事件中找到 |t - target_t| 最小的事件
+        - 直接复制该事件的时间戳为 target_t，payload 原样保留（不插值）
+        - 返回事件带 '_resampled': True 标记，供 clause gate 核验
+    """
+    if not events:
+        return []
+    if not target_timestamps:
+        return []
+
+    modality_filter = modality_filter or "uwb"
+    source_events = [e for e in events if e.get("modality") == modality_filter]
+    if not source_events:
+        return []
+
+    source_timestamps = np.array([float(e["t"]) for e in source_events])
+    resampled: list[dict[str, Any]] = []
+
+    for target_t in target_timestamps:
+        target_t = float(target_t)
+        abs_diffs = np.abs(source_timestamps - target_t)
+        nearest_idx = int(np.argmin(abs_diffs))
+        original_event = deepcopy(source_events[nearest_idx])
+        original_event["t"] = target_t
+        original_event["dt"] = 0.0
+        original_event["_resampled"] = True
+        original_event["_resample_source_t"] = float(source_timestamps[nearest_idx])
+        original_event["_resample_abs_dt"] = float(abs_diffs[nearest_idx])
+        resampled.append(original_event)
+
+    return resampled
+
+
+def build_unified_timeline(
+    uwb_events: list[dict[str, Any]],
+    vio_events: list[dict[str, Any]],
+    *,
+    max_dt_s: float = 0.1,
+) -> tuple[list[float], str]:
+    """构建 UWB/VIO 统一时间线，取较密传感器的原始时间戳，扩展以覆盖两端。
+
+    参数:
+        uwb_events: UWB 事件列表（已按 t 排序）。
+        vio_events: VIO 事件列表（已按 t 排序）。
+        max_dt_s: 最大允许时间间隔，超过则插补一个目标时间戳。
+
+    返回:
+        (target_timestamps, source_side) 二元组。
+        source_side: 取 'uwb' 或 'vio' 中时间戳更密的作为基础。
+    """
+    if not uwb_events and not vio_events:
+        return [], "none"
+
+    uwb_ts = [float(e["t"]) for e in uwb_events] if uwb_events else []
+    vio_ts = [float(e["t"]) for e in vio_events] if vio_events else []
+
+    # 判断哪个传感器时间戳更密（用中位 dt 衡量）
+    def _median_dt(ts: list[float]) -> float:
+        if len(ts) < 2:
+            return float("inf") if len(ts) < 2 else 0.0
+        dts = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
+        dts.sort()
+        return dts[len(dts) // 2]
+
+    uwb_dt = _median_dt(uwb_ts)
+    vio_dt = _median_dt(vio_ts)
+
+    if uwb_dt <= vio_dt:
+        source_side = "uwb"
+        base_ts = uwb_ts
+    else:
+        source_side = "vio"
+        base_ts = vio_ts
+
+    if not base_ts:
+        return [], source_side
+
+    # 在两端延伸，确保覆盖所有源事件
+    t_min = min((uwb_ts + vio_ts)) if (uwb_ts or vio_ts) else 0.0
+    t_max = max((uwb_ts + vio_ts)) if (uwb_ts or vio_ts) else 0.0
+
+    # 从 base_ts 出发，向两端扩展
+    extended = list(base_ts)
+    # 向后延伸
+    t = base_ts[-1] + _median_dt(base_ts) if len(base_ts) >= 2 else base_ts[-1] + max_dt_s
+    while t <= t_max + 1e-9:
+        extended.append(t)
+        dt = _median_dt(base_ts) if len(base_ts) >= 2 else max_dt_s
+        t += dt
+    # 向前延伸
+    t = base_ts[0] - (_median_dt(base_ts) if len(base_ts) >= 2 else max_dt_s)
+    while t >= t_min - 1e-9:
+        extended.insert(0, t)
+        dt = _median_dt(base_ts) if len(base_ts) >= 2 else max_dt_s
+        t -= dt
+
+    extended.sort()
+    # 去重（容差 1e-6）
+    unique_ts = [extended[0]] if extended else []
+    for t in extended[1:]:
+        if abs(t - unique_ts[-1]) > 1e-6:
+            unique_ts.append(t)
+
+    return unique_ts, source_side
 
 
 def merge_and_finalize_events(

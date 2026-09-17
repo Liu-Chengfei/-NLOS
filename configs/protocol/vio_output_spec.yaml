@@ -1,0 +1,42 @@
+# 文件职责：声明 VIO 传感器输出数据规范（第42条配置落点）。
+# 本文件是手册第42条的配置落点，声明 VIO 前端类型、采样频率与输出数据结构。
+# 验证：第42条要求 VIO（单目+IMU 前端，20 Hz）；输出 vio_pos（N×2/3）+ vio_yaw（N×1）+ vio_valid（N×1）+ 协方差（V0 健康档有效帧率 100%）。
+
+# VIO 传感器输出规范（对应手册第[42]条）
+sensor_type: "单目+IMU 前端"
+frequency_hz: 20
+
+# 输出数据字段声明
+output_fields:
+  - name: "vio_pos"
+    description: "N×2/3 位置输出，2D/3D 可选"
+    dimensions: "N×2/3"
+    unit: "m"
+    type: "位置矩阵"
+  - name: "vio_yaw"
+    description: "N×1 航向角输出"
+    dimensions: "N×1"
+    unit: "rad"
+    type: "航向向量"
+  - name: "vio_valid"
+    description: "N×1 有效标志"
+    dimensions: "N×1"
+    unit: "bool"
+    type: "有效标志向量"
+  - name: "covariance"
+    description: "协方差输出，V0 健康档有效帧率 100%"
+    dimensions: "N×3/6"
+    unit: "m² 和 rad²"
+    type: "协方差矩阵"
+
+# 数据格式说明
+data_format:
+  vio_pos: "形状为 (N, 2) 或 (N, 3) 的浮点矩阵，N 为时间步数，2/3 为位置维度（x/y 或 x/y/z），值域为位置值(单位: m)"
+  vio_yaw: "形状为 (N, 1) 的浮点向量，N 为时间步数，值为航向角(单位: rad)"
+  vio_valid: "形状为 (N, 1) 的布尔向量，N 为时间步数，标识对应帧是否有效"
+  covariance: "形状为 (N, 3) 或 (N, 6) 的浮点矩阵，N 为时间步数，3/6 为协方差维度（位置/姿态方差），值域为方差值(单位: m² 和 rad²)"
+
+# V0 健康档声明
+v0_health_frame_rate: 1.0
+v0_health_frame_rate_pct: "100%"
+v0_health_declaration: "V0 健康档有效帧率 100%"

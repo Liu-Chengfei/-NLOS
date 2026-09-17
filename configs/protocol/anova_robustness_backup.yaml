@@ -1,0 +1,16 @@
+# 条款 [61] ANOVA稳健性后备配置
+# 手册原文：若方差齐性严重违反，ANOVA 结果以非参数替代（如 Aligned Rank Transform 或对四组合做 Kruskal-Wallis + 事后 Dunn）作为稳健性后备，正文报告两种口径（方差分析的前提检验与效应量报告是统计报告标准组成部分）
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第334行
+
+clause_id: "61"
+clause_name: "ANOVA稳健性后备"
+
+variance_homogeneity_test: true
+nonparametric_alternative:
+  - "Aligned Rank Transform"
+  - "Kruskal-Wallis"
+post_hoc_test: "Dunn"
+report_both_formats: true
+description: "方差齐性违反时以非参数方法作为稳健性后备，正文报告两种口径"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第334行"

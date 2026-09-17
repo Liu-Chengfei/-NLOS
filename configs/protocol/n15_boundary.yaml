@@ -1,0 +1,13 @@
+# [45] N1.5 边界协议 — 不在本手册档位协议条款档位表内
+scope_note: "N1.5 不在本手册档位协议条款档位表内"
+n15_params:
+  rho: "20-25%"
+  mu: "1.5-2.5m"
+  sigma: "0.5m"
+current_manual_n_axis: [N0, N1, N2, N3]
+n15_belongs_to_other_system: true
+n15_executed_by_own_protocol: true
+other_system_protocol: "其各自对应协议文件"
+other_system_n_axis_includes_n15: true
+exclusion_reason: "本手册引用协议 N 轴为 N0–N3，不包含 N1.5"
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第300行"

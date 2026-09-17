@@ -1,0 +1,43 @@
+# 条款 [38] 规模不可降级（硬约束）配置
+# 手册位置：docs/异步实验_执行手册_终版v15_总纲条款版.md 第286行
+# 通过标准：hard_constraint=true 且降级策略为串行排队 且禁止降seed/降轨迹
+
+# 硬约束声明
+hard_constraint: true
+
+# 资源不足时的降级策略
+downgrade_policy:
+  action: "降为串行排队执行"
+  scope: "同一 GPU 上逐单元依次跑完"
+  budget: "预算固定"
+  no_expand: "不换卡/不加机/不扩资源"
+  description: >
+    全文档任何环节出现资源不足时，降为串行排队执行：
+    同一 GPU 上逐单元依次跑完，预算固定，不换卡、不加机、不扩资源。
+
+# 禁止项
+forbidden_actions:
+  no_reduce_seed: true
+  no_reduce_trajectory: true
+  no_downscale_to_finish: true
+  description: >
+    禁止以降 seed 换取跑完（no_reduce_seed=true）；
+    禁止以降轨迹数换取跑完（no_reduce_trajectory=true）；
+    禁止以降规模（降 sample/降 batch/降精度等）降级运行来跑完（no_downscale_to_finish=true）。
+
+# 资源不足时的动作
+resource_insufficient_action: "降为串行排队执行，同一 GPU 上逐单元依次跑完，预算固定，不换卡/不加机/不扩资源"
+
+# 退出策略
+exit_policy: "降级跑出的统计不满足功效声明，等于作废；R 系列不得以降级规模重跑为出口，只能追加补齐或诚实声明边界"
+
+# 约束声明
+constraint_declaration:
+  clause_reference: "[38]"
+  discipline_level: "hard"
+  scale_non_degradable: true
+  no_seed_reduction: true
+  no_trajectory_reduction: true
+  description: >
+    规模不可降级：任何环节资源不足时禁止降 seed、降轨迹数或降规模来跑完。
+    降级跑出的统计不满足功效声明，等于作废。

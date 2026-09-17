@@ -1,0 +1,36 @@
+# 档位协议条款 · K轴 —— 锚点配置
+# 对应手册第22条 (docs/异步实验_执行手册_终版v15_总纲条款版.md 第230-236行)
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+#
+# 原 G 轴并入 K 轴。锚数全档固定 4。模型输入不含锚点坐标。
+protocol_version: 27
+clause_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第230-236行"
+axis: K
+axis_name: "锚点配置(Anchor Geometry)"
+axis_description: "锚点布局与 GDOP 档位。原 G 轴并入 K 轴。锚数全档固定 4。模型输入不含锚点坐标。"
+
+constraint_declaration:
+  origin: "G 轴并入 K 轴"
+  anchor_count_fixed: 4
+  model_input_no_anchor_coords: true
+
+# K0：4 锚对称（矩形四角），GDOP 1.5–2.5，最优几何，方位均匀覆盖
+K0:
+  label: "4 锚对称（矩形四角）"
+  anchor_layout: "4 锚对称（矩形四角）"
+  gdop_range: [1.5, 2.5]
+  geometric_feature: "最优几何，方位均匀覆盖"
+
+# K1：4 锚非对称欠定，GDOP 3–5，锚点分布不均、存在共线倾向
+K1:
+  label: "4 锚非对称欠定"
+  anchor_layout: "4 锚非对称欠定"
+  gdop_range: [3, 5]
+  geometric_feature: "锚点分布不均、存在共线倾向"
+
+# K3：4 锚近共线退化，GDOP 8–15+，3 锚近似共线 + 1 锚孤立，精度崩溃边缘
+K3:
+  label: "4 锚近共线退化"
+  anchor_layout: "4 锚近共线退化"
+  gdop_range: [8, 15]
+  geometric_feature: "3 锚近似共线 + 1 锚孤立，精度崩溃边缘"

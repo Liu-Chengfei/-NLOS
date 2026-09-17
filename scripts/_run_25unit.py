@@ -956,6 +956,25 @@ def main() -> int:
     _lim1 = compute_parallel_limits(len(seed_seq_map), _unit_peak_mb, "neural")
     print(f"[25unit][C-7] 阶段 1 并行度三值: gpu={_lim1['gpu_parallel']} ram={_lim1['ram_parallel']} "
           f"pending={_lim1['pending']} → final={_lim1['final_parallel']} (RAM 限额 {_lim1['ram_limit_gb']}GB)")
+    # [15]: 并行调度记录随 decision log 留痕
+    from liquidloc.common.parallel_scheduling_log import record_stage_scheduling as _rec_sched
+    _sched_counter = [0]
+    _stage1_units = [f"{today}-{seed_id}-liquid_ekf" for seed_id in sorted(seed_seq_map)]
+    _rec_sched(
+        stage_name="stage1_neural_lnn",
+        parallel_degree=max(1, _lim1["final_parallel"]),
+        gpu_parallel_limit=_lim1["gpu_parallel"],
+        ram_parallel_limit=_lim1["ram_parallel"],
+        pending_tasks=_lim1["pending"],
+        final_parallel=_lim1["final_parallel"],
+        ram_limit_gb=_lim1["ram_limit_gb"],
+        unit_ids=_stage1_units,
+        worker_assignments={u: (i % max(1, _lim1["final_parallel"])) + 1
+                            for i, u in enumerate(_stage1_units)},
+        decision="proceed",
+        notes="Stage 1: LNN liquid_ekf units, parallel scheduling does not alter paper-level accounting.",
+        record_counter=_sched_counter,
+    )
     lnn_preds_by_seed: dict[int, dict[str, Any]] = {}
     with ThreadPoolExecutor(max_workers=max(1, _lim1["final_parallel"])) as ex:
         lnn_futures = {}
@@ -988,6 +1007,26 @@ def main() -> int:
     _lim2 = compute_parallel_limits(len(seed_seq_map) * 4, _unit_peak_mb, "neural")  # 4 methods per seed
     print(f"[25unit][C-7] 阶段 2 并行度三值: gpu={_lim2['gpu_parallel']} ram={_lim2['ram_parallel']} "
           f"pending={_lim2['pending']} → final={_lim2['final_parallel']}")
+    # [15]: 阶段 2 并行调度记录
+    _stage2_units = []
+    for seed_id in sorted(seed_seq_map):
+        for method in ["lstm_ekf", "transformer_ekf", "ekf", "robust_ekf"]:
+            _stage2_units.append(f"{today}-{seed_id}-{method}")
+    _rec_sched(
+        stage_name="stage2_remaining_methods",
+        parallel_degree=max(1, _lim2["final_parallel"]),
+        gpu_parallel_limit=_lim2["gpu_parallel"],
+        ram_parallel_limit=_lim2["ram_parallel"],
+        pending_tasks=_lim2["pending"],
+        final_parallel=_lim2["final_parallel"],
+        ram_limit_gb=_lim2["ram_limit_gb"],
+        unit_ids=_stage2_units,
+        worker_assignments={u: (i % max(1, _lim2["final_parallel"])) + 1
+                            for i, u in enumerate(_stage2_units)},
+        decision="proceed",
+        notes="Stage 2: LSTM/Transformer/EKF/robust_EKF units, parallel scheduling does not alter paper-level accounting.",
+        record_counter=_sched_counter,
+    )
     with ThreadPoolExecutor(max_workers=max(1, _lim2["final_parallel"])) as ex:
         non_lnn_futures = {}
         for seed_id, seq_dirs in seed_seq_map.items():

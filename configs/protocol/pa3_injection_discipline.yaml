@@ -1,0 +1,12 @@
+# PA-3 档位注入纪律（参数怎么注入）
+# 对应手册条款 [47]：PA-3 档位注入纪律
+# 对应 Stage 1 档位协议条款 A 轴表（数值权威源）
+# 本文件约束 A 轴档位参数的注入方式：严格按静态口径注入，禁止引入随时间线性增长的时钟漂移作为额外档位。
+discipline_name: "PA-3 档位注入纪律"
+inject_what: "参数怎么注入"
+a_axis_nature: "静态时钟偏移/延迟统计口径"
+a_axis_source: "Stage 1 档位协议条款 A 轴表"
+strict_static_injection: true
+forbidden_drift_as_level: true
+drift_evaluation_path: "协议裁决项 + 敏感性分析"
+forbidden_drift_description: "随时间线性增长的时钟漂移作为额外档位"

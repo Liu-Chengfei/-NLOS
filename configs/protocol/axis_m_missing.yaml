@@ -1,0 +1,64 @@
+# 档位协议条款 · M轴 —— 数据缺失
+# 对应手册第23条 (docs/异步实验_执行手册_终版v15_总纲条款版.md 第238-248行)
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+#
+# 数据缺失定义：描述"到没到"——不可解帧/无测距值的缺失注入。
+# M轴缺失为成簇注入，产生长间隙
+protocol_version: 27
+clause_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第238-248行"
+axis: M
+axis_name: "数据缺失 (M轴)"
+axis_description: "描述'到没到'——不可解帧/无测距值的缺失注入。M轴缺失为成簇注入，产生长间隙。"
+
+constraint_declaration:
+  missing_type: "data_absence"  # 描述到没到，非不可解帧
+  injection_type: "clustered"  # 成簇注入，产生长间隙
+  m2_independent: true  # M2为各自15%（非合计）
+  m3_imu_limit: 0.05  # M3中IMU缺失率上限5%
+
+# M0：0%（理想传输）
+M0:
+  label: "理想传输"
+  description: "0%（理想传输）"
+  uwb_missing_rate: 0.00
+  vio_missing_rate: 0.00
+  imu_missing_rate: 0.00
+  missing_definition: "0%（理想传输）"
+  injection_type: "none"
+  cluster_gap_seconds: null
+
+# M1：UWB 5% 成簇丢包（含 NLOS 引起的不可解帧，统一为缺失注入；成簇产生长间隙 0.3–2 s）
+M1:
+  label: "UWB成簇丢包"
+  description: "UWB 5% 成簇丢包（含 NLOS 引起的不可解帧，统一为缺失注入；成簇产生长间隙 0.3–2 s）"
+  uwb_missing_rate: 0.05
+  vio_missing_rate: 0.00
+  imu_missing_rate: 0.00
+  missing_definition: "UWB 5% 成簇丢包（含 NLOS 引起的不可解帧，统一为缺失注入；成簇产生长间隙 0.3–2 s）"
+  injection_type: "clustered"
+  cluster_gap_seconds: [0.3, 2.0]
+
+# M2：UWB 15% + VIO 15%（各自独立）
+M2:
+  label: "UWB+VIO各自15%丢包"
+  description: "UWB 15% + VIO 15%（各自独立）"
+  uwb_missing_rate: 0.15
+  vio_missing_rate: 0.15
+  imu_missing_rate: 0.00
+  missing_definition: "UWB 15% + VIO 15%（各自独立）"
+  injection_type: "clustered"
+  cluster_gap_seconds: [0.3, 2.0]
+  independent_note: "M2为各自15%（非合计）"
+
+# M3：UWB 30% + VIO 30%（IMU 缺失率 ≤5%）
+M3:
+  label: "UWB+VIO30%丢包+IMU上限5%"
+  description: "UWB 30% + VIO 30%（IMU 缺失率 ≤5%）"
+  uwb_missing_rate: 0.30
+  vio_missing_rate: 0.30
+  imu_missing_rate: 0.05
+  missing_definition: "UWB 30% + VIO 30%（IMU 缺失率 ≤5%）"
+  injection_type: "clustered"
+  cluster_gap_seconds: [0.3, 2.0]
+  imu_missing_rate_limit: 0.05
+  imu_limit_note: "IMU是时间基准，缺失过高导致状态发散"

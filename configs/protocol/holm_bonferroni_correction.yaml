@@ -1,0 +1,15 @@
+# 条款 [60] Holm-Bonferroni 多重比较校正配置
+# 手册原文：两两比较（五方法共 10 对）附 Holm-Bonferroni 多重比较校正
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第332行
+
+clause_id: "60"
+clause_name: "Holm-Bonferroni校正"
+
+correction_method: "holm_bonferroni"
+num_methods: 5
+num_comparisons: 10
+pair_count: 10
+multiple_comparison_adjusted: true
+description: "五方法两两比较共10对，使用Holm-Bonferroni校正控制族错误率"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第332行"

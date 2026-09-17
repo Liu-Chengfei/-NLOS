@@ -406,6 +406,23 @@ class PreparePipeline(PipelineAPI):
             uwb_events = build_uwb_events(internal_bundle.get('uwb_raw', []), scene_id, seq_id)  # 构建 UWB 事件。
             vio_source_rows = internal_bundle.get('vio_raw', []) or _flow_rows_as_vio_rows(internal_bundle.get('flow_raw', []))  # 没有 vio 就用 flow 转。
             vio_events = build_vio_events(vio_source_rows, scene_id, seq_id)  # 构建 VIO 事件。
+
+            # 条款 [12] 最近邻重采样：UWB/VIO 对齐到统一时间线，禁止插值抹平 NLOS 跳变。
+            # IMU 保留原始时间戳（驱动 EKF 预测），不参与重采样。
+            if uwb_events and vio_events:
+                from liquidloc.dataio.adapters.event_builder import (
+                    build_unified_timeline,
+                    nearest_neighbor_resample_events,
+                )
+                _unified_ts, _source_side = build_unified_timeline(uwb_events, vio_events)
+                if _unified_ts:
+                    uwb_events = nearest_neighbor_resample_events(
+                        uwb_events, _unified_ts, modality_filter="uwb",
+                    )
+                    vio_events = nearest_neighbor_resample_events(
+                        vio_events, _unified_ts, modality_filter="vio",
+                    )
+
             events = merge_and_finalize_events([imu_events, uwb_events, vio_events])  # 合并并整理最终事件序列。
 
             # 展开 scene_axis_protocol，将 scene_parameters 写入事件 meta 和序列产物。

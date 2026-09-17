@@ -1,0 +1,30 @@
+# 条款 [54] 布局参数 vs 方法排序散点/箱线图配置
+# 手册原文：布局参数 vs 方法排序的散点/箱线（论文稳健性图）。
+
+clause_id: "54"
+clause_name: "布局参数vs方法排序散点/箱线图"
+
+chart_types:
+  - "scatter"
+  - "boxplot"
+
+x_axis: "布局参数"
+y_axis: "方法排序"
+
+robustness_plot: true
+
+plot_spec:
+  scatter:
+    title: "布局参数 vs 方法排序散点图"
+    x_label: "布局参数"
+    y_label: "方法排序（RMSE）"
+    color_by: "方法"
+    marker: "o"
+  boxplot:
+    title: "布局参数 vs 方法排序箱线图"
+    x_label: "布局参数"
+    y_label: "方法排序（RMSE）"
+    notch: false
+    show_outliers: true
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第318行"

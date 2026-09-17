@@ -1,0 +1,35 @@
+# 文件职责：声明 IMU 传感器输出数据规范（第41条配置落点）。
+# 本文件是手册第41条的配置落点，声明 IMU 芯片类型、采样频率与输出数据结构。
+# 验证：第41条要求 IMU（消费级，150Hz）；输出 imu(N_imu×6, ax/ay/az/gx/gy/gz) + imu_t(N_imu×1, 自身时间戳)。
+
+# IMU 传感器输出规范（对应手册第[41]条）
+chip_type: "消费级"
+frequency_hz: 150
+
+# 输出数据字段声明
+output_fields:
+  - name: "imu"
+    description: "N_imu×6 惯性测量数据，ax/ay/az/gx/gy/gz"
+    dimensions: "N_imu×6"
+    channels: ["ax", "ay", "az", "gx", "gy", "gz"]
+    unit: "m/s² 和 rad/s"
+    type: "惯性测量矩阵"
+    native_rate: true
+    downsample: false
+    note: "150Hz 原生，不降采样"
+  - name: "imu_t"
+    description: "N_imu×1 自身时间戳"
+    dimensions: "N_imu×1"
+    unit: "s"
+    type: "时间戳向量"
+
+# 数据格式说明
+data_format:
+  imu: "形状为 (N_imu, 6) 的浮点矩阵，N_imu 为时间步数，6 为通道数（ax/ay/az/gx/gy/gz），值域为加速度(m/s²)和角速度(rad/s)，150Hz 原生不降采样"
+  imu_t: "形状为 (N_imu, 1) 的浮点向量，N_imu 为时间步数，值为 IMU 自身时间戳"
+
+# 频率与降采样声明
+sampling_declaration:
+  native_frequency_hz: 150
+  downsample_allowed: false
+  declaration: "150Hz 原生，不降采样"

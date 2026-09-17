@@ -1,0 +1,27 @@
+# 手册条款 [26] 运行断言：冒烟阶段探针断言
+# 手册引用: docs/异步实验_执行手册_终版v15_总纲条款版.md 第262行
+# 原文: [26] 运行断言：冒烟阶段探针断言（批形状/梯度范数/loss 轨迹）——至少选两种且必含 loss 轨迹与梯度范数
+
+protocol_version: "v15"
+manual_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第262行"
+clause_id: "[26]"
+
+assertion_types:
+  - batch_shape
+  - gradient_norm
+  - loss_trajectory
+
+constraint_declaration:
+  min_assertion_types: 2
+  required_assertion_types:
+    - loss_trajectory
+    - gradient_norm
+  assertion_stage: "smoke_stage"
+  assertion_type: "runtime_assertion"
+  probe_target: "冒烟阶段探针断言"
+
+# 配置说明:
+# - assertion_types: 断言类型列表，必须包含至少2种
+# - 必含字段: loss_trajectory（loss轨迹）、gradient_norm（梯度范数）
+# - 可选字段: batch_shape（批形状）
+# - constraint_declaration: 约束声明，至少选两种、必含 loss 轨迹与梯度范数

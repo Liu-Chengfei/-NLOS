@@ -1,0 +1,13 @@
+# 条款 [57] 划分按整条序列、训练与测试无重叠
+# 手册原文：划分按整条序列、训练与测试无重叠（第324行）
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第324行
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+
+clause_id: "57"
+clause_name: "划分按整条序列、训练与测试无重叠"
+split_method: "按整条序列划分"
+split_unit: "整条序列"
+train_test_no_overlap: true
+overlap_check_method: "轨迹ID唯一性检验"
+description: "划分单位必须是完整轨迹序列，训练集与测试集之间轨迹不交叉"
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第324行"

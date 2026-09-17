@@ -1,0 +1,17 @@
+# 条款 [27] 无临时脚本配置
+# 手册位置：docs/异步实验_执行手册_终版v15_总纲条款版.md 第264行
+# 通过标准：bash_tool_* / tmp_* / temp_* = 0
+
+forbidden_patterns:
+  - "bash_tool_*"
+  - "tmp_*"
+  - "temp_*"
+
+constraint_declaration:
+  clause_reference: "[27] 第3项 无临时脚本"
+  source_file: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+  source_line: 264
+  pass_criteria: "bash_tool_*、tmp_*、temp_* 三种命名模式的文件数量必须等于 0"
+  scan_scope: "工作区根目录（排除 .git、.venv-gpu、__pycache__ 等版本控制/缓存目录）"
+  enforcement: "hard"
+  related_clause: "第3项 无临时脚本；通过标准：bash_tool_* / tmp_* / temp_* = 0"

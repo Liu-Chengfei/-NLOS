@@ -1,0 +1,14 @@
+# 条款 [59] 配对样本对齐配置
+# 手册原文：配对样本对齐：各方法评估按"同一测试轨迹 × 同 seed"配对
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第330行
+
+clause_id: "59"
+clause_name: "配对样本对齐"
+
+paired_eval: true
+same_test_trajectory: true
+same_seed: true
+pairing_key: "同一测试轨迹 × 同 seed"
+description: "各方法评估按同一测试轨迹和同一 seed 进行配对比较"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第330行"

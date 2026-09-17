@@ -1,0 +1,17 @@
+{
+  "unit_id": "p14_test",
+  "timestamp": "2026-09-16T18:12:51.173436+00:00",
+  "bit_identical": true,
+  "max_abs_diff": 0.0,
+  "mean_abs_diff": 0.0,
+  "machine_eps_ratio": 0.0,
+  "passed": true,
+  "evidence": {
+    "bit_identical": true,
+    "max_abs_diff": 0.0,
+    "mean_abs_diff": 0.0,
+    "machine_eps_ratio": 0.0,
+    "passed": true
+  },
+  "decision": "PASS: parallel-serial equivalence confirmed"
+}

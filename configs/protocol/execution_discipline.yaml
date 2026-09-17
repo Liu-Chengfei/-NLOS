@@ -1,0 +1,141 @@
+# 执行工序总控纪律（硬约束）
+# 对应手册第29条 (docs/异步实验_执行手册_终版v15_总纲条款版.md 第268行)
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+protocol_version: "v15"
+manual_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第268行"
+clause_id: "29"
+
+# 纪律级别
+discipline_level: "hard"
+description_discipline: >
+  本条款为硬约束，每批开工与结束的统一工序把"门禁执行"变成固定动作序列，
+  防漏步/跳步。任何情况下不跳过本工序直接跑实验代码。
+
+# 批次单位定义
+batch_unit:
+  definition: "每个批次 = 一个阶段链切片（如 Pre 批 / 冒烟批 / 每 5–10 单元一批）"
+  examples:
+    - "Pre 批"
+    - "冒烟批"
+    - "每 5–10 单元一批"
+  description: >
+    本手册全流程按批次推进，批次是阶段链的切片，每个批次有明确的 gate 清单
+    与出口判据。批次之间通过 decision log 的断点状态衔接。
+
+# 固定工序（每批开工与结束都按下列固定工序执行）
+fixed_procedure:
+  - step: "开工读三样锚点"
+    order: 1
+    mandatory: true
+    description: >
+      开工时必须先读三样锚点，不许凭印象直接开跑下一段。
+      三样锚点 = 阶段覆盖总表中本批涉及的 gate 清单与出口判据。
+  - step: "读上一批 decision log 断点状态"
+    order: 2
+    mandatory: true
+    description: >
+      读取上一批 decision log 的"断点状态"（上批跑到哪个 gate、
+      留了什么未决项）。三样读完才允许执行本批动作。
+  - step: "执行本批动作"
+    order: 3
+    mandatory: true
+    description: >
+      三样锚点读完且确认无误后，才开始执行本批动作。
+      动作内容由阶段覆盖总表定义。
+  - step: "本批 gate 出口全绿"
+    order: 4
+    mandatory: true
+    description: >
+      本批 gate 的必交物（对照必交物表逐行）全部存在且断言通过（核对脚本），
+      才写 decision log 增量并进入下一 gate。
+  - step: "写 decision log 增量"
+    order: 5
+    mandatory: true
+    description: >
+      本批 gate 出口全绿后，写 decision log 增量记录本批完成情况，
+      包括跑到的 gate、留的未决项、下一步计划。
+  - step: "结束本批"
+    order: 6
+    mandatory: true
+    description: >
+      所有必交物存在且断言通过后，本批结束，准备进入下一批。
+
+# 开工必做
+required_at_start:
+  - action: "read_three_anchors"
+    description: >
+      开工先读三样锚点（防"读到旧文/凭记忆执行"）：
+      阶段覆盖总表中本批涉及的 gate 清单与出口判据。
+    must_complete_before_action: true
+  - action: "read_previous_batch_decision_log"
+    description: >
+      读取上一批 decision log 的断点状态（上批跑到哪个 gate、
+      留了什么未决项）。
+    must_complete_before_action: true
+  - action: "confirm_batch_scope"
+    description: >
+      确认本批范围（阶段覆盖总表中本批涉及的 gate 清单与出口判据）。
+    must_complete_before_action: true
+
+# 结束必做
+required_at_end:
+  - action: "verify_gate_exit_green"
+    description: >
+      gate 出口全绿才前进——本批 gate 的必交物（对照必交物表逐行）
+      全部存在且断言通过（核对脚本）。
+    must_complete_before_proceed: true
+  - action: "write_decision_log_increment"
+    description: >
+      写 decision log 增量记录本批完成情况。
+    must_complete_before_proceed: true
+  - action: "confirm_next_batch_readiness"
+    description: >
+      确认可以进入下一批（gate 全绿 + decision log 已更新）。
+    must_complete_before_proceed: true
+
+# 三样锚点定义
+three_anchors:
+  anchor_1:
+    name: "阶段覆盖总表中本批涉及的 gate 清单"
+    description: >
+      阶段覆盖总表中本批涉及的 gate 清单。
+      防"读到旧文/凭记忆执行"。
+    source: "阶段覆盖总表"
+  anchor_2:
+    name: "阶段覆盖总表中本批涉及的出口判据"
+    description: >
+      阶段覆盖总表中本批涉及的出口判据。
+      防"读到旧文/凭记忆执行"。
+    source: "阶段覆盖总表"
+  anchor_3:
+    name: "上一批 decision log 的断点状态"
+    description: >
+      上一批 decision log 的"断点状态"（上批跑到哪个 gate、
+      留了什么未决项）。
+      三样读完才允许执行本批动作。
+    source: "decision log"
+  read_sequence:
+    - "anchor_1: gate 清单"
+    - "anchor_2: 出口判据"
+    - "anchor_3: 断点状态"
+  read_complete_before_action: true
+  description_three_anchors: >
+    开工先读三样锚点（防"读到旧文/凭记忆执行"）：
+    阶段覆盖总表中本批涉及的 gate 清单与出口判据；
+    上一批 decision log 的断点状态（上批跑到哪个 gate、
+    留了什么未决项）。三样读完才允许执行本批动作。
+
+# 约束声明
+constraint_declaration:
+  clause_reference: "手册第29条"
+  discipline_level: "hard"
+  fixed_procedure_mandatory: true
+  no_skip_allowed: true
+  no_impression_execution: true
+  must_read_three_anchors_before_action: true
+  batch_boundary_gate_check: true
+  decision_log_incremental_required: true
+  description_constraint: >
+    不许凭印象直接开跑下一段。
+    每批开工与结束都按固定工序执行，把"门禁执行"变成固定动作序列，
+    防漏步/跳步。

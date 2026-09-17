@@ -1,0 +1,20 @@
+# 条款 [65] 先导实验配置
+# 手册原文：先导实验（pilot）（如需）单独用于方案冻结前估计效应量/方差/可行性，规模 ≤ 1 seed × 四组合各 1–2 条测试轨迹
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第342行
+
+clause_id: "65"
+clause_name: "先导实验"
+
+pilot_required: true
+pilot_timing: "方案冻结前"
+pilot_purpose: ["效应量估计", "方差估计", "可行性评估"]
+
+pilot_scale:
+  seed_count: 1
+  combinations: 4
+  trajectories_per_combo: [1, 2]
+  max_trajectories_per_combo: 2
+
+pilot_scope_description: "规模 ≤ 1 seed × 四组合各 1–2 条测试轨迹"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第342行"

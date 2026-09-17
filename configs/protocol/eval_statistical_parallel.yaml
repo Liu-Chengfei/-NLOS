@@ -1,0 +1,46 @@
+# 评估与统计并行协议配置
+# 对应手册第25条 (docs/异步实验_执行手册_终版v15_总纲条款版.md 第260行)
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+protocol_version: 28
+clause_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第260行"
+clause_id: "25"
+
+# 并行模式定义
+parallel_mode: "轨迹独立并行"
+description: >
+  测试轨迹推理在 GPU 上按轨迹独立并行执行。每个轨迹独立处理，
+  轨迹内部使用 batch_size=16 的批处理，不同轨迹之间不混合批次（C-2）。
+
+# GPU 执行设置
+gpu_execution: true
+description_gpu: "评估与统计推理在 GPU 上执行，默认使用 CUDA 设备"
+
+# 轨迹独立并行设置
+trajectory_independent: true
+description_trajectory_independent: "每个轨迹独立处理，不与其他轨迹混批"
+
+# 轨迹内批大小（手册定义 = 16）
+trajectory_batch_size: 16
+
+# 轨迹间不混批（C-2 要求）
+no_batch_mixing: true
+description_no_batch_mixing: >
+  轨迹间不混批：不同轨迹的数据不混合在同一 batch 中处理，
+  确保每个 batch 内的数据来自单一轨迹。对应参考准则 C-2。
+
+# 参考准则
+criterion_ref: "C-2"
+
+# 约束声明
+constraint_declaration:
+  trajectory_internal_batch_size: 16
+  trajectory_independent_parallel: true
+  no_mixing_across_trajectories: true
+  gpu_execution_default: true
+  criterion_reference: "C-2"
+  implementation_note: >
+    实现时须确保：
+    - 每个轨迹独立送入 GPU 推理
+    - 轨迹内部 batch_size=16
+    - 不同轨迹数据不混批（按轨迹 ID 或序列 ID 隔离）
+    - 统计评估结果按轨迹独立汇总后合并

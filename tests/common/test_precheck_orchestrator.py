@@ -432,13 +432,17 @@ class TestCoordinateAndImplementationChecks:
 
     def test_P11_pass(self):
         r = check_P11_input_isolation({
-            "input_features": ["range", "imu", "vio", "t"],
+            "model_cfg": {
+                "feature_order": ["dt", "ax", "ay", "gz", "range", "dx", "dy", "dyaw"],
+            },
         })
         assert r.passed
 
     def test_P11_fail_leaked(self):
         r = check_P11_input_isolation({
-            "input_features": ["range", "imu", "vio", "t", "anchor_x", "anchor_y"],
+            "model_cfg": {
+                "feature_order": ["dt", "ax", "ay", "gz", "range", "dx", "dy", "dyaw", "anchor_x", "anchor_y"],
+            },
         })
         assert not r.passed
 
@@ -847,7 +851,9 @@ class TestRunAllPrechecks:
             # P10
             "has_z_in_2d_metrics": False, "coordinate_dim": 2,
             # P11
-            "input_features": ["range", "imu", "vio", "t"],
+            "model_cfg": {
+                "feature_order": ["dt", "ax", "ay", "gz", "range", "dx", "dy", "dyaw"],
+            },
             # P12
             "train_nlos_stats": {"rho": 0.30, "mu_m": 5.0},
             "test_nlos_stats": {"rho": 0.32, "mu_m": 5.1},
@@ -980,7 +986,7 @@ class TestRunAllPrechecks:
         cfg = self._build_clean_cfg()
         # 故意破坏几项
         cfg["composition_counts"] = {"A2N2": 100, "A2N3": 0, "A3N2": 0, "A3N3": 0}  # P1 fail
-        cfg["input_features"] = ["range", "anchor_x"]  # P11 leak
+        cfg["model_cfg"]["feature_order"] = ["range", "anchor_x"]  # P11 leak（锚点绝对坐标进特征）
         cfg["n_seeds"] = 2  # P19 fail
         report = run_all_prechecks(cfg)
         assert report.overall_pass is False
