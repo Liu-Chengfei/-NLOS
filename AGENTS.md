@@ -1,83 +1,447 @@
-> 本 AGENTS.md 为「异步高NLOS实验」专属执行规则入口（条款 [1] 治理载体，规则层，精简版）。
-> 手册路径（唯一真源）：`docs/异步实验_执行手册_终版v15_总纲条款版.md`（764 条，7 阶段）。
+> 本 Stage 从五轴档位协议条款开始:档位参数为本实验场景规格唯一权威定义;随后为场景规格代码条款,逐条落实。
+> 
+> **五铁律**：
+> 1. 报告先于实验；
+> 2. 未清场不跑实验；
+> 3. 落实说明必须含函数名/改动点/断言，不得空话；
+> 4. 证据路径必须真实存在；
+> 5. 一旦本实验或另一实验进入论文级区间（重生成至验收），两实验不同时各跑论文级。
+> 
+> **唯一真源=本手册;状态只认磁盘;原文执行;不做解释性改编;一步一验失败即停、不确定不跑**
 
-## 治理载体分布（总纲全部内容由载体集合逐字承载，每行仅一份生效拷贝，与条款 [3] 一致）
-- 规则层（本文件）：五铁律 + 语言规则 + 手册第 6–15 行（三阶段制、0 清场）+ 手册第 121–166 行（归属总则、阶段执行地图、手册目标、底线、治理层条款 [1]–[5]）逐字；
-- 工序层 `.agents/skills/execution-report-gate/SKILL.md`：写/审/核落实报告时自动触发（触发词：落实报告、八字段、核验、验收、第 N 阶段）；§1 逐字收录手册第 17–119 行（落实报告格式规范），§2 细化扩展 + gate 检查项 + 常见错误 + 核查要点；唯一逐字载体。
-- 注入层 `.zcode/config.json` SessionStart 钩：会话启动/清空/压缩时自动注入五铁律 + 当前阶段磁盘状态；
-- 护栏层 `.zcode/config.json` PreToolUse 钩：第 0/1 阶段验收前拦截实验代码运行类命令；
-- 查询层 `.mcp.json` async-nlos-manual 服务器：按需检索手册 764 条原文（落实/复核条款时替代通读全文）；
-- 交接层 `docs/decision_log.md`：跨批交接 decision log 唯一载体。
+## 治理载体索引
 
-## 五铁律（本实验唯一规则入口，逐字遵循；条文取自手册治理类落实示例）
-1. 唯一真源 = 本实验《执行手册》（764 条），其他提示词不覆盖手册任何条款；
-2. 状态只认磁盘：进度/结果/是否已做只认磁盘上的 manifest、decision log、产物、时间戳、git commit；
-3. 原文执行：每一条条款逐字照做，不摘要、不改写、不缩写、不遗漏；
-4. 不做解释性改编：不替手册条款做「合理外推」，不按记忆判断进度；
-5. 一步一验失败即停：任一步骤核验不通过或不确定 → 停下等待用户批准，不进入下一步。
+|载体|落点|
+|---|---|
+|`AGENTS.md` 本文件|五铁律 + 治理载体索引|
+|`rules/`|条款归属总则.md、落实现状报告格式.md（八字段）、落实报告格式.md（原始副本）、判定铁律.md、阶段执行地图.md、手册目标.md、底线清单.md、指令状态表.md、文件冗余治理.md、违反即处置.md、状态只认磁盘.md、防p-hacking.md、解冻纪律与数据纯净性.md、落实证据行号要求.md、档位引用纪律.md、全量定义.md、评估口径.md、第2阶段附加义务.md、定位实现口径.md、数据口径.md、重采样归一化精度契约.md、并行调度纪律.md、治理载体分散布局.md、治理载体索引模板.md、档位协议_A轴_同步精度.md、档位协议_N轴_NLOS偏差.md、档位协议_V轴_视觉退化.md、档位协议_K轴_锚分布.md、档位协议_M轴_数据缺失.md、档位协议_五轴独立性.md、no_temp_scripts.yaml、条款37_档位定义声明.md、条款38_LOS段测距噪声基准.md、条款39_UWB输出规范.md、条款40_IMU输出规范.md、条款51_序列级划分.md、los_noise_baseline.yaml、uwb_output_spec.yaml|
+|`skills/`|逐条落实工序、落实报告书写、核验流程|
+|`.git/hooks/pre-commit`|0 清场、提交前自查、残留审计|
+|`outputs/`|落实报告（compliance_report_*.md）|
+|`archive/`|清场归档 + 决策日志|
+## [36] git 是最后防线
+**状态**: ✅ 已落地
+**文件**: 
+- `rules/条款36_git是_last_resort.yaml` — 约束配置
+- `.git/hooks/pre-commit` — pre-commit 防线（第 1-161 行）
+- `.gitignore:30-37` — .bak/tmp_*/temp_*/bash_tool_* 防护规则
+- `outputs/compliance_report_36.md` — 合规报告
 
-## 语言规则
-所有回答、解释、汇报与书写一律**简体中文**（专有名词、变量名、代码标识符等除外）。
+**内容**: git 仓库与工作区必须一致，任何版本回退/文件损坏/误改恢复一律走 git（checkout/revert），禁止复制 _backup/_old 副本。
 
-## 0 · 执行总纲（先读这个，其余全是细则）
+## [37] 档位定义声明
+**状态**: ✅ 已落地
+**文件**:
+- `rules/条款37_档位定义声明.md` — 条款治理规则文件
+- `configs/protocol/gear_definition_declaration.yaml` — 约束配置
+- `configs/protocol/axis_a_sync.yaml` — A 轴档位协议
+- `configs/protocol/axis_n_nlos.yaml` — N 轴档位协议
+- `configs/protocol/axis_v_visual.yaml` — V 轴档位协议
+- `configs/protocol/axis_k_anchor.yaml` — K 轴档位协议
+- `configs/protocol/axis_m_missing.yaml` — M 轴档位协议
+- `src/liquidloc/analysis/clause_gates.py:3242-3395` — 验证函数 `p37_gear_definition_declaration()`
+- `outputs/compliance_report_37.md` — 合规报告
 
-### 三阶段制（最高优先级，本手册第一条）
-**第 0 阶段 · 治理落实期（禁跑实验）**：**目标 = 每个治理条款都落实到位**。先逐条落实治理层全部条款（Stage 0：语言铁律、报告顺序铁律、落实报告格式、逐条落实工序、判定铁律、0 清场、底线、第 1 阶段附加义务等），**每条落实记录必须引用「文件 + 行号」证明**（证据字段写 `文件:行号`，如 `AGENTS.md` 第 12–30 行、`clear_workspace.py` 第 8 行）；全部落实后**单独写《第 0 阶段落实报告》**（八字段格式不变），跑 `bash verify_slim.sh 本手册` 核验 PASS → **提交用户验收，用户验收合格后才进入第 1 阶段**。**禁止跑任何实验**（冒烟/quick/预达标/全量/重跑全部禁止）。
-**第 1 阶段 · 代码落实期（禁跑实验）**：**目标 = Stage 1→6 全部条款（代码/配置/脚本/单测类）落实到位**（写代码、配配置、写脚本、写单测——档位协议与判据口径落为 config 常量、数据生成器/S9 校验/统计脚本、C-1–C-10/CODE/BUG 代码要求、组件单测与断言；**Stage 1-6 不存在「实验执行类」条款，全部为落实类**；Stage 7 为执行/决策/清理/提交类，第 2 阶段执行，见阶段执行地图「归属阶段」列）。按 Stage 顺序逐条映射代码 → 审查是否完美严格落实 → 不完美当场改 → 写落实报告；**落实中发现 bug 必须顺手修根因**（不留 TODO、不绕开、不注释掉旧实现），**每批落实完成时对条款映射范围代码做一次 bug 检查**（范围 = 本手册 Stage 1-6 条款映射到的代码及其同体系依赖模块，不扩大到条款映射范围之外；范围外发现 bug 只记录上报不擅改；静态审查/运行断言/单测至少一种，发现即修根因并写入该批落实报告的审查字段，留痕 git commit + decision log）。全部落实报告写完 + `bash verify_slim.sh 本手册` 核验 PASS → **提交用户验收，用户验收合格后才进入第 2 阶段**。**禁止跑任何实验**（冒烟/quick/预达标/全量/重跑全部禁止）。
-**第 2 阶段 · 实验执行期**：第 1 阶段验收合格 + `bash verify_slim.sh 本手册` 核验 PASS → **执行 Stage 1-6 已落实的全部代码并按 Stage 顺序跑实验**（Stage 1-6 的落实物是代码/脚本/单测，第 2 阶段负责把它们**真正跑起来**）：**先跑冒烟（先跑通管线：冒烟功能点全覆盖 + 统计脚本冒烟验证）→ 冒烟通过后 → 清场 → 上论文级实验**（RZ-0 清场 → RZ-1 重生成 → RZ-2 重训 → RZ-3 验收）→ 全量训练（50 单元）→ 统计检验与验收表（A-1–A-9）。**达标 → 直接提交交付（git 备份 → 卫生清点 → 提交前核对 → 交付论文级结果），不经过 Stage 7**；**未达标 → 才进 Stage 7 失败处置**（未达标判别→归因→补跑≤2轮→诚实出口），修复后重跑至达标，再走收尾提交。每个实验开跑前再清场 → 按 Stage 顺序执行。
+**内容**: A/N/V/K/M 各轴档位划分、参数与具体数值以 Stage 1 档位协议条款为唯一权威副本。
 
-### 0 清场（第 0 阶段第一动作，硬约束）
-写 `clear_workspace.py`：清空仿真数据集（npz/manifest）+ 权重（checkpoint）→ archive/，跑它，输出写入第 0 阶段落实报告。
-第 2 阶段每个实验开跑前再跑一次并贴输出；未清场 = 禁止生成新数据/初始化训练/加载旧权重。
+## [38] LOS 段测距噪声 σ≈0.6m
+**状态**: ✅ 已落地
+**文件**:
+- `rules/条款38_LOS段测距噪声基准.md` — 条款治理规则文件
+- `configs/protocol/los_noise_baseline.yaml` — LOS 段测距噪声基准配置（noise_value: 0.6, clause_id: 38）
+- `configs/models/ekf.yaml:30-31` — EKF UWB 量测噪声 σ=0.6m（S4 LOS 基准 σ0.6m）
+- `configs/models/robust_ekf.yaml:34-35` — Robust-EKF UWB 量测噪声 σ=0.6m（S4 LOS σ0.6m）
+- `outputs/compliance_report_38.md` — 合规报告
 
-### 落实报告格式（指针：内容不在本文件，逐字载体唯一在工序层 skill）
-落实报告八字段逐字段规范、一句话模板、批量提交前自检、完整示例、判定铁律、"落实:"字段要素说明、逐条落实工序 = 手册第 17–119 行，已逐字收录于 `.agents/skills/execution-report-gate/SKILL.md` §1（约 116 行）。触发时机：写任何落实报告（第 0/1 阶段）前必读 SKILL.md §1；§2 为细化扩展，含 gate 检查项、常见错误、核查要点。
+**内容**: LOS 段测距噪声 σ≈0.6m（器件事例级均值误差，作为 LOS 基准，非协议档位参数）。LOS 段高斯噪声（商用 UWB 模块室内实测测距误差标准差在亚米级、LOS 与 NLOS 统计分布差异显著）。
+## [39] UWB(DW1000级, 10Hz) 输出数据规范
+**状态**: ✅ 已落地
+**文件**:
+- `rules/条款39_UWB输出规范.md` — 条款治理规则文件
+- `configs/protocol/uwb_output_spec.yaml` — UWB 输出数据规范配置（chip_model: DW1000级, frequency_hz: 10Hz）
+- `src/liquidloc/analysis/clause_gates.py:3761-3927` — 验证函数 `p39_uwb_output_spec()`
+- `outputs/compliance_report_39.md` — 合规报告
 
-### 条款-三阶段归属总则（硬约束，先读）
-**Stage 0（治理层条款）**：总纲内标注"（治理层）"的条款 → **第 0 阶段逐条落实并写报告**，证据写治理载体（文件 + 章节/行号）。
-**Stage 1-6（落实类）**：全部为**第 1 阶段代码落实类**——按"逐条落实工序"映射代码/配置/脚本/单测并写落实报告。其中含"主线 A/B；第X项 怎么查/合格标准/未过处置/验收标准"的**执行判据条款**：第 1 阶段把判据**落为校验脚本/断言**（代码落点 = 校验脚本函数），第 2 阶段执行时**逐项对照判定**；判据条款的落实证据 = 校验脚本代码落实记录，不单独再写一份判据报告。
-**Stage 7 及文末"执行判据与失败处置细则"**：全部为**第 2 阶段执行/决策类**（未达标判别/归因/补救/落窗判定/诚实出口），**不写代码落实报告**，执行时逐项对照。
-**交付/必交物/审计清单类条款**（含"必交物/验收人/核对脚本/G/E/A/J 系列"）：流程配套，随对应 gate 执行时对照，不单独写落实报告。
+**内容**: UWB(DW1000级, 10Hz)；输出数据：`uwb_ranges`(N×4 测距, m) + `uwb_valid`(N×4 有效掩码)。UWB 传感器输出数据规范，包含测距矩阵与有效掩码矩阵。
 
-### 阶段执行地图（唯一执行顺序，禁止跳 Stage）
-| Stage | 内容 | 归属阶段 | 出口 gate |
-|---|---|---|---|
-| **0** | 治理落实（语言铁律/报告顺序/落实格式/工序/判定/0清场/底线） | **第 0 阶段** | 第0阶段落实报告核验 PASS + 用户验收合格 |
-| **1** | 定义 | 条款 [6-143] 共 138 条 | **第 1 阶段**（纯落实） | 落实报告核验 PASS + 判据全过 |
-| **2** | 写码 | 条款 [144-158] 共 15 条 | **第 1 阶段**（纯落实） | 落实报告核验 PASS + 判据全过 |
-| **3** | 生成数据 | 条款 [159-294] 共 136 条 | **第 1 阶段**（纯落实） | 落实报告核验 PASS + 判据全过 |
-| **4** | 预检 | 条款 [295-345] 共 51 条 | **第 1 阶段**（纯落实） | 落实报告核验 PASS + 判据全过 |
-| **5** | 训练 | 条款 [346-456] 共 111 条 | **第 1 阶段**（纯落实） | 落实报告核验 PASS + 判据全过 |
-| **6** | 验收 | 条款 [457-596] 共 140 条 | **第 1 阶段**（纯落实） | 落实报告核验 PASS + 判据全过 |
-| **7** | 失败处置与交付（未达标判别→归因→补跑≤2轮→清理→提交论文级结果；执行判据/失败处置细则见文末节） | **第 2 阶段**（执行/决策） | 主线 A/B 达标（论文级结果交付） |
-| **终检** | 全部报告核验 + 手册目标验收 | 第 2 阶段末尾 | verify_slim 全 PASS → 按报告决定跑实验 |
+## [40] IMU（消费级，150Hz）输出数据规范
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/imu_output_spec.yaml` — IMU 输出数据规范配置（chip_type: 消费级，frequency_hz: 150Hz）
+- `src/liquidloc/analysis/clause_gates.py:3930-4110` — 验证函数 `p40_imu_output_spec()`
+- `outputs/compliance_report_40.md` — 合规报告
 
-### 手册目标（最终检查只看这个）
-**主线 A（防 RMSE 整体过大）**：full/LNN RMSE 显著低于误差预算上界，无 >10m 爆炸行。
-**主线 B（防 full/LNN 非最低）**：full/LNN RMSE 必须为全部变体/方法中最低，配对检验（Wilcoxon）显著。
-数据/代码/结果可追溯（manifest + git commit + 验收留痕）。核验通过后**最终只看目标是否达成，不看流程勾选**。
+**内容**: IMU（消费级，150Hz）；输出数据：`imu`（N_imu×6：ax/ay/az/gx/gy/gz，150Hz 原生，不降采样）+ `imu_t`（N_imu×1 自身时间戳）。IMU 传感器输出数据规范。
 
-### 底线（违反 = 全部作废）
-**语言铁律（GLM 5.3 专属）**：GLM 5.3 全程必须使用**简体中文**回答、解释、汇报与书写落实报告；**禁止用英文回答、禁止中英混杂表述**；代码注释、日志输出（含命令执行输出解读）、提交信息（git commit message）、命名说明、验证输出解读、批处理小结、阶段验收报告、交付说明一律使用简体中文（专有名词/API/变量名/单位符号/期刊名除外，可保留英文原样，其余一律中文）。违反本条款 = 该条未落实；整批报告出现 3 处及以上非简体中文表述（代码/日志/引文原样除外）= 本批作废重做。
-**报告顺序铁律（GLM 5.3 专属）**：落实报告必须**按条款编号从小到大顺序书写**（[1]→[2]→[3]…），**禁止跳号、禁止倒序、禁止把多条条款合并成一条写**；漏号/跳号 = 该条未落实；顺序错乱或合并 = 本批作废重做。每批结束必须自查一遍"编号连续且严格递增"。
-报告先于实验；未清场不跑实验；落实说明必须含函数名/改动点/断言，不得空话；证据路径必须真实存在。
-**第 1 阶段附加义务（治理层条款）**：落实中发现任何 bug → 顺手修根因（禁止留 TODO/绕开/注释掉旧实现）；**bug 检查范围 = 本手册 Stage 1-6 条款映射到的代码**（正在落实的批次 + 已落实批次 + 其依赖的同体系模块），**不扩大到条款映射范围之外**（另一实验体系、历史遗留、无关工具代码发现 bug → 只记录上报 decision log 告知用户，不擅自修改，避免越权大修违反 [97]）；每批落实完成时对条款映射范围代码做一次 bug 检查（静态审查/运行断言/单测至少一种，发现即修根因）；修复与检查结果写入该批落实报告"审查:"字段并留痕（git commit + decision log）。违反 = 该条未落实。
-**第 2 阶段附加义务（治理层条款，实验执行期修 bug 的唯一合规路径）**：第 2 阶段冒烟/预达标/全量/验收过程中发现 bug 或未达标 → 按下列纪律修复，不违反任何条款：**归因先行**——任何未达标第一解释 = 执行偏差（先审执行），确认是代码 bug 而非执行偏差后才动代码；**范围限定**——只修本手册 Stage 1-6 条款映射范围代码的 bug（与第 1 阶段同范围），范围外发现 bug 只记录上报 decision log、不擅自修改（避免越权大修违反 [97]）；**BUG-5 回归链（[260]）**——每处修复必须走完整闭环：git diff 审阅 → decision log 记录 → 受影响范围判定 → 重跑 I 表相关单测 + S9 校验脚本 → 重过 C-1–C-10 受影响项 → 重新冒烟 → 重新预达标判定 → 重新 code freeze，任一环缺失 = 改动未完成；**解冻纪律（[651]）**——code freeze 后改码必须解冻并记录改动（decision log + git commit），修复后重新冒烟、重新预达标判定、重新冻结，已跑单元按"代码已改必须重跑"作废重跑；**禁掩盖**——禁止通过调 lr 反复试探掩盖 bug（[109]），调 lr 只允许用于"训练不充分"场景且同一失败最多 2 轮；**数据/权重纯净性**——若改的是数据生成器 → 按 [637] 全量重生成（RZ-1）+ 重训（RZ-2），论文级数字必须回到 RZ 链（清场/重生成/重训/验收）后再取；**留痕**——修复与检查结果写入 decision log + git commit，报告"审查:"字段写"问题→修复"。违反 = 该条未落实。
-**落实证据必须引用文件:行号（治理层条款）**：第 0 阶段与第 1 阶段每条落实记录的证据字段必须写**真实文件路径 + 行号/章节锚点**（如 `AGENTS.md` 第 12–30 行、`clear_workspace.py` 第 8 行、`config.py::BATCH_SIZE` 第 45 行）；只写文件名不写行号、或行号与文件实际不符 = 未落实。
+## [41] VIO（单目+IMU 前端，20 Hz）输出数据规范
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/vio_output_spec.yaml` — VIO 输出数据规范配置（frequency_hz: 20Hz, sensor_type: 单目+IMU前端）
+- `src/liquidloc/analysis/clause_gates.py:4111-4324` — 验证函数 `p41_vio_output_spec()`
+- `rules/条款41_VIO输出规范.md` — 条款治理规则文件
+- `outputs/compliance_report_41.md` — 合规报告
 
----
+**内容**: VIO（单目+IMU 前端，20 Hz）；输出数据：`vio_pos`（N×2/3）+ `vio_yaw`（N×1）+ `vio_valid`（N×1）+ 协方差（V0 健康档有效帧率 100%）。VIO 传感器输出数据规范。
+
+## [42] 四个输出头
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/four_output_heads.yaml` — 四个输出头机制链配置（uwb_scaling/bias/vio_scaling/risk）
+- `configs/protocol/imu_no_head_reasoning.yaml` — IMU 不设头推理说明配置
+- `src/liquidloc/analysis/clause_gates.py:4326-4518` — 验证函数 `p42_imu_no_head_reasoning()`
+- `src/liquidloc/analysis/clause_gates.py:4521-4665` — 验证函数 `p42b_four_output_heads()`
+- `rules/条款42_四个输出头机制链.md` — 条款治理规则文件
+- `outputs/compliance_report_42.md` — 合规报告
+
+**内容**: 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控，是"NLOS 识别 → 协方差调制/降权 → 鲁棒门控"机制链的落地（与 S4.2 鲁棒融合组合拳一致）。IMU 作为高频运动先验不参与头调制（惯性量测不经数据驱动加权，走 EKF 运动模型传播），故不设 IMU 头；risk 头为通道级联合风险。
+
+## [43] 禁止使用档位空间外的参数、禁止自行定义插值档/新档
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/no_extra_levels.yaml` — 禁止额外档位配置（forbidden_interpolation: true, forbidden_new_levels: true）
+- `src/liquidloc/analysis/clause_gates.py:4859-4960` — 验证函数 `p43_no_extra_levels()`
+- `rules/条款43_禁止额外档位.md` — 条款治理规则文件
+- `outputs/compliance_report_43.md` — 合规报告
+
+**内容**: 档位参数严格取自档位协议条款档位表（A/N/V/K/M 五轴），禁止使用档位空间外的参数值，禁止自行定义插值档（如 N1.5 类）或任何新档位。
+
+## [44] 档位注入纪律
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/clause44_injection_discipline.yaml` — 档位注入纪律配置（静态口径/禁止漂移档位）
+- `src/liquidloc/analysis/clause_gates.py:4668-4770` — 验证函数 `p44_gear_injection_discipline()`
+- `outputs/compliance_report_44.md` — 合规报告
+
+**内容**: A轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表），严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 → 协议裁决项 + 敏感性分析）。
+
+## [45] N1.5 边界协议
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/n15_boundary.yaml` — N1.5 边界协议配置
+- `src/liquidloc/analysis/clause_gates.py:4759-4855` — 验证函数 `p45_n15_boundary()`
+- `rules/条款45_两个σ语义分离.md` — 条款治理规则文件
+- `outputs/compliance_report_45.md` — 合规报告
+
+**内容**: N1.5（ρ=20–25%/μ=1.5–2.5m/σ=0.5m）不在本手册档位协议条款档位表内；本手册引用协议 N 轴为 N0–N3；N1.5 属于同机另一实验体系，按其各自对应协议文件执行。
+
+## [46] 协议引用边界
+**状态**: ✅ 已落地（由 p49_protocol_reference_boundary() 验证）
+**文件**:
+- `configs/protocol/protocol_reference_boundary.yaml` — 协议引用边界配置
+- `src/liquidloc/analysis/clause_gates.py:5098` 起 — 验证函数 `p49_protocol_reference_boundary()`
+- `outputs/compliance_report_46.md` — 合规报告
+
+**内容**: 档位以 Stage 1 档位协议条款为唯一权威副本；其他文件引用档位时必须标明出自该条款，不得复制参数数值形成第二权威副本。注意：验证函数沿用 p49 命名（历史实现），实际验证手册 [46] 协议引用边界条款。
+
+## [47] 三层证据结构总表
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/three_layer_evidence_structure.yaml` — 三层证据结构总表配置
+- `src/liquidloc/analysis/clause_gates.py` — 验证函数 `p47_three_layer_evidence()`
+- `outputs/compliance_report_47.md` — 合规报告
+
+**内容**: 三层证据结构总表（论文级数据架构，与 S3 轨迹规格衔接）：主场景（受控）S1–S3固定布局（20m×20m、4锚、4遮挡区）10seed×5方法=50单元；布局随机化泛化层；统计推断与主场景共享层。
+
+## [48] 规模档位
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/scale_gear_spec.yaml` — 规模档位配置（入门 N_layout=6、推荐 N_layout=10）
+- `src/liquidloc/analysis/clause_gates.py:5189-5290` — 验证函数 `p48_scale_gear_spec()`
+- `rules/条款48_规模档位.md` — 条款治理规则文件
+- `outputs/compliance_report_48.md` — 合规报告
+
+**内容**: 规模档位：入门 N_layout=6、推荐 N_layout=10（full + 2 个最强基线 LSTM/EKF × 2–3 seed 即可，泛化层只判排序不做因子推断，不需要主场景同等功效）。
+
+## [49] 布局参数与方法排序的散点/箱线
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/layout_scatter_plot_spec.yaml` — 布局参数散点配置
+- `src/liquidloc/analysis/clause_gates.py`（p54_layout_parameter_scatter 验证函数）
+- `outputs/compliance_report_49.md` — 合规报告
+
+**内容**: 布局参数变化与方法排序关系以散点/箱线图呈现，禁止只用汇总统计量。
+
+## [50] 测试轨迹与训练无重叠
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/clause50_test_train_no_overlap.yaml` — 测试轨迹与训练无重叠配置
+- `src/liquidloc/analysis/clause_gates.py`（p50_test_train_no_overlap 验证函数）
+- `rules/条款50_测试轨迹与训练无重叠.md` — 条款治理规则文件
+- `outputs/compliance_report_50.md` — 合规报告
+
+**内容**: 测试轨迹与训练数据在序列级别严格分离，不存在任何重叠。所有评估指标均在独立于训练集的数据上计算。
 
 
-### 治理层落实条款（Stage 0 · 第 0 阶段逐条落实并写报告）
+## [51] 划分按整条序列、训练与测试无重叠
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/clause51_sequence_split_no_overlap.yaml` — 序列级划分配置
+- `src/liquidloc/analysis/clause_gates.py`（p51_sequence_split_no_overlap 验证函数）
+- `rules/条款51_序列级划分.md` — 条款治理规则文件
+- `outputs/compliance_report_51.md` — 合规报告
 
-**[1]** **执行总纲固化（治理层·总纲条款）** ——本手册 `## 0 · 执行总纲` 下全部内容必须整体体现到治理层并逐条落实：**①三阶段制**（第 0 阶段治理落实期禁跑实验 → 第 1 阶段代码落实期禁跑实验 → 第 2 阶段实验执行期；每阶段单独写落实报告 / 验收合格才进下一阶段）、**②0 清场**（第 0 阶段第一动作：写 `clear_workspace.py` 清空仿真数据集+权重 → archive/，输出写入第 0 阶段落实报告）、**③落实报告格式**（八字段逐字段规范：条款号/状态/条款逐字抄录/代码绝对定位/落实极尽具体+全量映射/审查问题→修复+循环轨迹/验证命令→预期/证据真实路径+stdout 落盘；含一句话模板、治理类同构、批量提交前自检、完整示例、判定铁律、"落实:"字段要素说明、逐条落实工序——全部内容原样进入治理载体）、**④条款-三阶段归属总则**（Stage 0 治理层 / Stage 1-6 落实类 / Stage 7 执行决策类 / 交付清单类四类归属）、**⑤阶段执行地图**（唯一执行顺序，禁止跳 Stage）、**⑥手册目标**（主线 A 防 RMSE 整体过大 / 主线 B 防 full 非最低，最终只看目标是否达成）、**⑦底线**（语言铁律、报告顺序铁律、第 1 阶段附加义务、第 2 阶段附加义务、落实证据必须引用文件:行号）——第 0 阶段落实本条时：把上述总纲全部内容**逐字抄录到治理载体**（`AGENTS.md` 五铁律 + 总纲全文 + 指向本手册；落实报告格式模板文件；`checklist_gate.md`），保证总纲每一句（三阶段门禁、0 清场动作、八字段格式、逐条落实工序、归属总则、阶段顺序、主线 A/B 目标、底线禁止项）都有对应落点与触发时机；本条落实记录按八字段制书写（"条款:"字段逐字抄录本条款正文全文）。
+**内容**: 划分按整条序列进行，训练集与测试集之间不存在任何序列级别的重叠。禁止在同一序列内随机采样部分帧/窗口作为训练、部分帧/窗口作为测试，防止数据泄漏。
 
-**[2]** **状态只认磁盘、不认记忆（治理层）** ——任何"进度/结果/是否已做"的判断一律以磁盘上的 manifest/decision log/产物/时间戳/git commit 为准，执行者"我记得跑过"不算证据；跨批交接一律写 decision log（对应 Stage 7 失败处置与交付细则）。
+## [52] 基线不是裸模型
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/baseline_not_bare_model.yaml` — 基线不是裸模型配置
+- `src/liquidloc/analysis/clause_gates.py`（p52_baseline_not_bare_model 验证函数）
+- `outputs/compliance_report_52.md` — 合规报告
 
-**[3]** **代码与文件冗余治理（治理层）** ——禁止为同一逻辑留多份拷贝、禁止复制旧文件再改的备份文化，历史版本走 git，工作目录只保留当前生效版本；发现 _backup/_old/_copy 类冗余文件 → 移入 archive 或删除。
+**内容**: 确认 LSTM/Transformer 基线确实带头运行——否则 LNN 赢它们="4 个头 + 液态骨干"双重优势，对比不公平。
 
-**[4]** **提交前自查（治理层）** ——向用户提交论文级结果前先逐项自查是否符合手册目标（主线 A/B + 验收表 A-1–A-9），全部符合才整理提交（对应 Stage 7 失败处置与交付细则）。
+## [53] 配对样本对齐
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/paired_sample_alignment.yaml` — 配对样本对齐配置
+- `src/liquidloc/analysis/clause_gates.py:5658-5729` — 验证函数 `p53_paired_sample_alignment()`
+- `rules/条款53_配对样本对齐.md` — 条款治理规则文件
+- `outputs/compliance_report_53.md` — 合规报告
 
-**[5]** **违反即处置（治理层）** ——执行中任何环节发现违反本文档（未清场/审计失败/口径不符/数据或权重污染）→ 隔离作废相关产物 → 修复根因 → 回到对应回归点重跑。
+**内容**: 各方法评估按"同一测试轨迹 × 同 seed"配对。
 
-> 注：本文件内两处逐字段（「## 0 · 执行总纲」起至「0 清场」末 = 手册第 6–15 行；「### 条款-三阶段归属总则」起至治理层条款 [5] 末 = 手册第 121–166 行）与 SKILL.md 的 §1（手册第 17–119 行）合并 = 手册总纲第 6–166 行全量，每行仅一份生效拷贝；完整性由 sandbox/build_agents_md.py 内置逐行 diff 断言验证。
+## [54] 两两比较附Holm-Bonferroni多重比较校正
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/holm_bonferroni_correction.yaml` — Holm-Bonferroni校正配置
+- `src/liquidloc/analysis/clause_gates.py`（p60_holm_bonferroni_correction 验证函数）
+- `rules/条款54_两两比较附HolmBonferroni多重比较校正.md` — 条款治理规则文件
+- `outputs/compliance_report_54.md` — 合规报告
+
+**内容**: 五方法两两比较共10对，使用Holm-Bonferroni校正控制族错误率。多方法对比不做校正会放大假阳性；Holm-Bonferroni为稳健默认；ML比较应配套统计检验+CI+校正。
+
+## [55] 扩样路径
+**状态**: 落实中
+**文件**:
+- `configs/protocol/scale_expansion_path.yaml` — 扩样路径配置
+- `src/liquidloc/analysis/clause_gates.py`（p55_scale_expansion_path 验证函数）
+- `rules/条款55_扩样路径.md` — 条款治理规则文件
+- `outputs/compliance_report_55.md` — 合规报告
+
+**内容**: 10 seed 不足支撑功效时如实声明并给出扩样路径（只增不减：加 seed/轨迹至功效达标，规模恒 ≥ 论文级 10 seed × ≥100/seed，论文级硬约束——不存在"收窄/降档"方向的出口）。
+
+## [56] 分析单位与样本独立性声明（硬约束）
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/analysis_unit_sample_independence.yaml` — 分析单位配置
+- `src/liquidloc/analysis/clause_gates.py`（p64_analysis_unit_sample_independence 验证函数）
+- `rules/条款56_分析单位与样本独立性声明.md` — 条款治理规则文件
+- `outputs/compliance_report_56.md` — 合规报告
+
+**内容**: 滑窗W=128步（步长默认1帧）使相邻窗口重叠127/128，帧级误差样本高度自相关、不满足i.i.d.，所有统计检验必须以轨迹级为分析单位。
+
+## [57] 先导实验（pilot）
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/pilot_experiment.yaml` — 先导实验配置
+- `src/liquidloc/analysis/clause_gates.py`（p65_pilot_experiment 验证函数）
+- `rules/条款57_先导实验.md` — 条款治理规则文件
+- `outputs/compliance_report_57.md` — 合规报告
+
+**内容**: 先导实验单独用于方案冻结前估计效应量/方差/可行性，规模<=1 seed×四组合各1-2条测试轨迹。
+
+## [58] A2/A3 的偏移与抖动数值按协议生效
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/a2a3_shift_jitter.yaml` — A2/A3 偏移与抖动协议配置（clause_id="58"）
+- `src/liquidloc/analysis/clause_gates.py::p68_a2a3_shift_jitter()` — 验证函数
+- `rules/条款58_A2A3偏移与抖动.md` — 条款治理规则文件
+- `outputs/compliance_report_58.md` — 合规报告
+- `checkpoints/compliance_report_clause58.md` — 验证快照
+
+**内容**: A2/A3的偏移与抖动数值按协议生效，已按A2/A3全参数逐项核对。A2：UWB时钟偏移20-50ms、UWB往返延迟40-80ms、IMU时钟偏移5-15ms、IMU采样抖动±3ms、VIO时钟偏移20-50ms、VIO处理延迟30-80ms。
+
+## [59] 重采样方法声明（硬约束）
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/resampling_method_declaration.yaml` — 重采样方法声明配置
+- `src/liquidloc/analysis/clause_gates.py`（p69_resampling_method 验证函数）
+- `rules/条款59_重采样方法声明.md` — 条款治理规则文件
+- `outputs/compliance_report_59.md` — 合规报告
+
+**内容**: UWB/VIO重采样采用最近邻（nearest-neighbor）对齐到UWB帧时刻，不使用线性/样条插值生成测距或VIO值；声明写入论文方法节。
+
+## [60] 边界/极端情况
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/edge_case_extreme.yaml` — 边界/极端情况配置
+- `src/liquidloc/analysis/clause_gates.py`（p60_edge_case_extreme 验证函数）
+- `rules/条款60_边界极端情况.md` — 条款治理规则文件
+- `outputs/compliance_report_60.md` — 合规报告
+
+**内容**: 边界极端情况：空轨迹、极短序列、M1长间隙落在首尾，不产生人工尖峰/除零。
+
+## [61] 同 seed 初始化
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/same_seed_init.yaml` — 同seed初始化配置
+- `src/liquidloc/analysis/clause_gates.py`（p71_same_seed_init 验证函数）
+- `rules/条款61_同seed初始化.md` — 条款治理规则文件
+- `outputs/compliance_report_61.md` — 合规报告
+
+**内容**: 同seed初始化：LNN/LSTM/Transformer用同一seed的权重初始化。
+
+## [62] 论文级规模参数
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/power_sample_size.yaml` — 规模参数配置
+- `src/liquidloc/analysis/clause_gates.py`（p62_power_sample_size 验证函数）
+- `rules/条款62_论文级规模参数.md` — 条款治理规则文件
+- `outputs/compliance_report_62.md` — 合规报告
+
+**内容**: 论文级规模参数：训练12-15条/seed，测试>=100条/seed，四组合各>=25，120s基准，10 seed（论文级基线）。
+
+## [63] 布局随机化泛化层
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/layout_randomization.yaml` — 布局随机化配置
+- `src/liquidloc/analysis/clause_gates.py`（p72_layout_randomization 验证函数）
+- `rules/条款63_布局随机化泛化层.md` — 条款治理规则文件
+- `outputs/compliance_report_63.md` — 合规报告
+- `checkpoints/compliance_report_clause63.md` — checkpoint 验证报告
+
+**内容**: 布局随机化泛化层：N_layout>=6(入门)/10(推荐)，每布局5方法x2-3 seed。
+
+## [64] 重新生成全部 seed 数据
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/regenerate_all_seeds.yaml` — 重新生成全部 seed 配置
+- `src/liquidloc/analysis/clause_gates.py`（p73_regenerate_all_seeds 验证函数）
+- `rules/条款64_重新生成全部seed数据.md` — 条款治理规则文件
+- `outputs/compliance_report_64.md` — 合规报告
+- `checkpoints/compliance_report_clause64.md` — checkpoint 验证报告
+
+**内容**: 主场景10 seed全部重新生成，禁止新旧数据混用。
+
+## [65] 新旧数据混用禁令（硬约束）
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/no_old_new_mixing.yaml` — 新旧数据混用禁令配置
+- `src/liquidloc/analysis/clause_gates.py`（p74_no_old_new_mixing 验证函数）
+- `rules/条款65_新旧数据混用禁令.md` — 条款治理规则文件
+- `outputs/compliance_report_65.md` — 合规报告
+- `checkpoints/compliance_report_clause65.md` — checkpoint 验证报告
+
+**内容**: 禁止部分seed新+部分seed旧混用，硬约束。
+
+## [66] 禁止把冒烟数据并入全量测试集
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/no_smoke_merge.yaml` — 冒烟数据禁令配置
+- `src/liquidloc/analysis/clause_gates.py`（p75_no_smoke_merge 验证函数）
+- `rules/条款66_禁止冒烟数据并入全量测试集.md` — 条款治理规则文件
+- `outputs/compliance_report_66.md` — 合规报告
+- `checkpoints/compliance_report_clause66.md` — checkpoint 验证报告
+
+**内容**: 禁止冒烟>=12条测试数据并入全量测试集，整批化执行，硬约束。
+
+## [67] 全量单元
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/full_scale_unit.yaml` — 全量单元配置
+- `src/liquidloc/analysis/clause_gates.py`（p76_full_scale_unit 验证函数）
+- `rules/条款67_全量单元.md` — 条款治理规则文件
+- `outputs/compliance_report_67.md` — 合规报告
+- `checkpoints/compliance_report_clause67.md` — checkpoint 验证报告
+
+**内容**: 全量单元：主场景10 seed×5方法=50单元全部用新数据训练。
+
+## [68] 执行偏差（deviation）
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/execution_deviation.yaml` — 执行偏差配置（含 deviation 表、E 系列审计、目录命名规范）
+- `src/liquidloc/analysis/clause_gates.py:7103-7203` — 验证函数 `p68_execution_deviation()`
+- `rules/条款68_执行偏差.md` — 条款治理规则文件
+- `outputs/compliance_report_68.md` — 合规报告
+- `checkpoints/compliance_report_clause68.md` — 验证快照
+
+**内容**: 执行层面与方案的偏差（漏跑/换机/中断恢复）→ 记 execution deviation 表（E 系列审计覆盖），不影响协议与分析定义。实验目录结构 run 目录命名规范：`run-<日期>-<seed>-<method>-<config_hash>`。
+
+## [69] CPU 角色分层
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/cpu_role_description.yaml` — CPU 角色分层配置（cpu_non_training_only/cpu_idle_training/no_conflict/priority_rule）
+- `src/liquidloc/analysis/clause_gates.py:7418-7519` — 验证函数 `p69_cpu_role_hierarchy()`
+- `rules/条款69_CPU角色分层.md` — 条款治理规则文件
+- `outputs/compliance_report_69.md` — 合规报告
+- `checkpoints/compliance_report_clause69.md` — 验证快照
+
+**内容**: "CPU 仅限非训练负载"与"CPU 空闲协助训练"的关系：前者是 GPU 空闲时的默认分工（CPU 只做数据生成/评估/预处理），后者是 GPU 排满后的追加自由度（CPU 可承接剩余训练单元）——两者不冲突，GPU 有空的按前者，GPU 排满的按后者。
+
+## [70] 评估并行
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/clause70_evaluation_parallel.yaml` — 评估并行配置（gpu_execution=true, trajectory_batch_size=16, no_batch_mixing=true, evaluation_protocol_unchanged=true）
+- `src/liquidloc/analysis/clause_gates.py`（p70_evaluation_parallel 验证函数）
+- `rules/条款70_评估并行.md` — 条款治理规则文件
+- `outputs/compliance_report_70.md` — 合规报告
+- `checkpoints/compliance_report_clause70.md` — checkpoint 验证报告
+
+**内容**: 评估并行：测试轨迹推理在 GPU 上按轨迹独立并行执行（轨迹内窗口批大小 16，轨迹间不混批，评估协议不变）。
+
+## [71] 父进程链可回溯
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/parent_process_traceable.yaml` — 父进程链可回溯配置（traceable=true, command="ps -o ppid= -p <pid>"）
+- `src/liquidloc/analysis/clause_gates.py:8337-8417` — 验证函数 `p77_parent_process_traceable()`
+- `rules/条款71_父进程链可回溯.md` — 条款治理规则文件
+- `outputs/compliance_report_71.md` — 合规报告
+- `checkpoints/compliance_report_clause71.md` — checkpoint 验证报告
+
+**内容**: 父进程链可回溯到本体系的启动器（`ps -o ppid= -p <pid>` 逐级上溯，最终父进程是本体系的调度/启动脚本）。
+
+## [72] Transformer 滑窗同轨迹内合批
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/transformer_sliding_window.yaml` — Transformer 滑窗合批配置（enabled=true, method="同轨迹内窗口合批", log_batch_composition=true）
+- `src/liquidloc/analysis/clause_gates.py:8420-8505` — 验证函数 `p78_transformer_sliding_window()`
+- `rules/条款72_Transformer滑窗合批.md` — 条款治理规则文件
+- `outputs/compliance_report_72.md` — 合规报告
+- `checkpoints/compliance_report_clause72.md` — checkpoint 验证报告
+
+**内容**: Transformer 滑窗同轨迹内合批 评估日志打印批构成（同轨迹内窗口）。
+
+## [73] GPU 报错停
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/gpu_error_handling.yaml` — GPU 报错处理配置（verified=true, cpu_idle_assistance=true, cpu_only_for_full_gpu=true）
+- `src/liquidloc/analysis/clause_gates.py:8508-8592` — 验证函数 `p79_no_gpu_error_stop()`
+- `rules/条款73_GPU报错停.md` — 条款治理规则文件
+- `outputs/compliance_report_73.md` — 合规报告
+- `checkpoints/compliance_report_clause73.md` — checkpoint 验证报告
+
+**内容**: 在无 GPU 环境实测 → 确认报错停而非静默 CPU 训练。CPU 空闲协助（执行模式/执行模式·CPU 空闲协助）CPU 承接仅限 GPU 排满后启用的剩余训练单元。
+
+## [74] RAM 上限 12G
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/ram_limit_hard_cap.yaml` — RAM 上限配置（max_gb=12, verification_method="冒烟实测单单元峰值内存（psutil 探针）"）
+- `src/liquidloc/analysis/clause_gates.py:8595-8676` — 验证函数 `p80_ram_limit_12g()`
+- `rules/条款74_RAM上限.md` — 条款治理规则文件
+- `outputs/compliance_report_74.md` — 合规报告
+- `checkpoints/compliance_report_clause74.md` — checkpoint 验证报告
+
+**内容**: RAM ≤12G 硬上限（执行模式/执行模式·RAM ≤12G 硬上限）；验证方法（细化，自测留痕）：冒烟实测单单元峰值内存（psutil 探针）。
+
+## [75] 禁止借大修变口径
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/no_refactor_changes.yaml` — 禁止变口径配置（no_change_paper_level_values=true, no_change_data_gen=true, no_change_eval=true, no_change_protocol=true）
+- `src/liquidloc/analysis/clause_gates.py:8679-8768` — 验证函数 `p81_no_refactor_changes()`
+- `rules/条款75_禁止借大修变口径.md` — 条款治理规则文件
+- `outputs/compliance_report_75.md` — 合规报告
+- `checkpoints/compliance_report_clause75.md` — checkpoint 验证报告
+
+**内容**: 禁止借大修变口径——大修只改代码组织与可维护性（模块拆分/常量收敛/断言补齐/命名统一），不得改变任何论文级数值、不得改数据生成/评估/统计口径、不得为了好写而改协议。
+
+## [76] 大修范围界定
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/refactor_scope_definition.yaml` — 大修范围界定配置（clause_id=76, scope_definition, decision_log, refactor_restriction）
+- `src/liquidloc/analysis/clause_gates.py:8771-8882` — 验证函数 `p82_refactor_scope_definition()`
+- `rules/条款76_大修范围界定.md` — 条款治理规则文件
+- `outputs/compliance_report_76.md` — 合规报告
+- `checkpoints/compliance_report_clause76.md` — checkpoint 验证报告
+
+**内容**: 大修范围界定——明确本次大修的范围（哪个模块/哪个脚本/哪些接口），写入 decision log（时间/原因/影响范围/git commit）。

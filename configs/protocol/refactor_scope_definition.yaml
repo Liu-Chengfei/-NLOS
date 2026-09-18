@@ -1,0 +1,39 @@
+# 条款 [76] 大修范围界定
+# 手册原文：大修范围界定——明确本次大修的范围（哪个模块/哪个脚本/哪些接口），写入 decision log（时间/原因/影响范围/git commit）
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第303行
+
+clause_id: "76"
+clause_name: "大修范围界定"
+
+scope_definition:
+  modules:
+    - liquidloc.analysis
+    - liquidloc.data
+    - liquidloc.models
+    - liquidloc.run
+    - liquidloc.evaluation
+  scripts:
+    - run_experiments.py
+    - generate_data.py
+    - evaluate.py
+    - analyse.py
+  interfaces:
+    - UWB/VIO/IMU sensor interface
+    - EKF/Robust-EKF fusion interface
+    - LSTM/Transformer model interface
+    - evaluation metrics interface
+
+decision_log:
+  time: "2026-09-18"
+  reason: "条款 [76] 大修范围界定落实——明确本次大修的范围并写入 decision log"
+  scope: "代码组织与可维护性重构，不改变论文级数值与协议口径"
+  commit: "pending"
+
+refactor_restriction:
+  no_change_paper_level_values: true
+  no_change_data_gen: true
+  no_change_eval: true
+  no_change_protocol: true
+  description: "大修只改代码组织与可维护性（模块拆分/常量收敛/断言补齐/命名统一），不得改变任何论文级数值、不得改数据生成/评估/统计口径、不得为了好写而改协议"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第303行"

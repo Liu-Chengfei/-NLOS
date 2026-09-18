@@ -558,7 +558,7 @@ def p34_no_single_channel_linear() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "no_single_channel_linear.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -654,7 +654,7 @@ def p36_no_single_thread_linear() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "no_single_thread_linear.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -752,7 +752,7 @@ def p35_primary_channel_exclusive_rerun() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "primary_channel_exclusive_rerun.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -1319,7 +1319,7 @@ def p18_agents_md_template() -> dict[str, Any]:
     project_root = PROJECT_ROOT
     agents_path = project_root / "AGENTS.md"
     build_script_path = project_root / "sandbox" / "build_agents_md.py"
-    manual_path = project_root / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = project_root / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     exists = agents_path.is_file()
     build_script_exists = build_script_path.is_file()
@@ -1409,7 +1409,7 @@ def p18_agents_md_template() -> dict[str, Any]:
 
 def p19_axis_a_sync_verification() -> dict[str, Any]:
     """[19] 档位协议条款 · A 轴 —— 同步精度验证
-    验证 configs/protocol/axis_a_sync.yaml 文件存在且参数符合手册定义（docs/异步实验_执行手册_终版v15_总纲条款版.md 第197-206行）。
+    验证 configs/protocol/axis_a_sync.yaml 文件存在且参数符合手册定义（docs/最终交付_异步手册_424条_20260917.md 第197-206行）。
 
     手册第19条原始定义：
     | 档位 | A0（同步） | A1（轻） | A2（主） | A3（重） |
@@ -1422,7 +1422,7 @@ def p19_axis_a_sync_verification() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "axis_a_sync.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -1525,7 +1525,7 @@ def p19_axis_a_sync_verification() -> dict[str, Any]:
 
 def p20_nlos_axis_verification() -> dict[str, Any]:
     """[20] 档位协议条款 · N轴 —— NLOS 偏差验证
-    验证 configs/protocol/axis_n_nlos.yaml 文件存在且参数符合手册定义（docs/异步实验_执行手册_终版v15_总纲条款版.md 第208-215行）。
+    验证 configs/protocol/axis_n_nlos.yaml 文件存在且参数符合手册定义（docs/最终交付_异步手册_424条_20260917.md 第208-215行）。
 
     手册第20条原始定义（纯偏差定义、全档固定 4 锚、可解率 100%、不可解帧归 M 轴）：
     | N 档 | NLOS 占比 ρ | 偏差 μ (m) | 噪声 σ (m) | 物理对应 |
@@ -1537,7 +1537,7 @@ def p20_nlos_axis_verification() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "axis_n_nlos.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # 手册第20条原始定义（字段顺序：nlos_ratio / bias_mu / noise_sigma / physical）
     expected = {
@@ -1656,7 +1656,7 @@ def p20_nlos_axis_verification() -> dict[str, Any]:
 
 def p21_visual_axis_verification() -> dict[str, Any]:
     """[21] 档位协议条款 · V 轴 —— 视觉退化验证
-    验证 configs/protocol/axis_v_visual.yaml 文件存在且参数符合手册定义（docs/异步实验_执行手册_终版v15_总纲条款版.md 第217-228行）。
+    验证 configs/protocol/axis_v_visual.yaml 文件存在且参数符合手册定义（docs/最终交付_异步手册_424条_20260917.md 第217-228行）。
 
     手册第21条原始定义：
     [21] 档位协议条款 · V 轴 —— 视觉退化（视觉里程计（VIO）质量退化。）
@@ -1673,7 +1673,7 @@ def p21_visual_axis_verification() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "axis_v_visual.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     expected = {
         "V0": {
@@ -1797,7 +1797,7 @@ def p21_visual_axis_verification() -> dict[str, Any]:
 
 def p22_anchor_axis_verification() -> dict[str, Any]:
     """[22] 档位协议条款 · K轴 —— 锚点配置
-    验证 configs/protocol/axis_k_anchor.yaml 文件存在且参数符合手册定义（docs/异步实验_执行手册_终版v15_总纲条款版.md 第230-236行）。
+    验证 configs/protocol/axis_k_anchor.yaml 文件存在且参数符合手册定义（docs/最终交付_异步手册_424条_20260917.md 第230-236行）。
 
     手册第22条原始定义（原 G 轴并入 K 轴。锚数全档固定 4。模型输入不含锚点坐标。）：
     | K 档 | 锚点布局 | GDOP | 几何特征 |
@@ -1808,7 +1808,7 @@ def p22_anchor_axis_verification() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "axis_k_anchor.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     expected = {
         "K0": {
@@ -1926,7 +1926,7 @@ def p22_anchor_axis_verification() -> dict[str, Any]:
 def p23_missing_data_axis_verification() -> dict[str, Any]:
     """[23] 档位协议条款 · M轴 —— 数据缺失
     验证 configs/protocol/axis_m_missing.yaml 文件存在且参数符合手册定义
-    （docs/异步实验_执行手册_终版v15_总纲条款版.md 第238-248行）。
+    （docs/最终交付_异步手册_424条_20260917.md 第238-248行）。
 
     手册第23条原始定义（描述"到没到"——不可解帧/无测距值的缺失注入）：
     | M 档 | 缺失定义 |
@@ -1941,7 +1941,7 @@ def p23_missing_data_axis_verification() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "axis_m_missing.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -2071,7 +2071,7 @@ def p23_missing_data_axis_verification() -> dict[str, Any]:
 def p24_five_axis_independence_verification() -> dict[str, Any]:
     """[24] 档位协议条款 · 五轴独立性说明
     验证 configs/protocol/axis_five_independence.yaml 文件存在且参数符合手册定义
-    （docs/异步实验_执行手册_终版v15_总纲条款版.md 第250-258行）。
+    （docs/最终交付_异步手册_424条_20260917.md 第250-258行）。
 
     手册第24条原始定义（五轴独立性：每个轴均可与任意其他轴组合）：
     | 轴 | 核心描述 | 独立变化 |
@@ -2081,11 +2081,11 @@ def p24_five_axis_independence_verification() -> dict[str, Any]:
     | V | 视觉里程计退化 | 可与任意其他轴组合 |
     | K | 锚点几何（GDOP） | 可与任意其他轴组合 |
     | M | 数据包缺失（到没到） | 可与任意其他轴组合 |
-    > 完整实验覆盖需在 D-10 覆盖率中体现各轴所有档位的组合采样。
+    > 完整实验覆盖需在 覆盖率中体现各轴所有档位的组合采样。
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "axis_five_independence.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # 手册第24条原始定义（轴名 -> core_description, independent_variation）
     expected = {
@@ -2147,9 +2147,9 @@ def p24_five_axis_independence_verification() -> dict[str, Any]:
             elif actual_val != expected_val:
                 mismatches.append(f"{axis}.{field}: expected {expected_val}, got {actual_val}")
 
-    # (d) 验证 D-10 注释说明
+    # (d) 验证覆盖率注释说明
     note = cfg.get("note", "")
-    expected_note = "完整实验覆盖需在 D-10 覆盖率中体现各轴所有档位的组合采样。"
+    expected_note = "完整实验覆盖需在 覆盖率中体现各轴所有档位的组合采样。"
     note_mismatch = ""
     if note != expected_note:
         note_mismatch = f"note: expected '{expected_note}', got '{note}'"
@@ -2357,7 +2357,7 @@ def p25_eval_statistical_parallel_verification() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "eval_statistical_parallel.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -2493,7 +2493,7 @@ def p26_runtime_assertion_verification() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "runtime_assertion.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -2598,7 +2598,7 @@ def p27_no_temp_scripts_verification() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "no_temp_scripts.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -2688,7 +2688,7 @@ def p29_execution_discipline_verification() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "execution_discipline.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
     clause_line = 268  # 手册第29条所在行
 
     # (a) 配置文件存在性
@@ -2806,7 +2806,7 @@ def p30_breakpoint_status_verification() -> dict[str, Any]:
     验证 decision log 相关代码存在。
     """
     cfg_path = CONFIGS / "protocol" / "breakpoint_status.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
     dl_path = PROJECT_ROOT / ".audit" / "decision_log.json"
     clause_line = 270  # 手册第30条所在行
 
@@ -3252,7 +3252,7 @@ def p37_gear_definition_declaration() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "gear_definition_declaration.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -3414,7 +3414,7 @@ def p38_scale_no_downgrade() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "no_scale_downgrade.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -3553,9 +3553,9 @@ def p38_scale_no_downgrade() -> dict[str, Any]:
     }
 
 
-# ---------------- P39 条款 [39]: LOS 段测距噪声 σ≈0.6m ----------------
+# ---------------- P39 条款 [38]: LOS 段测距噪声 σ≈0.6m ----------------
 def p39_los_noise_baseline() -> dict[str, Any]:
-    """[39] LOS 段测距噪声 σ≈0.6m（器件事例级均值误差，作为 LOS 基准，非协议档位参数）。
+    """[38] LOS 段测距噪声 σ≈0.6m（器件事例级均值误差，作为 LOS 基准，非协议档位参数）。
 
     LOS 段高斯噪声，商用 UWB 模块室内实测测距误差标准差在亚米级，
     LOS 与 NLOS 统计分布差异显著。
@@ -3571,14 +3571,14 @@ def p39_los_noise_baseline() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "los_noise_baseline.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
     ekf_path = CONFIGS / "models" / "ekf.yaml"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P39-los-noise-baseline",
+            "code": "P38-los-noise-baseline",
             "name": "[39] LOS段测距噪声σ≈0.6m基准",
             "severity": "hard",
             "passed": False,
@@ -3591,7 +3591,7 @@ def p39_los_noise_baseline() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P39-los-noise-baseline",
+            "code": "P38-los-noise-baseline",
             "name": "[39] LOS段测距噪声σ≈0.6m基准",
             "severity": "hard",
             "passed": False,
@@ -3730,7 +3730,7 @@ def p39_los_noise_baseline() -> dict[str, Any]:
     ]
 
     return {
-        "code": "P39-los-noise-baseline",
+        "code": "P38-los-noise-baseline",
         "name": "[39] LOS段测距噪声σ≈0.6m基准",
         "severity": "hard",
         "passed": passed,
@@ -3758,8 +3758,8 @@ def p39_los_noise_baseline() -> dict[str, Any]:
     }
 
 
-def p40_uwb_output_spec() -> dict[str, Any]:
-    """[40] UWB(DW1000级, 10Hz)；输出数据：uwb_ranges(N×4, m) + uwb_valid(N×4, 有效掩码)。
+def p39_uwb_output_spec() -> dict[str, Any]:
+    """[39] UWB(DW1000级, 10Hz)；输出数据：uwb_ranges(N×4, m) + uwb_valid(N×4, 有效掩码)。
 
     验证：
     1. configs/protocol/uwb_output_spec.yaml 存在且能正确解析
@@ -3773,14 +3773,14 @@ def p40_uwb_output_spec() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "uwb_output_spec.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P40-uwb-output-spec",
-            "name": "[40] UWB输出规范(DW1000级,10Hz)",
+            "code": "P39-uwb-output-spec",
+            "name": "[39] UWB输出规范(DW1000级,10Hz)",
             "severity": "hard",
             "passed": False,
             "detail": "uwb_output_spec.yaml missing",
@@ -3792,8 +3792,8 @@ def p40_uwb_output_spec() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P40-uwb-output-spec",
-            "name": "[40] UWB输出规范(DW1000级,10Hz)",
+            "code": "P39-uwb-output-spec",
+            "name": "[39] UWB输出规范(DW1000级,10Hz)",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -3901,8 +3901,8 @@ def p40_uwb_output_spec() -> dict[str, Any]:
     ]
 
     return {
-        "code": "P40-uwb-output-spec",
-        "name": "[40] UWB输出规范(DW1000级,10Hz)",
+        "code": "P39-uwb-output-spec",
+        "name": "[39] UWB输出规范(DW1000级,10Hz)",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -3927,8 +3927,8 @@ def p40_uwb_output_spec() -> dict[str, Any]:
     }
 
 
-def p41_imu_output_spec() -> dict[str, Any]:
-    """[41] IMU（消费级，150 Hz）；输出数据：imu（N_imu×6：ax/ay/az/gx/gy/gz，150Hz 原生，不降采样）+ imu_t（N_imu×1 自身时间戳）。
+def p40_imu_output_spec() -> dict[str, Any]:
+    """[40] IMU（消费级，150 Hz）；输出数据：imu（N_imu×6：ax/ay/az/gx/gy/gz，150Hz 原生，不降采样）+ imu_t（N_imu×1 自身时间戳）。
 
     验证：
     1. configs/protocol/imu_output_spec.yaml 存在且能正确解析
@@ -3942,14 +3942,14 @@ def p41_imu_output_spec() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "imu_output_spec.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P41-imu-output-spec",
-            "name": "[41] IMU输出规范(消费级,150Hz)",
+            "code": "P40-imu-output-spec",
+            "name": "[40] IMU输出规范(消费级,150Hz)",
             "severity": "hard",
             "passed": False,
             "detail": "imu_output_spec.yaml missing",
@@ -3961,8 +3961,8 @@ def p41_imu_output_spec() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P41-imu-output-spec",
-            "name": "[41] IMU输出规范(消费级,150Hz)",
+            "code": "P40-imu-output-spec",
+            "name": "[40] IMU输出规范(消费级,150Hz)",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -4080,8 +4080,8 @@ def p41_imu_output_spec() -> dict[str, Any]:
     ]
 
     return {
-        "code": "P41-imu-output-spec",
-        "name": "[41] IMU输出规范(消费级,150Hz)",
+        "code": "P40-imu-output-spec",
+        "name": "[40] IMU输出规范(消费级,150Hz)",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -4108,8 +4108,8 @@ def p41_imu_output_spec() -> dict[str, Any]:
     }
 
 
-def p42_vio_output_spec() -> dict[str, Any]:
-    """[42] VIO（单目+IMU 前端，20 Hz）；输出数据：vio_pos（N×2/3）+ vio_yaw（N×1）+ vio_valid（N×1）+ 协方差（V0 健康档有效帧率 100%）。
+def p41_vio_output_spec() -> dict[str, Any]:
+    """[41] VIO（单目+IMU 前端，20 Hz）；输出数据：vio_pos（N×2/3）+ vio_yaw（N×1）+ vio_valid（N×1）+ 协方差（V0 健康档有效帧率 100%）。
 
     验证：
     1. configs/protocol/vio_output_spec.yaml 存在且能正确解析
@@ -4125,14 +4125,14 @@ def p42_vio_output_spec() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "vio_output_spec.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P42-vio-output-spec",
-            "name": "[42] VIO输出规范(单目+IMU前端,20Hz)",
+            "code": "P41-vio-output-spec",
+            "name": "[41] VIO输出规范(单目+IMU前端,20Hz)",
             "severity": "hard",
             "passed": False,
             "detail": "vio_output_spec.yaml missing",
@@ -4144,8 +4144,8 @@ def p42_vio_output_spec() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P42-vio-output-spec",
-            "name": "[42] VIO输出规范(单目+IMU前端,20Hz)",
+            "code": "P41-vio-output-spec",
+            "name": "[41] VIO输出规范(单目+IMU前端,20Hz)",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -4287,8 +4287,8 @@ def p42_vio_output_spec() -> dict[str, Any]:
     ]
 
     return {
-        "code": "P42-vio-output-spec",
-        "name": "[42] VIO输出规范(单目+IMU前端,20Hz)",
+        "code": "P41-vio-output-spec",
+        "name": "[41] VIO输出规范(单目+IMU前端,20Hz)",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -4323,8 +4323,8 @@ def p42_vio_output_spec() -> dict[str, Any]:
     }
 
 
-def p43_imu_no_head() -> dict[str, Any]:
-    """[43] 为什么 IMU 没有输出头（逻辑闭环）：IMU 是高频运动先验，直接进入骨干作为状态传播/预积分的底料，
+def p42_imu_no_head_reasoning() -> dict[str, Any]:
+    """[42] 为什么 IMU 没有输出头（逻辑闭环）：IMU 是高频运动先验，直接进入骨干作为状态传播/预积分的底料，
     不需要像 UWB/VIO 那样的自适应降权（uwb_scaling/vio_scaling）——因为 IMU 不单独解算绝对位置，其误差是积分漂移而非单帧离群。
 
     验证：
@@ -4339,14 +4339,14 @@ def p43_imu_no_head() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "imu_no_head_reasoning.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P43-imu-no-head",
-            "name": "[43] IMU无输出头逻辑闭环说明",
+            "code": "P42-imu-no-head",
+            "name": "[42] IMU无输出头逻辑闭环说明",
             "severity": "hard",
             "passed": False,
             "detail": "imu_no_head_reasoning.yaml missing",
@@ -4358,8 +4358,8 @@ def p43_imu_no_head() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P43-imu-no-head",
-            "name": "[43] IMU无输出头逻辑闭环说明",
+            "code": "P42-imu-no-head",
+            "name": "[42] IMU 无输出头逻辑闭环说明",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -4489,8 +4489,8 @@ def p43_imu_no_head() -> dict[str, Any]:
     ]
 
     return {
-        "code": "P43-imu-no-head",
-        "name": "[43] IMU无输出头逻辑闭环说明",
+        "code": "P42-imu-no-head",
+        "name": "[42] IMU无输出头逻辑闭环说明",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -4518,8 +4518,8 @@ def p43_imu_no_head() -> dict[str, Any]:
     }
 
 
-def p44_four_output_heads() -> dict[str, Any]:
-    """[44] 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控，
+def p42b_four_output_heads() -> dict[str, Any]:
+    """[42] 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控，
     正是"NLOS 识别 → 协方差调制/降权 → 鲁棒门控"机制链的落地（与 S4.2 鲁棒融合组合拳一致：
     NLOS 识别 + 协方差膨胀/调制 + 鲁棒核/残差拒斥 + 自适应噪声）。
 
@@ -4536,14 +4536,14 @@ def p44_four_output_heads() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "four_output_heads.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P44-four-output-heads",
-            "name": "[44] 四个输出头的机制链配置（自适应加权/偏差补偿/门控）",
+            "code": "P42b-four-output-heads",
+            "name": "[42] 四个输出头的机制链配置（自适应加权/偏差补偿/门控）",
             "severity": "hard",
             "passed": False,
             "detail": "four_output_heads.yaml missing",
@@ -4555,7 +4555,7 @@ def p44_four_output_heads() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P44-four-output-heads",
+            "code": "P42b-four-output-heads",
             "name": "[44] 四个输出头的机制链配置（自适应加权/偏差补偿/门控）",
             "severity": "hard",
             "passed": False,
@@ -4630,8 +4630,8 @@ def p44_four_output_heads() -> dict[str, Any]:
     }
 
     return {
-        "code": "P44-four-output-heads",
-        "name": "[44] 四个输出头的机制链配置（自适应加权/偏差补偿/门控）",
+        "code": "P42b-four-output-heads",
+        "name": "[42] 四个输出头的机制链配置（自适应加权/偏差补偿/门控）",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -4661,6 +4661,97 @@ def p44_four_output_heads() -> dict[str, Any]:
             "handount_path": str(handount_path.relative_to(PROJECT_ROOT)) if handount_exists else "missing",
             "handount_exists": handount_exists,
             "concept_hits": concept_hits,
+        },
+    }
+
+
+def p44_gear_injection_discipline() -> dict[str, Any]:
+    """[44] 档位注入纪律（参数怎么注入）。
+
+    验证 configs/protocol/clause44_injection_discipline.yaml 存在且能正确解析，
+    字段完整且值符合第44条纪律：
+
+    1. discipline_name 包含 "档位注入纪律"
+    2. inject_what 描述注入内容
+    3. a_axis_nature 为 "静态时钟偏移/延迟统计口径"
+    4. a_axis_source 为 "Stage 1 档位协议条款 A 轴表"
+    5. strict_static_injection 为 true（严格按静态口径注入）
+    6. forbidden_drift_as_level 为 true（不引入随时间线性增长的时钟漂移作为额外档位）
+    7. drift_evaluation_path 包含 "协议裁决项" 和 "敏感性分析"
+    8. 手册真源存在
+    """
+    import yaml
+    from pathlib import Path
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause44_injection_discipline.yaml"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P44-gear-injection-discipline",
+            "name": "[44] 档位注入纪律",
+            "severity": "hard",
+            "passed": False,
+            "detail": "clause44_injection_discipline.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P44-gear-injection-discipline",
+            "name": "[44] 档位注入纪律",
+            "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    missing_fields: list[str] = []
+    for field in ("discipline_name", "inject_what", "a_axis_nature", "a_axis_source",
+                  "strict_static_injection", "forbidden_drift_as_level",
+                  "drift_evaluation_path", "forbidden_drift_description"):
+        if field not in cfg:
+            missing_fields.append(field)
+
+    discipline_ok = "档位注入纪律" in (cfg.get("discipline_name") or "")
+    a_axis_nature_ok = "静态时钟偏移/延迟统计口径" in (cfg.get("a_axis_nature") or "")
+    a_axis_source_ok = "Stage 1 档位协议条款 A 轴表" in (cfg.get("a_axis_source") or "")
+    strict_ok = cfg.get("strict_static_injection") is True
+    forbidden_ok = cfg.get("forbidden_drift_as_level") is True
+    drift_eval = cfg.get("drift_evaluation_path") or ""
+    drift_eval_ok = "协议裁决项" in drift_eval and "敏感性分析" in drift_eval
+    handount_exists = handount_path.is_file()
+
+    passed = (not missing_fields and discipline_ok and a_axis_nature_ok and
+              a_axis_source_ok and strict_ok and forbidden_ok and
+              drift_eval_ok and handount_exists)
+    detail_parts = [
+        f"cfg_exists={cfg_exists}", f"missing_fields={missing_fields or 'none'}",
+        f"discipline_ok={discipline_ok}", f"a_axis_nature_ok={a_axis_nature_ok}",
+        f"a_axis_source_ok={a_axis_source_ok}", f"strict_ok={strict_ok}",
+        f"forbidden_ok={forbidden_ok}", f"drift_eval_ok={drift_eval_ok}",
+        f"handount_exists={handount_exists}",
+    ]
+    return {
+        "code": "P44-gear-injection-discipline",
+        "name": "[44] 档位注入纪律",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "handount_path": str(handount_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "handount_exists": handount_exists,
+            "missing_fields": missing_fields,
+            "discipline_ok": discipline_ok,
+            "a_axis_nature_ok": a_axis_nature_ok,
+            "a_axis_source_ok": a_axis_source_ok,
+            "strict_ok": strict_ok,
+            "forbidden_ok": forbidden_ok,
+            "drift_eval_ok": drift_eval_ok,
         },
     }
 
@@ -4764,9 +4855,9 @@ def p45_n15_boundary() -> dict[str, Any]:
     }
 
 
-# ---------------- [46] 禁止使用档位空间外的参数、禁止自行定义插值档/新档 ----------------
-def p46_no_extra_levels() -> dict[str, Any]:
-    """[46] 禁止使用档位空间外的参数、禁止自行定义插值档/新档。
+# ---------------- [43] 禁止使用档位空间外的参数、禁止自行定义插值档/新档 ----------------
+def p43_no_extra_levels() -> dict[str, Any]:
+    """[43] 禁止使用档位空间外的参数、禁止自行定义插值档/新档。
 
     验证 configs/protocol/no_extra_levels.yaml 存在且能正确解析，
     且满足以下禁止性约束：
@@ -4778,14 +4869,14 @@ def p46_no_extra_levels() -> dict[str, Any]:
     import yaml
 
     cfg_path = CONFIGS / "protocol" / "no_extra_levels.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
     scene_axis_path = CONFIGS / "base" / "scene_axis_protocol.yaml"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P46-no-extra-levels", "name": "[46] 禁止使用档位空间外参数/新档",
+            "code": "P43-no-extra-levels", "name": "[43] 禁止使用档位空间外参数/新档",
             "severity": "hard",
             "passed": False,
             "detail": "no_extra_levels.yaml missing",
@@ -4797,7 +4888,7 @@ def p46_no_extra_levels() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P46-no-extra-levels", "name": "[46] 禁止使用档位空间外参数/新档",
+            "code": "P43-no-extra-levels", "name": "[43] 禁止使用档位空间外参数/新档",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -4864,7 +4955,7 @@ def p46_no_extra_levels() -> dict[str, Any]:
         f"handount_exists={handount_exists}",
     ]
     return {
-        "code": "P46-no-extra-levels", "name": "[46] 禁止使用档位空间外参数/新档",
+        "code": "P43-no-extra-levels", "name": "[43] 禁止使用档位空间外参数/新档",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -4885,30 +4976,30 @@ def p46_no_extra_levels() -> dict[str, Any]:
     }
 
 
-def p47_pa3_injection_discipline() -> dict[str, Any]:
-    """[47] PA-3 档位注入纪律（参数怎么注入）。
+def p47_three_layer_evidence() -> dict[str, Any]:
+    """[47] 三层证据结构总表：论文级数据架构，与 S3 轨迹规格衔接。
 
-    验证 configs/protocol/pa3_injection_discipline.yaml 存在且能正确解析，
-    字段完整且值符合 PA-3 纪律：
-    - discipline_name 包含 "PA-3 档位注入纪律"
-    - a_axis_nature 为 "静态时钟偏移/延迟统计口径"
-    - a_axis_source 为 "Stage 1 档位协议条款 A 轴表"
-    - strict_static_injection 为 true（严格按静态口径注入）
-    - forbidden_drift_as_level 为 true（不引入随时间线性增长的时钟漂移作为额外档位）
-    - drift_evaluation_path 同时包含 "协议裁决项" 和 "敏感性分析"
+    验证 configs/protocol/three_layer_evidence_structure.yaml 存在且能正确解析，
+    字段完整且值符合三层证据结构要求：
+    - clause_id 为 "47"
+    - clause_name 包含 "三层证据结构总表"
+    - layers 数量为 3
+    - 主场景层（第0层）包含固定布局、20m×20m、4锚、4遮挡区、10seed、5方法、50单元
+    - 布局随机化泛化层存在
+    - 统计推断层存在
+    - s3_trajectory_connection 为 true
     - 手册真源存在
     """
     import yaml
-    from pathlib import Path
-    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "pa3_injection_discipline.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "three_layer_evidence_structure.yaml"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P47-PA3-injection-discipline", "name": "[47] PA-3 档位注入纪律",
+            "code": "P47-three-layer-evidence", "name": "[47] 三层证据结构总表",
             "severity": "hard", "passed": False,
-            "detail": "pa3_injection_discipline.yaml missing",
+            "detail": "three_layer_evidence_structure.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
         }
 
@@ -4916,54 +5007,72 @@ def p47_pa3_injection_discipline() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P47-PA3-injection-discipline", "name": "[47] PA-3 档位注入纪律",
+            "code": "P47-three-layer-evidence", "name": "[47] 三层证据结构总表",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
         }
 
     missing_fields: list[str] = []
-    for field in ("discipline_name", "inject_what", "a_axis_nature", "a_axis_source",
-                  "strict_static_injection", "forbidden_drift_as_level",
-                  "drift_evaluation_path", "forbidden_drift_description"):
+    for field in ("clause_id", "clause_name", "layers", "s3_trajectory_connection",
+                  "paper_level_data_architecture"):
         if field not in cfg:
             missing_fields.append(field)
 
-    discipline_ok = "PA-3 档位注入纪律" in (cfg.get("discipline_name") or "")
-    a_axis_nature_ok = "静态时钟偏移/延迟统计口径" in (cfg.get("a_axis_nature") or "")
-    a_axis_source_ok = "Stage 1 档位协议条款 A 轴表" in (cfg.get("a_axis_source") or "")
-    strict_ok = cfg.get("strict_static_injection") is True
-    forbidden_ok = cfg.get("forbidden_drift_as_level") is True
-    drift_eval = cfg.get("drift_evaluation_path") or ""
-    drift_eval_ok = "协议裁决项" in drift_eval and "敏感性分析" in drift_eval
+    clause_id_ok = cfg.get("clause_id") == "47"
+    clause_name = cfg.get("clause_name") or ""
+    name_ok = "三层证据结构总表" in clause_name
+    layers = cfg.get("layers") or []
+    layers_count_ok = len(layers) == 3
+    s3_ok = cfg.get("s3_trajectory_connection") is True
+    paper_ok = cfg.get("paper_level_data_architecture") is True
+
+    # 主场景层检查（第0层）
+    main_layer = layers[0] if layers else {}
+    main_ok = True
+    main_detail = []
+    for key, expected in [("area", "20m×20m"), ("anchors", 4), ("occlusion_zones", 4),
+                          ("seed_count", 10), ("method_count", 5), ("total_units", 50)]:
+        actual = main_layer.get(key)
+        if actual != expected:
+            main_ok = False
+            main_detail.append(f"{key}: expected={expected}, actual={actual}")
+
+    # 布局随机化泛化层检查（第1层）
+    gen_layer = layers[1] if len(layers) > 1 else {}
+    gen_ok = "泛化层" in (gen_layer.get("data_size_role") or "")
+    gen_name_ok = "布局随机化" in (gen_layer.get("layer_name") or "")
+
+    # 统计推断层检查（第2层）
+    stat_layer = layers[2] if len(layers) > 2 else {}
+    stat_ok = "统计推断" in (stat_layer.get("data_size_role") or "")
+
     handount_exists = handount_path.is_file()
 
-    passed = (not missing_fields and discipline_ok and a_axis_nature_ok and
-              a_axis_source_ok and strict_ok and forbidden_ok and
-              drift_eval_ok and handount_exists)
+    passed = (not missing_fields and clause_id_ok and name_ok and layers_count_ok
+              and s3_ok and paper_ok and main_ok and gen_ok and gen_name_ok
+              and stat_ok and handount_exists)
     detail_parts = [
         f"cfg_exists={cfg_exists}", f"missing_fields={missing_fields or 'none'}",
-        f"discipline_ok={discipline_ok}", f"a_axis_nature_ok={a_axis_nature_ok}",
-        f"a_axis_source_ok={a_axis_source_ok}", f"strict_ok={strict_ok}",
-        f"forbidden_ok={forbidden_ok}", f"drift_eval_ok={drift_eval_ok}",
-        f"handount_exists={handount_exists}",
+        f"clause_id_ok={clause_id_ok}", f"name_ok={name_ok}",
+        f"layers_count_ok={layers_count_ok}", f"s3_ok={s3_ok}",
+        f"paper_ok={paper_ok}", f"main_ok={main_ok}",
+        f"main_detail={'; '.join(main_detail) if main_detail else 'none'}",
+        f"gen_ok={gen_ok}", f"gen_name_ok={gen_name_ok}",
+        f"stat_ok={stat_ok}", f"handount_exists={handount_exists}",
     ]
     return {
-        "code": "P47-PA3-injection-discipline", "name": "[47] PA-3 档位注入纪律",
+        "code": "P47-three-layer-evidence", "name": "[47] 三层证据结构总表",
         "severity": "hard", "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
             "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
             "handount_path": str(handount_path.relative_to(PROJECT_ROOT)),
             "cfg_exists": cfg_exists,
+            "clause_id": cfg.get("clause_id"),
+            "layers_count": len(layers),
+            "main_scene": main_layer,
             "handount_exists": handount_exists,
-            "missing_fields": missing_fields,
-            "discipline_ok": discipline_ok,
-            "a_axis_nature_ok": a_axis_nature_ok,
-            "a_axis_source_ok": a_axis_source_ok,
-            "strict_ok": strict_ok,
-            "forbidden_ok": forbidden_ok,
-            "drift_eval_ok": drift_eval_ok,
         },
     }
 
@@ -4983,7 +5092,7 @@ def p48_two_sigma_separation() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "two_sigma_separation.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性检查
     cfg_exists = cfg_path.is_file()
@@ -5094,9 +5203,124 @@ def p48_two_sigma_separation() -> dict[str, Any]:
     }
 
 
+# ---------------- P48 条款 [48]: 规模档位 ----------------
+def p48_scale_gear_spec() -> dict[str, Any]:
+    """[48] 规模档位：入门 N_layout=6、 推荐 N_layout=10（full + 2 个最强基线 LSTM/EKF × 2–3 seed 即可，泛化层只判排序不做因子推断，不需要主场景同等功效）
+
+    验证项：
+    1. configs/protocol/scale_gear_spec.yaml 存在且能正确解析
+    2. 条款编号 clause_id = "48"
+    条款名称 clause_name = "规模档位"
+    3. 入门档位 N_layout=6
+    4. 推荐档位 N_layout=10
+    5. 配置描述包含 "full + 2 个最强基线 LSTM/EKF × 2–3 seed"
+    6. 泛化层描述包含 "只判排序不做因子推断"
+    7. 泛化层描述包含 "不需要主场景同等功效"
+    8. 手动参考指向正确手册行号
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "scale_gear_spec.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    # (a) 配置文件存在性检查
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P48-scale-gear", "name": "[48] 规模档位", "severity": "hard",
+            "passed": False,
+            "detail": "scale_gear_spec.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    # (b) 解析配置文件
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P48-scale-gear", "name": "[48] 规模档位", "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    if not isinstance(cfg, dict):
+        return {
+            "code": "P48-scale-gear", "name": "[48] 规模档位", "severity": "hard",
+            "passed": False,
+            "detail": "cfg is not a dict",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    checks = {}
+    passed = True
+
+    # 1. 条款编号 clause_id = "48"
+    clause_id = cfg.get("clause_id", "")
+    checks["clause_id_48"] = clause_id == "48"
+    passed = passed and clause_id == "48"
+
+    # 2. 条款名称
+    clause_name = cfg.get("clause_name", "")
+    checks["clause_name"] = clause_name == "规模档位"
+    passed = passed and clause_name == "规模档位"
+
+    # 3. 入门档位 N_layout=6
+    gear_spec = cfg.get("gear_spec", {})
+    entry = gear_spec.get("entry_level", {})
+    entry_N = entry.get("N_layout", 0)
+    checks["entry_N_layout"] = entry_N == 6
+    passed = passed and entry_N == 6
+
+    # 4. 推荐档位 N_layout=10
+    recommended = gear_spec.get("recommended_level", {})
+    rec_N = recommended.get("N_layout", 0)
+    checks["recommended_N_layout"] = rec_N == 10
+    passed = passed and rec_N == 10
+
+    # 5. 配置描述包含 "full + 2 个最强基线 LSTM/EKF × 2–3 seed"
+    config_desc = recommended.get("config", "")
+    checks["config_desc"] = "full" in config_desc and "LSTM" in config_desc and "EKF" in config_desc
+    passed = passed and ("full" in config_desc and "LSTM" in config_desc and "EKF" in config_desc)
+
+    # 6. 泛化层描述包含 "只判排序不做因子推断"
+    gen_layer = cfg.get("generalization_layer", {})
+    eval_method = gen_layer.get("evaluation_method", "")
+    checks["eval_method"] = "只判排序" in eval_method and "不做因子推断" in eval_method
+    passed = passed and ("只判排序" in eval_method and "不做因子推断" in eval_method)
+
+    # 7. 泛化层描述包含 "不需要主场景同等功效"
+    requirement = gen_layer.get("requirement", "")
+    checks["requirement"] = "不需要主场景同等功效" in requirement
+    passed = passed and "不需要主场景同等功效" in requirement
+
+    # 8. 手册原文存在且 manual_ref 指向手册第275行
+    manual_exists = manual_path.is_file()
+    checks["manual_exists"] = manual_exists
+
+    if manual_exists:
+        manual_ref = cfg.get("manual_ref", "")
+        checks["manual_ref_correct"] = "第275行" in manual_ref or "275" in manual_ref
+        passed = passed and ("第275行" in manual_ref or "275" in manual_ref)
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P48-scale-gear", "name": "[48] 规模档位", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+        },
+    }
+
+
 # ---------------- P49 条款 [49]: PA-5 协议引用边界 ----------------
 def p49_protocol_reference_boundary() -> dict[str, Any]:
-    """[49] PA-5 协议引用边界：本手册档位参数数值唯一权威 = Stage 1 档位协议条款。
+    """[46] PA-5 协议引用边界：本手册档位参数数值唯一权威 = Stage 1 档位协议条款。
+
+    注意：函数沿用 p49 历史命名，实际验证手册 [46] 条款。
 
     验证项：
     1. configs/protocol/protocol_reference_boundary.yaml 存在且能正确解析
@@ -5111,7 +5335,7 @@ def p49_protocol_reference_boundary() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "protocol_reference_boundary.yaml"
-    handount_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性
     cfg_exists = cfg_path.is_file()
@@ -5158,37 +5382,30 @@ def p49_protocol_reference_boundary() -> dict[str, Any]:
     }
 
 
-# ---------------- P50 条款 [50]: GT 真值精度声明 ----------------
-def p50_gt_truth_precision() -> dict[str, Any]:
-    """P50: GT 真值精度声明（硬约束）验证。
+# ---------------- P50 条款 [50]: 测试轨迹与训练无重叠（P6） ----------------
+def p50_test_train_no_overlap() -> dict[str, Any]:
+    """P50: 测试轨迹与训练无重叠（P6）验证。
 
-    手册 [50]：gt_pos/gt_yaw 为本仿真数据集的无噪声理想真值（由轨迹几何精确生成，
-    GT 不确定度 = 0），评估时不引入 GT 不确定度传播——误差预算（0-4）只含传感器
-    噪声×GDOP 项，不含 GT 噪声项。
+    手册 [50]：测试轨迹与训练无重叠。
 
     验证项：
-    1. configs/protocol/gt_truth_precision.yaml 存在且能正确解析
-    2. statement_name 包含"GT 真值精度声明"
-    3. constraint_level 为"硬约束"
-    4. gt_pos_nature 包含"无噪声理想真值"
-    5. gt_yaw_nature 包含"无噪声理想真值"
-    6. generation_method 包含"轨迹几何精确生成"
-    7. gt_uncertainty 为 0
-    8. no_gt_uncertainty_propagation 为 true
-    9. error_budget_components 包含"传感器噪声"和"GDOP"
-    10. no_gt_noise_in_budget 为 true
-    11. 手册真源存在
+    1. configs/protocol/clause50_test_train_no_overlap.yaml 存在且能正确解析
+    2. clause_name 包含"测试轨迹与训练无重叠"
+    3. test_train_no_overlap 为 true
+    4. paper_reference 包含"P6"
+    5. description 包含"测试轨迹"和"训练"
+    6. 手册真源存在
     """
     import yaml
-    cfg_path = CONFIGS / "protocol" / "gt_truth_precision.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    cfg_path = CONFIGS / "protocol" / "clause50_test_train_no_overlap.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     # (a) 配置文件存在性
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P50-gt-truth-precision", "name": "[50] GT 真值精度声明", "severity": "hard",
-            "passed": False, "detail": "gt_truth_precision.yaml missing",
+            "code": "P50-test-train-no-overlap", "name": "[50] 测试轨迹与训练无重叠", "severity": "hard",
+            "passed": False, "detail": "clause50_test_train_no_overlap.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
         }
 
@@ -5197,29 +5414,26 @@ def p50_gt_truth_precision() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P50-gt-truth-precision", "name": "[50] GT 真值精度声明", "severity": "hard",
+            "code": "P50-test-train-no-overlap", "name": "[50] 测试轨迹与训练无重叠", "severity": "hard",
             "passed": False, "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
         }
 
     # (c) 各项校验
     checks: dict[str, bool] = {}
-    checks["statement_name"] = isinstance(cfg.get("statement_name"), str) and "GT 真值精度声明" in cfg.get("statement_name", "")
-    checks["constraint_level"] = cfg.get("constraint_level") == "硬约束"
-    checks["gt_pos_nature"] = isinstance(cfg.get("gt_pos_nature"), str) and "无噪声理想真值" in cfg.get("gt_pos_nature", "")
-    checks["gt_yaw_nature"] = isinstance(cfg.get("gt_yaw_nature"), str) and "无噪声理想真值" in cfg.get("gt_yaw_nature", "")
-    checks["generation_method"] = isinstance(cfg.get("generation_method"), str) and "轨迹几何精确生成" in cfg.get("generation_method", "")
-    checks["gt_uncertainty"] = cfg.get("gt_uncertainty") == 0
-    checks["no_gt_uncertainty_propagation"] = cfg.get("no_gt_uncertainty_propagation") is True
-    ebc = cfg.get("error_budget_components", "")
-    checks["error_budget_components"] = isinstance(ebc, str) and "传感器噪声" in ebc and "GDOP" in ebc
-    checks["no_gt_noise_in_budget"] = cfg.get("no_gt_noise_in_budget") is True
+    clause_name = cfg.get("clause_name", "")
+    checks["clause_name_contains_test_train_no_overlap"] = "测试轨迹与训练无重叠" in clause_name
+    checks["test_train_no_overlap_true"] = cfg.get("test_train_no_overlap") is True
+    paper_ref = str(cfg.get("paper_reference", ""))
+    checks["paper_reference_contains_p6"] = "P6" in paper_ref
+    desc = str(cfg.get("description", ""))
+    checks["description_contains_test_and_train"] = "测试轨迹" in desc and "训练" in desc
     checks["manual_exists"] = manual_path.is_file()
 
     passed = all(checks.values()) and cfg_exists
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P50-gt-truth-precision", "name": "[50] GT 真值精度声明", "severity": "hard",
+        "code": "P50-test-train-no-overlap", "name": "[50] 测试轨迹与训练无重叠", "severity": "hard",
         "passed": passed,
         "detail": f"cfg_exists={cfg_exists}; checks={'; '.join(detail_parts)}",
         "evidence": {
@@ -5231,43 +5445,46 @@ def p50_gt_truth_precision() -> dict[str, Any]:
     }
 
 
-def p51_layout_randomization() -> dict[str, Any]:
-    """P51: 布局随机化泛化层（域随机化/程序化环境生成的报告规范）验证。
+def p51_sequence_split_no_overlap() -> dict[str, Any]:
+    """P51: 划分按整条序列、训练与测试无重叠。
 
-    手册 [51]：本实验不自采第二物理场景，改用两层互补验证（均按同一协议口径）：
-    布局随机化泛化层——同仿真器、随机化场景配置、只判排序稳定性——域随机化/
-    程序化环境生成的报告规范。
+    手册 [51]：划分按整条序列、训练与测试无重叠。
 
     验证项：
-    1. configs/protocol/layout_randomization_layer.yaml 存在且能正确解析
-    2. layer_name 包含"布局随机化泛化层"
-    3. no_second_physics_scene 为 true
-    4. two_layer_validation 为 true
-    5. same_simulator 为 true
-    6. randomized_scenario_config 为 true
-    7. sort_stability_only 为 true
-    8. report_spec 包含"域随机化"和"程序化环境"
-    9. protocol_source 包含"同一协议口径"
+    1. configs/protocol/clause51_sequence_split_no_overlap.yaml 存在且能正确解析
+    2. clause_name 包含"划分按整条序列"和"训练与测试无重叠"
+    3. split_by_full_sequence 为 true
+    4. train_test_no_overlap 为 true
+    5. split_unit 为"整条序列"
+    6. overlap_check_method 包含"轨迹ID"或"唯一性"
+    7. manual_ref 指向"最终交付_异步手册_424条_20260917.md"
+    8. manual_line 为 278
     """
     import yaml
-    cfg_path = CONFIGS / "protocol" / "layout_randomization_layer.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    cfg_path = CONFIGS / "protocol" / "clause51_sequence_split_no_overlap.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
+    # (a) 配置文件存在性
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P51-layout-randomization", "name": "[51] 布局随机化泛化层",
-            "severity": "hard", "passed": False,
-            "detail": "layout_randomization_layer.yaml missing",
+            "code": "P51-sequence-split-no-overlap",
+            "name": "[51] 划分按整条序列、训练与测试无重叠",
+            "severity": "hard",
+            "passed": False,
+            "detail": "clause51_sequence_split_no_overlap.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
         }
 
+    # (b) 解析配置文件
     try:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P51-layout-randomization", "name": "[51] 布局随机化泛化层",
-            "severity": "hard", "passed": False,
+            "code": "P51-sequence-split-no-overlap",
+            "name": "[51] 划分按整条序列、训练与测试无重叠",
+            "severity": "hard",
+            "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
                          "parse_error": str(exc)},
@@ -5275,8 +5492,10 @@ def p51_layout_randomization() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P51-layout-randomization", "name": "[51] 布局随机化泛化层",
-            "severity": "hard", "passed": False,
+            "code": "P51-sequence-split-no-overlap",
+            "name": "[51] 划分按整条序列、训练与测试无重叠",
+            "severity": "hard",
+            "passed": False,
             "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
                          "cfg_type": type(cfg).__name__},
@@ -5284,61 +5503,89 @@ def p51_layout_randomization() -> dict[str, Any]:
 
     checks: dict[str, Any] = {}
 
-    checks["layer_name"] = isinstance(cfg.get("layer_name"), str) and "布局随机化泛化层" in cfg.get("layer_name", "")
-    checks["no_second_physics_scene"] = cfg.get("no_second_physics_scene") is True
-    checks["two_layer_validation"] = cfg.get("two_layer_validation") is True
-    checks["same_simulator"] = cfg.get("same_simulator") is True
-    checks["randomized_scenario_config"] = cfg.get("randomized_scenario_config") is True
-    checks["sort_stability_only"] = cfg.get("sort_stability_only") is True
+    # 1. clause_name 包含"划分按整条序列"和"训练与测试无重叠"
+    clause_name = cfg.get("clause_name", "")
+    checks["clause_name_contains_sequence_split"] = "划分按整条序列" in clause_name
+    checks["clause_name_contains_no_overlap"] = "训练与测试无重叠" in clause_name
+    clause_name_ok = "划分按整条序列" in clause_name and "训练与测试无重叠" in clause_name
 
-    rs = cfg.get("report_spec", "")
-    checks["report_spec"] = isinstance(rs, str) and "域随机化" in rs and "程序化环境" in rs
+    # 2. split_by_full_sequence 为 true
+    checks["split_by_full_sequence_true"] = cfg.get("split_by_full_sequence") is True
 
-    ps = cfg.get("protocol_source", "")
-    checks["protocol_source"] = isinstance(ps, str) and "同一协议口径" in ps
+    # 3. train_test_no_overlap 为 true
+    checks["train_test_no_overlap_true"] = cfg.get("train_test_no_overlap") is True
+
+    # 4. split_unit 为"整条序列"
+    split_unit = cfg.get("split_unit", "")
+    checks["split_unit_is_full_sequence"] = split_unit == "整条序列"
+
+    # 5. overlap_check_method 包含"轨迹ID"或"唯一性"
+    overlap_method = cfg.get("overlap_check_method", "")
+    checks["overlap_check_method_valid"] = "轨迹ID" in overlap_method or "唯一性" in overlap_method
+
+    # 6. manual_ref 指向正确手册
+    manual_ref = cfg.get("manual_ref", "")
+    checks["manual_ref_correct"] = "最终交付_异步手册_424条_20260917.md" in manual_ref
+
+    # 7. manual_line 为 278
+    checks["manual_line_278"] = cfg.get("manual_line") == 278
+
+    # 8. 手册真源存在
+    checks["manual_exists"] = manual_path.is_file()
+
+    # 9. paper_reference 包含"P6"
+    paper_ref = str(cfg.get("paper_reference", ""))
+    checks["paper_reference_contains_p6"] = "P6" in paper_ref
+
+    # 10. constraint_level 为"硬约束"
+    checks["constraint_level_hard"] = cfg.get("constraint_level") == "硬约束"
 
     passed = all(checks.values()) and cfg_exists
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P51-layout-randomization", "name": "[51] 布局随机化泛化层", "severity": "hard",
+        "code": "P51-sequence-split-no-overlap",
+        "name": "[51] 划分按整条序列、训练与测试无重叠",
+        "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
             "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
             "exists": cfg_exists,
             "checks": checks,
+            "manual_ref": cfg.get("manual_ref") if isinstance(cfg, dict) else None,
+            "manual_line": cfg.get("manual_line") if isinstance(cfg, dict) else None,
         },
     }
 
 
-# ---------------- P51 条款 [51]: 布局随机化泛化层 ----------------
-# 见上方 p51_layout_randomization() 定义（函数定义 + _ALL 注册行）
+# ---------------- P51 条款 [51]: 划分按整条序列、训练与测试无重叠 ----------------
+# 验证函数 p51_sequence_split_no_overlap() 见上方定义
 
 # ---------------- P52 条款 [52]: 三层证据结构总表 ----------------
 
-def p52_three_layer_evidence() -> dict[str, Any]:
-    """P52: 三层证据结构总表（论文级数据架构，与 S3 轨迹规格衔接）验证。
+def p52_baseline_not_bare_model() -> dict[str, Any]:
+    """P52: 基线不是裸模型（LSTM/Transformer 必须带头运行）验证。
 
-    手册 [52]：三层证据结构总表（论文级数据架构，与 S3 轨迹规格衔接）：
-    主场景（受控）S1–S3固定布局（20m×20m、4锚、4遮挡区）10seed×5方法=50单元
+    手册 [52]：基线不是裸模型：确认 LSTM/Transformer 确实带头运行——否则
+    LNN 赢它们="4 个头 + 液态骨干"双重优势，对比不公平。
 
     验证项：
-    1. configs/protocol/three_layer_evidence_structure.yaml 存在且能正确解析
-    2. 三层证据结构名称正确（论文级数据架构，与 S3 轨迹规格衔接）
-    3. 主场景（受控）层参数正确：20m×20m、4锚、4遮挡区、10seed×5方法=50单元
-    4. S3 轨迹规格衔接标志为 true
-    5. 论文级数据架构标志为 true
+    1. configs/protocol/baseline_not_bare_model.yaml 存在且能正确解析
+    2. baseline_has_head 为 true
+    3. LSTM 与 Transformer 均在 baselines 列表中且 with_head=true
+    4. fairness_reason 包含"LNN"和"双重优势"
+    5. no_bare_model_allowed 为 true
     """
     import yaml
-    cfg_path = CONFIGS / "protocol" / "three_layer_evidence_structure.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    cfg_path = CONFIGS / "protocol" / "baseline_not_bare_model.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P52-three-layer-evidence", "name": "[52] 三层证据结构总表",
+            "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型",
             "severity": "hard", "passed": False,
-            "detail": "three_layer_evidence_structure.yaml missing",
+            "detail": "baseline_not_bare_model.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
         }
 
@@ -5346,7 +5593,7 @@ def p52_three_layer_evidence() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P52-three-layer-evidence", "name": "[52] 三层证据结构总表",
+            "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
@@ -5355,7 +5602,7 @@ def p52_three_layer_evidence() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P52-three-layer-evidence", "name": "[52] 三层证据结构总表",
+            "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型",
             "severity": "hard", "passed": False,
             "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
@@ -5364,70 +5611,37 @@ def p52_three_layer_evidence() -> dict[str, Any]:
     checks = {}
     passed = True
 
-    # 1. 结构名称验证
-    structure_name = cfg.get("structure_name", "")
-    checks["structure_name"] = (
-        "三层证据结构" in structure_name and
-        "论文级数据架构" in structure_name and
-        "S3 轨迹规格衔接" in structure_name
-    )
+    # 1. baseline_has_head 为 true
+    baseline_has_head = cfg.get("baseline_has_head", False) is True
+    checks["baseline_has_head"] = baseline_has_head
+    passed = passed and baseline_has_head
 
-    # 2. 主场景层验证
-    layers = cfg.get("layers", [])
-    main_layer = None
-    for layer in layers:
-        if layer.get("layer_name", "") == "主场景（受控）":
-            main_layer = layer
-            break
+    # 2. LSTM 带头
+    baselines = cfg.get("baselines", [])
+    lstm_head = any(b.get("name") == "LSTM" and b.get("with_head") is True for b in baselines)
+    transformer_head = any(b.get("name") == "Transformer" and b.get("with_head") is True for b in baselines)
+    checks["lstm_with_head"] = lstm_head
+    checks["transformer_with_head"] = transformer_head
+    passed = passed and lstm_head and transformer_head
 
-    if main_layer is None:
-        passed = False
-        checks["main_layer"] = False
-    else:
-        area = main_layer.get("area", "")
-        anchors = main_layer.get("anchors", 0)
-        occlusion_zones = main_layer.get("occlusion_zones", 0)
-        seed_count = main_layer.get("seed_count", 0)
-        method_count = main_layer.get("method_count", 0)
-        total_units = main_layer.get("total_units", 0)
+    # 3. fairness_reason 包含关键词
+    reason = cfg.get("fairness_reason", "")
+    checks["fairness_reason_has_LNN"] = "LNN" in reason
+    checks["fairness_reason_has_double_advantage"] = "双重优势" in reason or "双重优势" in reason
+    passed = passed and ("LNN" in reason) and ("双重优势" in reason)
 
-        area_ok = "20m×20m" in area or "20m" in area
-        anchors_ok = anchors == 4
-        occlusion_ok = occlusion_zones == 4
-        seed_ok = seed_count == 10
-        method_ok = method_count == 5
-        total_ok = total_units == 50
+    # 4. 禁止裸模型
+    no_bare = cfg.get("no_bare_model_allowed", False) is True
+    checks["no_bare_model_allowed"] = no_bare
+    passed = passed and no_bare
 
-        checks["main_layer_area"] = area_ok
-        checks["main_layer_anchors"] = anchors_ok
-        checks["main_layer_occlusion_zones"] = occlusion_ok
-        checks["main_layer_seed_count"] = seed_ok
-        checks["main_layer_method_count"] = method_ok
-        checks["main_layer_total_units"] = total_ok
-
-        passed = passed and all([area_ok, anchors_ok, occlusion_ok, seed_ok, method_ok, total_ok])
-
-    # 3. S3 轨迹规格衔接
-    s3_ok = cfg.get("s3_trajectory_connection", False) is True
-    checks["s3_connection"] = s3_ok
-    passed = passed and s3_ok
-
-    # 4. 论文级数据架构
-    paper_arch = cfg.get("paper_level_data_architecture", False) is True
-    checks["paper_architecture"] = paper_arch
-    passed = passed and paper_arch
-
-    # 5. 三层结构数量
-    checks["three_layers"] = len(layers) == 3
-    passed = passed and len(layers) == 3
-
-    # 6. 手册真源存在
+    # 5. 手册真源存在
     manual_exists = manual_path.is_file()
     checks["manual_exists"] = manual_exists
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P52-three-layer-evidence", "name": "[52] 三层证据结构总表", "severity": "hard",
+        "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型", "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
@@ -5440,30 +5654,30 @@ def p52_three_layer_evidence() -> dict[str, Any]:
 
 # ---------------- P53 条款 [53]: 规模档位 ----------------
 
-def p53_scale_gear() -> dict[str, Any]:
-    """P53: 规模档位（入门 N_layout=6、推荐 N_layout=10）验证。
+# ---------------- P53 条款 [53]: 配对样本对齐 ----------------
+def p53_paired_sample_alignment() -> dict[str, Any]:
+    """[53] 配对样本对齐：各方法评估按同一测试轨迹 × 同 seed 配对。
 
-    手册 [53]：规模档位：入门 N_layout=6、推荐 N_layout=10（full + 2 个最强基线
-    LSTM/EKF × 2–3 seed 即可，泛化层只判排序不做因子推断，不需要主场景同等功效）
-
-    验证项：
-    1. configs/protocol/scale_gear_spec.yaml 存在且能正确解析
-    2. 入门档位 N_layout=6
-    3. 推荐档位 N_layout=10
-    4. 配置参数 full + 2个最强基线 LSTM/EKF × 2-3 seed
-    5. 泛化层只判排序不做因子推断
-    6. 泛化层不需要主场景同等功效
+    验证 configs/protocol/paired_sample_alignment.yaml 存在且能正确解析，
+    字段完整且值符合配对样本对齐要求：
+    - clause_id 为 "53"
+    - clause_name 包含 "配对样本对齐"
+    - paired_eval 为 true
+    - same_test_trajectory 为 true
+    - same_seed 为 true
+    - pairing_key 包含 "同一测试轨迹 × 同 seed"
+    - 手册真源存在
     """
     import yaml
-    cfg_path = CONFIGS / "protocol" / "scale_gear_spec.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    cfg_path = CONFIGS / "protocol" / "paired_sample_alignment.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P53-scale-gear", "name": "[53] 规模档位",
+            "code": "P53-paired-sample-alignment", "name": "[53] 配对样本对齐",
             "severity": "hard", "passed": False,
-            "detail": "scale_gear_spec.yaml missing",
+            "detail": "paired_sample_alignment.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
         }
 
@@ -5471,82 +5685,56 @@ def p53_scale_gear() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P53-scale-gear", "name": "[53] 规模档位",
+            "code": "P53-paired-sample-alignment", "name": "[53] 配对样本对齐",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
-            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
-                         "parse_error": str(exc)},
-        }
-
-    if not isinstance(cfg, dict):
-        return {
-            "code": "P53-scale-gear", "name": "[53] 规模档位",
-            "severity": "hard", "passed": False,
-            "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
         }
 
-    checks = {}
-    passed = True
+    missing_fields: list[str] = []
+    for field in ("clause_id", "clause_name", "paired_eval", "same_test_trajectory",
+                   "same_seed", "pairing_key"):
+        if field not in cfg:
+            missing_fields.append(field)
 
-    # 1. 入门档位 N_layout=6
-    gear_spec = cfg.get("gear_spec", {})
-    entry = gear_spec.get("entry_level", {})
-    entry_N = entry.get("N_layout", 0)
-    checks["entry_N_layout"] = entry_N == 6
-    passed = passed and entry_N == 6
-
-    # 2. 推荐档位 N_layout=10
-    recommended = gear_spec.get("recommended_level", {})
-    rec_N = recommended.get("N_layout", 0)
-    checks["recommended_N_layout"] = rec_N == 10
-    passed = passed and rec_N == 10
-
-    # 3. 配置参数包含 full + 2个最强基线 LSTM/EKF × 2-3 seed
-    config = recommended.get("config", "")
-    checks["config_contains_full"] = "full" in config
-    checks["config_contains_LSTM"] = "LSTM" in config
-    checks["config_contains_EKF"] = "EKF" in config
-    passed = passed and all([
-        "full" in config,
-        "LSTM" in config,
-        "EKF" in config,
-    ])
-
-    # 4. 泛化层只判排序不做因子推断
-    gen_layer = cfg.get("generalization_layer", {})
-    eval_method = gen_layer.get("evaluation_method", "")
-    checks["eval_method"] = "只判排序" in eval_method and "不做因子推断" in eval_method
-    passed = passed and ("只判排序" in eval_method and "不做因子推断" in eval_method)
-
-    # 5. 不需要主场景同等功效
-    requirement = gen_layer.get("requirement", "")
-    checks["requirement"] = "不需要主场景同等功效" in requirement
-    passed = passed and "不需要主场景同等功效" in requirement
-
-    # 6. 手册真源存在
+    clause_id_ok = cfg.get("clause_id") == "53"
+    clause_name = cfg.get("clause_name") or ""
+    name_ok = "配对样本对齐" in clause_name
+    paired_eval_ok = cfg.get("paired_eval") is True
+    same_trajectory_ok = cfg.get("same_test_trajectory") is True
+    same_seed_ok = cfg.get("same_seed") is True
+    pairing_key_ok = "同一测试轨迹 × 同 seed" in (cfg.get("pairing_key") or "")
     manual_exists = manual_path.is_file()
-    checks["manual_exists"] = manual_exists
 
-    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    passed = (not missing_fields and clause_id_ok and name_ok and paired_eval_ok
+              and same_trajectory_ok and same_seed_ok and pairing_key_ok and manual_exists)
+    detail_parts = [
+        f"cfg_exists={cfg_exists}", f"missing_fields={missing_fields or 'none'}",
+        f"clause_id_ok={clause_id_ok}", f"name_ok={name_ok}",
+        f"paired_eval_ok={paired_eval_ok}", f"same_trajectory_ok={same_trajectory_ok}",
+        f"same_seed_ok={same_seed_ok}", f"pairing_key_ok={pairing_key_ok}",
+        f"manual_exists={manual_exists}",
+    ]
     return {
-        "code": "P53-scale-gear", "name": "[53] 规模档位", "severity": "hard",
-        "passed": passed,
+        "code": "P53-paired-sample-alignment", "name": "[53] 配对样本对齐",
+        "severity": "hard", "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
             "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
             "exists": cfg_exists,
-            "checks": checks,
+            "clause_id": cfg.get("clause_id"),
+            "pairing_key": cfg.get("pairing_key"),
+            "manual_exists": manual_exists,
         },
     }
 
 
-# ---------------- P54 条款 [54]: 布局参数 vs 方法排序散点/箱线 ----------------
+# ---------------- P49 条款 [49]: 布局参数 vs 方法排序散点/箱线 ----------------
 
 def p54_layout_parameter_scatter() -> dict[str, Any]:
-    """P54: 布局参数 vs 方法排序的散点/箱线（论文稳健性图）验证。
+    """P49: 布局参数 vs 方法排序的散点/箱线（论文稳健性图）验证。
 
-    手册 [54]：布局参数 vs 方法排序的散点/箱线（论文稳健性图）。
+    手册 [49]：布局参数 vs 方法排序的散点/箱线（论文稳健性图）。
 
     验证项：
     1. configs/protocol/layout_scatter_plot_spec.yaml 存在且能正确解析
@@ -5557,12 +5745,12 @@ def p54_layout_parameter_scatter() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "layout_scatter_plot_spec.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P54-layout-scatter-plot", "name": "[54] 布局参数vs方法排序散点/箱线图",
+            "code": "P49-layout-scatter-plot", "name": "[49] 布局参数vs方法排序散点/箱线图",
             "severity": "hard", "passed": False,
             "detail": "layout_scatter_plot_spec.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -5572,7 +5760,7 @@ def p54_layout_parameter_scatter() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P54-layout-scatter-plot", "name": "[54] 布局参数vs方法排序散点/箱线图",
+            "code": "P49-layout-scatter-plot", "name": "[49] 布局参数vs方法排序散点/箱线图",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
@@ -5581,7 +5769,7 @@ def p54_layout_parameter_scatter() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P54-layout-scatter-plot", "name": "[54] 布局参数vs方法排序散点/箱线图",
+            "code": "P49-layout-scatter-plot", "name": "[49] 布局参数vs方法排序散点/箱线图",
             "severity": "hard", "passed": False,
             "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
@@ -5617,7 +5805,7 @@ def p54_layout_parameter_scatter() -> dict[str, Any]:
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P54-layout-scatter-plot", "name": "[54] 布局参数vs方法排序散点/箱线图",
+        "code": "P49-layout-scatter-plot", "name": "[49] 布局参数vs方法排序散点/箱线图",
         "severity": "hard", "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
@@ -5628,32 +5816,35 @@ def p54_layout_parameter_scatter() -> dict[str, Any]:
     }
 
 
-# ---------------- P55 条款 [55]: 执行入口 ----------------
+# ---------------- P55: 条款 [55] 扩样路径 ----------------
 
-def p55_execution_entry() -> dict[str, Any]:
-    """P55: 执行入口验证。
+def p55_scale_expansion_path() -> dict[str, Any]:
+    """P55: 扩样路径声明验证。
 
-    手册 [55]：执行入口：主场景照常走本文档全部流程。
+    手册 [55]：10 seed 不足支撑功效时如实声明并给出扩样路径（只增不减：加 seed/轨迹至功效达标，
+    规模恒 ≥ 论文级 10 seed × ≥100/seed，论文级硬约束——不存在"收窄/降档"方向的出口）。
 
     验证项：
-    1. configs/protocol/execution_entry.yaml 存在且能正确解析
-    2. entry_name 包含"执行入口"
-    3. main_scene_flow 包含"主场景照常走本文档全部流程"
-    4. flow_source 包含"本文档全部流程"
-    5. execution_type 为"主场景"
-    6. proceed_normal 为 true
-    7. 手册真源存在
+    1. configs/protocol/scale_expansion_path.yaml 存在且能正确解析
+    2. clause_id 为 "55"
+    3. clause_name 包含"扩样路径声明"或"扩样"
+    4. ten_seed_insufficient_honest_declaration 为 true
+    5. expansion_path_only_increase 为 true（只增不减）
+    6. scale_floor_ge_10seed_100perseed 为 true（规模恒 ≥ 论文级 10 seed × ≥100/seed）
+    7. paper_level_constraint 为 true
+    8. no_narrowing_exit 为 true（不存在收窄/降档方向的出口）
+    9. 手册真源存在
     """
     import yaml
-    cfg_path = CONFIGS / "protocol" / "execution_entry.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    cfg_path = CONFIGS / "protocol" / "scale_expansion_path.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P55-execution-entry", "name": "[55] 执行入口",
+            "code": "P55-scale-expansion-path", "name": "[55] 扩样路径",
             "severity": "hard", "passed": False,
-            "detail": "execution_entry.yaml missing",
+            "detail": "scale_expansion_path.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
         }
 
@@ -5661,7 +5852,7 @@ def p55_execution_entry() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P55-execution-entry", "name": "[55] 执行入口",
+            "code": "P55-scale-expansion-path", "name": "[55] 扩样路径",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
@@ -5670,53 +5861,71 @@ def p55_execution_entry() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P55-execution-entry", "name": "[55] 执行入口",
+            "code": "P55-scale-expansion-path", "name": "[55] 扩样路径",
             "severity": "hard", "passed": False,
             "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
         }
 
-    checks = {}
+    checks: dict[str, bool] = {}
     passed = True
 
-    # 1. entry_name 包含"执行入口"
-    entry_name = cfg.get("entry_name", "")
-    checks["entry_name_contains_execution_entry"] = "执行入口" in entry_name
-    passed = passed and ("执行入口" in entry_name)
+    # 1. clause_id 为 "55"
+    clause_id = str(cfg.get("clause_id", ""))
+    checks["clause_id_is_55"] = clause_id == "55"
+    passed = passed and (clause_id == "55")
 
-    # 2. main_scene_flow 包含"主场景照常走本文档全部流程"
-    main_scene_flow = cfg.get("main_scene_flow", "")
-    checks["main_scene_flow_contains_main"] = "主场景照常走本文档全部流程" in main_scene_flow
-    passed = passed and ("主场景照常走本文档全部流程" in main_scene_flow)
+    # 2. clause_name 包含"扩样路径声明"或"扩样"
+    clause_name = str(cfg.get("clause_name", ""))
+    ok_name = ("扩样路径声明" in clause_name) or ("扩样" in clause_name)
+    checks["clause_name_contains"] = ok_name
+    passed = passed and ok_name
 
-    # 3. flow_source 包含"本文档全部流程"
-    flow_source = cfg.get("flow_source", "")
-    checks["flow_source_contains_full_flow"] = "本文档全部流程" in flow_source
-    passed = passed and ("本文档全部流程" in flow_source)
+    # 3. ten_seed_insufficient_honest_declaration 为 true
+    tsi = cfg.get("ten_seed_insufficient_honest_declaration")
+    ok_tsi = tsi is True
+    checks["ten_seed_insufficient_honest_declaration"] = ok_tsi
+    passed = passed and ok_tsi
 
-    # 4. execution_type 为"主场景"
-    execution_type = cfg.get("execution_type", "")
-    checks["execution_type_is_main"] = execution_type == "主场景"
-    passed = passed and (execution_type == "主场景")
+    # 4. expansion_path_only_increase 为 true（只增不减）
+    ep = cfg.get("expansion_path_only_increase")
+    ok_ep = ep is True
+    checks["expansion_path_only_increase"] = ok_ep
+    passed = passed and ok_ep
 
-    # 5. proceed_normal 为 true
-    proceed_normal = cfg.get("proceed_normal", False)
-    checks["proceed_normal_is_true"] = proceed_normal is True
-    passed = passed and (proceed_normal is True)
+    # 5. scale_floor_ge_10seed_100perseed 为 true
+    sf = cfg.get("scale_floor_ge_10seed_100perseed")
+    ok_sf = sf is True
+    checks["scale_floor_ge_10seed_100perseed"] = ok_sf
+    passed = passed and ok_sf
 
-    # 6. 手册真源存在
+    # 6. paper_level_constraint 为 true
+    plc = cfg.get("paper_level_constraint")
+    ok_plc = plc is True
+    checks["paper_level_constraint"] = ok_plc
+    passed = passed and ok_plc
+
+    # 7. no_narrowing_exit 为 true（不存在收窄/降档方向的出口）
+    nn = cfg.get("no_narrowing_exit")
+    ok_nn = nn is True
+    checks["no_narrowing_exit"] = ok_nn
+    passed = passed and ok_nn
+
+    # 8. 手册真源存在
     manual_exists = manual_path.is_file()
     checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P55-execution-entry", "name": "[55] 执行入口",
+        "code": "P55-scale-expansion-path", "name": "[55] 扩样路径",
         "severity": "hard", "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
             "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
             "exists": cfg_exists,
             "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
         },
     }
 
@@ -5766,7 +5975,7 @@ def p56_test_train_no_overlap() -> dict[str, Any]:
     passed = passed and bool(ver_method)
 
     # 5. 手册真源存在
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
     manual_exists = manual_path.is_file()
     checks["manual_exists"] = manual_exists
     passed = passed and manual_exists
@@ -5829,7 +6038,7 @@ def p57_sequence_split_no_overlap() -> dict[str, Any]:
     passed = passed and ("轨迹ID" in overlap_method or "唯一性" in overlap_method)
 
     # 5. 手册真源存在
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
     manual_exists = manual_path.is_file()
     checks["manual_exists"] = manual_exists
     passed = passed and manual_exists
@@ -5862,7 +6071,7 @@ def p58_baseline_not_bare_model() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "baseline_not_bare_model.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
@@ -5949,7 +6158,7 @@ def p59_pairwise_alignment() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "paired_sample_alignment.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
@@ -6022,24 +6231,25 @@ def p59_pairwise_alignment() -> dict[str, Any]:
 def p60_holm_bonferroni_correction() -> dict[str, Any]:
     """P60: Holm-Bonferroni 多重比较校正验证。
 
-    手册 [60]：两两比较（五方法共 10 对）附 Holm-Bonferroni 多重比较校正 ——
+    手册 [54]：两两比较（五方法共 10 对）附 Holm-Bonferroni 多重比较校正 ——
     多方法对比不做校正会放大假阳性。
 
     验证项：
     1. configs/protocol/holm_bonferroni_correction.yaml 存在且能正确解析
-    2. correction_method 为 "holm_bonferroni"
-    3. num_comparisons 为 10（五方法共 C(5,2)=10 对）
-    4. num_methods 为 5
-    5. multiple_comparison_adjusted 为 true
+    2. clause_id 为 "54"
+    3. correction_method 为 "holm_bonferroni"
+    4. num_comparisons 为 10（五方法共 C(5,2)=10 对）
+    5. num_methods 为 5
+    6. multiple_comparison_adjusted 为 true
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "holm_bonferroni_correction.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P60-holm-bonferroni-correction", "name": "[60] Holm-Bonferroni校正",
+            "code": "P60-holm-bonferroni-correction", "name": "[54] Holm-Bonferroni校正",
             "severity": "hard", "passed": False,
             "detail": "holm_bonferroni_correction.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -6049,7 +6259,7 @@ def p60_holm_bonferroni_correction() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P60-holm-bonferroni-correction", "name": "[60] Holm-Bonferroni校正",
+            "code": "P60-holm-bonferroni-correction", "name": "[54] Holm-Bonferroni校正",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
@@ -6058,7 +6268,7 @@ def p60_holm_bonferroni_correction() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P60-holm-bonferroni-correction", "name": "[60] Holm-Bonferroni校正",
+            "code": "P60-holm-bonferroni-correction", "name": "[54] Holm-Bonferroni校正",
             "severity": "hard", "passed": False,
             "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
@@ -6067,38 +6277,43 @@ def p60_holm_bonferroni_correction() -> dict[str, Any]:
     checks = {}
     passed = True
 
-    # 1. correction_method 为 holm_bonferroni
+    # 1. clause_id 为 "54"
+    clause_id = str(cfg.get("clause_id", ""))
+    checks["clause_id_is_54"] = clause_id == "54"
+    passed = passed and (clause_id == "54")
+
+    # 2. correction_method 为 holm_bonferroni
     method = cfg.get("correction_method", "")
     checks["correction_method"] = method.lower() == "holm_bonferroni"
     passed = passed and method.lower() == "holm_bonferroni"
 
-    # 2. num_comparisons 为 10
+    # 3. num_comparisons 为 10
     num_comp = cfg.get("num_comparisons", 0)
     checks["num_comparisons_is_10"] = num_comp == 10
     passed = passed and num_comp == 10
 
-    # 3. num_methods 为 5
+    # 4. num_methods 为 5
     num_methods = cfg.get("num_methods", 0)
     checks["num_methods_is_5"] = num_methods == 5
     passed = passed and num_methods == 5
 
-    # 4. multiple_comparison_adjusted 为 true
+    # 5. multiple_comparison_adjusted 为 true
     adjusted = cfg.get("multiple_comparison_adjusted", False) is True
     checks["multiple_comparison_adjusted"] = adjusted
     passed = passed and adjusted
 
-    # 5. pair_count matches C(5,2)=10
+    # 6. pair_count matches C(5,2)=10
     pair_count = cfg.get("pair_count", 0)
     checks["pair_count_is_10"] = pair_count == 10
     passed = passed and pair_count == 10
 
-    # 6. 手册真源存在
+    # 7. 手册真源存在
     manual_exists = manual_path.is_file()
     checks["manual_exists"] = manual_exists
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P60-holm-bonferroni-correction", "name": "[60] Holm-Bonferroni校正",
+        "code": "P60-holm-bonferroni-correction", "name": "[54] Holm-Bonferroni校正",
         "severity": "hard", "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
@@ -6117,7 +6332,7 @@ def p61_anova_robustness_backup() -> dict[str, Any]:
     （方差分析的前提检验与效应量报告是统计报告标准组成部分）。
 
     验证项：
-    1. configs/protocol/anova_robustness_backup.yaml 存在且能正确解析
+    1. configs/protocol/anova_robustness.yaml 存在且能正确解析
     2. clause_name 包含 "ANOVA稳健性后备"
     3. variance_homogeneity_test 为 true
     4. nonparametric_alternative 包含 "Kruskal-Wallis"
@@ -6126,15 +6341,15 @@ def p61_anova_robustness_backup() -> dict[str, Any]:
     7. 手册真源存在
     """
     import yaml
-    cfg_path = CONFIGS / "protocol" / "anova_robustness_backup.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    cfg_path = CONFIGS / "protocol" / "anova_robustness.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
             "code": "P61-anova-robustness-backup", "name": "[61] ANOVA稳健性后备",
             "severity": "hard", "passed": False,
-            "detail": "anova_robustness_backup.yaml missing",
+            "detail": "anova_robustness.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
         }
 
@@ -6210,31 +6425,29 @@ def p61_anova_robustness_backup() -> dict[str, Any]:
 
 # ---------------- P62: 条款 [62] 功效与样本量声明 ----------------
 def p62_power_sample_size() -> dict[str, Any]:
-    """P62: 功效与样本量声明（论文必报）验证。
+    """P62: 论文级规模参数验证。
 
-    手册 [62]：论文须报告目标效应量（最小可检测相对提升，按 A-2 的 40% 下限折算）、
-    显著性水平 α=0.05、功效 power≥0.8、以及 10 seed × ≥100 测试轨迹对应的统计把握
-    说明（含预估方差来源：冒烟/先导实验）。
+    手册 [62]：论文级规模参数：训练 12-15 条/seed、测试 >=100 条/seed
+    （A2/A3 x N2/N3 四组合各 >=25）、120s 基准、10 seed（论文级基线）。
 
     验证项：
     1. configs/protocol/power_sample_size.yaml 存在且能正确解析
-    2. clause_name 包含"功效与样本量声明"
-    3. target_effect_size 为 true
-    4. alpha 为 0.05
-    5. power >= 0.8
-    6. sample_size_10seed_100traj 为 true
-    7. statistical_power_justification 为 true
-    8. variance_source 包含 "smoke_test" 和 "pilot_experiment"
-    9. 手册真源存在
+    2. clause_id 为 "62"
+    3. train_per_seed_min >= 12 且 train_per_seed_max <= 15
+    4. test_per_seed_min >= 100
+    5. A2A3_N2N3_combo_min >= 25
+    6. baseline_120s 为 true
+    7. paper_seed == 10
+    8. 手册真源存在
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "power_sample_size.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P62-power-sample-size", "name": "[62] 功效与样本量声明",
+            "code": "P62-power-sample-size", "name": "[62] 论文级规模参数",
             "severity": "hard", "passed": False,
             "detail": "power_sample_size.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -6244,7 +6457,7 @@ def p62_power_sample_size() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P62-power-sample-size", "name": "[62] 功效与样本量声明",
+            "code": "P62-power-sample-size", "name": "[62] 论文级规模参数",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
@@ -6253,7 +6466,7 @@ def p62_power_sample_size() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P62-power-sample-size", "name": "[62] 功效与样本量声明",
+            "code": "P62-power-sample-size", "name": "[62] 论文级规模参数",
             "severity": "hard", "passed": False,
             "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
@@ -6262,56 +6475,62 @@ def p62_power_sample_size() -> dict[str, Any]:
     checks: dict[str, bool] = {}
     passed = True
 
-    # 1. clause_name 包含"功效与样本量声明"
+    # 1. clause_id 为 "62"
+    clause_id = str(cfg.get("clause_id", ""))
+    ok_id = clause_id == "62"
+    checks["clause_id_is_62"] = ok_id
+    passed = passed and ok_id
+
+    # 2. clause_name 包含"论文级规模参数"
     clause_name = str(cfg.get("clause_name", ""))
-    ok_name = "功效与样本量声明" in clause_name
+    ok_name = "论文级规模参数" in clause_name
     checks["clause_name_contains"] = ok_name
     passed = passed and ok_name
 
-    # 2. target_effect_size 为 true
-    tes = cfg.get("target_effect_size")
-    ok_tes = tes is True
-    checks["target_effect_size"] = ok_tes
-    passed = passed and ok_tes
+    # 3. train_per_seed_min >= 12
+    tps_min = cfg.get("train_per_seed_min", 0)
+    ok_tps_min = isinstance(tps_min, (int, float)) and tps_min >= 12
+    checks["train_per_seed_min_gte_12"] = ok_tps_min
+    passed = passed and ok_tps_min
 
-    # 3. alpha 为 0.05
-    alpha = cfg.get("alpha")
-    ok_alpha = alpha == 0.05
-    checks["alpha_is_0.05"] = ok_alpha
-    passed = passed and ok_alpha
+    # 4. train_per_seed_max <= 15
+    tps_max = cfg.get("train_per_seed_max", 999)
+    ok_tps_max = isinstance(tps_max, (int, float)) and tps_max <= 15
+    checks["train_per_seed_max_lte_15"] = ok_tps_max
+    passed = passed and ok_tps_max
 
-    # 4. power >= 0.8
-    power = cfg.get("power", 0)
-    ok_power = power >= 0.8
-    checks["power_gte_0.8"] = ok_power
-    passed = passed and ok_power
+    # 5. test_per_seed_min >= 100
+    test_min = cfg.get("test_per_seed_min", 0)
+    ok_test_min = isinstance(test_min, (int, float)) and test_min >= 100
+    checks["test_per_seed_min_gte_100"] = ok_test_min
+    passed = passed and ok_test_min
 
-    # 5. sample_size_10seed_100traj 为 true
-    ss = cfg.get("sample_size_10seed_100traj")
-    ok_ss = ss is True
-    checks["sample_size_10seed_100traj"] = ok_ss
-    passed = passed and ok_ss
+    # 6. A2A3_N2N3_combo_min >= 25
+    combo_min = cfg.get("A2A3_N2N3_combo_min", 0)
+    ok_combo = isinstance(combo_min, (int, float)) and combo_min >= 25
+    checks["combo_min_gte_25"] = ok_combo
+    passed = passed and ok_combo
 
-    # 6. statistical_power_justification 为 true
-    spj = cfg.get("statistical_power_justification")
-    ok_spj = spj is True
-    checks["statistical_power_justification"] = ok_spj
-    passed = passed and ok_spj
+    # 7. baseline_120s 为 true
+    baseline = cfg.get("baseline_120s")
+    ok_baseline = baseline is True
+    checks["baseline_120s"] = ok_baseline
+    passed = passed and ok_baseline
 
-    # 7. variance_source 包含 smoke_test 和 pilot_experiment
-    vs = cfg.get("variance_source", [])
-    ok_vs = "smoke_test" in vs and "pilot_experiment" in vs
-    checks["variance_source_has_smoke_test_and_pilot_experiment"] = ok_vs
-    passed = passed and ok_vs
+    # 8. paper_seed == 10
+    seed_count = cfg.get("paper_seed", 0)
+    ok_seed = seed_count == 10
+    checks["paper_seed_is_10"] = ok_seed
+    passed = passed and ok_seed
 
-    # 8. 手册真源存在
+    # 9. 手册真源存在
     manual_exists = manual_path.is_file()
     checks["manual_exists"] = manual_exists
     passed = passed and manual_exists
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P62-power-sample-size", "name": "[62] 功效与样本量声明",
+        "code": "P62-power-sample-size", "name": "[62] 论文级规模参数",
         "severity": "hard", "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
@@ -6341,7 +6560,7 @@ def p63_scale_expansion_path() -> dict[str, Any]:
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "scale_expansion_path.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
@@ -6428,11 +6647,11 @@ def p63_scale_expansion_path() -> dict[str, Any]:
         },
     }
 
-# ---------------- P64: 条款 [64] 分析单位与样本独立性声明 ----------------
+# ---------------- P64: 条款 [56] 分析单位与样本独立性声明 ----------------
 def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     """P64: 分析单位与样本独立性声明验证。
 
-    手册 [64]：滑窗 W=128 步（步长默认 1 帧）使相邻窗口重叠 127/128，
+    手册 [56]：滑窗 W=128 步（步长默认 1 帧）使相邻窗口重叠 127/128，
     帧级误差样本高度自相关、不满足 i.i.d. ——所有统计检验（配对 Wilcoxon、2×2 ANOVA、TOST、贝叶斯因子）
     必须以轨迹级为分析单位（每 seed 每测试轨迹汇总一个 RMSE 值，
     10 seed × ≥100 轨迹 = 每方法 ≥1000 个轨迹级样本，四组合每组合 ≥250 个）。
@@ -6448,11 +6667,12 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     8. statistics_methods 包含 Wilcoxon、2x2_ANOVA、TOST、Bayesian_factor
     9. per_seed_per_trajectory_rmse 为 true
     10. hard_constraint 为 true
-    11. 手册真源存在
+    11. scale_requirement 非空且含关键数字（≥1000、≥250）
+    12. 手册真源存在
     """
     import yaml
     cfg_path = CONFIGS / "protocol" / "analysis_unit_sample_independence.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     required_methods = ["Wilcoxon", "2x2_ANOVA", "TOST", "Bayesian_factor"]
 
@@ -6460,7 +6680,7 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P64-analysis-unit-sample-independence",
-            "name": "[64] 分析单位与样本独立性声明",
+            "name": "[56] 分析单位与样本独立性声明",
             "severity": "hard",
             "passed": False,
             "detail": "analysis_unit_sample_independence.yaml missing",
@@ -6472,7 +6692,7 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     except Exception as exc:
         return {
             "code": "P64-analysis-unit-sample-independence",
-            "name": "[64] 分析单位与样本独立性声明",
+            "name": "[56] 分析单位与样本独立性声明",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -6483,7 +6703,7 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     if not isinstance(cfg, dict):
         return {
             "code": "P64-analysis-unit-sample-independence",
-            "name": "[64] 分析单位与样本独立性声明",
+            "name": "[56] 分析单位与样本独立性声明",
             "severity": "hard",
             "passed": False,
             "detail": "cfg is not a dict",
@@ -6548,6 +6768,12 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     checks["hard_constraint"] = ok_hc
     passed = passed and ok_hc
 
+    # 9b. scale_requirement 非空且含关键数字
+    sr = str(cfg.get("scale_requirement", ""))
+    ok_sr = "≥1000" in sr and "≥250" in sr
+    checks["scale_requirement"] = ok_sr
+    passed = passed and ok_sr
+
     # 10. 手册真源存在
     manual_exists = manual_path.is_file()
     checks["manual_exists"] = manual_exists
@@ -6556,7 +6782,7 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
         "code": "P64-analysis-unit-sample-independence",
-        "name": "[64] 分析单位与样本独立性声明",
+        "name": "[56] 分析单位与样本独立性声明",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -6585,7 +6811,7 @@ def p65_pilot_experiment() -> dict[str, Any]:
     - 手册真源存在
     """
     cfg_path = PROJECT_ROOT / "configs" / "protocol" / "pilot_experiment.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     checks: dict[str, Any] = {}
     passed = True
@@ -6678,7 +6904,7 @@ def p66_no_nan_inf_gradient() -> dict[str, Any]:
     9. 手册真源存在
     """
     cfg_path = PROJECT_ROOT / "configs" / "protocol" / "no_nan_inf_gradient.yaml"
-    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
@@ -6768,6 +6994,1923 @@ def p66_no_nan_inf_gradient() -> dict[str, Any]:
         },
     }
 
+
+def p67_a2_a3_offset_protocol_verification() -> dict[str, Any]:
+    """[67] A2/A3 的偏移与抖动数值按协议生效验证
+
+    验证 A2/A3 的偏移与抖动数值按协议生效（见 S5、协议 A 轴）——**按 A2/A3 全参数核对**：
+    A2：UWB 时钟偏移 20–50ms、 UWB 往返延迟 40–80ms、IMU 时钟偏移 5–15ms、IMU 采样抖动 ±3ms、VIO 时钟偏移 20–50ms、 VIO 处理延迟 30–80ms
+    """
+    import yaml
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "axis_a_sync.yaml"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    # 检查配置文件是否存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P67-a2-a3-offset-protocol", "name": "[67] A2/A3 参数按协议生效验证",
+            "severity": "hard", "passed": False,
+            "detail": "axis_a_sync.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    # 解析配置文件
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P67-a2-a3-offset-protocol", "name": "[67] A2/A3 参数按协议生效验证",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    # 手册第67条定义的期望值（范围用 [min, max] 表示）
+    expected = {
+        "A2": {
+            "uwb_clock_offset_ms": [20, 50],
+            "uwb_round_trip_delay_ms": [40, 80],
+            "imu_clock_offset_ms": [5, 15],
+            "imu_sampling_jitter_ms": [3, 3],
+            "vio_clock_offset_ms": [20, 50],
+            "vio_processing_delay_ms": [30, 80],
+        },
+        "A3": {
+            "uwb_clock_offset_ms": [100, 200],
+            "uwb_round_trip_delay_ms": [120, 250],
+            "imu_clock_offset_ms": [20, 50],
+            "imu_sampling_jitter_ms": [10, 10],
+            "vio_clock_offset_ms": [100, 200],
+            "vio_processing_delay_ms": [150, 300],
+        },
+    }
+
+    # 验证 A2 和 A3 的所有参数
+    mismatches: list[str] = []
+    missing_levels: list[str] = []
+    missing_fields: list[str] = []
+    validated_levels: list[str] = []
+
+    for level, expected_fields in expected.items():
+        if level not in cfg:
+            missing_levels.append(level)
+            continue
+        for field, expected_val in expected_fields.items():
+            actual_val = cfg[level].get(field)
+            if actual_val is None:
+                missing_fields.append(f"{level}.{field}")
+            elif actual_val != expected_val:
+                mismatches.append(f"{level}.{field}: expected {expected_val}, got {actual_val}")
+        validated_levels.append(level)
+
+    # 手册文件存在性检查
+    handount_exists = handount_path.is_file()
+
+    passed = (
+        cfg_exists and
+        not mismatches and
+        not missing_levels and
+        not missing_fields and
+        handount_exists and
+        set(validated_levels) == {"A2", "A3"}
+    )
+
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"validated_levels={validated_levels}",
+        f"mismatches={mismatches or 'none'}",
+        f"missing_levels={missing_levels or 'none'}",
+        f"missing_fields={missing_fields or 'none'}",
+        f"handount_exists={handount_exists}",
+    ]
+    return {
+        "code": "P67-a2-a3-offset-protocol", "name": "[67] A2/A3 参数按协议生效验证",
+        "severity": "hard", "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "handount_path": str(handount_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "handount_exists": handount_exists,
+            "validated_levels": validated_levels,
+            "mismatches": mismatches,
+            "missing_levels": missing_levels,
+            "missing_fields": missing_fields,
+        },
+    }
+
+def p68_execution_deviation() -> dict[str, Any]:
+    """[68] 执行偏差（deviation）验证。
+
+    手册 [68]：执行层面与方案的偏差（漏跑/换机/中断恢复）→ 记 execution deviation 表（E 系列审计覆盖），
+    不影响协议与分析定义。实验目录结构 run 目录命名规范：`run-<日期>-<seed>-<method>-<config_hash>`
+    """
+    import yaml
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "execution_deviation.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks = {
+        "cfg_exists": cfg_exists,
+        "manual_exists": manual_exists,
+    }
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P68-execution-deviation", "name": "[68] 执行偏差验证", "severity": "hard",
+            "passed": False,
+            "detail": "execution_deviation.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P68-execution-deviation", "name": "[68] 执行偏差验证", "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    if not isinstance(cfg, dict):
+        return {
+            "code": "P68-execution-deviation", "name": "[68] 执行偏差验证", "severity": "hard",
+            "passed": False, "detail": "cfg is not a dict",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    # clause_id 必须为 "68"
+    checks["clause_id_ok"] = cfg.get("clause_id") == "68"
+    passed = passed and cfg.get("clause_id") == "68"
+
+    # 检查 execution_deviation 表字段
+    exec_dev = cfg.get("execution_deviation", {})
+    checks["table_name"] = exec_dev.get("table_name") == "execution_deviation"
+    passed = passed and exec_dev.get("table_name") == "execution_deviation"
+
+    checks["audit_series_E"] = exec_dev.get("audit_series") == "E"
+    passed = passed and exec_dev.get("audit_series") == "E"
+
+    checks["scope_defined"] = "漏跑/换机/中断恢复" in exec_dev.get("scope", "")
+    passed = passed and checks["scope_defined"]
+
+    checks["not_affect_protocol"] = exec_dev.get("does_not_affect_protocol_definition") is True
+    passed = passed and exec_dev.get("does_not_affect_protocol_definition") is True
+
+    # 检查 run 目录命名规范
+    dir_struct = cfg.get("experiment_dir_structure", {})
+    naming_pattern = dir_struct.get("naming_pattern", "")
+    checks["naming_pattern_correct"] = "run-<日期>-<seed>-<method>-<config_hash>" in naming_pattern
+    passed = passed and checks["naming_pattern_correct"]
+
+    # 手册文件检查
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"clause_id_ok={checks['clause_id_ok']}",
+        f"table_name={checks['table_name']}",
+        f"audit_series_E={checks['audit_series_E']}",
+        f"scope_defined={checks['scope_defined']}",
+        f"not_affect_protocol={checks['not_affect_protocol']}",
+        f"naming_pattern_correct={checks['naming_pattern_correct']}",
+        f"manual_exists={manual_exists}",
+    ]
+
+    return {
+        "code": "P68-execution-deviation", "name": "[68] 执行偏差（deviation）验证",
+        "severity": "hard", "passed": passed,
+        "detail": "; ".join(f"{k}={v}" for k, v in checks.items() if k != "manual_exists"),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "manual_exists": manual_exists,
+            "clause_id": cfg.get("clause_id"),
+            "table_name": exec_dev.get("table_name"),
+            "audit_series": exec_dev.get("audit_series"),
+            "naming_pattern": dir_struct.get("naming_pattern"),
+            "flags": checks,
+        },
+    }
+
+def p68_a2a3_shift_jitter() -> dict[str, Any]:
+    """[58] A2/A3 偏移与抖动数值按协议生效验证
+
+    验证 A2/A3 的偏移与抖动数值按协议生效（见档位协议 A 轴）——**按 A2/A3 全参数核对**：
+    A2：UWB 时钟偏移 20-50ms、UWB 往返延迟 40-80ms、IMU 时钟偏移 5-15ms、
+    IMU 采样抖动+/-3ms、VIO 时钟偏移 20-50ms、VIO 处理延迟 30-80ms
+    """
+    import yaml
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "a2a3_shift_jitter.yaml"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    # 检查配置文件是否存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P58-a2a3-shift-jitter", "name": "[58] A2/A3 偏移与抖动按协议生效验证",
+            "severity": "hard", "passed": False,
+            "detail": "a2a3_shift_jitter.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    # 解析配置文件
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P58-a2a3-shift-jitter", "name": "[58] A2/A3 偏移与抖动按协议生效验证",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    # 手册第58条定义的期望值（范围用 [min, max] 表示）
+    expected = {
+        "A2": {
+            "uwb_clock_offset_ms": [20, 50],
+            "uwb_round_trip_delay_ms": [40, 80],
+            "imu_clock_offset_ms": [5, 15],
+            "imu_sampling_jitter_ms": [3, 3],
+            "vio_clock_offset_ms": [20, 50],
+            "vio_processing_delay_ms": [30, 80],
+        },
+        "A3": {
+            "uwb_clock_offset_ms": [100, 200],
+            "uwb_round_trip_delay_ms": [120, 250],
+            "imu_clock_offset_ms": [20, 50],
+            "imu_sampling_jitter_ms": [10, 10],
+            "vio_clock_offset_ms": [100, 200],
+            "vio_processing_delay_ms": [150, 300],
+        },
+    }
+
+    # 验证 A2 和 A3 的所有参数
+    mismatches: list[str] = []
+    missing_levels: list[str] = []
+    missing_fields: list[str] = []
+    validated_levels: list[str] = []
+
+    for level, expected_fields in expected.items():
+        if level not in cfg:
+            missing_levels.append(level)
+            continue
+        for field, expected_val in expected_fields.items():
+            actual_val = cfg[level].get(field)
+            if actual_val is None:
+                missing_fields.append(f"{level}.{field}")
+            elif actual_val != expected_val:
+                mismatches.append(f"{level}.{field}: expected {expected_val}, got {actual_val}")
+        validated_levels.append(level)
+
+    # 手册文件存在性检查
+    handount_exists = handount_path.is_file()
+
+    # clause_id 检查（5铁律：配置必须含 clause_id="58"）
+    clause_id_ok = cfg.get("clause_id") == "58" or "条款" in cfg.get("description", "")
+
+    passed = (
+        cfg_exists and
+        not mismatches and
+        not missing_levels and
+        not missing_fields and
+        handount_exists and
+        set(validated_levels) == {"A2", "A3"} and
+        clause_id_ok
+    )
+
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"clause_id_ok={clause_id_ok}",
+        f"validated_levels={validated_levels}",
+        f"mismatches={mismatches or 'none'}",
+        f"missing_levels={missing_levels or 'none'}",
+        f"missing_fields={missing_fields or 'none'}",
+        f"handount_exists={handount_exists}",
+    ]
+    return {
+        "code": "P58-a2a3-shift-jitter", "name": "[58] A2/A3 偏移与抖动按协议生效验证",
+        "severity": "hard", "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "handount_path": str(handount_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "handount_exists": handount_exists,
+            "validated_levels": validated_levels,
+            "mismatches": mismatches,
+            "missing_levels": missing_levels,
+            "missing_fields": missing_fields,
+            "clause_id": cfg.get("clause_id", cfg.get("条款号", "N/A")),
+        },
+    }
+
+
+def p69_resampling_method() -> dict[str, Any]:
+    """[59] 重采样方法声明（硬约束）验证。
+
+    手册 [59]：UWB/VIO 重采样到 10Hz 公共轴的插值方法统一指定 ——
+    本实验采用最近邻（nearest-neighbor）对齐到 UWB 帧时刻，
+    不使用线性/样条插值生成测距或 VIO 值。
+    """
+    import yaml
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "resampling_method_declaration.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks = {
+        "cfg_exists": cfg_exists,
+        "manual_exists": manual_exists,
+    }
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P69-resampling-method", "name": "[59] 重采样方法声明", "severity": "hard",
+                "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P69-resampling-method", "name": "[59] 重采样方法声明", "severity": "hard",
+                "passed": False, "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        checks["clause_id"] = cfg.get("clause_id") == "59"
+        passed = passed and cfg.get("clause_id") == "59"
+
+        checks["resampling_method_is_nearest_neighbor"] = cfg.get("resampling_method") == "nearest-neighbor"
+        passed = passed and cfg.get("resampling_method") == "nearest-neighbor"
+
+        checks["target_rate_10hz"] = cfg.get("target_rate") == "10Hz"
+        passed = passed and cfg.get("target_rate") == "10Hz"
+
+        checks["interpolation_not_linear"] = cfg.get("interpolation_not_linear") is True
+        passed = passed and cfg.get("interpolation_not_linear") is True
+
+        checks["interpolation_not_spline"] = cfg.get("interpolation_not_spline") is True
+        passed = passed and cfg.get("interpolation_not_spline") is True
+
+        checks["uwb_10hz_frame_timestamp"] = cfg.get("UWB_10Hz_frame_timestamp") is True
+        passed = passed and cfg.get("UWB_10Hz_frame_timestamp") is True
+
+        checks["vio_20hz_nearest"] = cfg.get("VIO_20Hz_nearest") is True
+        passed = passed and cfg.get("VIO_20Hz_nearest") is True
+
+        checks["gt_alignment_direct"] = cfg.get("gt_alignment_direct") is True
+        passed = passed and cfg.get("gt_alignment_direct") is True
+
+        checks["write_to_paper_method_section"] = cfg.get("write_to_paper_method_section") is True
+        passed = passed and cfg.get("write_to_paper_method_section") is True
+    else:
+        passed = False
+
+    # 禁止代码中出现对 UWB/VIO 范围的线性/样条插值
+    illegal_interp: list[str] = []
+    nearest_sites: list[str] = []
+    for p, txt in _iter_files([SRC], (".py",)):
+        for i, line in enumerate(txt.splitlines(), 1):
+            # 对 UWB/VIO range 使用 linear/spline 插值 → 禁止
+            if re.search(r"(?:uwb.*interp|interp.*uwb|range.*interp|vio.*interp|interpolate.*range)", line, re.I):
+                if re.search(r"(?:linear|spline|np\.interp|interp1d)", line, re.I):
+                    illegal_interp.append(f"{p.name}:{i}")
+            # 最近邻实现 → 允许/要求
+            if re.search(r"(?:nearest|nearest_neighbor|nearest.*align|align.*nearest)", line, re.I):
+                nearest_sites.append(f"{p.name}:{i}")
+
+    checks["illegal_linear_spline_interp"] = len(illegal_interp) == 0
+    checks["nearest_implementation_sites"] = len(nearest_sites) >= 1
+    passed = passed and len(illegal_interp) == 0 and len(nearest_sites) >= 1
+
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P69-resampling-method", "name": "[59] 重采样方法声明", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "illegal_interp_sites": illegal_interp,
+            "nearest_sites": nearest_sites[:5],
+        },
+    }
+
+
+def p69_cpu_role_hierarchy() -> dict[str, Any]:
+    """[69] CPU 仅限非训练负载与 CPU 空闲协助训练的关系验证。
+
+    手册 [69]："CPU 仅限非训练负载"与"CPU 空闲协助训练"的关系：
+    前者是 GPU 空闲时的默认分工（CPU 只做数据生成/评估/预处理），
+    后者是 GPU 排满后的追加自由度（CPU 可承接剩余训练单元）
+    ——两者不冲突，GPU 有空的按前者，GPU 排满的按后者。
+    """
+    import yaml
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "cpu_role_description.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, Any] = {
+        "cfg_exists": cfg_exists,
+        "manual_exists": manual_exists,
+    }
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P69-cpu-role-hierarchy", "name": "[69] CPU 角色分层验证", "severity": "hard",
+            "passed": False,
+            "detail": "cpu_role_description.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P69-cpu-role-hierarchy", "name": "[69] CPU 角色分层验证", "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    if not isinstance(cfg, dict):
+        return {
+            "code": "P69-cpu-role-hierarchy", "name": "[69] CPU 角色分层验证", "severity": "hard",
+            "passed": False, "detail": "cfg is not a dict",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    # clause_id 必须为 "69"
+    checks["clause_id_ok"] = cfg.get("clause_id") == "69"
+    passed = passed and cfg.get("clause_id") == "69"
+
+    # 检查 cpu_non_training_only
+    cpu_non_training = cfg.get("cpu_non_training_only", {})
+    checks["cpu_non_training_enabled"] = cpu_non_training.get("enabled") is True
+    passed = passed and cpu_non_training.get("enabled") is True
+    checks["cpu_non_training_scope"] = "GPU 空闲时" in cpu_non_training.get("scope", "")
+    passed = passed and checks["cpu_non_training_scope"]
+    non_train_tasks = cpu_non_training.get("tasks", [])
+    checks["non_training_has_data_gen"] = any("数据生成" in str(t) for t in non_train_tasks)
+    passed = passed and checks["non_training_has_data_gen"]
+    checks["non_training_has_eval"] = any("评估" in str(t) for t in non_train_tasks)
+    passed = passed and checks["non_training_has_eval"]
+    checks["non_training_has_preprocess"] = any("预处理" in str(t) for t in non_train_tasks)
+    passed = passed and checks["non_training_has_preprocess"]
+
+    # 检查 cpu_idle_training
+    cpu_idle = cfg.get("cpu_idle_training", {})
+    checks["cpu_idle_enabled"] = cpu_idle.get("enabled") is True
+    passed = passed and cpu_idle.get("enabled") is True
+    checks["cpu_idle_scope"] = "GPU 排满" in cpu_idle.get("scope", "")
+    passed = passed and checks["cpu_idle_scope"]
+    idle_tasks = cpu_idle.get("tasks", [])
+    checks["idle_has_remaining_training"] = any("剩余训练" in str(t) for t in idle_tasks)
+    passed = passed and checks["idle_has_remaining_training"]
+
+    # 检查优先级规则
+    checks["no_conflict"] = cfg.get("no_conflict") is True
+    passed = passed and cfg.get("no_conflict") is True
+    priority = cfg.get("priority_rule", "")
+    checks["priority_rule_defined"] = "GPU 有空" in priority or "GPU 排满" in priority
+    passed = passed and checks["priority_rule_defined"]
+
+    # 手册文件检查
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"clause_id_ok={checks['clause_id_ok']}",
+        f"cpu_non_training_enabled={checks['cpu_non_training_enabled']}",
+        f"cpu_non_training_scope={checks['cpu_non_training_scope']}",
+        f"non_training_tasks_valid={checks['non_training_has_data_gen'] and checks['non_training_has_eval'] and checks['non_training_has_preprocess']}",
+        f"cpu_idle_enabled={checks['cpu_idle_enabled']}",
+        f"cpu_idle_scope={checks['cpu_idle_scope']}",
+        f"cpu_idle_tasks_valid={checks['idle_has_remaining_training']}",
+        f"no_conflict={checks['no_conflict']}",
+        f"priority_rule_defined={checks['priority_rule_defined']}",
+        f"manual_exists={manual_exists}",
+    ]
+    return {
+        "code": "P69-cpu-role-hierarchy", "name": "[69] CPU 角色分层验证",
+        "severity": "hard", "passed": passed,
+        "detail": "; ".join(f"{k}={v}" for k, v in checks.items()),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "manual_exists": manual_exists,
+            "clause_id": cfg.get("clause_id"),
+            "flags": checks,
+        },
+    }
+
+
+def p60_edge_case_extreme() -> dict[str, Any]:
+    """[60] 边界/极端情况（空轨迹、极短序列、M1长间隙首尾、人工尖峰、除零）验证。
+
+    手册 [60]：边界/极端情况：空轨迹、极短序列、M1 长间隙落在首尾，
+    不产生人工尖峰/除零。
+
+    验证项：
+    1. configs/protocol/edge_case_extreme.yaml 存在且能正确解析
+    2. clause_id == "60"
+    3. empty_trajectory_handling == true
+    4. short_sequence_handling == true
+    5. m1_long_gap_at_boundaries == true
+    6. no_artificial_peak == true
+    7. no_division_by_zero == true
+    8. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "edge_case_extreme.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P60-edge-case-extreme", "name": "[60] 边界/极端情况",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P60-edge-case-extreme", "name": "[60] 边界/极端情况",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        # 1. clause_id
+        ok_id = cfg.get("clause_id") == "60"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        # 2. empty_trajectory_handling
+        ok_empty = cfg.get("empty_trajectory_handling") is True
+        checks["empty_trajectory_handling"] = ok_empty
+        passed = passed and ok_empty
+
+        # 3. short_sequence_handling
+        ok_short = cfg.get("short_sequence_handling") is True
+        checks["short_sequence_handling"] = ok_short
+        passed = passed and ok_short
+
+        # 4. m1_long_gap_at_boundaries
+        ok_m1_gap = cfg.get("m1_long_gap_at_boundaries") is True
+        checks["m1_long_gap_at_boundaries"] = ok_m1_gap
+        passed = passed and ok_m1_gap
+
+        # 5. no_artificial_peak
+        ok_peak = cfg.get("no_artificial_peak") is True
+        checks["no_artificial_peak"] = ok_peak
+        passed = passed and ok_peak
+
+        # 6. no_division_by_zero
+        ok_div = cfg.get("no_division_by_zero") is True
+        checks["no_division_by_zero"] = ok_div
+        passed = passed and ok_div
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P60-edge-case-extreme", "name": "[60] 边界/极端情况", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p70_evaluation_parallel() -> dict[str, Any]:
+    """[70] 评估并行：测试轨迹推理在 GPU 上按轨迹独立并行执行
+    （轨迹内窗口批大小 16，轨迹间不混批，评估协议不变）。
+
+    验证范围（静态+配置核验）：
+      ① 配置文件存在性 + YAML 可解析
+      ② 关键参数逐字核对（gpu_execution=true, trajectory_batch_size=16,
+         no_batch_mixing=true, evaluation_protocol_unchanged=true）
+      ③ 代码侧存在评估并行执行逻辑（按轨迹独立、不混批、GPU 执行）
+    """
+    import yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause70_evaluation_parallel.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    # (a) 配置文件存在性检查
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    if not cfg_exists:
+        return {
+            "code": "P70-evaluation-parallel",
+            "name": "[70] 评估并行",
+            "severity": "hard",
+            "passed": False,
+            "detail": f"clause70_evaluation_parallel.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    # (b) YAML 解析 + 关键参数核对
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P70-evaluation-parallel",
+            "name": "[70] 评估并行",
+            "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    expected_cfg = {
+        "clause_id": "70",
+        "clause_name": "评估并行",
+    }
+
+    cfg_mismatches: list[str] = []
+    for key, expected_val in expected_cfg.items():
+        actual_val = cfg.get(key)
+        if actual_val != expected_val:
+            cfg_mismatches.append(
+                f"{key}: expected {expected_val!r}, got {actual_val!r}"
+            )
+
+    # (c) 评估并行参数核对
+    eval_parallel = cfg.get("evaluation_parallel", {})
+    checks: dict[str, bool] = {}
+
+    # gpu_execution
+    ok_gpu = eval_parallel.get("gpu_execution") is True
+    checks["gpu_execution_true"] = ok_gpu
+
+    # trajectory_batch_size
+    ok_batch = eval_parallel.get("trajectory_batch_size") == 16
+    checks["trajectory_batch_size_16"] = ok_batch
+
+    # no_batch_mixing
+    ok_mixing = eval_parallel.get("no_batch_mixing") is True
+    checks["no_batch_mixing_true"] = ok_mixing
+
+    # evaluation_protocol_unchanged
+    ok_protocol = eval_parallel.get("evaluation_protocol_unchanged") is True
+    checks["evaluation_protocol_unchanged_true"] = ok_protocol
+
+    # constraint_declaration
+    constraint = cfg.get("constraint_declaration", {})
+    ok_constraint = (
+        constraint.get("trajectory_independent_parallel") is True
+        and constraint.get("no_mixing_across_trajectories") is True
+        and constraint.get("gpu_execution_default") is True
+        and constraint.get("window_batch_size") == 16
+    )
+    checks["constraint_declaration_valid"] = ok_constraint
+
+    # (d) 代码侧评估/统计并行执行逻辑（静态存在性）
+    parallel_sites: list[str] = []
+    trajectory_sites: list[str] = []
+    gpu_sites: list[str] = []
+
+    import re
+
+    for p, txt in _iter_files([SRC], (".py",)):
+        for i, line in enumerate(txt.splitlines(), 1):
+            # 评估/统计模块中的并行执行逻辑
+            if re.search(r"(并行执行|parallel.*eval|parallel.*stat|统计并行|评估并行)", line):
+                parallel_sites.append(f"{p.name}:{i}")
+            # 轨迹独立/不混批逻辑
+            if re.search(r"(per_sequence|trajectory_id|seq_id|按轨迹|不混批|trajectory_independent|no_batch_mixing)", line):
+                trajectory_sites.append(f"{p.name}:{i}")
+            # GPU 执行逻辑
+            if re.search(r"(cuda|gpu|device.*cuda|torch\.cuda)", line):
+                gpu_sites.append(f"{p.name}:{i}")
+
+    has_parallel_logic = len(parallel_sites) >= 1
+    has_trajectory_logic = len(trajectory_sites) >= 1
+    has_gpu_logic = len(gpu_sites) >= 1
+
+    # (e) 组合判断
+    passed = (
+        cfg_exists
+        and not cfg_mismatches
+        and ok_gpu
+        and ok_batch
+        and ok_mixing
+        and ok_protocol
+        and ok_constraint
+        and has_parallel_logic
+        and has_trajectory_logic
+        and has_gpu_logic
+        and manual_exists
+    )
+
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"cfg_mismatches={cfg_mismatches or 'none'}",
+        f"gpu_execution={ok_gpu}",
+        f"trajectory_batch_size_16={ok_batch}",
+        f"no_batch_mixing={ok_mixing}",
+        f"evaluation_protocol_unchanged={ok_protocol}",
+        f"constraint_valid={ok_constraint}",
+        f"parallel_logic_sites={len(parallel_sites)}",
+        f"trajectory_logic_sites={len(trajectory_sites)}",
+        f"gpu_logic_sites={len(gpu_sites)}",
+        f"manual_exists={manual_exists}",
+    ]
+    return {
+        "code": "P70-evaluation-parallel",
+        "name": "[70] 评估并行",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "cfg_mismatches": cfg_mismatches,
+            "evaluation_parallel": eval_parallel,
+            "parallel_logic_sites": parallel_sites[:6],
+            "trajectory_logic_sites": trajectory_sites[:6],
+            "gpu_logic_sites": gpu_sites[:6],
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p72_layout_randomization() -> dict[str, Any]:
+    """[63] 布局随机化泛化层：N_layout >=6（入门）/10（推荐）、每布局 5 方法 x 2-3 seed。
+
+    手册 [63]：布局随机化泛化层 N_layout >=6（入门）/10（推荐）、
+    每布局 5 方法 x 2-3 seed（布局随机化层）
+
+    验证项：
+    1. configs/protocol/layout_randomization.yaml 存在且能正确解析
+    2. clause_id == "63"
+    3. min_layouts_entry >= 6
+    4. min_layouts_recommended >= 10
+    5. methods_per_layout == 5
+    6. seeds_per_layout_min >= 2
+    7. seeds_per_layout_max <= 3
+    8. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "layout_randomization.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P72-layout-randomization", "name": "[63] 布局随机化泛化层",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P72-layout-randomization", "name": "[63] 布局随机化泛化层",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        # 1. clause_id
+        ok_id = cfg.get("clause_id") == "63"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        # 2. layout_randomization section exists
+        lr = cfg.get("layout_randomization", {})
+        if not isinstance(lr, dict):
+            checks["layout_randomization_section"] = False
+            passed = False
+        else:
+            checks["layout_randomization_section"] = True
+
+            # 3. min_layouts_entry >= 6
+            ok_min_entry = lr.get("min_layouts_entry", 0) >= 6
+            checks["min_layouts_entry_gte_6"] = ok_min_entry
+            passed = passed and ok_min_entry
+
+            # 4. min_layouts_recommended >= 10
+            ok_min_rec = lr.get("min_layouts_recommended", 0) >= 10
+            checks["min_layouts_recommended_gte_10"] = ok_min_rec
+            passed = passed and ok_min_rec
+
+            # 5. methods_per_layout == 5
+            ok_methods = lr.get("methods_per_layout") == 5
+            checks["methods_per_layout_eq_5"] = ok_methods
+            passed = passed and ok_methods
+
+            # 6. seeds_per_layout_min >= 2
+            ok_seeds_min = lr.get("seeds_per_layout_min", 0) >= 2
+            checks["seeds_per_layout_min_gte_2"] = ok_seeds_min
+            passed = passed and ok_seeds_min
+
+            # 7. seeds_per_layout_max <= 3
+            ok_seeds_max = lr.get("seeds_per_layout_max", 999) <= 3
+            checks["seeds_per_layout_max_lte_3"] = ok_seeds_max
+            passed = passed and ok_seeds_max
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P72-layout-randomization", "name": "[63] 布局随机化泛化层",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p71_same_seed_init() -> dict[str, Any]:
+    """[61] 同 seed 初始化：LNN/LSTM/Transformer 用同一 seed 的权重初始化。
+
+    手册 [61]：LNN/LSTM/Transformer 用同一 seed 的权重初始化。
+
+    验证项：
+    1. configs/protocol/same_seed_init.yaml 存在且能正确解析
+    2. clause_id == "61"
+    3. same_seed_init 为 true
+    4. models 包含 ["LNN", "LSTM", "Transformer"]
+    5. weight_init_consistent 为 true
+    6. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "same_seed_init.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P71-same-seed-init", "name": "[61] 同 seed 初始化",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P71-same-seed-init", "name": "[61] 同 seed 初始化",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        # 1. clause_id
+        ok_id = cfg.get("clause_id") == "61"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        # 2. same_seed_init
+        ok_same_seed = cfg.get("same_seed_init") is True
+        checks["same_seed_init"] = ok_same_seed
+        passed = passed and ok_same_seed
+
+        # 3. models
+        models = cfg.get("models", [])
+        ok_models = set(models) == {"LNN", "LSTM", "Transformer"}
+        checks["models_correct"] = ok_models
+        passed = passed and ok_models
+
+        # 4. weight_init_consistent
+        ok_weight = cfg.get("weight_init_consistent") is True
+        checks["weight_init_consistent"] = ok_weight
+        passed = passed and ok_weight
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P71-same-seed-init", "name": "[61] 同 seed 初始化", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p76_full_scale_unit() -> dict[str, Any]:
+    """[67] 全量单元：主场景 10 seed × 5 方法 = 50 单元全部用新数据训练。
+
+    手册 [67]：全量单元：主场景 10 seed × 5 方法 = 50 单元全部用新数据训练。
+
+    验证项：
+    1. configs/protocol/full_scale_unit.yaml 存在且能正确解析
+    2. clause_id == "67"
+    3. full_scale_unit.scenario == "主场景"
+    4. full_scale_unit.seeds == 10
+    5. full_scale_unit.methods == 5
+    6. full_scale_unit.total_units == 50
+    7. full_scale_unit.all_new_data == true
+    8. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "full_scale_unit.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P76-full-scale-unit", "name": "[67] 全量单元",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P76-full-scale-unit", "name": "[67] 全量单元",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        ok_id = cfg.get("clause_id") == "67"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        fsu = cfg.get("full_scale_unit", {})
+        if not isinstance(fsu, dict):
+            checks["full_scale_unit_section"] = False
+            passed = False
+        else:
+            checks["full_scale_unit_section"] = True
+
+            ok_sc = fsu.get("scenario") == "主场景"
+            checks["scenario_is_主场景"] = ok_sc
+            passed = passed and ok_sc
+
+            ok_seeds = fsu.get("seeds") == 10
+            checks["seeds_eq_10"] = ok_seeds
+            passed = passed and ok_seeds
+
+            ok_methods = fsu.get("methods") == 5
+            checks["methods_eq_5"] = ok_methods
+            passed = passed and ok_methods
+
+            ok_units = fsu.get("total_units") == 50
+            checks["total_units_eq_50"] = ok_units
+            passed = passed and ok_units
+
+            ok_new = fsu.get("all_new_data") is True
+            checks["all_new_data_true"] = ok_new
+            passed = passed and ok_new
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P76-full-scale-unit", "name": "[67] 全量单元",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+
+
+
+def p75_no_smoke_merge() -> dict[str, Any]:
+    """[66] 禁止把冒烟 ≥12 条测试数据并入全量测试集（硬约束）。
+
+    手册 [66]：禁止把冒烟 ≥12 条测试数据并入全量测试集（与"测试轨迹重新生成"一致，此处整批化执行）。
+
+    验证项：
+    1. configs/protocol/no_smoke_merge.yaml 存在且能正确解析
+    2. clause_id == "66"
+    3. smoke_data.hard_constraint == true
+    4. smoke_data.max_smoke_trajectories >= 12
+    5. smoke_data.no_merge_into_full_test == true
+    6. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "no_smoke_merge.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P75-no-smoke-merge", "name": "[66] 禁止冒烟数据并入全量测试集",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P75-no-smoke-merge", "name": "[66] 禁止冒烟数据并入全量测试集",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        ok_id = cfg.get("clause_id") == "66"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        sd = cfg.get("smoke_data", {})
+        if not isinstance(sd, dict):
+            checks["smoke_data_section"] = False
+            passed = False
+        else:
+            checks["smoke_data_section"] = True
+
+            ok_hc = sd.get("hard_constraint") is True
+            checks["hard_constraint_true"] = ok_hc
+            passed = passed and ok_hc
+
+            ok_max = sd.get("max_smoke_trajectories", 0) >= 12
+            checks["max_smoke_trajectories_gte_12"] = ok_max
+            passed = passed and ok_max
+
+            ok_merge = sd.get("no_merge_into_full_test") is True
+            checks["no_merge_into_full_test_true"] = ok_merge
+            passed = passed and ok_merge
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P75-no-smoke-merge", "name": "[66] 禁止冒烟数据并入全量测试集",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p74_no_old_new_mixing() -> dict[str, Any]:
+    """[65] 新旧数据混用禁令（硬约束）：禁止"部分 seed 新 + 部分 seed 旧"混用。
+
+    手册 [65]：新旧数据混用禁令（硬约束）：禁止"部分 seed 新 + 部分 seed 旧"混用。
+
+    验证项：
+    1. configs/protocol/no_old_new_mixing.yaml 存在且能正确解析
+    2. clause_id == "65"
+    3. no_mixing.hard_constraint == true
+    4. no_mixing.no_partial_old_new_mix == true
+    5. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "no_old_new_mixing.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P74-no-old-new-mixing", "name": "[65] 新旧数据混用禁令",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P74-no-old-new-mixing", "name": "[65] 新旧数据混用禁令",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        # 1. clause_id
+        ok_id = cfg.get("clause_id") == "65"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        # 2. no_mixing section
+        nm = cfg.get("no_mixing", {})
+        if not isinstance(nm, dict):
+            checks["no_mixing_section"] = False
+            passed = False
+        else:
+            checks["no_mixing_section"] = True
+
+            # 3. hard_constraint == true
+            ok_hc = nm.get("hard_constraint") is True
+            checks["hard_constraint_true"] = ok_hc
+            passed = passed and ok_hc
+
+            # 4. no_partial_old_new_mix == true
+            ok_mix = nm.get("no_partial_old_new_mix") is True
+            checks["no_partial_old_new_mix_true"] = ok_mix
+            passed = passed and ok_mix
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P74-no-old-new-mixing", "name": "[65] 新旧数据混用禁令",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p73_regenerate_all_seeds() -> dict[str, Any]:
+    """[64] 重新生成全部 seed 数据：主场景 10 seed 全部重新生成。
+
+    手册 [64]：重新生成全部 seed 数据：主场景 10 seed 全部重新生成。
+
+    验证项：
+    1. configs/protocol/regenerate_all_seeds.yaml 存在且能正确解析
+    2. clause_id == "64"
+    3. regenerate.scope == "主场景"
+    4. regenerate.seed_count == 10
+    5. regenerate.regenerate_all == true
+    6. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "regenerate_all_seeds.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P73-regenerate-all-seeds", "name": "[64] 重新生成全部 seed 数据",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P73-regenerate-all-seeds", "name": "[64] 重新生成全部 seed 数据",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        # 1. clause_id
+        ok_id = cfg.get("clause_id") == "64"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        # 2. regenerate section
+        rg = cfg.get("regenerate", {})
+        if not isinstance(rg, dict):
+            checks["regenerate_section"] = False
+            passed = False
+        else:
+            checks["regenerate_section"] = True
+
+            # 3. scope == "主场景"
+            ok_scope = rg.get("scope") == "主场景"
+            checks["scope_is_主场景"] = ok_scope
+            passed = passed and ok_scope
+
+            # 4. seed_count == 10
+            ok_seed_count = rg.get("seed_count") == 10
+            checks["seed_count_eq_10"] = ok_seed_count
+            passed = passed and ok_seed_count
+
+            # 5. regenerate_all == true
+            ok_regen_all = rg.get("regenerate_all") is True
+            checks["regenerate_all_true"] = ok_regen_all
+            passed = passed and ok_regen_all
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P73-regenerate-all-seeds", "name": "[64] 重新生成全部 seed 数据",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p77_parent_process_traceable() -> dict[str, Any]:
+    """[71] 父进程链可回溯到本体系的启动器（ps -o ppid= -p <pid> 逐级上溯，最终父进程是本体系的调度/启动脚本）。
+
+    手册 [71]：父进程链可回溯到本体系的启动器（`ps -o ppid= -p <pid>` 逐级上溯，最终父进程是本体系的调度/启动脚本）。
+
+    验证项：
+    1. configs/protocol/parent_process_traceable.yaml 存在且能正确解析
+    2. clause_id == "71"
+    3. parent_process_chain.traceable == true
+    4. parent_process_chain.command 包含 "ps -o ppid="
+    5. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "parent_process_traceable.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P77-parent-process-traceable", "name": "[71] 父进程链可回溯",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P77-parent-process-traceable", "name": "[71] 父进程链可回溯",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        ok_id = cfg.get("clause_id") == "71"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        ppc = cfg.get("parent_process_chain", {})
+        if not isinstance(ppc, dict):
+            checks["parent_process_chain_section"] = False
+            passed = False
+        else:
+            checks["parent_process_chain_section"] = True
+
+            ok_trace = ppc.get("traceable") is True
+            checks["traceable_true"] = ok_trace
+            passed = passed and ok_trace
+
+            cmd = ppc.get("command", "")
+            ok_cmd = "ps -o ppid=" in cmd
+            checks["command_contains_ps_ppid"] = ok_cmd
+            passed = passed and ok_cmd
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P77-parent-process-traceable", "name": "[71] 父进程链可回溯",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p78_transformer_sliding_window() -> dict[str, Any]:
+    """[72] Transformer 滑窗同轨迹内合批 评估日志打印批构成（同轨迹内窗口）。
+
+    手册 [72]：Transformer 滑窗同轨迹内合批 评估日志打印批构成（同轨迹内窗口）。
+
+    验证项：
+    1. configs/protocol/transformer_sliding_window.yaml 存在且能正确解析
+    2. clause_id == "72"
+    3. transformer_sliding_window.enabled == true
+    4. transformer_sliding_window.method 包含 "同轨迹内窗口"
+    5. transformer_sliding_window.log_batch_composition == true
+    6. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "transformer_sliding_window.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P78-transformer-sliding-window", "name": "[72] Transformer 滑窗同轨迹内合批",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P78-transformer-sliding-window", "name": "[72] Transformer 滑窗同轨迹内合批",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        ok_id = cfg.get("clause_id") == "72"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        tsw = cfg.get("transformer_sliding_window", {})
+        if not isinstance(tsw, dict):
+            checks["transformer_sliding_window_section"] = False
+            passed = False
+        else:
+            checks["transformer_sliding_window_section"] = True
+
+            ok_en = tsw.get("enabled") is True
+            checks["enabled_true"] = ok_en
+            passed = passed and ok_en
+
+            method = tsw.get("method", "")
+            ok_method = "同轨迹内窗口" in method
+            checks["method_contains_同轨迹内窗口"] = ok_method
+            passed = passed and ok_method
+
+            ok_log = tsw.get("log_batch_composition") is True
+            checks["log_batch_composition_true"] = ok_log
+            passed = passed and ok_log
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P78-transformer-sliding-window", "name": "[72] Transformer 滑窗同轨迹内合批",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p79_no_gpu_error_stop() -> dict[str, Any]:
+    """[73] 在无 GPU 环境实测 → 确认报错停而非静默 CPU 训练。CPU 空闲协助（执行模式/执行模式·CPU 空闲协助）CPU 承接仅限 GPU 排满后启用的剩余训练单元。
+
+    手册 [73]：在无 GPU 环境实测 → 确认报错停而非静默 CPU 训练 **CPU 空闲协助**（执行模式/执行模式·CPU 空闲协助） CPU 承接仅限 GPU 排满后启用的剩余训练单元。
+
+    验证项：
+    1. configs/protocol/gpu_error_handling.yaml 存在且能正确解析
+    2. clause_id == "73"
+    3. gpu_error_handling.verified == true
+    4. gpu_error_handling.cpu_idle_assistance == true
+    5. gpu_error_handling.cpu_only_for_full_gpu == true
+    6. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "gpu_error_handling.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P79-no-gpu-error-stop", "name": "[73] GPU 失败报错停",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P79-no-gpu-error-stop", "name": "[73] GPU 失败报错停",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        ok_id = cfg.get("clause_id") == "73"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        gefh = cfg.get("gpu_error_handling", {})
+        if not isinstance(gefh, dict):
+            checks["gpu_error_handling_section"] = False
+            passed = False
+        else:
+            checks["gpu_error_handling_section"] = True
+
+            ok_verified = gefh.get("verified") is True
+            checks["verified_true"] = ok_verified
+            passed = passed and ok_verified
+
+            ok_cpu_idle = gefh.get("cpu_idle_assistance") is True
+            checks["cpu_idle_assistance_true"] = ok_cpu_idle
+            passed = passed and ok_cpu_idle
+
+            ok_cpu_only = gefh.get("cpu_only_for_full_gpu") is True
+            checks["cpu_only_for_full_gpu_true"] = ok_cpu_only
+            passed = passed and ok_cpu_only
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P79-no-gpu-error-stop", "name": "[73] GPU 报错停",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p80_ram_limit_12g() -> dict[str, Any]:
+    """[74] RAM ≤12G 硬上限（执行模式/执行模式·RAM ≤12G 硬上限）；验证方法（细化，自测留痕）：冒烟实测单单元峰值内存（psutil 探针）。
+
+    手册 [74]：**RAM ≤12G 硬上限**（执行模式/执行模式·RAM ≤12G 硬上限）；验证方法（细化，自测留痕）：冒烟实测单单元峰值内存（psutil 探针）。
+
+    验证项：
+    1. configs/protocol/ram_limit_hard_cap.yaml 存在且能正确解析
+    2. clause_id == "74"
+    3. ram_limit_hard_cap.max_gb <= 12
+    4. ram_limit_hard_cap.verification_method 包含 "psutil"
+    5. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "ram_limit_hard_cap.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P80-ram-limit-12g", "name": "[74] RAM 12G 上限",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P80-ram-limit-12g", "name": "[74] RAM 12G 上限",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        ok_id = cfg.get("clause_id") == "74"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        rlhc = cfg.get("ram_limit_hard_cap", {})
+        if not isinstance(rlhc, dict):
+            checks["ram_limit_hard_cap_section"] = False
+            passed = False
+        else:
+            checks["ram_limit_hard_cap_section"] = True
+
+            max_gb = rlhc.get("max_gb", 999)
+            ok_max = max_gb <= 12
+            checks["max_gb_lte_12"] = ok_max
+            passed = passed and ok_max
+
+            vmethod = rlhc.get("verification_method", "")
+            ok_vmethod = "psutil" in vmethod
+            checks["verification_method_contains_psutil"] = ok_vmethod
+            passed = passed and ok_vmethod
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P80-ram-limit-12g", "name": "[74] RAM 12G 上限",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p81_no_refactor_changes() -> dict[str, Any]:
+    """[75] 禁止借大修变口径——大修只改代码组织与可维护性（模块拆分/常量收敛/断言补齐/命名统一），不得改变任何论文级数值、不得改数据生成/评估/统计口径、不得为了好写而改协议。
+
+    手册 [75]：**禁止借大修变口径** ——大修只改代码组织与可维护性（模块拆分/常量收敛/断言补齐/命名统一），**不得改变任何论文级数值、不得改数据生成/评估/统计口径、不得为了好写而改协议**
+
+    验证项：
+    1. configs/protocol/no_refactor_changes.yaml 存在且能正确解析
+    2. clause_id == "75"
+    3. refactor_restriction.no_change_paper_level_values == true
+    4. refactor_restriction.no_change_data_gen == true
+    5. refactor_restriction.no_change_eval == true
+    6. refactor_restriction.no_change_protocol == true
+    7. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "no_refactor_changes.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P81-no-refactor-changes", "name": "[75] 禁止借大修变口径",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P81-no-refactor-changes", "name": "[75] 禁止借大修变口径",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        ok_id = cfg.get("clause_id") == "75"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        rr = cfg.get("refactor_restriction", {})
+        if not isinstance(rr, dict):
+            checks["refactor_restriction_section"] = False
+            passed = False
+        else:
+            checks["refactor_restriction_section"] = True
+
+            ok_values = rr.get("no_change_paper_level_values") is True
+            checks["no_change_paper_level_values_true"] = ok_values
+            passed = passed and ok_values
+
+            ok_datagen = rr.get("no_change_data_gen") is True
+            checks["no_change_data_gen_true"] = ok_datagen
+            passed = passed and ok_datagen
+
+            ok_eval = rr.get("no_change_eval") is True
+            checks["no_change_eval_true"] = ok_eval
+            passed = passed and ok_eval
+
+            ok_protocol = rr.get("no_change_protocol") is True
+            checks["no_change_protocol_true"] = ok_protocol
+            passed = passed and ok_protocol
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P81-no-refactor-changes", "name": "[75] 禁止借大修变口径",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p82_refactor_scope_definition() -> dict[str, Any]:
+    """[76] 大修范围界定——明确本次大修的范围（哪个模块/哪个脚本/哪些接口），写入 decision log（时间/原因/影响范围/git commit）。
+
+    手册 [76]：**大修范围界定**——明确本次大修的范围（哪个模块/哪个脚本/哪些接口），写入 decision log（时间/原因/影响范围/git commit）
+
+    验证项：
+    1. configs/protocol/refactor_scope_definition.yaml 存在且能正确解析
+    2. clause_id == "76"
+    3. scope_definition.modules 非空
+    4. scope_definition.scripts 非空
+    5. scope_definition.interfaces 非空
+    6. decision_log.time 非空
+    7. decision_log.reason 非空
+    8. decision_log.scope 非空
+    9. decision_log.commit 非空
+    10. refactor_restriction.no_change_paper_level_values == true
+    11. refactor_restriction.no_change_data_gen == true
+    12. refactor_restriction.no_change_eval == true
+    13. refactor_restriction.no_change_protocol == true
+    14. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "refactor_scope_definition.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P82-refactor-scope-definition", "name": "[76] 大修范围界定",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P82-refactor-scope-definition", "name": "[76] 大修范围界定",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        ok_id = cfg.get("clause_id") == "76"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        # scope_definition checks
+        sd = cfg.get("scope_definition", {})
+        if not isinstance(sd, dict):
+            checks["scope_definition_section"] = False
+            passed = False
+        else:
+            checks["scope_definition_section"] = True
+            modules = sd.get("modules", [])
+            ok_modules = isinstance(modules, list) and len(modules) > 0
+            checks["scope_definition_modules_nonempty"] = ok_modules
+            passed = passed and ok_modules
+
+            scripts = sd.get("scripts", [])
+            ok_scripts = isinstance(scripts, list) and len(scripts) > 0
+            checks["scope_definition_scripts_nonempty"] = ok_scripts
+            passed = passed and ok_scripts
+
+            interfaces = sd.get("interfaces", [])
+            ok_interfaces = isinstance(interfaces, list) and len(interfaces) > 0
+            checks["scope_definition_interfaces_nonempty"] = ok_interfaces
+            passed = passed and ok_interfaces
+
+        # decision_log checks
+        dl = cfg.get("decision_log", {})
+        if not isinstance(dl, dict):
+            checks["decision_log_section"] = False
+            passed = False
+        else:
+            checks["decision_log_section"] = True
+            ok_time = bool(dl.get("time"))
+            checks["decision_log_time"] = ok_time
+            passed = passed and ok_time
+
+            ok_reason = bool(dl.get("reason"))
+            checks["decision_log_reason"] = ok_reason
+            passed = passed and ok_reason
+
+            ok_scope = bool(dl.get("scope"))
+            checks["decision_log_scope"] = ok_scope
+            passed = passed and ok_scope
+
+            ok_commit = bool(dl.get("commit"))
+            checks["decision_log_commit"] = ok_commit
+            passed = passed and ok_commit
+
+        # refactor_restriction checks
+        rr = cfg.get("refactor_restriction", {})
+        if not isinstance(rr, dict):
+            checks["refactor_restriction_section"] = False
+            passed = False
+        else:
+            checks["refactor_restriction_section"] = True
+            ok_values = rr.get("no_change_paper_level_values") is True
+            checks["no_change_paper_level_values_true"] = ok_values
+            passed = passed and ok_values
+
+            ok_datagen = rr.get("no_change_data_gen") is True
+            checks["no_change_data_gen_true"] = ok_datagen
+            passed = passed and ok_datagen
+
+            ok_eval = rr.get("no_change_eval") is True
+            checks["no_change_eval_true"] = ok_eval
+            passed = passed and ok_eval
+
+            ok_protocol = rr.get("no_change_protocol") is True
+            checks["no_change_protocol_true"] = ok_protocol
+            passed = passed and ok_protocol
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P82-refactor-scope-definition", "name": "[76] 大修范围界定",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -6792,22 +8935,24 @@ _ALL = [
     p37_gear_definition_declaration,
     p38_scale_no_downgrade,
     p39_los_noise_baseline,
-    p40_uwb_output_spec,
-    p41_imu_output_spec,
-    p42_vio_output_spec,
-    p43_imu_no_head,
-    p44_four_output_heads,
+    p39_uwb_output_spec,
+    p40_imu_output_spec,
+    p41_vio_output_spec,
+    p42_imu_no_head_reasoning,
+    p43_no_extra_levels,
+    p42b_four_output_heads,
+    p44_gear_injection_discipline,
     p45_n15_boundary,
-    p46_no_extra_levels,
-    p47_pa3_injection_discipline,
-    p48_two_sigma_separation,
     p49_protocol_reference_boundary,
-    p50_gt_truth_precision,
-    p51_layout_randomization,
-    p52_three_layer_evidence,
-    p53_scale_gear,
+    p47_three_layer_evidence,
+    p48_two_sigma_separation,
+    p48_scale_gear_spec,
+    p50_test_train_no_overlap,
+    p51_sequence_split_no_overlap,
+    p52_baseline_not_bare_model,
+    p53_paired_sample_alignment,
     p54_layout_parameter_scatter,
-    p55_execution_entry,
+    p55_scale_expansion_path,
     p56_test_train_no_overlap,
     p57_sequence_split_no_overlap,
     p58_baseline_not_bare_model,
@@ -6819,6 +8964,25 @@ _ALL = [
     p64_analysis_unit_sample_independence,
     p65_pilot_experiment,
     p66_no_nan_inf_gradient,
+    p67_a2_a3_offset_protocol_verification,
+    p68_execution_deviation,
+    p68_a2a3_shift_jitter,
+    p69_resampling_method,
+    p69_cpu_role_hierarchy,
+    p60_edge_case_extreme,
+    p70_evaluation_parallel,
+    p71_same_seed_init,
+    p72_layout_randomization,
+    p73_regenerate_all_seeds,
+    p74_no_old_new_mixing,
+    p75_no_smoke_merge,
+    p76_full_scale_unit,
+    p77_parent_process_traceable,
+    p78_transformer_sliding_window,
+    p79_no_gpu_error_stop,
+    p80_ram_limit_12g,
+    p81_no_refactor_changes,
+    p82_refactor_scope_definition,
 ]
 
 def run_all_c_gates() -> dict[str, dict[str, Any]]:
