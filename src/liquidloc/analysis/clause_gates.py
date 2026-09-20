@@ -470,6 +470,75 @@ def p15_pilot_isolation() -> dict[str, Any]:
     }
 
 
+
+def p15_p_hacking_prevention() -> dict[str, Any]:
+    """[15] 底线：解冻纪律与数据纯净性（治理层）——验证解冻纪律规则文件、配置文件、验证函数、AGENTS.md索引、状态表条目、八字段报告、pre-commit钩子完整。
+    
+    核心判据：
+    - 生成器有改动 → 解冻 → 修改 → 重新冒烟 → 再冻结 → 清场重做
+    - 禁止"补跑只挑结果好的单元"（选择性补跑 = 变相p-hacking）
+    - 禁止"把数据改到结果满意为止"（若属档位/注入语义错误 → 走协议变更流程或缩小声明范围，不得改数据到满意）
+    - 修复后结果不得与旧结果混用（纪律）
+    - 任何旧数据集一律不得复用（哪怕旧数据本身合格），论文级结论必须来自这批复现可查的全新数据
+    - 诊断轨/冒烟数据的任何结果不得以任何形式并入、替代或"补充"验收轨数据（用后即弃或隔离归档，禁止并入任何正式数据）
+    """
+    cfg_path = CONFIGS / "protocol" / "clause15_thaw_discipline.yaml"
+    checks: dict[str, bool] = {}
+    checks["manual_exists"] = MANUAL.exists()
+    checks["manual_has_criterion"] = any(
+        "解冻" in l and "冻结" in l and "清场" in l
+        for l in MANUAL.read_text(encoding="utf-8").splitlines()
+    )
+    checks["manual_has_forbid_selective_rerun"] = any(
+        "选择性补跑" in l or "只挑结果好" in l
+        for l in MANUAL.read_text(encoding="utf-8").splitlines()
+    )
+    checks["manual_has_forbid_data_modification"] = any(
+        "改到满意" in l or "改数据" in l
+        for l in MANUAL.read_text(encoding="utf-8").splitlines()
+    )
+    checks["manual_has_forbid_reuse_old"] = any(
+        "旧数据" in l and "不得复用" in l
+        for l in MANUAL.read_text(encoding="utf-8").splitlines()
+    )
+    checks["manual_has_forbid_diagnostic_into_production"] = any(
+        "诊断轨" in l and "并入" in l
+        for l in MANUAL.read_text(encoding="utf-8").splitlines()
+    )
+    checks["cfg_exists"] = cfg_path.is_file()
+    checks["cfg_parse_ok"] = load_clause_cfg(cfg_path).get("clause_id") == 15 if cfg_path.is_file() else False
+    checks["clause_name_contains_15"] = "15" in MANUAL.read_text(encoding="utf-8")
+    checks["agents_md_exists"] = AGENTS_PATH.is_file()
+    checks["agents_md_has_clause_15"] = AGENTS_PATH.read_text(encoding="utf-8").find("[15]") != -1
+    checks["status_table_exists"] = STATUS_TABLE.exists()
+    checks["status_table_has_clause_15"] = any("| [15]" in l for l in STATUS_TABLE.read_text(encoding="utf-8").splitlines())
+    checks["status_table_clause_15_field_valid"] = any(
+        "| [15] |" in l and ("解冻" in l or "数据纯净" in l or "p-hacking" in l)
+        for l in STATUS_TABLE.read_text(encoding="utf-8").splitlines()
+    )
+    checks["report_exists"] = (REPORT_DIR / "compliance_report_15.md").exists()
+    checks["report_has_eight_fields"] = (
+        (REPORT_DIR / "compliance_report_15.md").exists()
+        and all(f in (REPORT_DIR / "compliance_report_15.md").read_text(encoding="utf-8") for f in ["条款", "状态", "代码", "落实", "审查", "验证", "证据"])
+    )
+    checks["report_has_done_status"] = (
+        (REPORT_DIR / "compliance_report_15.md").exists()
+        and ("已落实" in (REPORT_DIR / "compliance_report_15.md").read_text(encoding="utf-8") or "✅" in (REPORT_DIR / "compliance_report_15.md").read_text(encoding="utf-8"))
+    )
+    checks["hook_exists"] = HOOK.exists()
+    checks["hook_contains_p15_call"] = any("p15_p_hacking_prevention" in l for l in HOOK.read_text(encoding="utf-8").splitlines())
+    
+    return {
+        "code": "P15-thaw",
+        "name": "[15] 底线：解冻纪律与数据纯净性（治理层）",
+        "severity": "hard",
+        "passed": all(checks.values()),
+        "status": "rule",
+        "detail": f"checks={sum(checks.values())}/{len(checks)}",
+        "evidence": {"checks": checks, "cfg_path": str(cfg_path), "manual_path": str(MANUAL), "report_path": str(REPORT_DIR / "compliance_report_15.md")},
+    }
+
+
 def p28_nearest_resampling() -> dict[str, Any]:
     """[752] UWB/VIO 最近邻对齐，禁止 linear/spline 生成测距。"""
     linear_interp = []
@@ -16694,7 +16763,7 @@ _ALL = [
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
     c8_cross_experiment_isolation, c9_pre_run_cleanup, c10_retrain_from_scratch,
     p19_tf32_amp_explicit, p22_two_step_inference, p23_analysis_unit_trajectory,
-    p15_pilot_isolation, p15_parallel_scheduling_log, p28_nearest_resampling,
+    p15_pilot_isolation, p15_p_hacking_prevention, p15_parallel_scheduling_log, p28_nearest_resampling,
     p13_language_iron_rule, p14_p_hacking_prevention, p16_resource_conflict_scheduler,
     p17_batch_decomposition, p18_agents_md_template, p19_axis_a_sync_verification,
     p20_nlos_axis_verification, p21_visual_axis_verification, p22_anchor_axis_verification,

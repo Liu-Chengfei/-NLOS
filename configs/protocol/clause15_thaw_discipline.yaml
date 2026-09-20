@@ -1,0 +1,34 @@
+# 条款[15]：解冻纪律与数据纯净性（治理层）
+# 版本: 2026-05-04 (初始版本)
+# 修订: 2026-05-04 (补全规则文件)
+
+clause_id: 15
+clause_name: 解冻纪律与数据纯净性
+constraint_level: 硬约束
+governance_phase: 零
+
+# 核心判据
+criterion:
+  - 生成器有改动→解冻→修改→重新冒烟→再冻结→清场重做
+  - 禁止选择性补跑（变相p-hacking）
+  - 禁止改数据到满意（若属语义错误→走协议变更流程）
+  - 修复后结果不得与旧结果混用
+  - 旧数据集不得复用，论文级结论必须来自新数据
+  - 诊断轨/冒烟数据不得并入验收轨
+
+# 禁止项
+forbidden:
+  - 选择性补跑
+  - 改数据到满意
+  - 旧数据复用
+  - 诊断轨并入验收轨
+
+# 执行保障
+execution:
+  rule_file: rules/防p-hacking.md
+  config_file: configs/protocol/clause15_thaw_discipline.yaml
+  check_function: clause_gates.py:p15_p_hacking_prevention
+  precommit_hook: .git/hooks/pre-commit
+  agents_md: AGENTS.md
+  status_table: rules/指令状态表.md
+  report: outputs/compliance_report_15.md

@@ -875,13 +875,15 @@ PASSED: True | manual_exists=True; manual_has_criterion=True; manual_has_line_a=
 
 **内容**: 禁止借大修变口径——大修只改代码组织与可维护性（模块拆分/常量收敛/断言补齐/命名统一），不得改变任何论文级数值、不得改数据生成/评估/统计口径、不得为了好写而改协议。
 
-## [76] 大修范围界定
-**状态**: ✅ 已落地
-**文件**:
-- `configs/protocol/refactor_scope_definition.yaml` — 大修范围界定配置（clause_id=76, scope_definition, decision_log, refactor_restriction）
-- `src/liquidloc/analysis/clause_gates.py:8771-8882` — 验证函数 `p82_refactor_scope_definition()`
-- `rules/判定铁律.md` — 条款治理规则文件
-- `outputs/compliance_report_76.md` — 合规报告
-- `checkpoints/compliance_report_clause76.md` — checkpoint 验证报告
+## [76]
 
-**内容**: 大修范围界定——明确本次大修的范围（哪个模块/哪个脚本/哪些接口），写入 decision log（时间/原因/影响范围/git commit）。
+## [15] 底线：解冻纪律与数据纯净性（治理层）
+**状态**: ✅ 已落实
+**文件**:
+- 规则目录解冻纪律规则文件 — 解冻纪律规则文件（核心判据加禁止项加执行保障）
+- 配置文件目录条款十五解冻纪律配置文件 — 解冻纪律配置（硬约束声明）
+- 条款门禁源码 — 验证函数
+- 版本控制预提交钩子 — 解冻纪律检查调用点
+- 输出目录八字段落实报告 — 八字段落实报告
+**判据**: 生成器改动→解冻→修改→重冒烟→再冻结→清场重做；禁止选择性补跑/改数据到满意/旧数据复用/诊断轨并入验收轨
+
