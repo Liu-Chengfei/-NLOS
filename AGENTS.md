@@ -34,11 +34,11 @@
 ## [14] 底线：防p-hacking（治理层）
 **状态**: ✅ 已落实
 **文件**:
-- `rules/防p-hacking.md` — 防p-hacking规则文件（核心判据加禁止项加执行保障）
-- `configs/protocol/clause14_panti_hacking.yaml` — 防p-hacking配置（clause_id=14, constraint_level=硬约束）
-- `src/liquidloc/analysis/clause_gates.py` — 验证函数 `p一四防p-hacking检查()`
-- `.git/hooks/pre-commit` — 防p-hacking检查调用点
-- `outputs/compliance_report_14.md` — 八字段落实报告
+- 规则目录防p-hacking规则文件 — 防p-hacking规则文件（核心判据加禁止项加执行保障）
+- 配置文件目录条款十四防p-hacking配置文件 — 防p-hacking配置（硬约束声明）
+- 条款门禁源码 — 验证函数
+- 版本控制预提交钩子 — 防p-hacking检查调用点
+- 输出目录八字段落实报告 — 八字段落实报告
 **判据**: 禁止选择性补跑/改数据到满意/旧数据复用/诊断轨并入验收轨
 
 ## [13] 底线：语言铁律（GLM 5.3 专属）
