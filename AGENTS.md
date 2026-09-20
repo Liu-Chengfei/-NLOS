@@ -58,6 +58,18 @@
 
 **内容**: 向用户提交论文级结果前先逐项自查是否符合手册目标（核心判据 + 验收表），全部符合才整理提交。
 
+## [9] 落实报告格式（治理层·八字段）
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/clause09_compliance_report_format.yaml` — 约束配置
+- `rules/落实报告格式规范.md` — 八字段格式规范（唯一权威副本，含八字段逐字段说明/一句话模板/治理类同构/提交前自检/完整示例/判定铁律）
+- `.agents/skills/execution-report-gate/SKILL.md` — §1 为八字段格式唯一逐字权威副本（入口）
+- `src/liquidloc/analysis/clause_gates.py` — p9_compliance_report_format() 验证函数
+- `.git/hooks/pre-commit` — pre-commit 八字段验证调用点（p9调用在p8之后）
+- `outputs/compliance_report_9.md` — 合规报告
+
+**内容**: 每条指令输出 = 落实报告格式一行，八字段逐字段规范（条款号/状态/条款逐字抄录/代码绝对定位/落实极尽具体+全量映射/审查问题→修复+循环轨迹/验证命令→预期/证据真实路径+stdout落盘），含一句话模板、治理类同构、提交前自检、完整示例、判定铁律；缺任一字段或字段不合格 = 该条未落实。细则进 `rules/落实报告格式规范.md`，不堆进 AGENTS.md。
+
 ## [36] git 是最后防线
 **状态**: ✅ 已落地
 **文件**: 

@@ -1,0 +1,13 @@
+# [9] 落实报告格式（治理层·八字段）
+clause_name: "[9] 落实报告格式"
+constraint_level: "硬约束"
+eight_fields_spec: true
+one_sentence_template: true
+governance_homology: true
+pre_submit_self_check: true
+complete_examples: true
+judgment_iron_rule: true
+description: "每条指令输出 = 落实报告格式一行，八字段逐字段规范（条款号/状态/条款逐字抄录/代码绝对定位/落实极尽具体+全量映射/审查问题→修复+循环轨迹/验证命令→预期/证据真实路径+stdout落盘），含一句话模板、治理类同构、提交前自检、完整示例、判定铁律"
+enforcement: "p9_compliance_report_format() 验证函数检查规则文件完整性 + 逐条款核验"
+manual_ref: "最终交付_异步手册_424条_20260917.md:162"
+verification_gate: "p9_compliance_report_format"

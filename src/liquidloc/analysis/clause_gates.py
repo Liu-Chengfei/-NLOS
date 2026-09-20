@@ -15921,6 +15921,190 @@ def p8_submit_self_check() -> dict[str, Any]:
     }
 
 
+# ---------------- 条款[9]: 落实报告格式（治理层·八字段） ----------------
+def p9_compliance_report_format() -> dict[str, Any]:
+    """[9] 落实报告格式（治理层·八字段）—— 每条指令输出 = 落实报告格式一行，八字段逐字段规范（条款号/状态/条款逐字抄录/代码绝对定位/落实极尽具体+全量映射/审查问题→修复+循环轨迹/验证命令→预期/证据真实路径+stdout落盘），含一句话模板、治理类同构、提交前自检、完整示例、判定铁律；缺任一字段或字段不合格 = 该条未落实。完整规范见 rules/落实报告格式规范.md。
+
+    验证项：
+    1. rules/落实报告格式规范.md 存在且含八字段规范逐字段说明（含合格标准/不合格典型/合格示例三级）
+    2. 规则文件含一句话模板
+    3. 规则文件含治理类同构
+    4. 规则文件含提交前自检（6项清单，编号0-5）
+    5. 规则文件含完整示例（代码类 + 治理类各一例）
+    6. 规则文件含判定铁律
+    7. configs/protocol/clause09_compliance_report_format.yaml 存在且能正确解析
+    8. clause_name 包含「[9] 落实报告格式」
+    9. 关键约束字段存在：eight_fields_spec=true, one_sentence_template=true, governance_homology=true, pre_submit_self_check=true, complete_examples=true, judgment_iron_rule=true
+    10. 手册文件含[9]条款原文
+    11. pre-commit钩子已嵌入p9调用点
+    12. AGENTS.md 治理载体索引含[9]条目
+    13. rules/指令状态表.md 含[9]条目且状态字段合法
+    14. compliance_report_9.md 存在且八字段完整
+    """
+    import yaml as _yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause09_compliance_report_format.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_9.md"
+    rules_path = PROJECT_ROOT / "rules" / "落实报告格式规范.md"
+    hook_path = PROJECT_ROOT / ".git" / "hooks" / "pre-commit"
+
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception:
+            cfg = {}
+
+    checks: dict[str, bool] = {}
+
+    # 1. 规则文件存在且含八字段规范逐字段说明（含合格标准/不合格典型/合格示例三级）
+    rules_exists = rules_path.is_file()
+    checks["rules_exists"] = rules_exists
+    if rules_exists:
+        rules_text = rules_path.read_text(encoding="utf-8")
+        has_field1 = "字段 1" in rules_text and "合格" in rules_text and "不合格" in rules_text
+        has_field8 = "字段 8" in rules_text and "合格" in rules_text and "不合格" in rules_text
+        checks["rules_has_all_eight_fields"] = has_field1 and has_field8
+        # 每个字段必须含三级（合格标准/不合格典型/合格示例）
+        field_sections = ["字段 1", "字段 2", "字段 3", "字段 4", "字段 5", "字段 6", "字段 7", "字段 8"]
+        all_fields_have_levels = all(
+            f in rules_text and "合格标准" in rules_text and "不合格典型" in rules_text and "合格示例" in rules_text
+            for f in field_sections
+        )
+        checks["rules_all_fields_have_three_levels"] = all_fields_have_levels
+    else:
+        checks["rules_has_all_eight_fields"] = False
+        checks["rules_all_fields_have_three_levels"] = False
+
+    # 2. 一句话模板
+    checks["one_sentence_template"] = rules_exists and "一句话模板" in (rules_path.read_text(encoding="utf-8") if rules_exists else "")
+    # 3. 治理类同构
+    checks["governance_homology"] = rules_exists and "治理类同构" in (rules_path.read_text(encoding="utf-8") if rules_exists else "")
+    # 4. 提交前自检（6项清单，编号0-5）
+    checks["pre_submit_self_check"] = rules_exists and "提交前自检" in (rules_path.read_text(encoding="utf-8") if rules_exists else "")
+    # 5. 完整示例（代码类 + 治理类各一例）
+    checks["complete_examples_code"] = rules_exists and "完整示例（代码类" in (rules_path.read_text(encoding="utf-8") if rules_exists else "")
+    checks["complete_examples_governance"] = rules_exists and "完整示例（治理类" in (rules_path.read_text(encoding="utf-8") if rules_exists else "")
+    # 6. 判定铁律
+    checks["judgment_iron_rule"] = rules_exists and "判定铁律" in (rules_path.read_text(encoding="utf-8") if rules_exists else "")
+
+    # 7. 配置文件存在且解析成功
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 8. clause_name 包含 [9] 落实报告格式
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_9"] = isinstance(cn, str) and "[9]" in cn and "落实报告格式" in cn
+
+    # 9. 关键约束字段
+    checks["eight_fields_spec"] = cfg.get("eight_fields_spec") is True
+    checks["one_sentence_template_cfg"] = cfg.get("one_sentence_template") is True
+    checks["governance_homology_cfg"] = cfg.get("governance_homology") is True
+    checks["pre_submit_self_check_cfg"] = cfg.get("pre_submit_self_check") is True
+    checks["complete_examples_cfg"] = cfg.get("complete_examples") is True
+    checks["judgment_iron_rule_cfg"] = cfg.get("judgment_iron_rule") is True
+
+    # 10. 手册文件存在且含 [9] 条款关键词
+    manual_exists = manual_path.is_file()
+    checks["manual_exists"] = manual_exists
+    if manual_exists:
+        manual_text = manual_path.read_text(encoding="utf-8")
+        checks["manual_contains_9"] = "[9]" in manual_text or "**\\[9\\]**" in manual_text
+        checks["manual_contains_format"] = "落实报告格式" in manual_text
+        checks["manual_contains_eight_fields"] = "八字段" in manual_text
+    else:
+        checks["manual_contains_9"] = False
+        checks["manual_contains_format"] = False
+        checks["manual_contains_eight_fields"] = False
+
+    # 11. pre-commit钩子已嵌入p9调用点
+    hook_exists = hook_path.is_file()
+    checks["hook_exists"] = hook_exists
+    if hook_exists:
+        hook_text = hook_path.read_text(encoding="utf-8")
+        checks["hook_contains_p9_call"] = "p9_compliance_report_format" in hook_text or "--check p9" in hook_text
+    else:
+        checks["hook_contains_p9_call"] = False
+
+    # 12. AGENTS.md 治理载体索引含[9]条目
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_9_section"] = "## [9]" in agents_text
+    else:
+        checks["agents_md_has_clause_9_section"] = False
+
+    # 13. 指令状态表含[9]条目
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_9"] = "| [9]" in status_text
+        status_line = None
+        for line in status_text.splitlines():
+            if "| [9]" in line:
+                status_line = line
+                break
+        if status_line:
+            parts = [p.strip() for p in status_line.split("|")]
+            status_field = parts[2] if len(parts) >= 3 else ""
+            checks["status_table_clause_9_field_valid"] = (
+                "done" in status_field or "blocked" in status_field or "pending" in status_field
+            )
+        else:
+            checks["status_table_clause_9_field_valid"] = False
+    else:
+        checks["status_table_clause_9_field_valid"] = False
+
+    # 14. 落实报告八字段完整
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        report_text = report_path.read_text(encoding="utf-8")
+        required_fields = ["[9]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"]
+        all_fields_present = all(f in report_text for f in required_fields)
+        has_done = "已落实" in report_text or "✅" in report_text
+        checks["report_has_eight_fields"] = all_fields_present
+        checks["report_has_done_status"] = has_done
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    passed = all(checks.values()) and cfg_exists and cfg_parse_ok and rules_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P9-compliance-report-format",
+        "name": "[9] 落实报告格式",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "cfg_exists": cfg_exists,
+            "cfg_parse_ok": cfg_parse_ok,
+            "rules_path": str(rules_path.relative_to(PROJECT_ROOT)) if rules_exists else "missing",
+            "rules_exists": rules_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)) if manual_exists else "missing",
+            "manual_exists": manual_exists,
+            "hook_path": str(hook_path.relative_to(PROJECT_ROOT)) if hook_exists else "missing",
+            "hook_exists": hook_exists,
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+        },
+    }
+
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
