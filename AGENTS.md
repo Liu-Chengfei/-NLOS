@@ -48,6 +48,16 @@
 
 **内容**: 执行中任何环节发现违反本文档（未清场/审计失败/口径不符/数据或权重污染）→ 隔离作废相关产物（archive 留痕）→ 修复根因 → 回到对应回归点重跑，处置证据随结果一并提交；任何"未达预期"的第一解释永远是执行偏差，不是方法不行、不是数据集不行；窗口外先修根因再谈结论。
 
+## [8] 提交前自查（治理层）
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/clause08_submit_self_check.yaml` — 约束配置
+- `src/liquidloc/analysis/clause_gates.py` — p8_submit_self_check() 验证函数
+- `.git/hooks/pre-commit` — pre-commit 自查调用点（p8调用在check_dependencies之后）
+- `outputs/compliance_report_8.md` — 合规报告
+
+**内容**: 向用户提交论文级结果前先逐项自查是否符合手册目标（核心判据 + 验收表），全部符合才整理提交。
+
 ## [36] git 是最后防线
 **状态**: ✅ 已落地
 **文件**: 

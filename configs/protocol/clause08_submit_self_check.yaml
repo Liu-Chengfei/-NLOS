@@ -1,0 +1,12 @@
+# [8] 提交前自查（治理层）
+clause_name: "[8] 提交前自查"
+constraint_level: "硬约束"
+self_check_before_submit: true
+check_all_reports_pass: true
+check_status_table_done: true
+check_manual_goals_met: true
+check_eight_fields_complete: true
+description: "向用户提交论文级结果前先逐项自查是否符合手册目标（核心判据 + 验收表），全部符合才整理提交。"
+enforcement: "pre-commit钩子调用p8_submit_self_check()；所有治理条款[1]-[8]done + 八字段报告存在 + 无pending/blocked"
+manual_ref: "最终交付_异步手册_424条_20260917.md:161"
+verification_gate: "p8_submit_self_check"

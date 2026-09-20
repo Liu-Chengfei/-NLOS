@@ -15774,6 +15774,153 @@ def p7_violation_disposition() -> dict[str, Any]:
     }
 
 
+# ---------------- 条款[8]: 提交前自查（治理层） ----------------
+def p8_submit_self_check() -> dict[str, Any]:
+    """[8] 提交前自查（治理层）—— 向用户提交论文级结果前先逐项自查是否符合手册目标
+    （核心判据 + 验收表），全部符合才整理提交。
+
+    验证项：
+    1. configs/protocol/clause08_submit_self_check.yaml 存在且能正确解析
+    2. clause_name 包含「[8] 提交前自查」
+    3. 关键约束字段存在：self_check_before_submit、check_all_reports_pass
+    4. 手册文件含[8]条款原文（提交/自查/核心判据/验收表等关键词）
+    5. pre-commit钩子已嵌入p8调用点（p8_submit_self_check()）
+    6. AGENTS.md 治理载体索引含[8]条目
+    7. rules/指令状态表.md 含[8]条目且状态字段合法
+    8. compliance_report_8.md 存在且八字段完整
+    """
+    import yaml as _yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause08_submit_self_check.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_8.md"
+    hook_path = PROJECT_ROOT / ".git" / "hooks" / "pre-commit"
+
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception:
+            cfg = {}
+
+    checks: dict[str, bool] = {}
+
+    # 1. 配置文件存在且解析成功
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 2. clause_name 包含 [8] 提交前自查
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_8"] = isinstance(cn, str) and "[8]" in cn and "提交前自查" in cn
+
+    # 3. 关键约束字段
+    checks["constraint_level_is_hard"] = cfg.get("constraint_level") == "硬约束"
+    checks["self_check_before_submit"] = cfg.get("self_check_before_submit") is True
+    checks["check_all_reports_pass"] = cfg.get("check_all_reports_pass") is True
+    checks["check_status_table_done"] = cfg.get("check_status_table_done") is True
+    checks["check_manual_goals_met"] = cfg.get("check_manual_goals_met") is True
+    checks["check_eight_fields_complete"] = cfg.get("check_eight_fields_complete") is True
+
+    # 4. 手册文件存在且含 [8] 条款关键词
+    manual_exists = manual_path.is_file()
+    checks["manual_exists"] = manual_exists
+    if manual_exists:
+        manual_text = manual_path.read_text(encoding="utf-8")
+        checks["manual_contains_8"] = "[8]" in manual_text or "**\\[8\\]**" in manual_text
+        checks["manual_contains_self_check"] = "提交前自查" in manual_text
+        checks["manual_contains_core_criteria"] = "核心判据" in manual_text or "核心判据" in manual_text
+        checks["manual_contains_acceptance_table"] = "验收表" in manual_text
+    else:
+        checks["manual_contains_8"] = False
+        checks["manual_contains_self_check"] = False
+        checks["manual_contains_core_criteria"] = False
+        checks["manual_contains_acceptance_table"] = False
+
+    # 5. pre-commit钩子已嵌入p8调用点
+    hook_exists = hook_path.is_file()
+    checks["hook_exists"] = hook_exists
+    if hook_exists:
+        hook_text = hook_path.read_text(encoding="utf-8")
+        checks["hook_contains_p8_call"] = "p8_submit_self_check" in hook_text or "--check p8" in hook_text
+    else:
+        checks["hook_contains_p8_call"] = False
+
+    # 6. AGENTS.md 治理载体索引含[8]条目
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_8_section"] = "## [8]" in agents_text
+    else:
+        checks["agents_md_has_clause_8_section"] = False
+
+    # 7. 指令状态表含[8]条目
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_8"] = "| [8]" in status_text
+        status_line = None
+        for line in status_text.splitlines():
+            if "| [8]" in line:
+                status_line = line
+                break
+        if status_line:
+            parts = [p.strip() for p in status_line.split("|")]
+            status_field = parts[2] if len(parts) >= 3 else ""
+            checks["status_table_clause_8_field_valid"] = (
+                "done" in status_field or "blocked" in status_field or "pending" in status_field
+            )
+        else:
+            checks["status_table_clause_8_field_valid"] = False
+    else:
+        checks["status_table_clause_8_field_valid"] = False
+
+    # 8. 落实报告八字段完整
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        report_text = report_path.read_text(encoding="utf-8")
+        required_fields = ["[8]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"]
+        all_fields_present = all(f in report_text for f in required_fields)
+        has_done = "已落实" in report_text or "✅" in report_text
+        checks["report_has_eight_fields"] = all_fields_present
+        checks["report_has_done_status"] = has_done
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    passed = all(checks.values()) and cfg_exists and cfg_parse_ok
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P8-submit-self-check",
+        "name": "[8] 提交前自查",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "cfg_exists": cfg_exists,
+            "cfg_parse_ok": cfg_parse_ok,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)) if manual_exists else "missing",
+            "manual_exists": manual_exists,
+            "hook_path": str(hook_path.relative_to(PROJECT_ROOT)) if hook_exists else "missing",
+            "hook_exists": hook_exists,
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+        },
+    }
+
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -15889,6 +16036,7 @@ _ALL = [
     p131_seed_trajectory_explicit,
     p36_git_is_last_resort,
     p7_violation_disposition,
+    p8_submit_self_check,
 ]
 
 
@@ -15906,13 +16054,28 @@ def run_all_c_gates() -> dict[str, dict[str, Any]]:
 
 
 if __name__ == "__main__":
-    import json
-    res = run_all_c_gates()
-    npass = sum(1 for r in res.values() if r.get("passed"))
-    for k in sorted(res):
-        r = res[k]
-        print(f"{k}: {'PASS' if r.get('passed') else 'FAIL'}  {str(r.get('detail', r.get('error','')))[:90]}")
-    print(f"\nC-gates: {npass}/{len(res)} passed")
+    import json, sys as _sys
+    target = _sys.argv[1] if len(_sys.argv) > 1 else "all"
+    if target in ("all", "--all"):
+        res = run_all_c_gates()
+        npass = sum(1 for r in res.values() if r.get("passed"))
+        for k in sorted(res):
+            r = res[k]
+            print(f"{k}: {'PASS' if r.get('passed') else 'FAIL'}  {str(r.get('detail', r.get('error','')))[:90]}")
+        print(f"\nC-gates: {npass}/{len(res)} passed")
+    elif target.startswith("p8"):
+        r = p8_submit_self_check()
+        print(f"P8: {'PASSED' if r.get('passed') else 'FAILED'}  {r.get('detail', '')}")
+        if not r.get("passed"):
+            _sys.exit(1)
+    elif target.startswith("p7"):
+        r = p7_violation_disposition()
+        print(f"P7: {'PASSED' if r.get('passed') else 'FAILED'}  {r.get('detail', '')}")
+        if not r.get("passed"):
+            _sys.exit(1)
+    else:
+        print(f"unknown gate: {target}")
+        _sys.exit(1)
 
 
 # ---------------- 条款[3]: 状态只认磁盘、不认记忆（治理层） ----------------
