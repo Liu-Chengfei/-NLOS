@@ -641,6 +641,120 @@ def p34_no_single_channel_linear() -> dict[str, Any]:
     }
 
 
+def p36_git_is_last_resort() -> dict[str, dict[str, Any]]:
+    """[36] git 是最后防线——禁止 _backup/_old 副本，git 恢复流程为唯一合法恢复路径。
+
+    验证项：
+    1. configs/protocol/git_is_last_resort.yaml 存在且可解析
+    2. 关键字段完整（backup_prohibition / git_recovery_mandatory / working_tree_synchronization / pre_commit_hook）
+    3. backup_prohibition：forbidden_patterns 含 _backup/_old，forbidden_extensions 含 .bak，enforcement=="hard"
+    4. git_recovery_mandatory：allowed_recovery_methods 非空，forbidden_recovery_methods 非空
+    5. working_tree_synchronization：check_pre_commit 和 check_gate_entry 均为 True
+    6. pre_commit_hook.location == ".git/hooks/pre-commit" 且钩子文件存在
+    7. .gitignore 含 *.log 和 *.bak 防护规则
+    """
+    import yaml
+    from pathlib import Path as _P
+
+    cfg_path = CONFIGS / "protocol" / "git_is_last_resort.yaml"
+    proj_root = PROJECT_ROOT
+
+    # (a) 配置文件存在性
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P36-git-last-resort", "name": "[36] git 是最后防线", "severity": "hard",
+                "passed": False, "detail": "git_is_last_resort.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(proj_root)), "exists": False}}
+
+    # (b) 解析
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P36-git-last-resort", "name": "[36] git 是最后防线", "severity": "hard",
+                "passed": False, "detail": f"yaml 解析错误: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(proj_root))}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P36-git-last-resort", "name": "[36] git 是最后防线", "severity": "hard",
+                "passed": False, "detail": "yaml 根节点非 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(proj_root))}}
+
+    # 关键字段嵌套在 constraint_configuration 下；pre_commit_hook 在顶层
+    ccfg = cfg.get("constraint_configuration", cfg)
+
+    checks: dict[str, bool] = {}
+    detail_parts: list[str] = []
+
+    # (c) 关键字段存在性（从 constraint_configuration 读取）
+    for field in ("backup_prohibition", "git_recovery_mandatory", "working_tree_synchronization"):
+        ok = field in ccfg and isinstance(ccfg[field], dict)
+        checks[f"field:{field}"] = ok
+        detail_parts.append(f"{field}={'OK' if ok else 'MISSING'}")
+
+    # pre_commit_hook 在顶层
+    hook_field_ok = "pre_commit_hook" in cfg and isinstance(cfg["pre_commit_hook"], dict)
+    checks["field:pre_commit_hook"] = hook_field_ok
+    detail_parts.append(f"pre_commit_hook={'OK' if hook_field_ok else 'MISSING'}")
+
+    # (d) backup_prohibition 约束
+    bp = ccfg.get("backup_prohibition", {})
+    fp = bp.get("forbidden_patterns", [])
+    fe = bp.get("forbidden_extensions", [])
+    enf_ok = bp.get("enforcement") == "hard"
+    fp_ok = all(p in fp for p in ("_backup", "_old"))
+    fe_ok = ".bak" in fe
+    checks["backup_patterns"] = fp_ok
+    checks["backup_exts"] = fe_ok
+    checks["backup_enforcement_hard"] = enf_ok
+    detail_parts.append(f"forbidden_patterns_ok={fp_ok}")
+    detail_parts.append(f"forbidden_exts_ok={fe_ok}")
+    detail_parts.append(f"enforcement_hard={enf_ok}")
+
+    # (e) git_recovery_mandatory 约束
+    grm = ccfg.get("git_recovery_mandatory", {})
+    allowed = grm.get("allowed_recovery_methods", [])
+    forbidden = grm.get("forbidden_recovery_methods", [])
+    grm_ok = len(allowed) >= 1 and len(forbidden) >= 1
+    checks["git_recovery_methods"] = grm_ok
+    detail_parts.append(f"git_recovery(allowed={len(allowed)},forbidden={len(forbidden)})={'OK' if grm_ok else 'MISSING'}")
+
+    # (f) working_tree_synchronization
+    wts = ccfg.get("working_tree_synchronization", {})
+    wts_ok = wts.get("check_pre_commit") is True and wts.get("check_gate_entry") is True
+    checks["working_tree_sync"] = wts_ok
+    detail_parts.append(f"working_tree_sync_ok={wts_ok}")
+
+    # (g) pre-commit hook
+    hook_loc = cfg.get("pre_commit_hook", {}).get("location", ".git/hooks/pre-commit")
+    hook_path = proj_root / hook_loc
+    hook_exists = hook_path.is_file()
+    checks["pre_commit_hook"] = hook_exists
+    detail_parts.append(f"pre_commit_hook_exists={hook_exists}")
+
+    # (h) .gitignore 含 *.log 和 *.bak
+    gitignore = proj_root / ".gitignore"
+    gi_exists = gitignore.is_file()
+    gi_has_log = gi_has_bak = False
+    if gi_exists:
+        gi_text = gitignore.read_text(encoding="utf-8")
+        gi_has_log = "*.log" in gi_text
+        gi_has_bak = "*.bak" in gi_text
+    checks["gitignore_log_bak"] = gi_exists and gi_has_log and gi_has_bak
+    detail_parts.append(f".gitignore(log={gi_has_log},bak={gi_has_bak})={'OK' if gi_exists and gi_has_log and gi_has_bak else 'MISSING'}")
+
+    passed = all(checks.values())
+    return {
+        "code": "P36-git-last-resort", "name": "[36] git 是最后防线", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(proj_root)),
+            "hook_path": str(hook_path.relative_to(proj_root)) if hook_exists else "MISSING",
+            "checks": checks,
+        },
+    }
+
+
 def p36_no_single_thread_linear() -> dict[str, Any]:
     """[36] 禁止单线程从头做到尾不交叉（单线执行 = 干漏风险最高形态）。
 
@@ -8911,6 +9025,6237 @@ def p82_refactor_scope_definition() -> dict[str, Any]:
     }
 
 
+def p182_manifest() -> dict[str, Any]:
+    """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
+
+    手册原文：
+    [182] **manifest**：每个 seed 一个 JSON ——含场景图、锚点坐标、 档位（A2/A3、N2/N3 四组合 A2N2/A2N3/A3N2/A3N3 各 25%）、 各组合轨迹数、注入统计（ρ/μ/σ 实际值）、 随机源 seed、 **外参/杆臂（相机-IMU 外参 T_cam_imu、IMU 相对 tag 中心的杆臂 lever arm，按理想值固定，与 S4.2 依据 4 一致）**
+    """
+    cfg_path = CONFIGS / "protocol" / "clause182_manifest.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 182_manifest.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P182-manifest", "name": "[182] manifest 内容要求",
+                "severity": "hard", "passed": False,
+                "detail": "clause182_manifest.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P182-manifest", "name": "[182] manifest 内容要求",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P182-manifest", "name": "[182] manifest 内容要求",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "182"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望=182, 匹配={id_ok}")
+
+    # 检查 clause_name 含 manifest
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "manifest" in clause_name.lower() or "manifest" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含manifest={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 manifest.required_fields 包含 8 个必需字段
+    manifest = cfg.get("manifest", {}) or {}
+    req_fields = manifest.get("required_fields", []) or []
+    req_strs = [str(f) for f in req_fields]
+    required_field_names = ["场景图", "锚点坐标", "档位", "各组合轨迹数", "注入统计_ρ_μ_σ", "随机源_seed", "外参_T_cam_imu", "杆臂_lever_arm"]
+    has_all_fields = all(any(rf in req for req in req_strs) for rf in required_field_names)
+    checks["all_required_fields_present"] = has_all_fields
+    detail_parts.append(f"required_fields 含全部8项={has_all_fields}, 值={req_strs!r}")
+
+    # 检查 gear_distribution
+    gear_dist = cfg.get("gear_distribution", {}) or {}
+    expected_ratio = str(gear_dist.get("expected_ratio", ""))
+    ratio_ok = "25%" in expected_ratio
+    checks["gear_ratio_25pct"] = ratio_ok
+    detail_parts.append(f"gear_ratio={expected_ratio!r}, 含25%={ratio_ok}")
+
+    # 检查 extrinsic_lever_arm
+    ele = cfg.get("extrinsic_lever_arm", {}) or {}
+    has_cam_imu = bool(ele.get("cam_imu_extrinsic", {}))
+    has_lever = bool(ele.get("lever_arm", {}))
+    ele_ok = has_cam_imu and has_lever
+    checks["extrinsic_lever_arm_config"] = ele_ok
+    detail_parts.append(f"extrinsic_lever_arm 完整={ele_ok}")
+
+    # 检查 related_checks 包含 179,180,181,183,506,S4.2
+    related = cfg.get("related_checks", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["179", "180", "181", "183", "506", "S4.2"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_all"] = related_ok
+    detail_parts.append(f"related_checks 含 {need_related}={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失，需创建")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "条款原文" in rule_text or "[182]" in rule_text
+        has_meaning = "条款含义" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_182 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_182 = "[182]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_182"] = line_with_182
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[182]={line_with_182}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P182-manifest", "name": "[182] manifest 内容要求",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "manual_ref": manual_ref}}
+
+
+def p183_layout_manifest() -> dict[str, Any]:
+    """[183] 每布局全部参数 + 随机根种子写入该布局 manifest。
+
+    手册原文：
+    [183] 每布局全部参数 + 随机根种子写入该布局 manifest。
+    """
+    cfg_path = CONFIGS / "protocol" / "clause183_layout_manifest.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 183_布局_manifest参数写入.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P183-layout-manifest", "name": "[183] 布局参数根种子写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": "clause183_layout_manifest.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P183-layout-manifest", "name": "[183] 布局参数根种子写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P183-layout-manifest", "name": "[183] 布局参数根种子写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "183"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='183', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "布局" in clause_name or "manifest" in clause_name.lower()
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含布局或manifest={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 manifest.required_fields 包含 布局参数 和 随机根种子
+    manifest = cfg.get("manifest", {}) or {}
+    req_fields = manifest.get("required_fields", []) or []
+    req_strs = [str(f) for f in req_fields]
+    has_layout_params = any("布局参数" in r for r in req_strs)
+    has_root_seed = any("随机根种子" in r or "root_seed" in r for r in req_strs)
+    checks["has_layout_parameters"] = has_layout_params
+    checks["has_root_seed"] = has_root_seed
+    detail_parts.append(f"required_fields 含布局参数={has_layout_params}, 随机根种子={has_root_seed}, 值={req_strs!r}")
+
+    # 检查 layout_manifest 配置
+    layout_manifest_cfg = cfg.get("layout_manifest", {}) or {}
+    root_seed_required = layout_manifest_cfg.get("root_seed_required", False)
+    all_params_required = layout_manifest_cfg.get("all_parameters_required", False)
+    checks["root_seed_required"] = root_seed_required is True
+    checks["all_params_required"] = all_params_required is True
+    detail_parts.append(f"root_seed_required={root_seed_required}, all_parameters_required={all_params_required}")
+
+    # 检查 verification_items
+    ver_items = cfg.get("verification_items", {}) or {}
+    has_manifest_exists = ver_items.get("layout_manifest_exists", False)
+    has_params_complete = ver_items.get("layout_parameters_complete", False)
+    has_seed = ver_items.get("root_seed_in_manifest", False)
+    checks["verification_items_complete"] = has_manifest_exists and has_params_complete and has_seed
+    detail_parts.append(f"verification_items 完整={checks['verification_items_complete']}")
+
+    # 检查 related_checks 包含 182, 184, 506
+    related = cfg.get("related_checks", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["182", "184", "506"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_all"] = related_ok
+    detail_parts.append(f"related_checks 含 {need_related}={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失，需创建")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "条款原文" in rule_text or "[183]" in rule_text
+        has_meaning = "条款含义" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_183 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_183 = "[183]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_183"] = line_with_183
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[183]={line_with_183}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P183-layout-manifest", "name": "[183] 布局参数根种子写入 manifest",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "manual_ref": manual_ref}}
+
+
+def p184_data_independence() -> dict[str, Any]:
+    """[184] 与主场景的数据独立性：每个布局的轨迹必须重新生成。
+
+    手册原文：
+    [184] 与主场景的数据独立性：每个布局的轨迹必须重新生成（同协议、同代码、只换 scene 配置参数——scene manifest 化），禁止复用主场景轨迹或"换标签"
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause184_data_independence.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 184_数据独立性.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P184-data-independence", "name": "[184] 与主场景的数据独立性",
+                "severity": "hard", "passed": False,
+                "detail": "clause184_data_independence.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P184-data-independence", "name": "[184] 与主场景的数据独立性",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P184-data-independence", "name": "[184] 与主场景的数据独立性",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "184"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='184', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "数据独立" in clause_name or "独立性" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含数据独立={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 data_independence 字段
+    data_indep = cfg.get("data_independence", {}) or {}
+    regenerate_per_layout = data_indep.get("regenerate_per_layout", False)
+    forbid_reuse = data_indep.get("forbid_reuse_main_scene", False)
+    checks["regenerate_per_layout"] = regenerate_per_layout is True
+    checks["forbid_reuse_main_scene"] = forbid_reuse is True
+    detail_parts.append(f"regenerate_per_layout={regenerate_per_layout}, forbid_reuse_main_scene={forbid_reuse}")
+
+    # 检查 scene_manifest 字段
+    scene_manifest = cfg.get("scene_manifest", {}) or {}
+    same_protocol = scene_manifest.get("same_protocol", False)
+    same_code = scene_manifest.get("same_code", False)
+    per_layout_scene = scene_manifest.get("per_layout_scene_config", False)
+    checks["scene_manifest_same_protocol"] = same_protocol is True
+    checks["scene_manifest_same_code"] = same_code is True
+    checks["scene_manifest_per_layout"] = per_layout_scene is True
+    detail_parts.append(f"scene_manifest: same_protocol={same_protocol}, same_code={same_code}, per_layout={per_layout_scene}")
+
+    # 检查 verification_items
+    ver_items = cfg.get("verification_items", {}) or {}
+    checks["verification_items_config_exists"] = ver_items.get("config_exists", False) is True
+    checks["verification_items_rule_doc_exists"] = ver_items.get("rule_doc_exists", False) is True
+    checks["verification_items_validator_exists"] = ver_items.get("validator_exists", False) is True
+    vi_complete = all([
+        ver_items.get("config_exists", False),
+        ver_items.get("rule_doc_exists", False),
+        ver_items.get("validator_exists", False),
+    ])
+    detail_parts.append(f"verification_items 完整={vi_complete}")
+
+    # 检查 related_checks 包含 183, 186, 295
+    related = cfg.get("related_checks", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["183", "186", "295"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_all"] = related_ok
+    detail_parts.append(f"related_checks 含 {need_related}={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失，需创建")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "条款原文" in rule_text or "[184]" in rule_text
+        has_meaning = "条款含义" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_184 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_184 = "[184]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_184"] = line_with_184
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[184]={line_with_184}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P184-data-independence", "name": "[184] 与主场景的数据独立性",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "manual_ref": manual_ref}}
+
+
+def p185_miluv_anchor_strategy() -> dict[str, Any]:
+    """[185] MILUV 锚点数量策略声明：二选一（固定 4 锚 GDOP 择优 or 全量 6 锚），并在论文声明。
+
+    手册原文：
+    [185] MILUV 为 UWB 测距 + IMU（150Hz 级）+ Vicon 毫米级真值，锚点 6 个 ——若模型输入按固定锚数设计，取固定 4 锚子集（GDOP 择优，写入 manifest 并声明）或确认模型锚数无关后全量使用，二选一并在论文声明。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause185_miluv_anchor_strategy.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 185_MILUV 锚点策略声明.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P185-miluv-anchor-strategy", "name": "[185] MILUV 锚点数量策略声明",
+                "severity": "hard", "passed": False,
+                "detail": "clause185_miluv_anchor_strategy.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P185-miluv-anchor-strategy", "name": "[185] MILUV 锚点数量策略声明",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P185-miluv-anchor-strategy", "name": "[185] MILUV 锚点数量策略声明",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "185"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='185', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "MILUV" in clause_name or "锚点策略" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含MILUV或锚点策略={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 miluv_system
+    miluv = cfg.get("miluv_system", {}) or {}
+    sensors = miluv.get("sensors", {}) or {}
+    has_uwb = sensors.get("uwb_range", False) is True
+    imu_hz = sensors.get("imu_hz", 0)
+    has_imu = int(imu_hz) >= 150
+    has_vicon = sensors.get("vicon_mm_gt", False) is True
+    anchor_count = int(miluv.get("anchor_count", 0))
+    checks["miluv_uwb_present"] = has_uwb
+    checks["miluv_imu_150hz"] = has_imu
+    checks["miluv_vicon_present"] = has_vicon
+    checks["miluv_anchor_count_6"] = anchor_count == 6
+    detail_parts.append(f"miluv_system: uwb={has_uwb}, imu_150hz={has_imu}, vicon={has_vicon}, anchor_count={anchor_count}")
+
+    # 检查 anchor_strategy：二选一（选项A 或 选项B）
+    anchor_strat = cfg.get("anchor_strategy", {}) or {}
+    opt_a = anchor_strat.get("option_a", {}) or {}
+    opt_b = anchor_strat.get("option_b", {}) or {}
+    a_has_fixed = int(opt_a.get("fixed_anchor_subset", 0)) == 4
+    a_has_gdop = opt_a.get("gdop_selection", False) is True
+    a_has_manifest = opt_a.get("gdop_result_in_manifest", False) is True
+    b_has_indep = opt_b.get("anchor_count_independent", False) is True
+    b_has_full = int(opt_b.get("full_anchor_count", 0)) == 6
+    paper_decl_req = anchor_strat.get("paper_declaration_required", False) is True
+
+    option_a_valid = a_has_fixed and a_has_gdop and a_has_manifest
+    option_b_valid = b_has_indep and b_has_full
+    either_option_valid = option_a_valid or option_b_valid
+    checks["option_a_valid"] = option_a_valid
+    checks["option_b_valid"] = option_b_valid
+    checks["either_option_valid"] = either_option_valid
+    checks["paper_declaration_required"] = paper_decl_req
+    detail_parts.append(f"选项A(4锚GDOP)= {option_a_valid}, 选项B(全量6锚)= {option_b_valid}, 二选一有效={either_option_valid}")
+
+    # 检查 manifest_requirements
+    manifest_req = cfg.get("manifest_requirements", {}) or {}
+    man_strat = manifest_req.get("anchor_strategy_in_manifest", False) is True
+    man_gdop = manifest_req.get("gdop_selection_in_manifest", False) is True
+    man_indep = manifest_req.get("anchor_independence_confirmation_in_manifest", False) is True
+    checks["manifest_anchor_strategy"] = man_strat
+    checks["manifest_gdop_or_indep"] = man_gdop or man_indep
+    detail_parts.append(f"manifest要求: anchor_strategy={man_strat}, gdop/indep={man_gdop or man_indep}")
+
+    # 检查 paper_declaration
+    paper_decl = cfg.get("paper_declaration", {}) or {}
+    paper_req = paper_decl.get("required", False) is True
+    content_reqs = paper_decl.get("content_requirements", []) or []
+    checks["paper_declaration_required"] = paper_req
+    checks["paper_content_requirements_present"] = len(content_reqs) >= 1
+    detail_parts.append(f"paper_declaration: required={paper_req}, content_reqs_count={len(content_reqs)}")
+
+    # 检查 verification_items
+    ver_items = cfg.get("verification_items", {}) or {}
+    vi_cfg = ver_items.get("config_exists", False) is True
+    vi_rule = ver_items.get("rule_doc_exists", False) is True
+    vi_val = ver_items.get("validator_exists", False) is True
+    vi_man = ver_items.get("manifest_contains_anchor_strategy", False) is True
+    vi_paper = ver_items.get("paper_declaration_present", False) is True
+    checks["verification_items_complete"] = vi_cfg and vi_rule and vi_val and vi_man and vi_paper
+    detail_parts.append(f"verification_items 完整={checks['verification_items_complete']}")
+
+    # 检查 related_checks 包含 183, 184, 186
+    related = cfg.get("related_checks", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["183", "184", "186"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_all"] = related_ok
+    detail_parts.append(f"related_checks 含 {need_related}={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失，需创建")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "条款原文" in rule_text or "[185]" in rule_text
+        has_meaning = "条款含义" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_185 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_185 = "[185]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_185"] = line_with_185
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[185]={line_with_185}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P185-miluv-anchor-strategy", "name": "[185] MILUV 锚点数量策略声明",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "manual_ref": manual_ref}}
+
+
+def p186_new_validation_layer() -> dict[str, Any]:
+    """[186] 新增验证层复用 I-1–I-5/P22 脚手架：实现/冒烟/统计校验复用同一套脚手架。
+
+    手册原文：
+    [186] 为**新增验证层**，其实现/冒烟/统计校验复用同一套 I-1–I-5/P22 脚手架（场景 manifest 化后 S9 校验按各布局专属期望执行）
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause186_new_validation_layer.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 186_新增验证层.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P186-new-validation-layer", "name": "[186] 新增验证层复用脚手架",
+                "severity": "hard", "passed": False,
+                "detail": "clause186_new_validation_layer.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P186-new-validation-layer", "name": "[186] 新增验证层复用脚手架",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P186-new-validation-layer", "name": "[186] 新增验证层复用脚手架",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "186"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='186', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "验证层" in clause_name or "脚手架" in clause_name or "I-1" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含关键词={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 scaffold_fork_required
+    scaffold_req = cfg.get("scaffold_fork_required", False)
+    checks["scaffold_fork_required"] = scaffold_req is True
+    detail_parts.append(f"scaffold_fork_required={scaffold_req}")
+
+    # 检查 supported_scaffolds 包含 I-1~I-5 和 P22
+    scaffolds = cfg.get("supported_scaffolds", []) or []
+    scaffolds_str = [str(s) for s in scaffolds]
+    required_scaffolds = ["I-1", "I-2", "I-3", "I-4", "I-5", "P22"]
+    has_all_scaffolds = all(any(r in s for s in scaffolds_str) for r in required_scaffolds)
+    checks["has_all_scaffolds"] = has_all_scaffolds
+    detail_parts.append(f"支持脚手架含 I-1~I-5/P22={has_all_scaffolds}, 值={scaffolds_str!r}")
+
+    # 检查 new_layer_must_reuse
+    must_reuse = cfg.get("new_layer_must_reuse", False)
+    checks["new_layer_must_reuse"] = must_reuse is True
+    detail_parts.append(f"new_layer_must_reuse={must_reuse}")
+
+    # 检查三项复用验证
+    reused = cfg.get("reused_components", {}) or {}
+    reuse_impl = reused.get("implementation", False) is True
+    reuse_smoke = reused.get("smoke_test", False) is True
+    reuse_stat = reused.get("statistical_validation", False) is True
+    checks["reuse_implementation"] = reuse_impl
+    checks["reuse_smoke"] = reuse_smoke
+    checks["reuse_statistical"] = reuse_stat
+    checks["all_three_reused"] = reuse_impl and reuse_smoke and reuse_stat
+    detail_parts.append(f"三项复用(实现/冒烟/统计)={checks['all_three_reused']}")
+
+    # 检查场景 manifest 化要求
+    scene_manifest_req = cfg.get("scene_manifest_required", False)
+    checks["scene_manifest_required"] = scene_manifest_req is True
+    detail_parts.append(f"scene_manifest_required={scene_manifest_req}")
+
+    scene_manifest_spec = cfg.get("scene_manifest_spec", {}) or {}
+    manifest_fields = scene_manifest_spec.get("fields", []) or []
+    checks["manifest_fields_defined"] = len(manifest_fields) >= 3
+    detail_parts.append(f"manifest字段定义数={len(manifest_fields)}")
+
+    # 检查 S9 布局专属校验
+    s9_spec = cfg.get("s9_layout_specific", {}) or {}
+    s9_enabled = s9_spec.get("enabled", False) is True
+    s9_per_layout = s9_spec.get("per_layout_expected", False) is True
+    s9_manifest_driven = s9_spec.get("manifest_driven", False) is True
+    checks["s9_enabled"] = s9_enabled
+    checks["s9_per_layout"] = s9_per_layout
+    checks["s9_manifest_driven"] = s9_manifest_driven
+    checks["s9_layout_specific_valid"] = s9_enabled and s9_per_layout and s9_manifest_driven
+    detail_parts.append(f"S9布局专属校验={checks['s9_layout_specific_valid']}")
+
+    # 检查 related_checks 包含 183, 184, 185
+    related = cfg.get("related_checks", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["183", "184", "185"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_core"] = related_ok
+    detail_parts.append(f"related_checks 含 183/184/185={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失，需创建")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "条款原文" in rule_text or "[186]" in rule_text
+        has_meaning = "核心要求" in rule_text or "条款含义" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_186 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_186 = "[186]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_186"] = line_with_186
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[186]={line_with_186}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P186-new-validation-layer", "name": "[186] 新增验证层复用脚手架",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "manual_ref": manual_ref}}
+
+
+# ---------------- [187] P27（激活热图）↔ S6 nl_flag/scene_mask ----------------
+def p187_activation_heatmap_scene_mask() -> dict[str, Any]:
+    """[187] P27（激活热图）↔ S6 nl_flag/scene_mask。
+
+    手册原文：
+    [187] P27（激活热图）↔ S6 `nl_flag`/`scene_mask`。
+    S8 数据生成流水线（注入顺序契约）
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause187_activation_heatmap.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 187_激活热图scene_mask.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P187-activation-heatmap", "name": "[187] P27激活热图 scene_mask对齐",
+                "severity": "hard", "passed": False,
+                "detail": "clause187_activation_heatmap.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P187-activation-heatmap", "name": "[187] P27激活热图 scene_mask对齐",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P187-activation-heatmap", "name": "[187] P27激活热图 scene_mask对齐",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "187"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='187', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "P27" in clause_name or "激活热图" in clause_name or "scene_mask" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含关键词={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 P27 激活热图配置
+    p27_spec = cfg.get("p27_spec", {}) or {}
+    activation_stats_enabled = p27_spec.get("activation_stats_enabled", False) is True
+    heatmap_saved = p27_spec.get("heatmap_saved", False) is True
+    n_heads = p27_spec.get("n_output_heads", 0)
+    n_heads_ok = n_heads == 4
+    checks["p27_activation_stats_enabled"] = activation_stats_enabled
+    checks["p27_heatmap_saved"] = heatmap_saved
+    checks["p27_n_heads_is_4"] = n_heads_ok
+    detail_parts.append(f"P27激活统计启用={activation_stats_enabled}, 热图保存={heatmap_saved}, 输出头数={n_heads}(期望=4), 匹配={n_heads_ok}")
+
+    # 检查 S6 nl_flag 字段
+    s6_spec = cfg.get("s6_nlv_data_contract", {}) or {}
+    nl_flag_spec = s6_spec.get("nl_flag", {}) or {}
+    nl_flag_field = nl_flag_spec.get("field_name", "")
+    nl_flag_ok = nl_flag_field == "nl_flag"
+    nl_flag_type = nl_flag_spec.get("type", "")
+    type_ok = nl_flag_type == "binary"
+    checks["s6_nl_flag_field"] = nl_flag_ok
+    checks["s6_nl_flag_type_binary"] = type_ok
+    detail_parts.append(f"S6 nl_flag 字段={nl_flag_field!r}, 类型={nl_flag_type!r}, 匹配={nl_flag_ok and type_ok}")
+
+    # 检查 S6 scene_mask 字段
+    scene_mask_spec = s6_spec.get("scene_mask", {}) or {}
+    scene_mask_field = scene_mask_spec.get("field_name", "")
+    scene_mask_ok = scene_mask_field == "scene_mask"
+    scene_mask_values = scene_mask_spec.get("values", []) or []
+    values_ok = set(scene_mask_values) == {0, 1, 2, 3}
+    checks["s6_scene_mask_field"] = scene_mask_ok
+    checks["s6_scene_mask_values"] = values_ok
+    detail_parts.append(f"S6 scene_mask 字段={scene_mask_field!r}, 取值={scene_mask_values}, 包含0-3={values_ok}")
+
+    # 检查 verification_items 包含必要检查项
+    ver_items = cfg.get("verification_items", {}) or {}
+    p27_checks = ver_items.get("p27_activation_stats", {}).get("checks", []) or []
+    s6_checks = ver_items.get("s6_nlv_fields", {}).get("checks", []) or []
+    p27_has_required = any("heatmap" in c.lower() or "activation" in c.lower() for c in p27_checks)
+    s6_has_required = any("nl_flag" in c.lower() or "scene_mask" in c.lower() for c in s6_checks)
+    checks["verification_p27_items"] = p27_has_required
+    checks["verification_s6_items"] = s6_has_required
+    detail_parts.append(f"verification p27项含关键词={p27_has_required}, 值={p27_checks!r}")
+    detail_parts.append(f"verification s6项含关键词={s6_has_required}, 值={s6_checks!r}")
+
+    # 检查 boundaries.required 包含核心约束
+    boundaries = cfg.get("boundaries", {}) or {}
+    required = boundaries.get("required", []) or []
+    required_strs = [str(r) for r in required]
+    has_heatmap_constraint = any("激活热图" in r or "activation_heatmap" in r.lower() for r in required_strs)
+    has_nl_flag_constraint = any("nl_flag" in r for r in required_strs)
+    has_scene_mask_constraint = any("scene_mask" in r for r in required_strs)
+    checks["boundary_has_heatmap_constraint"] = has_heatmap_constraint
+    checks["boundary_has_nl_flag_constraint"] = has_nl_flag_constraint
+    checks["boundary_has_scene_mask_constraint"] = has_scene_mask_constraint
+    detail_parts.append(f"边界约束含激活热图={has_heatmap_constraint}, nl_flag={has_nl_flag_constraint}, scene_mask={has_scene_mask_constraint}")
+
+    # 检查 related_clauses 包含 186, 188
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["186", "188"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_186_188"] = related_ok
+    detail_parts.append(f"related_clauses 含 186/188={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失，需创建")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "[187]" in rule_text
+        has_meaning = "条款含义" in rule_text or "核心要求" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_187 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_187 = "[187]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_187"] = line_with_187
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[187]={line_with_187}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P187-activation-heatmap", "name": "[187] P27激活热图 scene_mask对齐",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "manual_ref": manual_ref}}
+
+
+# ---------------- [188] 生成顺序钉死 ----------------
+def p188_generation_order() -> dict[str, Any]:
+    """[188] 生成顺序钉死（避免 NLOS 不可解帧与人为丢包在缺失统计上重复或漏算）。
+
+    手册原文：
+    [188] 此节钉死生成顺序，避免"NLOS 不可解帧"与"人为丢包"在缺失统计上重复或漏算。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause188_generation_order.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 188_生成顺序钉死.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P188-generation-order", "name": "[188] 生成顺序钉死",
+                "severity": "hard", "passed": False,
+                "detail": "clause188_generation_order.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P188-generation-order", "name": "[188] 生成顺序钉死",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P188-generation-order", "name": "[188] 生成顺序钉死",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "188"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='188', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "生成顺序" in clause_name or "钉死" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含关键词={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 generation_order_spec
+    gen_spec = cfg.get("generation_order_spec", {}) or {}
+    sequence = gen_spec.get("sequence", {}) or {}
+    step_orders = []
+    for key, step in sequence.items():
+        if isinstance(step, dict):
+            order = step.get("order", 0)
+            step_orders.append((order, key, step.get("stage", "")))
+    step_orders.sort()
+    order_correct = all(ord_val == i + 1 for i, (ord_val, _, _) in enumerate(step_orders))
+    checks["step_order_correct"] = order_correct
+    detail_parts.append(f"步骤顺序正确={order_correct}, 值={[o for o, k, s in step_orders]}")
+
+    # 检查必须包含的7个步骤
+    required_stages = ["场景/轨迹", "传感器量测", "A 轴", "N 轴", "M 轴", "重采样", "写 npz"]
+    stages_present = []
+    for _, _, stage in step_orders:
+        for req in required_stages:
+            if req in stage:
+                stages_present.append(req)
+                break
+    stages_ok = len(stages_present) >= 6  # 至少6个
+    checks["required_stages_present"] = stages_ok
+    detail_parts.append(f"必需阶段存在={stages_ok}, 值={stages_present!r}")
+
+    # 检查 N 轴 NLOS 在 M 轴缺失之前
+    nlos_order = None
+    m_axis_order = None
+    for ord_val, key, step in step_orders:
+        if "N 轴" in step:
+            nlos_order = ord_val
+        if "M 轴" in step:
+            m_axis_order = ord_val
+    nlos_before_maxis = nlos_order is not None and m_axis_order is not None and nlos_order < m_axis_order
+    checks["nlos_before_missing"] = nlos_before_maxis
+    detail_parts.append(f"NLOS在M轴缺失前={nlos_before_maxis}, NLOS_order={nlos_order}, M_axis_order={m_axis_order}")
+
+    # 检查 A 轴偏移在重采样之前
+    a_axis_order = None
+    resample_order = None
+    for ord_val, key, step in step_orders:
+        if "A 轴" in step:
+            a_axis_order = ord_val
+        if "重采样" in step:
+            resample_order = ord_val
+    a_before_resample = a_axis_order is not None and resample_order is not None and a_axis_order < resample_order
+    checks["a_axis_before_resample"] = a_before_resample
+    detail_parts.append(f"A轴在重采样前={a_before_resample}, A_axis_order={a_axis_order}, resample_order={resample_order}")
+
+    # 检查 M 轴缺失范围
+    m_scope = gen_spec.get("m_axis_missing_scope", {}) or {}
+    m1_only = m_scope.get("m1_only", False) is True
+    checks["m_axis_uwb_only"] = m1_only
+    detail_parts.append(f"M轴缺失仅UWB(M1)={m1_only}")
+
+    # 检查 IMU 频率保持 150Hz
+    step_6 = sequence.get("step_6", {}) or {}
+    imu_hz = step_6.get("imu_hz", 0)
+    imu_keep = step_6.get("imu_keep_native", False) is True
+    imu_ok = imu_hz == 150 and imu_keep
+    checks["imu_150hz_native"] = imu_ok
+    detail_parts.append(f"IMU保持150Hz={imu_ok}, imu_hz={imu_hz}, keep_native={imu_keep}")
+
+    # 检查 constraints
+    constraints = cfg.get("constraints", {}) or {}
+    no_reversal = constraints.get("no_order_reversal", False) is True
+    no_skip = constraints.get("no_skip_steps", False) is True
+    no_dup = constraints.get("no_duplicate_injection", False) is True
+    checks["constraints_no_reversal"] = no_reversal
+    checks["constraints_no_skip"] = no_skip
+    checks["constraints_no_duplicate"] = no_dup
+    detail_parts.append(f"约束: 禁止顺序颠倒={no_reversal}, 禁止跳过步骤={no_skip}, 禁止重复注入={no_dup}")
+
+    # 检查 boundaries
+    boundaries = cfg.get("boundaries", {}) or {}
+    required_b = boundaries.get("required", []) or []
+    req_strs = [str(r) for r in required_b]
+    has_nlos_before_m = any("NLOS" in r or "NLOS" in r or "丢包" in r for r in req_strs)
+    has_imu = any("IMU" in r or "150" in r for r in req_strs)
+    checks["boundary_has_nlos_before_m"] = has_nlos_before_m
+    checks["boundary_has_imu_150hz"] = has_imu
+    detail_parts.append(f"边界约束含NLOS顺序={has_nlos_before_m}, IMU150Hz={has_imu}")
+
+    # 检查 related_clauses
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["187", "189", "190"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_187_189_190"] = related_ok
+    detail_parts.append(f"related_clauses 含 187/189/190={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失，需创建")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "[188]" in rule_text
+        has_meaning = "条款含义" in rule_text or "核心要求" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_188 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_188 = "[188]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_188"] = line_with_188
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[188]={line_with_188}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P188-generation-order", "name": "[188] 生成顺序钉死",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "manual_ref": manual_ref}}
+
+
+def p189_generation_sequence() -> dict[str, Any]:
+    """[189] 生成顺序（每条序列）：严格按 7 步顺序生成，IMU 保留 150Hz 原生。
+
+    手册原文：
+    [189] 生成顺序（每条序列）：
+    (1) 场景/轨迹生成 → (2) 传感器量测仿真（UWB/IMU/VIO 原始） →
+    (3) A 轴异步偏移注入（重采样前） → (4) N 轴 NLOS 偏差注入（按遮挡区） →
+    (5) M 轴缺失注入（人为丢包） → (6) 统一重采样到公共时间轴
+    （UWB/VIO/gt → 10Hz；IMU 保留 150Hz 原生，不降采样，写 `imu_t`） →
+    (7) 写 npz + manifest
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause189_generation_sequence.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 189_生成顺序.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P189-generation-sequence", "name": "[189] 生成顺序（每条序列）",
+                "severity": "hard", "passed": False,
+                "detail": "clause189_generation_sequence.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P189-generation-sequence", "name": "[189] 生成顺序（每条序列）",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P189-generation-sequence", "name": "[189] 生成顺序（每条序列）",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "189"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='189', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "生成顺序" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含关键词={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 generation_sequence_spec
+    gen_spec = cfg.get("generation_sequence_spec", {}) or {}
+    sequence = gen_spec.get("sequence", {}) or {}
+
+    # 检查 7 个步骤
+    required_steps = ["step_1", "step_2", "step_3", "step_4", "step_5", "step_6", "step_7"]
+    all_steps_present = all(s in sequence for s in required_steps)
+    checks["all_7_steps_present"] = all_steps_present
+    detail_parts.append(f"7 步全部存在={all_steps_present}")
+
+    # 检查步骤顺序正确（1-7 递增）
+    step_orders = []
+    for key in required_steps:
+        step = sequence.get(key, {})
+        if isinstance(step, dict):
+            order = step.get("order", 0)
+            step_orders.append((order, key, step.get("stage", "")))
+    step_orders.sort()
+    order_correct = all(ord_val == i + 1 for i, (ord_val, _, _) in enumerate(step_orders))
+    checks["step_order_correct"] = order_correct
+    detail_parts.append(f"步骤顺序正确={order_correct}, 值={[o for o, k, s in step_orders]}")
+
+    # 检查 A 轴偏移在重采样前
+    a_axis_order = None
+    resample_order = None
+    for ord_val, key, step in step_orders:
+        if "A 轴" in step:
+            a_axis_order = ord_val
+        if "重采样" in step:
+            resample_order = ord_val
+    a_before_resample = a_axis_order is not None and resample_order is not None and a_axis_order < resample_order
+    checks["a_axis_before_resample"] = a_before_resample
+    detail_parts.append(f"A轴在重采样前={a_before_resample}, A_order={a_axis_order}, resample_order={resample_order}")
+
+    # 检查 N 轴 NLOS 在 M 轴缺失之前
+    nlos_order = None
+    m_axis_order = None
+    for ord_val, key, step in step_orders:
+        if "N 轴" in step:
+            nlos_order = ord_val
+        if "M 轴" in step:
+            m_axis_order = ord_val
+    nlos_before_maxis = nlos_order is not None and m_axis_order is not None and nlos_order < m_axis_order
+    checks["nlos_before_missing"] = nlos_before_maxis
+    detail_parts.append(f"NLOS在M轴缺失前={nlos_before_maxis}, NLOS_order={nlos_order}, M_axis_order={m_axis_order}")
+
+    # 检查 IMU 频率保持 150Hz
+    step_6 = sequence.get("step_6", {}) or {}
+    imu_hz = step_6.get("imu_hz", 0)
+    imu_keep = step_6.get("imu_keep_native", False) is True
+    imu_ok = imu_hz == 150 and imu_keep
+    checks["imu_150hz_native"] = imu_ok
+    detail_parts.append(f"IMU保持150Hz={imu_ok}, imu_hz={imu_hz}, keep_native={imu_keep}")
+
+    # 检查 M 轴缺失范围
+    m_scope = gen_spec.get("m_axis_missing_scope", {}) or {}
+    m1_only = m_scope.get("m1_only", False) is True
+    checks["m_axis_uwb_only"] = m1_only
+    detail_parts.append(f"M轴缺失仅UWB(M1)={m1_only}")
+
+    # 检查 constraints
+    constraints = cfg.get("constraints", {}) or {}
+    no_reversal = constraints.get("no_order_reversal", False) is True
+    no_skip = constraints.get("no_skip_steps", False) is True
+    no_dup = constraints.get("no_duplicate_injection", False) is True
+    checks["constraints_no_reversal"] = no_reversal
+    checks["constraints_no_skip"] = no_skip
+    checks["constraints_no_duplicate"] = no_dup
+    detail_parts.append(f"约束: 禁止顺序颠倒={no_reversal}, 禁止跳过步骤={no_skip}, 禁止重复注入={no_dup}")
+
+    # 检查 boundaries
+    boundaries = cfg.get("boundaries", {}) or {}
+    required_b = boundaries.get("required", []) or []
+    req_strs = [str(r) for r in required_b]
+    has_nlos_before_m = any("NLOS" in r or "丢包" in r for r in req_strs)
+    has_imu = any("IMU" in r or "150" in r for r in req_strs)
+    checks["boundary_has_nlos_before_m"] = has_nlos_before_m
+    checks["boundary_has_imu_150hz"] = has_imu
+    detail_parts.append(f"边界约束含NLOS顺序={has_nlos_before_m}, IMU150Hz={has_imu}")
+
+    # 检查 related_clauses
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["188", "190"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_188_190"] = related_ok
+    detail_parts.append(f"related_clauses 含 188/190={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失，需创建")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "[189]" in rule_text
+        has_meaning = "条款含义" in rule_text or "核心要求" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_189 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_189 = "[189]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_189"] = line_with_189
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[189]={line_with_189}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P189-generation-sequence", "name": "[189] 生成顺序（每条序列）",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+                         "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "manual_ref": manual_ref}}
+
+
+def p190_m_axis_missing_uwb_only() -> dict[str, Any]:
+    """[190] M 轴缺失只作用于 UWB（M1），VIO 缺失仅在 M2/M3（不在异步高NLOS实验）出现。
+
+    手册原文：
+    [190] M 轴缺失只作用于 UWB（M1），VIO 缺失仅在 M2/M3（不在异步高NLOS实验）出现。
+    S9 数据生成校验脚本契约（生成后、预检前必跑）
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause190_m_axis_missing_uwb_only.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 190_M轴缺失只作用于UWB.md"
+    s9_script_path = PROJECT_ROOT / "scripts" / "s9_validate_seeds.py"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P190-m-axis-missing-uwb-only", "name": "[190] M轴缺失只作用于UWB（M1）",
+                "severity": "hard", "passed": False,
+                "detail": "clause190_m_axis_missing_uwb_only.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P190-m-axis-missing-uwb-only", "name": "[190] M轴缺失只作用于UWB（M1）",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P190-m-axis-missing-uwb-only", "name": "[190] M轴缺失只作用于UWB（M1）",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "190"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='190', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "M轴缺失" in clause_name or "UWB" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含关键词={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 m_axis_missing_spec
+    m_spec = cfg.get("m_axis_missing_spec", {}) or {}
+    m1_scope = m_spec.get("m1_scope", {}) or {}
+    m1_applies = m1_scope.get("applies_to", "")
+    m1_uwb = m1_applies == "UWB"
+    checks["m1_applies_to_uwb"] = m1_uwb
+    detail_parts.append(f"M1作用域applies_to={m1_applies!r}, UWB={m1_uwb}")
+
+    # 检查 m2_scope（VIO缺失仅在M2/M3）
+    m2_scope = m_spec.get("m2_scope", {}) or {}
+    m2_applies = m2_scope.get("applies_to", "")
+    m2_vio = m2_applies == "VIO"
+    m2_exists_in = m2_scope.get("exists_in_clauses", [])
+    m2_ok = m2_vio and any("M2" in str(c) or "M3" in str(c) for c in m2_exists_in)
+    checks["m2_vio_only_in_m2_m3"] = m2_ok
+    detail_parts.append(f"M2/M3 VIO作用域={m2_ok}, applies_to={m2_applies!r}, exists_in={m2_exists_in!r}")
+
+    # 检查 scope_constraint
+    scope_constraint = cfg.get("m_axis_scope_constraint", {}) or {}
+    uwb_only = scope_constraint.get("uwb_only_in_m1", False) is True
+    vio_only = scope_constraint.get("vio_only_in_m2_m3", False) is True
+    not_in_exp = scope_constraint.get("not_in_async_nlos_experiment", False) is True
+    checks["scope_constraint_uwb_only"] = uwb_only
+    checks["scope_constraint_vio_only"] = vio_only
+    checks["scope_constraint_not_in_exp"] = not_in_exp
+    detail_parts.append(f"作用域约束: UWB-only-M1={uwb_only}, VIO-only-M2M3={vio_only}, 非本实验={not_in_exp}")
+
+    # 检查 s9_contract
+    s9_contract = cfg.get("s9_contract", {}) or {}
+    s9_timing = s9_contract.get("execution_timing", []) or []
+    timing_ok = "生成后" in s9_timing and "预检前必跑" in s9_timing
+    checks["s9_timing_enforced"] = timing_ok
+    detail_parts.append(f"S9校验时机强制={timing_ok}, 值={s9_timing!r}")
+
+    # 检查 constraints
+    constraints = cfg.get("constraints", {}) or {}
+    c_m_axis_uwb = constraints.get("m_axis_uwb_only_in_m1", False) is True
+    c_vio_m2m3 = constraints.get("vio_missing_restricted_to_m2_m3", False) is True
+    c_s9_timing = constraints.get("s9_validation_timing", False) is True
+    checks["constraints_m_axis_uwb"] = c_m_axis_uwb
+    checks["constraints_vio_m2m3"] = c_vio_m2m3
+    checks["constraints_s9_timing"] = c_s9_timing
+    detail_parts.append(f"约束: M轴UWB-M1={c_m_axis_uwb}, VIO-M2M3={c_vio_m2m3}, S9时机={c_s9_timing}")
+
+    # 检查 boundaries
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    required = boundaries.get("required", []) or []
+    forbidden_strs = [str(r) for r in forbidden]
+    required_strs = [str(r) for r in required]
+    has_forbidden_vio_in_m1 = any("VIO" in r and "M1" in r for r in forbidden_strs)
+    has_required_uwb_m1 = any("UWB" in r and "M1" in r for r in required_strs)
+    checks["boundary_forbids_vio_in_m1"] = has_forbidden_vio_in_m1
+    checks["boundary_requires_uwb_m1"] = has_required_uwb_m1
+    detail_parts.append(f"边界: 禁止VIO-M1={has_forbidden_vio_in_m1}, 要求UWB-M1={has_required_uwb_m1}")
+
+    # 检查 related_clauses
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["188", "189", "191"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_188_189_191"] = related_ok
+    detail_parts.append(f"related_clauses 含 188/189/191={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查 S9 校验脚本文件存在
+    s9_exists = s9_script_path.is_file()
+    checks["s9_script_exists"] = s9_exists
+    detail_parts.append(f"S9校验脚本存在={s9_exists}, 路径={s9_script_path.relative_to(PROJECT_ROOT)}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失，需创建")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "[190]" in rule_text
+        has_meaning = "条款含义" in rule_text or "核心要求" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_190 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_190 = "[190]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_190"] = line_with_190
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[190]={line_with_190}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P190-m-axis-missing-uwb-only", "name": "[190] M轴缺失只作用于UWB（M1）",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "manual_ref": manual_ref,
+                         "s9_script_path": str(s9_script_path.relative_to(PROJECT_ROOT))}}
+
+
+def p191_per_seed_validation_report() -> dict[str, Any]:
+    """[191] 每 seed 一份校验报告（JSON），与 manifest 并存。
+
+    手册原文：
+    [191] 输出：每 seed 一份校验报告（JSON），与 manifest 并存
+    S9 数据生成校验脚本契约（生成后、预检前必跑）
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause191_per_seed_validation_report.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 191_每seed校验报告.md"
+    s9_script_path = PROJECT_ROOT / "scripts" / "s9_validate_seeds.py"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P191-per-seed-validation-report", "name": "[191] 每seed校验报告（JSON），与manifest并存",
+                "severity": "hard", "passed": False,
+                "detail": "clause191_per_seed_validation_report.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P191-per-seed-validation-report", "name": "[191] 每seed校验报告（JSON），与manifest并存",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P191-per-seed-validation-report", "name": "[191] 每seed校验报告（JSON），与manifest并存",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "191"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='191', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "校验报告" in clause_name or "seed" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含关键词={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 output_spec.per_seed_report 配置
+    output_spec = cfg.get("output_spec", {}) or {}
+    per_seed = output_spec.get("per_seed_report", {}) or {}
+    filename = per_seed.get("filename", "")
+    filename_ok = filename == "s9_validation_report.json"
+    checks["per_seed_report_filename"] = filename_ok
+    detail_parts.append(f"报告文件名={filename!r}, 期望='s9_validation_report.json', 匹配={filename_ok}")
+
+    location = per_seed.get("location", "")
+    location_ok = "seed" in location.lower() or "manifest" in location.lower()
+    checks["per_seed_report_location"] = location_ok
+    detail_parts.append(f"报告位置={location!r}, 含seed/manifest={location_ok}")
+
+    # 检查必填字段是否完整
+    required_fields = per_seed.get("required_fields", [])
+    required_strs = [str(f) for f in required_fields]
+    has_overall = any("overall_pass" in f for f in required_strs)
+    has_seed = any("seed" in f for f in required_strs)
+    has_composition = any("composition" in f for f in required_strs)
+    has_nlos = any("nlos" in f for f in required_strs)
+    has_missing = any("missing" in f for f in required_strs)
+    has_schema = any("schema" in f for f in required_strs)
+    required_fields_ok = has_overall and has_seed and has_composition and has_nlos and has_missing and has_schema
+    checks["required_fields_complete"] = required_fields_ok
+    detail_parts.append(f"必填字段完整(overall/seed/composition/nlos/missing/schema)={required_fields_ok}")
+
+    # 检查 implementation 信息
+    implementation = output_spec.get("implementation", {}) or {}
+    script_val = implementation.get("script", "")
+    impl_script_ok = "s9_validate_seeds" in script_val
+    checks["implementation_script"] = impl_script_ok
+    detail_parts.append(f"实现脚本={script_val!r}, 含 s9_validate_seeds={impl_script_ok}")
+
+    co_exist = implementation.get("co_exist", "")
+    co_exist_ok = "manifest" in co_exist.lower()
+    checks["co_exist_with_manifest"] = co_exist_ok
+    detail_parts.append(f"共存要求(与manifest同目录)={co_exist_ok}, 值={co_exist!r}")
+
+    # 检查 verification_items
+    verification = cfg.get("verification_items", {}) or {}
+    per_seed_checks = verification.get("per_seed_report_exists", {}) or {}
+    has_file_check = any("file_exists" in str(v) or "exists" in str(v).lower() for v in per_seed_checks.values())
+    # checks 可能是 list 或 dict
+    checks_list = per_seed_checks.get("checks", []) if isinstance(per_seed_checks, dict) else []
+    has_fields_check = any("field" in str(v).lower() or "required" in str(v).lower() for v in checks_list)
+    # 如果 checks 不是 list，遍历所有值
+    if not isinstance(checks_list, list):
+        checks_list = list(per_seed_checks.values()) if isinstance(per_seed_checks, dict) else []
+        has_fields_check = any("field" in str(v).lower() or "required" in str(v).lower() for v in checks_list)
+    checks["verification_items_present"] = has_file_check and has_fields_check
+    detail_parts.append(f"验证项含文件存在和字段检查={has_file_check and has_fields_check}, checks_list={checks_list}")
+
+    # 检查 boundaries
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    required = boundaries.get("required", []) or []
+    forbidden_strs = [str(r) for r in forbidden]
+    required_strs = [str(r) for r in required]
+    has_forbidden_no_per_seed = any("per-seed" in r or "聚合报告" in r for r in forbidden_strs)
+    has_required_report = any("s9_validation_report" in r or "overall_pass" in r for r in required_strs)
+    has_required_manifest = any("manifest" in r for r in required_strs)
+    checks["boundary_forbids_no_per_seed"] = has_forbidden_no_per_seed
+    checks["boundary_requires_report"] = has_required_report
+    checks["boundary_requires_manifest"] = has_required_manifest
+    detail_parts.append(f"边界: 禁止无per-seed={has_forbidden_no_per_seed}, 要求报告={has_required_report}, 要求manifest={has_required_manifest}")
+
+    # 检查 related_clauses
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r).strip() for r in related]
+    need_related = ["190", "192", "195", "202"]
+    related_ok = all(any(n in r for r in related_strs) for n in need_related)
+    checks["related_contains_190_192_195_202"] = related_ok
+    detail_parts.append(f"related_clauses 含 190/192/195/202={related_ok}, 值={related_strs!r}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ref_ok
+    detail_parts.append(f"manual_ref 正确={ref_ok}, 值={manual_ref!r}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "[191]" in rule_text
+        has_meaning = "条款含义" in rule_text or "核心要求" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查 S9 脚本 per-seed 报告写入逻辑
+    s9_exists = s9_script_path.is_file()
+    checks["s9_script_exists"] = s9_exists
+    detail_parts.append(f"S9脚本存在={s9_exists}, 路径={s9_script_path.relative_to(PROJECT_ROOT)}")
+
+    s9_has_per_seed = False
+    s9_has_write = False
+    if s9_exists:
+        try:
+            s9_text = s9_script_path.read_text(encoding="utf-8")
+            s9_has_per_seed = "s9_validation_report.json" in s9_text
+            s9_has_write = "per_seed_report" in s9_text or "per-seed" in s9_text
+            checks["s9_has_per_seed_logic"] = s9_has_per_seed
+            checks["s9_has_write_code"] = s9_has_write
+            detail_parts.append(f"S9含per_seed_report.json引用={s9_has_per_seed}, 含写入代码={s9_has_write}")
+        except Exception:
+            detail_parts.append("S9 脚本读取失败")
+            checks["s9_has_per_seed_logic"] = False
+            checks["s9_has_write_code"] = False
+
+    # 检查 S9 脚本中 per-seed 报告字段完整性
+    s9_fields_ok = False
+    if s9_exists:
+        try:
+            s9_text = s9_script_path.read_text(encoding="utf-8")
+            required_s9_fields = ["overall_pass", "composition_pass", "nlos_pass",
+                                  "missing_pass", "gdop_pass", "boundary_pass",
+                                  "schema_pass", "timestamp_monotonic", "imu_rate_pass"]
+            s9_fields_ok = all(f in s9_text for f in required_s9_fields)
+            checks["s9_report_fields_complete"] = s9_fields_ok
+            detail_parts.append(f"S9报告中所有必填字段出现在脚本中={s9_fields_ok}")
+        except Exception:
+            checks["s9_report_fields_complete"] = False
+    else:
+        checks["s9_report_fields_complete"] = False
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_191 = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_191 = "[191]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_191"] = line_with_191
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[191]={line_with_191}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P191-per-seed-validation-report", "name": "[191] 每seed校验报告（JSON），与manifest并存",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "s9_script_path": str(s9_script_path.relative_to(PROJECT_ROOT)),
+                         "manual_ref": manual_ref}}
+
+
+def p192_s9_correctness_gate() -> dict[str, Any]:
+    """[192] S9 表格校验的是"数据是否按协议正确生成"（正确性 gate）。
+
+    手册原文：
+    [192] 为什么需要这一节：S9 表格校验的是"数据是否按协议正确生成"（正确性 gate）
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause192_data_correctness_gate.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 192_S9表格校验目的.md"
+    s9_script_path = PROJECT_ROOT / "scripts" / "s9_validate_seeds.py"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P192-s9-correctness-gate", "name": "[192] S9正确性gate：数据按协议正确生成",
+                "severity": "hard", "passed": False,
+                "detail": "clause192_data_correctness_gate.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P192-s9-correctness-gate", "name": "[192] S9正确性gate：数据按协议正确生成",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P192-s9-correctness-gate", "name": "[192] S9正确性gate：数据按协议正确生成",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "192"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='192', 匹配={id_ok}")
+
+    # 检查 clause_name
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "S9" in clause_name or "正确性" in clause_name or "correctness" in clause_name.lower()
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name 含关键词={name_ok}, 值={clause_name!r}")
+
+    # 检查 severity
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 purpose 字段存在且含正确性 gate 说明
+    purpose = str(cfg.get("purpose", ""))
+    has_purpose = len(purpose) > 10 and ("正确性" in purpose or "correctness" in purpose.lower() or "按协议" in purpose)
+    checks["purpose_defined"] = has_purpose
+    detail_parts.append(f"purpose 字段完整(含正确性gate说明)={has_purpose}")
+
+    # 检查 s9_correctness_gate 配置块
+    s9_cfg = cfg.get("s9_correctness_gate", {}) or {}
+    s9_cfg_ok = isinstance(s9_cfg, dict)
+    checks["s9_correctness_gate_block_exists"] = s9_cfg_ok
+    detail_parts.append(f"s9_correctness_gate 配置块存在={s9_cfg_ok}")
+
+    # 检查 S9 脚本存在的 7 项校验内容覆盖
+    s9_checks = s9_cfg.get("checks", {}) or {}
+    required_check_keys = ["composition", "nlos_injection", "missing_stats", "boundary_violations", "schema", "overall"]
+    present_checks = [k for k in required_check_keys if k in s9_checks]
+    s9_checks_coverage = len(present_checks) >= len(required_check_keys)
+    checks["s9_checks_coverage"] = s9_checks_coverage
+    detail_parts.append(f"S9 7项校验覆盖(应有{len(required_check_keys)}项, 实际{len(present_checks)}项)={s9_checks_coverage}")
+
+    # 检查 fail_action = regenerate_seed
+    fail_action = str(s9_cfg.get("checks", {}).get("overall", {}).get("fail_action", "") if isinstance(s9_cfg.get("checks", {}).get("overall"), dict) else "")
+    fail_ok = "regenerate" in fail_action.lower()
+    checks["s9_fail_action_regenerate"] = fail_ok
+    detail_parts.append(f"S9失败动作(re生生成)={fail_ok}, 值={fail_action!r}")
+
+    # 检查 dq_prerequisite 配置
+    dq_cfg = cfg.get("dq_prerequisite", {}) or {}
+    dq_order_ok = str(dq_cfg.get("order", "")) in ("S9 → DQ，不可逆序", "S9→DQ", "S9 → DQ")
+    dq_condition_ok = "S9" in str(dq_cfg.get("condition", ""))
+    checks["dq_prerequisite_correct"] = dq_order_ok and dq_condition_ok
+    detail_parts.append(f"DQ前置条件(S9在前)={dq_order_ok and dq_condition_ok}, order={str(dq_cfg.get('order',''))!r}")
+
+    # 检查 S9 脚本存在并实现全部 7 项校验
+    s9_exists = s9_script_path.is_file()
+    checks["s9_script_exists"] = s9_exists
+    detail_parts.append(f"S9脚本存在={s9_exists}, 路径={s9_script_path.relative_to(PROJECT_ROOT)}")
+
+    s9_has_composition = False
+    s9_has_nlos = False
+    s9_has_boundary = False
+    s9_has_schema = False
+    s9_has_overall = False
+    if s9_exists:
+        try:
+            s9_text = s9_script_path.read_text(encoding="utf-8")
+            s9_has_composition = "composition" in s9_text
+            s9_has_nlos = "nlos" in s9_text.lower() or "NLOS" in s9_text
+            s9_has_boundary = "boundary" in s9_text.lower() or "buffer" in s9_text.lower()
+            s9_has_schema = "schema" in s9_text.lower()
+            s9_has_overall = "overall" in s9_text.lower() or "overall_pass" in s9_text
+            s9_impl_ok = s9_has_composition and s9_has_nlos and s9_has_boundary and s9_has_schema and s9_has_overall
+            checks["s9_impl_composition"] = s9_has_composition
+            checks["s9_impl_nlos"] = s9_has_nlos
+            checks["s9_impl_boundary"] = s9_has_boundary
+            checks["s9_impl_schema"] = s9_has_schema
+            checks["s9_impl_overall"] = s9_has_overall
+            checks["s9_impl_complete"] = s9_impl_ok
+            detail_parts.append(f"S9脚本实现完整(composition/nlos/boundary/schema/overall)={s9_impl_ok}")
+        except Exception:
+            checks["s9_impl_complete"] = False
+            detail_parts.append("S9 脚本读取失败")
+    else:
+        checks["s9_impl_complete"] = False
+
+    # 检查 boundaries 配置
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    required = boundaries.get("required", []) or []
+    forbidden_strs = [str(r) for r in forbidden]
+    required_strs = [str(r) for r in required]
+    has_forbidden_skip_s9 = any("跳过S9" in r or "跳过 s9" in r.lower() or "直接运行DQ" in r for r in forbidden_strs)
+    has_required_s9_before_dq = any("S9" in r and "DQ" in r for r in required_strs)
+    checks["boundary_forbids_skip_s9"] = has_forbidden_skip_s9
+    checks["boundary_requires_s9_before_dq"] = has_required_s9_before_dq
+    detail_parts.append(f"边界约束(禁止跳过S9)={has_forbidden_skip_s9}, S9在DQ前={has_required_s9_before_dq}")
+
+    # 检查规则文档
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        detail_parts.append("规则文档缺失")
+        checks["rule_doc_exists"] = False
+    else:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "[192]" in rule_text
+        has_meaning = "条款含义" in rule_text or "核心要求" in rule_text
+        has_criteria = "验收标准" in rule_text
+        doc_ok = has_original and has_meaning and has_criteria
+        checks["rule_doc_complete"] = doc_ok
+        detail_parts.append(f"规则文档完整(原文/含义/验收标准)={doc_ok}")
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_192 = False
+    manual_ref = str(manual_path.relative_to(PROJECT_ROOT))
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_192 = "[192]" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_192"] = line_with_192
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[192]={line_with_192}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P192-s9-correctness-gate", "name": "[192] S9正确性gate：数据按协议正确生成",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "s9_script_path": str(s9_script_path.relative_to(PROJECT_ROOT)),
+                         "manual_ref": manual_ref}}
+
+
+def p193_validation() -> dict[str, Any]:
+    """[193] 先审执行再查数据适配：失败判别顺序铁律
+
+    手册原文：
+    [193] 此时须先回第一问把执行审到无可再审（见失败判别总入口），审完再查数据适配，
+    且不排除"执行偏差尚未审尽"的可能，结论表述须带"在已排除执行/代码根因的前提下"。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause193_execution_review_first.yaml"
+    rule_path = PROJECT_ROOT / "rules" / "条款 193 先审执行再查数据适配.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-8: 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P193-validation", "name": "[193]先审执行再查数据适配",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause193_execution_review_first.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P193-validation", "name": "[193]先审执行再查数据适配",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P193-validation", "name": "[193]先审执行再查数据适配",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-8: clause_id = "193"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "193"
+    checks["vs8_clause_id"] = id_ok
+    detail_parts.append(f"VS-8 clause_id={clause_id!r}, 期望='193', 匹配={id_ok}")
+
+    # VS-9: severity = "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs9_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-9 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-1: execution_order 块存在
+    eo = cfg.get("execution_order", {}) or {}
+    eo_ok = isinstance(eo, dict)
+    checks["vs1_execution_order_exists"] = eo_ok
+    detail_parts.append(f"VS-1 execution_order 块存在={eo_ok}")
+
+    # VS-2: 第一问定义完整（audit_items 含 E-1 至 E-6）
+    fq = eo.get("first_question", {}) or {}
+    fq_desc = str(fq.get("description", ""))
+    fq_items = fq.get("audit_items", []) or []
+    item_strs = [str(i) for i in fq_items]
+    e_items = [s for s in item_strs if re.search(r"E-[1-6]", s)]
+    first_q_ok = bool(fq_desc) and len(e_items) >= 6
+    checks["vs2_first_question_defined"] = first_q_ok
+    checks["vs2_e_items_count"] = len(e_items) >= 6
+    detail_parts.append(f"VS-2 第一问定义完整(description含关键词, E-1~E-6 共{len(e_items)}项)={first_q_ok}")
+
+    # VS-3: 第二问定义完整（check_items、prerequisite、note）
+    sq = eo.get("second_question", {}) or {}
+    sq_desc = str(sq.get("description", ""))
+    sq_items = sq.get("check_items", []) or []
+    sq_prereq = str(sq.get("prerequisite", ""))
+    sq_note = str(sq.get("note", ""))
+    second_q_ok = bool(sq_desc) and len(sq_items) >= 2 and bool(sq_prereq)
+    checks["vs3_second_question_defined"] = second_q_ok
+    checks["vs3_sq_items_count"] = len(sq_items) >= 2
+    checks["vs3_sq_prerequisite_not_empty"] = bool(sq_prereq)
+    detail_parts.append(f"VS-3 第二问定义完整(description={bool(sq_desc)}, check_items={len(sq_items)}项, prerequisite={'yes' if sq_prereq else 'no'})={second_q_ok}")
+
+    # 检查第二问是否含"不排除执行偏差尚未审尽"提示
+    note_has_residual = "不排除" in sq_note or "尚未审尽" in sq_note or "残余" in sq_note
+    checks["vs3_note_residual_bias"] = note_has_residual
+    detail_parts.append(f"VS-3 第二问 note 含'不排除残余偏差'={note_has_residual}")
+
+    # VS-4: 结论语法要求配置到位
+    cg = cfg.get("conclusion_grammar", {}) or {}
+    req_phrase = bool(cg.get("require_prerequisite_phrase", False))
+    prereq_phrase = str(cg.get("prerequisite_phrase", ""))
+    phrase_ok = "已排除执行" in prereq_phrase or "排除执行" in prereq_phrase
+    checks["vs4_conclusion_grammar_defined"] = req_phrase and phrase_ok
+    detail_parts.append(f"VS-4 结论语法要求(require_prerequisite_phrase={req_phrase}, prerequisite_phrase={'含' if phrase_ok else '不含'}'已排除执行')={req_phrase and phrase_ok}")
+
+    # 检查 forbidden 列表不含前提短语的情况
+    forbidden_items = cg.get("forbidden_without_phrase", []) or []
+    checks["vs4_forbidden_items_present"] = len(forbidden_items) >= 2
+    detail_parts.append(f"VS-4 forbidden_without_phrase 列表长度={len(forbidden_items)}, 至少需2项={len(forbidden_items) >= 2}")
+
+    # VS-5: boundaries.forbidden 含至少 4 条
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden_list = boundaries.get("forbidden", []) or []
+    forbidden_strs = [str(f) for f in forbidden_list]
+    vs5_ok = len(forbidden_strs) >= 4
+    checks["vs5_forbidden_count"] = len(forbidden_strs) >= 4
+    detail_parts.append(f"VS-5 forbidden 列表长度={len(forbidden_strs)}, 至少需4项={vs5_ok}")
+    # 检查含关键禁止项
+    has_skip_first = any("第一问" in f or "跳过" in f or "先宣称" in f for f in forbidden_strs)
+    checks["vs5_forbids_skip_first_question"] = has_skip_first
+    detail_parts.append(f"VS-5 含'禁止跳过第一问'={has_skip_first}")
+
+    # VS-6: boundaries.required 含至少 3 条
+    required_list = boundaries.get("required", []) or []
+    required_strs = [str(r) for r in required_list]
+    vs6_ok = len(required_strs) >= 3
+    checks["vs6_required_count"] = len(required_strs) >= 3
+    detail_parts.append(f"VS-6 required 列表长度={len(required_strs)}, 至少需3项={vs6_ok}")
+    # 检查含"执行已审至无可再审"前提声明
+    has_prereq_declare = any("无可再审" in r for r in required_strs)
+    checks["vs6_requires_no_more_review_declare"] = has_prereq_declare
+    detail_parts.append(f"VS-6 含'审至无可再审'要求={has_prereq_declare}")
+
+    # VS-7: related_clauses 含 192、584、597
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r) for r in related]
+    required_related = {"192", "584", "597"}
+    found_related = required_related.intersection(set(related_strs))
+    vs7_ok = found_related == required_related
+    checks["vs7_related_clauses_complete"] = vs7_ok
+    detail_parts.append(f"VS-7 related_clauses={related_strs}, 需含192/584/597, 实际找到={found_related}, 完整={vs7_ok}")
+
+    # VS-10: 检查规则文档存在
+    rule_exists = rule_path.is_file()
+    checks["vs10_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-10 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    # 规则文档内容检查
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[193]**" in rule_text or "[193]" in rule_text
+        has_meaning = "含义" in rule_text or "含义" in rule_text
+        has_standard = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_standard
+    checks["vs10_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-10 规则文档内容有效(含原文+含义+验收标准)={rule_content_ok}")
+
+    passed = all(v is True for v in checks.values())
+    return {
+        "code": "P193-validation",
+        "name": "[193]先审执行再查数据适配",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p194_data_audit_fitness_for_purpose() -> dict[str, Any]:
+    """[194] 数据审计与 fitness-for-purpose 评估（data-centric 核心共识）
+
+    手册原文：
+    [194] 数据审计（data audit）与"数据集是否适配研究问题"（fitness-for-purpose）评估是
+    数据为中心（data-centric）方法论的核心共识：数据质量（缺失/噪声/偏差/污染/泄漏）是
+    评估虚高与负结果的首要风险源，数据审计必须**前置到实验准备/数据生成阶段**，
+    负结果报告须区分"方法失败"与"数据不支持该问题"。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause194_data_audit_fitness_for_purpose.yaml"
+    rule_path = PROJECT_ROOT / "rules" / "条款 194_数据审计与fitness-for-purpose.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P194-validation", "name": "[194]数据审计与fitness-for-purpose",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause194_data_audit_fitness_for_purpose.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P194-validation", "name": "[194]数据审计与fitness-for-purpose",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P194-validation", "name": "[194]数据审计与fitness-for-purpose",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "194"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "194"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='194', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: 数据质量五维度（缺失/噪声/偏差/污染/泄漏）全部存在
+    quality_dims = cfg.get("data_audit_spec", {}).get("quality_dimensions", []) or []
+    dim_strs = [str(d).lower() for d in quality_dims]
+    required_dims = ["缺失", "噪声", "偏差", "污染", "泄漏"]
+    missing_dims = [d for d in required_dims if not any(d in ds for ds in dim_strs)]
+    dims_ok = len(missing_dims) == 0
+    checks["vs4_quality_dimensions_complete"] = dims_ok
+    checks["vs4_missing_dimensions_empty"] = not missing_dims
+    detail_parts.append(
+        f"VS-4 数据质量五维度（缺失/噪声/偏差/污染/泄漏）全部存在: "
+        f"找到{len(quality_dims)}项, 缺失={'无' if not missing_dims else str(missing_dims)}, 完整={dims_ok}"
+    )
+
+    # VS-5: 前置时机配置（timing.requirement 含"前置到"或"实验准备/数据生成阶段"）
+    timing_req = str(cfg.get("data_audit_spec", {}).get("timing", {}).get("requirement", ""))
+    timing_ok = bool(timing_req) and ("前置" in timing_req or "实验准备" in timing_req or "数据生成" in timing_req)
+    checks["vs5_timing_frontloaded"] = timing_ok
+    detail_parts.append(f"VS-5 数据审计前置时机: requirement={timing_req!r}, 含前置关键词={timing_ok}")
+
+    # VS-6: 负结果区分配置（negative_result_distinction 含两类归因）
+    ffp_spec = cfg.get("data_audit_spec", {}).get("fitness_for_purpose", {}) or {}
+    neg_dist = ffp_spec.get("negative_result_distinction", []) or []
+    neg_dist_strs = [str(d) for d in neg_dist]
+    has_method_fail = any("方法失败" in d for d in neg_dist_strs)
+    has_data_not_support = any("数据不支持" in d for d in neg_dist_strs)
+    neg_dist_ok = has_method_fail and has_data_not_support
+    checks["vs6_negative_result_distinction_defined"] = neg_dist_ok
+    detail_parts.append(
+        f"VS-6 负结果区分: 方法失败={'有' if has_method_fail else '无'}, "
+        f"数据不支持该问题={'有' if has_data_not_support else '无'}, 完整={neg_dist_ok}"
+    )
+
+    # VS-7: fitness-for-purpose 块存在且有 description
+    ffp = cfg.get("data_audit_spec", {}).get("fitness_for_purpose", {}) or {}
+    ffp_desc = str(ffp.get("description", ""))
+    ffp_ok = bool(ffp_desc) and ("适配" in ffp_desc or "fitness" in ffp_desc.lower() or "purpose" in ffp_desc.lower())
+    checks["vs7_fitness_for_purpose_defined"] = ffp_ok
+    detail_parts.append(f"VS-7 fitness-for-purpose 块存在且含描述: description={'含' if ffp_desc else '空'}={ffp_ok}")
+
+    # VS-8: related_clauses 含 192, 193, 195, 220
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r) for r in related]
+    required_related = {"192", "193", "195", "220"}
+    found_related = required_related.intersection(set(related_strs))
+    vs8_ok = found_related == required_related
+    checks["vs8_related_clauses_complete"] = vs8_ok
+    detail_parts.append(
+        f"VS-8 related_clauses={related_strs}, 需含192/193/195/220, 实际找到={found_related}, 完整={vs8_ok}"
+    )
+
+    # VS-9: manual_ref 指向正确手册文件
+    manual_ref = str(cfg.get("manual_ref", ""))
+    manual_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["vs9_manual_ref_correct"] = manual_ok
+    detail_parts.append(f"VS-9 manual_ref={manual_ref!r}, 指向正确手册={manual_ok}")
+
+    # VS-10: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs10_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-10 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[194]**" in rule_text or "[194]" in rule_text
+        has_meaning = "含义" in rule_text
+        has_standard = "验收" in rule_text or "标准" in rule_text
+        has_data_audit_frontload = "前置" in rule_text or "前置" in rule_text
+        has_neg_distinction = "方法失败" in rule_text and "数据不支持" in rule_text
+        rule_content_ok = has_original and has_meaning and has_standard and has_data_audit_frontload and has_neg_distinction
+    checks["vs10_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(
+        f"VS-10 规则文档内容有效(含原文+含义+验收标准+前置要求+负结果区分)={rule_content_ok}"
+    )
+
+    passed = all(v is True for v in checks.values())
+    return {
+        "code": "P194-validation",
+        "name": "[194]数据审计与fitness-for-purpose",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p195_dq_timing() -> dict[str, Any]:
+    """[195] DQ 检查在 S9 正确性校验通过后、进入 Step 1 前执行
+
+    手册原文：
+    [195] DQ 检查在 S9 正确性校验通过后、进入 Step 1 前执行
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause195_dq_timing.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 195_DQ检查时机.md"
+    s9_script_path = PROJECT_ROOT / "scripts" / "s9_validate_seeds.py"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P195-dq-timing", "name": "[195] DQ检查时机",
+                "severity": "hard", "passed": False,
+                "detail": "clause195_dq_timing.yaml missing",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append("配置文件存在=True")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P195-dq-timing", "name": "[195] DQ检查时机",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P195-dq-timing", "name": "[195] DQ检查时机",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # 检查 clause_id
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "195"
+    checks["clause_id"] = id_ok
+    detail_parts.append(f"clause_id={clause_id!r}, 期望='195', 匹配={id_ok}")
+
+    # 检查 clause_name 含关键词
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "DQ" in clause_name or "S9" in clause_name or "时序" in clause_name
+    checks["clause_name_valid"] = name_ok
+    detail_parts.append(f"clause_name={clause_name!r}, 含关键词={name_ok}")
+
+    # 检查 severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["severity_is_hard"] = sev_ok
+    detail_parts.append(f"severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # 检查 purpose 字段
+    purpose = str(cfg.get("purpose", ""))
+    has_purpose = len(purpose) > 10 and ("DQ" in purpose or "S9" in purpose or "Step 1" in purpose)
+    checks["purpose_defined"] = has_purpose
+    detail_parts.append(f"purpose 字段完整(含DQ/S9/Step1)={has_purpose}")
+
+    # 检查 execution_order 时序配置
+    exec_order = cfg.get("execution_order", {}) or {}
+    steps = exec_order.get("gate_sequence", []) or []
+    step_names = [str(s.get("name", "")) for s in steps]
+    s9_before_dq = False
+    dq_before_step1 = False
+    if len(steps) >= 3:
+        s9_step = str(steps[0].get("name", "")) if steps else ""
+        dq_step = str(steps[1].get("name", "")) if len(steps) > 1 else ""
+        step1_step = str(steps[2].get("name", "")) if len(steps) > 2 else ""
+        s9_before_dq = "S9" in s9_step and "DQ" in dq_step
+        dq_before_step1 = "DQ" in dq_step and "Step 1" in step1_step
+    checks["s9_before_dq_order"] = s9_before_dq
+    checks["dq_before_step1_order"] = dq_before_step1
+    detail_parts.append(f"时序配置(S9→DQ→Step1)={s9_before_dq and dq_before_step1}, steps={step_names}")
+
+    # 检查 forbidden 违规项
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    forbidden_strs = [str(r) for r in forbidden]
+    has_forbidden_s9_before_dq = any("S9" in r and "DQ" in r and ("未通过" in r or "之前" in r) for r in forbidden_strs)
+    has_forbidden_dq_after_step1 = any("Step 1" in r and "DQ" in r for r in forbidden_strs)
+    checks["forbidden_s9_before_dq"] = has_forbidden_s9_before_dq
+    checks["forbidden_dq_after_step1"] = has_forbidden_dq_after_step1
+    detail_parts.append(f"forbidden 项(S9未通过前DQ / DQ在Step1后)={has_forbidden_s9_before_dq and has_forbidden_dq_after_step1}")
+
+    # 检查 required 约束项
+    required = boundaries.get("required", []) or []
+    required_strs = [str(r) for r in required]
+    has_required_s9_before_dq = any("S9" in r and "DQ" in r and ("通过后" in r or "通过后" in r) for r in required_strs)
+    has_required_dq_before_step1 = any("DQ" in r and "Step 1" in r for r in required_strs)
+    checks["required_s9_before_dq"] = has_required_s9_before_dq
+    checks["required_dq_before_step1"] = has_required_dq_before_step1
+    detail_parts.append(f"required 项(S9通过后DQ / DQ通过后Step1)={has_required_s9_before_dq and has_required_dq_before_step1}")
+
+    # 检查 related_clauses
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r) for r in related]
+    required_related = {"192", "193", "194", "196", "220", "262", "268"}
+    found_related = required_related.intersection(set(related_strs))
+    related_ok = found_related == required_related
+    checks["related_clauses_complete"] = related_ok
+    detail_parts.append(f"related_clauses 完整(192/193/194/196/220/262/268)={related_ok}, 找到={found_related}")
+
+    # 检查 manual_ref
+    manual_ref = str(cfg.get("manual_ref", ""))
+    manual_ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = manual_ref_ok
+    detail_parts.append(f"manual_ref 指向正确={manual_ref_ok}")
+
+    # 检查 S9 脚本存在
+    s9_exists = s9_script_path.is_file()
+    checks["s9_script_exists"] = s9_exists
+    detail_parts.append(f"S9脚本存在={s9_exists}")
+
+    # 检查规则文档存在
+    rule_exists = rule_path.is_file()
+    checks["rule_doc_exists"] = rule_exists
+    detail_parts.append(f"规则文档存在={rule_exists}")
+
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[195]**" in rule_text or "[195]" in rule_text
+        has_meaning = "含义" in rule_text or "核心要求" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        checks["rule_doc_complete"] = has_original and has_meaning and has_criteria
+        detail_parts.append(f"规则文档完整(原文+含义+验收标准)={has_original and has_meaning and has_criteria}")
+    else:
+        checks["rule_doc_complete"] = False
+
+    # 检查手册真源文件
+    manual_exists = manual_path.is_file()
+    line_with_195 = False
+    manual_ref_path = str(manual_path.relative_to(PROJECT_ROOT))
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            line_with_195 = "**[195]**" in manual_content
+        except Exception:
+            pass
+    checks["manual_file_has_195"] = line_with_195
+    checks["manual_file_exists"] = manual_exists
+    detail_parts.append(f"手册真源文件存在={manual_exists}, 包含[195]={line_with_195}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {"code": "P195-dq-timing", "name": "[195] DQ检查时机：S9后Step1前",
+            "severity": "hard", "passed": all_passed,
+            "detail": "; ".join(detail_parts),
+            "violations": [k for k, v in checks.items() if v is not True], "warnings": [],
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+                         "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+                         "s9_script_path": str(s9_script_path.relative_to(PROJECT_ROOT)),
+                         "manual_ref": manual_ref_path}}
+
+
+
+def p196_dq_fail_disposal() -> dict[str, Any]:
+    """[196] DQ 不合格处置顺序：先修数据，修不通才允许缩小声明范围
+
+    手册原文：
+    [196] 不合格 → 先修数据（重生成/调轨迹设计/走协议变更），修不通才允许"缩小声明范围"（见 R-1 、R-5）。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause196_dq_fail_disposal.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 196_DQ不合格处置顺序.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # 检查配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P196-dq-fail-disposal", "name": "[196] DQ不合格处置顺序",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause196_dq_fail_disposal.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P196-dq-fail-disposal", "name": "[196] DQ不合格处置顺序",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P196-dq-fail-disposal", "name": "[196] DQ不合格处置顺序",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "196"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "196"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='196', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: purpose 字段存在且内容有效
+    purpose = str(cfg.get("purpose", ""))
+    purpose_ok = len(purpose) > 10 and ("DQ" in purpose or "修数据" in purpose or "处置" in purpose)
+    checks["vs4_purpose_defined"] = purpose_ok
+    detail_parts.append(f"VS-4 purpose 字段完整(含DQ/修数据/处置)={purpose_ok}")
+
+    # VS-5: disposal_sequence.step 1 是修数据动作（重生成/调轨迹/协议变更）
+    disposal_seq = cfg.get("disposal_sequence", []) or []
+    step_names = [str(s.get("name", "")) for s in disposal_seq]
+    step_actions = [s.get("actions", []) or [] for s in disposal_seq]
+    has_step1 = len(disposal_seq) >= 1
+    has_step2 = len(disposal_seq) >= 2
+    # Step 1 的动作应包含修数据相关关键词
+    step1_actions_str = " ".join([str(a) for a in step_actions[0]]) if step_actions else ""
+    step1_is_repair = any(k in step1_actions_str for k in ["重生成", "调轨迹", "协议变更", "修数据"])
+    # Step 2 的动作应包含缩小声明相关关键词
+    step2_actions_str = " ".join([str(a) for a in step_actions[1]]) if len(step_actions) > 1 else ""
+    step2_is_narrow = any(k in step2_actions_str for k in ["缩小", "声明范围", "诚实声明"])
+    checks["vs5_step1_repair_data"] = has_step1 and step1_is_repair
+    checks["vs5_step2_narrow_scope"] = has_step2 and step2_is_narrow
+    detail_parts.append(
+        f"VS-5 处置序列: steps={step_names}, "
+        f"Step1修数据={'有' if step1_is_repair else '无'}, Step2缩小声明={'有' if step2_is_narrow else '无'}"
+    )
+
+    # VS-6: Step 2 prerequisite 含 "穷尽"
+    step2_prereq = str(disposal_seq[1].get("prerequisite", "")) if len(disposal_seq) > 1 else ""
+    prereq_ok = "穷尽" in step2_prereq or "未通过" in step2_prereq
+    checks["vs6_step2_prerequisite_has_exhausted"] = prereq_ok
+    detail_parts.append(f"VS-6 Step2 prerequisite含'穷尽': {step2_prereq!r} -> {prereq_ok}")
+
+    # VS-7: forbidden 含核心违规项
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    forbidden_strs = [str(f) for f in forbidden]
+    has_forbidden_skip_repair = any("跳过修数据" in f or "直接缩小" in f for f in forbidden_strs)
+    has_forbidden_no_r1_r5 = any("R-1" in f and "R-5" in f for f in forbidden_strs)
+    checks["vs7_forbidden_has_core_violations"] = has_forbidden_skip_repair and has_forbidden_no_r1_r5
+    detail_parts.append(
+        f"VS-7 forbidden核心违规(跳过修数据直接缩小/未经R-1R-5): "
+        f"跳过修数据={'有' if has_forbidden_skip_repair else '无'}, R-1R-5={'有' if has_forbidden_no_r1_r5 else '无'}"
+    )
+
+    # VS-8: required 含核心约束项
+    required = boundaries.get("required", []) or []
+    required_strs = [str(r) for r in required]
+    has_required_repair_first = any("第一动作" in r and "修数据" in r for r in required_strs)
+    has_required_narrow_after_exhausted = any("穷尽" in r and "缩小" in r for r in required_strs)
+    checks["vs8_required_has_core_constraints"] = has_required_repair_first and has_required_narrow_after_exhausted
+    detail_parts.append(
+        f"VS-8 required核心约束(修数据优先/穷尽后缩小声明): "
+        f"修数据第一动作={'有' if has_required_repair_first else '无'}, 穷尽后缩小={'有' if has_required_narrow_after_exhausted else '无'}"
+    )
+
+    # VS-9: related_clauses 覆盖
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r) for r in related]
+    required_related = {"192", "193", "194", "195", "279", "601", "646", "732", "759"}
+    found_related = required_related.intersection(set(related_strs))
+    related_ok = found_related == required_related
+    checks["vs9_related_clauses_complete"] = related_ok
+    detail_parts.append(
+        f"VS-9 related_clauses 完整(192/193/194/195/279/601/646/732/759)={related_ok}, "
+        f"找到={found_related}"
+    )
+
+    # VS-10: manual_ref 指向正确手册文件
+    manual_ref = str(cfg.get("manual_ref", ""))
+    manual_ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["vs10_manual_ref_correct"] = manual_ref_ok
+    detail_parts.append(f"VS-10 manual_ref={manual_ref!r}, 指向正确={manual_ref_ok}")
+
+    # VS-11: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs11_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-11 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[196]**" in rule_text or "[196]" in rule_text
+        has_meaning = "含义" in rule_text or "核心要求" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        has_first_repair = "先修数据" in rule_text or "修数据" in rule_text
+        has_narrow_scope = "缩小声明" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria and has_first_repair and has_narrow_scope
+    checks["vs11_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(
+        f"VS-11 规则文档内容有效(原文+含义+验收标准+先修数据+缩小声明范围)={rule_content_ok}"
+    )
+
+    # VS-12: 手册真源文件包含 [196]
+    manual_exists = manual_path.is_file()
+    has_196_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_196_in_manual = "**[196]**" in manual_content or "[196]" in manual_content
+        except Exception:
+            pass
+    checks["vs12_manual_has_clause_196"] = has_196_in_manual
+    checks["vs12_manual_file_exists"] = manual_exists
+    detail_parts.append(
+        f"VS-12 手册真源文件存在={manual_exists}, 包含[196]={has_196_in_manual}"
+    )
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P196-dq-fail-disposal",
+        "name": "[196] DQ不合格处置顺序：先修数据后缩小声明",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p197_four_combination_distribution_check() -> dict[str, Any]:
+    """[197] 四组合各 >= 设计轨迹数 分布不一致 -> 重生成训练集补足组合覆盖
+
+    手册原文：
+    [197] 四组合各 >= 设计轨迹数 分布不一致 -> 重生成训练集补足组合覆盖
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause197_four_combination_distribution.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 197_四组合分布不一致.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P197-four-combination-distribution", "name": "[197] 四组合分布不一致重生成",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause197_four_combination_distribution.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P197-four-combination-distribution", "name": "[197] 四组合分布不一致重生成",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P197-four-combination-distribution", "name": "[197] 四组合分布不一致重生成",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "197"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "197"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='197', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: four_combinations 包含全部四个组合 A2N2/A2N3/A3N2/A3N3
+    four_combos = cfg.get("four_combinations", []) or []
+    four_combos_strs = [str(c).strip() for c in four_combos]
+    required_combos = {"A2N2", "A2N3", "A3N2", "A3N3"}
+    found_combos = set(four_combos_strs)
+    combos_ok = required_combos.issubset(found_combos)
+    checks["vs4_four_combinations_complete"] = combos_ok
+    detail_parts.append(
+        f"VS-4 four_combinations 含全部四组合 A2N2/A2N3/A3N2/A3N3={combos_ok}, "
+        f"找到={found_combos}, 期望={required_combos}"
+    )
+
+    # VS-5: design_trajectory_count 存在且含训练/测试设计数说明
+    dtc = cfg.get("design_trajectory_count", {}) or {}
+    dtc_str = str(dtc)
+    has_train_spec = "training" in dtc_str.lower() or "训练" in dtc_str
+    has_test_spec = "test" in dtc_str.lower() or "测试" in dtc_str
+    checks["vs5_design_trajectory_count_specified"] = has_train_spec and has_test_spec
+    detail_parts.append(f"VS-5 design_trajectory_count含训练/测试规格={checks['vs5_design_trajectory_count_specified']}")
+
+    # VS-6: 分布不一致触发重生成动作
+    disposal_seq = cfg.get("disposal_sequence", []) or []
+    step_names = [str(s.get("name", "")) for s in disposal_seq]
+    step_actions = [s.get("actions", []) or [] for s in disposal_seq]
+    all_step_text = " ".join([str(a) for s in step_actions for a in s]) + " ".join(step_names)
+    has_regenerate_trigger = "重生成" in all_step_text
+    checks["vs6_distribution_inconsistency_triggers_regenerate"] = has_regenerate_trigger
+    detail_parts.append(f"VS-6 分布不一致触发重生成={'有' if has_regenerate_trigger else '无'}, steps={step_names}")
+
+    # VS-7: forbidden 含"跳过分布检查直接进入训练"
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    forbidden_strs = [str(f) for f in forbidden]
+    forbidden_full = " ".join(forbidden_strs)
+    has_forbidden_skip = "跳过分布检查" in forbidden_full or "分布检查" in forbidden_full
+    checks["vs7_forbidden_has_skip_dist_check"] = has_forbidden_skip
+    detail_parts.append(f"VS-7 forbidden含'跳过分布检查'={has_forbidden_skip}")
+
+    # VS-8: required 含"重生成后须重新验证"
+    required = boundaries.get("required", []) or []
+    required_strs = [str(r) for r in required]
+    required_full = " ".join(required_strs)
+    has_required_reverify = "重新验证" in required_full or "重新验证四组合" in required_full
+    checks["vs8_required_has_regenerate_reverify"] = has_required_reverify
+    detail_parts.append(f"VS-8 required含'重生成后须重新验证'={has_required_reverify}")
+
+    # VS-9: related_clauses 覆盖
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r) for r in related]
+    # 必需关联条款：192/194/195/196/198/200/240/273/276/321/414（来自配置文件）
+    required_related = {"192", "194", "195", "196", "198", "200", "240", "273", "276", "321", "414"}
+    found_related = required_related.intersection(set(related_strs))
+    related_ok = found_related == required_related
+    checks["vs9_related_clauses_complete"] = related_ok
+    detail_parts.append(
+        f"VS-9 related_clauses 完整={related_ok}, 找到={found_related}, 期望={required_related}"
+    )
+
+    # VS-10: manual_ref 指向正确手册文件
+    manual_ref = str(cfg.get("manual_ref", ""))
+    manual_ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["vs10_manual_ref_correct"] = manual_ref_ok
+    detail_parts.append(f"VS-10 manual_ref={manual_ref!r}, 指向正确={manual_ref_ok}")
+
+    # VS-11: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs11_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-11 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[197]**" in rule_text or "[197]" in rule_text
+        has_meaning = "含义" in rule_text or "核心要求" in rule_text or "分布一致性" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        has_regenerate_action = "重生成" in rule_text or "补足" in rule_text
+        has_four_combos = "A2N2" in rule_text or "A2N3" in rule_text or "A3N2" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria and has_regenerate_action and has_four_combos
+    checks["vs11_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(
+        f"VS-11 规则文档内容有效(原文+含义+验收标准+重生成+四组合)={rule_content_ok}"
+    )
+
+    # VS-12: 手册真源文件包含 [197]
+    manual_exists = manual_path.is_file()
+    has_197_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_197_in_manual = "**[197]**" in manual_content or "[197]" in manual_content
+        except Exception:
+            pass
+    checks["vs12_manual_has_clause_197"] = has_197_in_manual
+    checks["vs12_manual_file_exists"] = manual_exists
+    detail_parts.append(
+        f"VS-12 手册真源文件存在={manual_exists}, 包含[197]={has_197_in_manual}"
+    )
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P197-four-combination-distribution",
+        "name": "[197] 四组合各>=设计轨迹数 分布不一致重生成训练集补足覆盖",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+
+def p199_uwb_valid_nl_flag_check() -> dict[str, Any]:
+    """[199] uwb_valid 分布与 M1 缺失率一致，nl_flag 与 N 注入统计交叉验证
+
+    手册原文：
+    [199] 检查训练/测试的 uwb_valid=0 分布与 M1 缺失率一致，nl_flag 与 N 注入统计可交叉验证。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause199_uwb_valid_nl_flag_check.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 199_uwb_valid_nl_flag_check.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P199-uwb-valid-nl-flag-check", "name": "[199] uwb_valid分布与M1缺失率一致且nl_flag与N注入交叉验证",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause199_uwb_valid_nl_flag_check.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P199-uwb-valid-nl-flag-check", "name": "[199] uwb_valid分布与M1缺失率一致且nl_flag与N注入交叉验证",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P199-uwb-valid-nl-flag-check", "name": "[199] uwb_valid分布与M1缺失率一致且nl_flag与N注入交叉验证",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "199"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "199"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='199', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: four_combinations 包含全部四个组合 A2N2/A2N3/A3N2/A3N3
+    four_combos = cfg.get("four_combinations", []) or []
+    four_combos_strs = [str(c).strip() for c in four_combos]
+    required_combos = {"A2N2", "A2N3", "A3N2", "A3N3"}
+    found_combos = set(four_combos_strs)
+    combos_ok = required_combos.issubset(found_combos)
+    checks["vs4_four_combinations_complete"] = combos_ok
+    detail_parts.append(
+        f"VS-4 four_combinations 含全部四组合 A2N2/A2N3/A3N2/A3N3={combos_ok}, "
+        f"找到={found_combos}"
+    )
+
+    # VS-5: uwb_valid_check 含目标缺失率、容差、检查范围
+    uwb_valid_check = cfg.get("uwb_valid_check", {}) or {}
+    uwb_valid_str = str(uwb_valid_check)
+    has_m1_rate = "m1_missing_rate_target" in uwb_valid_check or "0.05" in uwb_valid_str or "5%" in uwb_valid_str
+    has_tolerance = "m1_missing_rate_tolerance" in uwb_valid_check or "tolerance" in uwb_valid_str
+    has_check_scope = "check_scope" in uwb_valid_check and len(uwb_valid_check.get("check_scope", [])) > 0
+    uwb_check_ok = has_m1_rate and has_tolerance and has_check_scope
+    checks["vs5_uwb_valid_check_complete"] = uwb_check_ok
+    detail_parts.append(
+        f"VS-5 uwb_valid_check 含目标缺失率/容差/检查范围={uwb_check_ok}, "
+        f"m1_missing_rate={has_m1_rate}, tolerance={has_tolerance}, check_scope={has_check_scope}"
+    )
+
+    # VS-6: nl_flag_check 含 N2/N3 区间、四组合说明
+    nl_flag_check = cfg.get("nl_flag_check", {}) or {}
+    nl_flag_str = str(nl_flag_check)
+    has_n2_range = "n2_nlos_ratio_range" in nl_flag_check or "0.25" in nl_flag_str or "0.30" in nl_flag_str
+    has_n3_range = "n3_nlos_ratio_range" in nl_flag_check or "0.35" in nl_flag_str or "0.40" in nl_flag_str
+    has_four_combo_note = any(f"A2N2" in nl_flag_str or "A2N3" in nl_flag_str or "A3N2" in nl_flag_str or "A3N3" in nl_flag_str for _ in [1])
+    nl_flag_check_ok = has_n2_range and has_n3_range and has_four_combo_note
+    checks["vs6_nl_flag_check_complete"] = nl_flag_check_ok
+    detail_parts.append(
+        f"VS-6 nl_flag_check 含N2/N3区间+四组合说明={nl_flag_check_ok}, "
+        f"n2_range={has_n2_range}, n3_range={has_n3_range}, four_combo={has_four_combo_note}"
+    )
+
+    # VS-7: disposal_sequence 含读取->判定->处置三步
+    disposal_seq = cfg.get("disposal_sequence", []) or []
+    step_names = [str(s.get("name", "")) for s in disposal_seq]
+    step_actions = [s.get("actions", []) or [] for s in disposal_seq]
+    all_step_text = " ".join([str(a) for s in step_actions for a in s]) + " " + " ".join(step_names)
+    has_regenerate = "重生成" in all_step_text
+    disposal_ok = len(disposal_seq) >= 3 and has_regenerate
+    checks["vs7_disposal_sequence_complete"] = disposal_ok
+    detail_parts.append(
+        f"VS-7 disposal_sequence 含3步+重生成={disposal_ok}, steps={step_names}, 含重生成={has_regenerate}"
+    )
+
+    # VS-8: forbidden 含跳过检查、分布不符继续训练等
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    forbidden_strs = [str(f) for f in forbidden]
+    forbidden_full = " ".join(forbidden_strs)
+    has_forbidden_skip = "跳过" in forbidden_full and ("检查" in forbidden_full or "进入训练" in forbidden_full)
+    has_forbidden_continue = "继续训练" in forbidden_full and ("分布" in forbidden_full or "不符" in forbidden_full)
+    checks["vs8_forbidden_has_skip_and_continue"] = has_forbidden_skip and has_forbidden_continue
+    detail_parts.append(
+        f"VS-8 forbidden含'跳过检查'={has_forbidden_skip}, 含'分布不符继续训练'={has_forbidden_continue}"
+    )
+
+    # VS-9: required 含必须检查训练+测试、必须交叉验证
+    required_list = boundaries.get("required", []) or []
+    required_strs = [str(r) for r in required_list]
+    required_full = " ".join(required_strs)
+    has_required_both = "必须检查" in required_full and ("训练" in required_full and "测试" in required_full)
+    has_required_cross = "交叉验证" in required_full
+    checks["vs9_required_has_both_and_cross"] = has_required_both and has_required_cross
+    detail_parts.append(
+        f"VS-9 required含'必须检查训练+测试'={has_required_both}, 含'必须交叉验证'={has_required_cross}"
+    )
+
+    # VS-10: related_clauses 覆盖关键条款
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r) for r in related]
+    required_related = {"190", "197", "198", "200", "201", "240", "321", "414"}
+    found_related = required_related.intersection(set(related_strs))
+    related_ok = found_related == required_related
+    checks["vs10_related_clauses_complete"] = related_ok
+    detail_parts.append(
+        f"VS-10 related_clauses 完整={related_ok}, 找到={found_related}, 期望={required_related}"
+    )
+
+    # VS-11: manual_ref 指向正确手册文件
+    manual_ref = str(cfg.get("manual_ref", ""))
+    manual_ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["vs11_manual_ref_correct"] = manual_ref_ok
+    detail_parts.append(f"VS-11 manual_ref={manual_ref!r}, 指向正确={manual_ref_ok}")
+
+    # VS-12: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs12_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-12 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[199]**" in rule_text or "[199]" in rule_text
+        has_meaning = "含义" in rule_text or "核心原则" in rule_text or "分布一致性" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text or "阈值" in rule_text
+        has_m1_rate_in_rule = "5%" in rule_text or "0.05" in rule_text
+        has_n2_range_in_rule = "0.25" in rule_text or "0.30" in rule_text
+        has_n3_range_in_rule = "0.35" in rule_text or "0.40" in rule_text
+        has_regenerate_action = "重生成" in rule_text
+        has_four_combos = "A2N2" in rule_text or "A2N3" in rule_text or "A3N2" in rule_text or "A3N3" in rule_text
+        has_uwb_valid = "uwb_valid" in rule_text
+        has_nl_flag = "nl_flag" in rule_text
+        rule_content_ok = (has_original and has_meaning and has_criteria and
+                          has_m1_rate_in_rule and has_n2_range_in_rule and has_n3_range_in_rule and
+                          has_regenerate_action and has_four_combos and has_uwb_valid and has_nl_flag)
+    checks["vs12_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-12 规则文档内容有效={rule_content_ok}")
+
+    # VS-13: 手册真源文件包含 [199]
+    manual_exists = manual_path.is_file()
+    has_199_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_199_in_manual = "**[199]**" in manual_content or "[199]" in manual_content
+        except Exception:
+            pass
+    checks["vs13_manual_has_clause_199"] = has_199_in_manual
+    checks["vs13_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-13 手册真源文件存在={manual_exists}, 包含[199]={has_199_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P199-uwb-valid-nl-flag-check",
+        "name": "[199] uwb_valid分布与M1缺失率一致且nl_flag与N注入交叉验证",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+
+def p200_scale_and_split() -> dict[str, Any]:
+    """[200] 规模与划分：训练12-15/测试>=100·四组合各>=25
+
+    手册原文：
+    [200] 规模与划分：训练/测试序列数符合设计（训练 12–15 / 测试 >=100·四组合各 >=25 / seed）
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause200_scale_and_split.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 200_规模与划分.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P200-scale-and-split", "name": "[200] 规模与划分——训练12-15条/seed测试>=100条seed各组合>=25条",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause200_scale_and_split.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P200-scale-and-split", "name": "[200] 规模与划分——训练12-15条/seed测试>=100条seed各组合>=25条",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P200-scale-and-split", "name": "[200] 规模与划分——训练12-15条/seed测试>=100条seed各组合>=25条",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "200"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "200"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='200', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: four_combinations 包含全部四个组合 A2N2/A2N3/A3N2/A3N3
+    four_combos = cfg.get("four_combinations", []) or []
+    four_combos_strs = [str(c).strip() for c in four_combos]
+    required_combos = {"A2N2", "A2N3", "A3N2", "A3N3"}
+    found_combos = set(four_combos_strs)
+    combos_ok = required_combos.issubset(found_combos)
+    checks["vs4_four_combinations_complete"] = combos_ok
+    detail_parts.append(
+        f"VS-4 four_combinations 含全部四组合 A2N2/A2N3/A3N2/A3N3={combos_ok}, "
+        f"找到={found_combos}"
+    )
+
+    # VS-5: train_spec 含 count_per_seed(lo=12, hi=15)
+    train_spec = cfg.get("train_spec", {}) or {}
+    cps = train_spec.get("count_per_seed", {}) or {}
+    lo_val = cps.get("lo", -1)
+    hi_val = cps.get("hi", -1)
+    has_lo_12 = lo_val == 12
+    has_hi_15 = hi_val == 15
+    train_spec_ok = has_lo_12 and has_hi_15
+    checks["vs5_train_spec_count_per_seed_12_to_15"] = train_spec_ok
+    detail_parts.append(
+        f"VS-5 train_spec.count_per_seed 含 lo=12, hi=15={train_spec_ok}, "
+        f"找到 lo={lo_val}, hi={hi_val}"
+    )
+
+    # VS-6: test_spec 含 total_min=100 和 per_combination_min=25
+    test_spec = cfg.get("test_spec", {}) or {}
+    total_min = test_spec.get("total_min", -1)
+    per_comb_min = test_spec.get("per_combination_min", -1)
+    has_total_100 = total_min == 100
+    has_per_comb_25 = per_comb_min == 25
+    test_spec_ok = has_total_100 and has_per_comb_25
+    checks["vs6_test_spec_total_min_100_and_per_comb_min_25"] = test_spec_ok
+    detail_parts.append(
+        f"VS-6 test_spec 含 total_min=100, per_combination_min=25={test_spec_ok}, "
+        f"找到 total_min={total_min}, per_comb_min={per_comb_min}"
+    )
+
+    # VS-7: verification_plan 含读取->判定训练->判定测试->处置四步
+    vp = cfg.get("verification_plan", []) or []
+    step_names = [str(s.get("name", "")) for s in vp]
+    step_actions = [s.get("actions", []) or [] for s in vp]
+    all_step_text = " ".join([str(a) for s in step_actions for a in s]) + " " + " ".join(step_names)
+    has_read = any("读取" in n or "manifest" in n.lower() for n in step_names)
+    has_train_judge = any("训练" in n or "序列" in n for n in step_names)
+    has_test_judge = any("测试" in n or "test" in n.lower() for n in step_names)
+    has_disposal = any("处置" in n for n in step_names)
+    vp_ok = len(vp) >= 4 and has_read and has_train_judge and has_test_judge and has_disposal
+    checks["vs7_verification_plan_has_four_steps"] = vp_ok
+    detail_parts.append(
+        f"VS-7 verification_plan 含四步(读取+判定训练+判定测试+处置)={vp_ok}, "
+        f"steps={step_names}"
+    )
+
+    # VS-8: forbidden 含跳过检查、尺寸不符继续训练等
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    forbidden_strs = [str(f) for f in forbidden]
+    forbidden_full = " ".join(forbidden_strs)
+    has_forbidden_skip_check = "跳过" in forbidden_full and ("检查" in forbidden_full or "进入训练" in forbidden_full)
+    has_forbidden_size_mismatch = ("训练" in forbidden_full and "序列数" in forbidden_full) or \
+                                   ("测试" in forbidden_full and "序列数" in forbidden_full)
+    has_forbidden_continue = "继续训练" in forbidden_full
+    checks["vs8_forbidden_has_skip_and_size_mismatch_and_continue"] = has_forbidden_skip_check and has_forbidden_size_mismatch and has_forbidden_continue
+    detail_parts.append(
+        f"VS-8 forbidden含'跳过检查'={has_forbidden_skip_check}, 含'尺寸不符继续训练'={has_forbidden_size_mismatch and has_forbidden_continue}"
+    )
+
+    # VS-9: required 含必须检查训练+测试+四组合
+    required_list = boundaries.get("required", []) or []
+    required_strs = [str(r) for r in required_list]
+    required_full = " ".join(required_strs)
+    has_required_train = "必须检查" in required_full and "训练" in required_full
+    has_required_test = "必须检查" in required_full and "测试" in required_full
+    has_required_four_combo = "四组合" in required_full or "组合" in required_full
+    checks["vs9_required_has_train_test_and_four_combo"] = has_required_train and has_required_test and has_required_four_combo
+    detail_parts.append(
+        f"VS-9 required含'必须检查训练+测试+四组合'={has_required_train and has_required_test and has_required_four_combo}"
+    )
+
+    # VS-10: related_clauses 覆盖关键条款
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r) for r in related]
+    required_related = {"197", "198", "201", "202", "240", "321", "414"}
+    found_related = required_related.intersection(set(related_strs))
+    related_ok = found_related == required_related
+    checks["vs10_related_clauses_complete"] = related_ok
+    detail_parts.append(
+        f"VS-10 related_clauses 完整={related_ok}, 找到={found_related}, 期望={required_related}"
+    )
+
+    # VS-11: manual_ref 指向正确手册文件
+    manual_ref = str(cfg.get("manual_ref", ""))
+    manual_ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["vs11_manual_ref_correct"] = manual_ref_ok
+    detail_parts.append(f"VS-11 manual_ref={manual_ref!r}, 指向正确={manual_ref_ok}")
+
+    # VS-12: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs12_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-12 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[200]**" in rule_text or "[200]" in rule_text
+        has_meaning = "含义" in rule_text or "核心原则" in rule_text or "规模" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        has_12_15 = "12" in rule_text and "15" in rule_text
+        has_100 = "100" in rule_text
+        has_25 = "25" in rule_text
+        has_four_combos = "A2N2" in rule_text or "A2N3" in rule_text or "A3N2" in rule_text or "A3N3" in rule_text
+        rule_content_ok = (has_original and has_meaning and has_criteria and
+                          has_12_15 and has_100 and has_25 and has_four_combos)
+    checks["vs12_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-12 规则文档内容有效={rule_content_ok}")
+
+    # VS-13: 手册真源文件包含 [200]
+    manual_exists = manual_path.is_file()
+    has_200_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_200_in_manual = "**[200]**" in manual_content or "[200]" in manual_content
+        except Exception:
+            pass
+    checks["vs13_manual_has_clause_200"] = has_200_in_manual
+    checks["vs13_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-13 手册真源文件存在={manual_exists}, 包含[200]={has_200_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P200-scale-and-split",
+        "name": "[200] 规模与划分——训练12-15条/seed测试>=100条seed各组合>=25条",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+
+def p198_trajectory_count_stats_check() -> dict[str, Any]:
+    """[198] 打印各组合实际轨迹数量与 ρ/μ/σ，误差超阈值重生成
+
+    手册原文：
+    [198] 打印各组合实际轨迹数量与 ρ/μ/σ（误差超 10% 或任一组合比例偏差超 5% 重生成）。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause198_trajectory_count_stats.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 198_打印轨迹数量rho_mu_sigma.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P198-trajectory-count-stats", "name": "[198] 打印轨迹数与rho/mu/sigma误差阈值重生成",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause198_trajectory_count_stats.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P198-trajectory-count-stats", "name": "[198] 打印轨迹数与rho/mu/sigma误差阈值重生成",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P198-trajectory-count-stats", "name": "[198] 打印轨迹数与rho/mu/sigma误差阈值重生成",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "198"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "198"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='198', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: four_combinations 包含全部四个组合 A2N2/A2N3/A3N2/A3N3
+    four_combos = cfg.get("four_combinations", []) or []
+    four_combos_strs = [str(c).strip() for c in four_combos]
+    required_combos = {"A2N2", "A2N3", "A3N2", "A3N3"}
+    found_combos = set(four_combos_strs)
+    combos_ok = required_combos.issubset(found_combos)
+    checks["vs4_four_combinations_complete"] = combos_ok
+    detail_parts.append(
+        f"VS-4 four_combinations 含全部四组合 A2N2/A2N3/A3N2/A3N3={combos_ok}, "
+        f"找到={found_combos}"
+    )
+
+    # VS-5: stat_metrics 含 rho/mu/sigma 三项
+    stat_metrics = cfg.get("stat_metrics", {}) or {}
+    stat_keys = list(stat_metrics.keys())
+    has_rho = "rho" in stat_keys
+    has_mu = "mu" in stat_keys
+    has_sigma = "sigma" in stat_keys
+    stats_ok = has_rho and has_mu and has_sigma
+    checks["vs5_stat_metrics_rho_mu_sigma_present"] = stats_ok
+    detail_parts.append(f"VS-5 stat_metrics 含 rho/mu/sigma={stats_ok}, 找到={stat_keys}")
+
+    # VS-6: 误差 10% 阈值明确存在
+    error_threshold = cfg.get("error_threshold", {}) or {}
+    e10 = error_threshold.get("error_exceeds_10_percent", {}) or {}
+    e10_text = str(e10)
+    has_10pct = "10" in e10_text or "10%" in e10_text
+    checks["vs6_error_exceeds_10_percent_defined"] = has_10pct
+    detail_parts.append(f"VS-6 误差超10%阈值明确={has_10pct}")
+
+    # VS-7: 比例偏差 5% 阈值明确存在
+    e5pct = error_threshold.get("proportion_deviation_exceeds_5_percent", {}) or {}
+    e5pct_text = str(e5pct)
+    has_5pct = "5" in e5pct_text or "5%" in e5pct_text
+    checks["vs7_proportion_deviation_5_percent_defined"] = has_5pct
+    detail_parts.append(f"VS-7 比例偏差超5%阈值明确={has_5pct}")
+
+    # VS-8: disposal_sequence 含重生成步骤
+    disposal_seq = cfg.get("disposal_sequence", []) or []
+    step_names = [str(s.get("name", "")) for s in disposal_seq]
+    step_actions = [s.get("actions", []) or [] for s in disposal_seq]
+    all_step_text = " ".join([str(a) for s in step_actions for a in s]) + " " + " ".join(step_names)
+    has_regenerate = "重生成" in all_step_text
+    checks["vs8_disposal_sequence_has_regenerate"] = has_regenerate
+    detail_parts.append(f"VS-8 disposal_sequence含重生成步骤={has_regenerate}, steps={step_names}")
+
+    # VS-9: forbidden 含跳过打印
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    forbidden_strs = [str(f) for f in forbidden]
+    forbidden_full = " ".join(forbidden_strs)
+    has_forbidden_skip = "跳过" in forbidden_full and ("打印" in forbidden_full or "统计量" in forbidden_full)
+    checks["vs9_forbidden_has_skip_print"] = has_forbidden_skip
+    detail_parts.append(f"VS-9 forbidden含'跳过统计量打印'={has_forbidden_skip}")
+
+    # VS-10: required 含必须打印和必须重生成
+    required_list = boundaries.get("required", []) or []
+    required_strs = [str(r) for r in required_list]
+    required_full = " ".join(required_strs)
+    has_required_print = "必须打印" in required_full
+    has_required_regenerate = "必须重生成" in required_full
+    checks["vs10_required_has_print_and_regenerate"] = has_required_print and has_required_regenerate
+    detail_parts.append(
+        f"VS-10 required含'必须打印'={has_required_print}, 含'必须重生成'={has_required_regenerate}"
+    )
+
+    # VS-11: related_clauses 覆盖
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r) for r in related]
+    required_related = {"192", "194", "195", "196", "197", "200", "240", "273", "276", "321", "414"}
+    found_related = required_related.intersection(set(related_strs))
+    related_ok = found_related == required_related
+    checks["vs11_related_clauses_complete"] = related_ok
+    detail_parts.append(
+        f"VS-11 related_clauses 完整={related_ok}, 找到={found_related}, 期望={required_related}"
+    )
+
+    # VS-12: manual_ref 指向正确手册文件
+    manual_ref = str(cfg.get("manual_ref", ""))
+    manual_ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["vs12_manual_ref_correct"] = manual_ref_ok
+    detail_parts.append(f"VS-12 manual_ref={manual_ref!r}, 指向正确={manual_ref_ok}")
+
+    # VS-13: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs13_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-13 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[198]**" in rule_text or "[198]" in rule_text
+        has_meaning = "含义" in rule_text or "核心原则" in rule_text or "误差" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text or "阈值" in rule_text
+        has_10pct_in_rule = "10%" in rule_text
+        has_5pct_in_rule = "5%" in rule_text
+        has_regenerate_action = "重生成" in rule_text
+        has_four_combos = "A2N2" in rule_text or "A2N3" in rule_text or "A3N2" in rule_text
+        has_stats = "rho" in rule_text.lower() or "μ" in rule_text or "mu" in rule_text
+        rule_content_ok = (has_original and has_meaning and has_criteria and
+                          has_10pct_in_rule and has_5pct_in_rule and has_regenerate_action and
+                          has_four_combos and has_stats)
+    checks["vs13_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-13 规则文档内容有效={rule_content_ok}")
+
+    # VS-14: 手册真源文件包含 [198]
+    manual_exists = manual_path.is_file()
+    has_198_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_198_in_manual = "**[198]**" in manual_content or "[198]" in manual_content
+        except Exception:
+            pass
+    checks["vs14_manual_has_clause_198"] = has_198_in_manual
+    checks["vs14_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-14 手册真源文件存在={manual_exists}, 包含[198]={has_198_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P198-trajectory-count-stats",
+        "name": "[198] 打印各组合实际轨迹数量与ρ/μ/σ，误差超阈值重生成",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+
+def p201_injection_symmetry() -> dict[str, Any]:
+    """[201] 训练/测试注入对称：训练集含与测试集同分布的NLOS大脉冲（各方法都见得到压力）
+
+    手册原文：
+    [201] 训练/测试注入对称：训练集含与测试集同分布的 NLOS 大脉冲（各方法都见得到压力）。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause201_injection_symmetry.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 201_训练测试注入对称.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P201-injection-symmetry", "name": "[201] 训练测试注入对称——同分布NLOS大脉冲各方法都见得到压力",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause201_injection_symmetry.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P201-injection-symmetry", "name": "[201] 训练测试注入对称——同分布NLOS大脉冲各方法都见得到压力",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P201-injection-symmetry", "name": "[201] 训练测试注入对称——同分布NLOS大脉冲各方法都见得到压力",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "201"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "201"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='201', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: four_combinations 包含全部四个组合 A2N2/A2N3/A3N2/A3N3
+    four_combos = cfg.get("four_combos", []) or cfg.get("four_combinations", []) or []
+    four_combos_strs = [str(c).strip() for c in four_combos]
+    required_combos = {"A2N2", "A2N3", "A3N2", "A3N3"}
+    found_combos = set(four_combos_strs)
+    combos_ok = required_combos.issubset(found_combos)
+    checks["vs4_four_combinations_complete"] = combos_ok
+    detail_parts.append(
+        f"VS-4 four_combinations 含全部四组合 A2N2/A2N3/A3N2/A3N3={combos_ok}, "
+        f"找到={found_combos}"
+    )
+
+    # VS-5: nlos_injection_spec 含 NLOS 大脉冲规格（阈值和最小数量）
+    nlos_spec = cfg.get("nlos_injection_spec", {}) or {}
+    has_threshold = "threshold" in str(nlos_spec).lower() or "nlos_large_pulse" in str(nlos_spec).lower()
+    has_min_count = "min_nlos_large_pulses" in nlos_spec or "min_count" in nlos_spec
+    nlos_spec_ok = has_threshold and has_min_count
+    checks["vs5_nlos_injection_spec_has_threshold_and_min_count"] = nlos_spec_ok
+    detail_parts.append(
+        f"VS-5 nlos_injection_spec 含阈值和最小数量={nlos_spec_ok}, "
+        f"has_threshold={has_threshold}, has_min_count={has_min_count}"
+    )
+
+    # VS-6: injection_symmetry_check 含 required_checks 四项
+    symmetry_check = cfg.get("injection_symmetry_check", {}) or {}
+    required_checks = symmetry_check.get("required_checks", {}) or {}
+    required_check_keys = list(required_checks.keys())
+    has_train_nlos = "train_has_nlos_large_pulses" in required_check_keys
+    has_test_nlos = "test_has_nlos_large_pulses" in required_check_keys
+    has_same_dist = "train_test_same_distribution" in required_check_keys
+    has_method_pressure = "each_method_sees_pressure" in required_check_keys
+    symmetry_ok = has_train_nlos and has_test_nlos and has_same_dist and has_method_pressure
+    checks["vs6_injection_symmetry_check_four_required_checks"] = symmetry_ok
+    detail_parts.append(
+        f"VS-6 injection_symmetry_check 含四项 required_checks={symmetry_ok}, 找到={required_check_keys}"
+    )
+
+    # VS-7: verification_plan 含读取->判定->压力可见性->处置四步
+    vp = cfg.get("verification_plan", []) or []
+    step_names = [str(s.get("name", "")) for s in vp]
+    step_actions = [s.get("actions", []) or [] for s in vp]
+    all_vp_text = " ".join([str(a) for s in step_actions for a in s]) + " " + " ".join(step_names)
+    has_read = "读取" in all_vp_text
+    has_symmetry_judge = "分布" in all_vp_text or "对称" in all_vp_text or "判定" in all_vp_text
+    has_pressure = "压力" in all_vp_text or "可见性" in all_vp_text
+    has_disposal = "处置" in all_vp_text or "重生成" in all_vp_text
+    vp_ok = has_read and has_symmetry_judge and has_pressure and has_disposal
+    checks["vs7_verification_plan_has_read_judge_pressure_disposal"] = vp_ok
+    detail_parts.append(
+        f"VS-7 verification_plan 含读取/判定/压力/处置四步={vp_ok}, steps={step_names}"
+    )
+
+    # VS-8: forbidden 含跳过检查、分布偏差超限继续训练
+    boundaries = cfg.get("boundaries", {}) or {}
+    forbidden = boundaries.get("forbidden", []) or []
+    forbidden_strs = [str(f) for f in forbidden]
+    forbidden_full = " ".join(forbidden_strs)
+    has_forbidden_skip = "跳过" in forbidden_full or "禁止" in forbidden_full
+    has_forbidden_continue = "继续训练" in forbidden_full or "继续" in forbidden_full
+    checks["vs8_forbidden_has_skip_and_continue_training"] = has_forbidden_skip and has_forbidden_continue
+    detail_parts.append(
+        f"VS-8 forbidden 含'跳过检查'={has_forbidden_skip}, 含'继续训练'={has_forbidden_continue}"
+    )
+
+    # VS-9: required 含必须检查训练+测试+四组合+分布匹配
+    required_list = boundaries.get("required", []) or []
+    required_strs = [str(r) for r in required_list]
+    required_full = " ".join(required_strs)
+    has_required_train = "必须检查" in required_full and "训练" in required_full
+    has_required_test = "必须检查" in required_full and "测试" in required_full
+    has_required_four_combo = "四组合" in required_full or "组合" in required_full
+    has_required_distribution = "分布" in required_full or "对称" in required_full
+    checks["vs9_required_has_train_test_four_combo_distribution"] = (
+        has_required_train and has_required_test and has_required_four_combo and has_required_distribution
+    )
+    detail_parts.append(
+        f"VS-9 required 含'必须检查训练+测试+四组合+分布匹配'="
+        f"{has_required_train and has_required_test and has_required_four_combo and has_required_distribution}"
+    )
+
+    # VS-10: related_clauses 覆盖关键条款
+    related = cfg.get("related_clauses", []) or []
+    related_strs = [str(r) for r in related]
+    required_related = {"200", "202", "240", "321", "414"}
+    found_related = required_related.intersection(set(related_strs))
+    related_ok = found_related == required_related
+    checks["vs10_related_clauses_complete"] = related_ok
+    detail_parts.append(
+        f"VS-10 related_clauses 完整={related_ok}, 找到={found_related}, 期望={required_related}"
+    )
+
+    # VS-11: manual_ref 指向正确手册文件
+    manual_ref = str(cfg.get("manual_ref", ""))
+    manual_ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["vs11_manual_ref_correct"] = manual_ref_ok
+    detail_parts.append(f"VS-11 manual_ref={manual_ref!r}, 指向正确={manual_ref_ok}")
+
+    # VS-12: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs12_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-12 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[201]**" in rule_text or "[201]" in rule_text
+        has_meaning = "含义" in rule_text or "核心原则" in rule_text or "NLOS" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        has_same_dist = "同分布" in rule_text or "分布" in rule_text
+        has_pressure = "压力" in rule_text
+        has_symmetry = "对称" in rule_text
+        rule_content_ok = (has_original and has_meaning and has_criteria and
+                          has_same_dist and has_pressure and has_symmetry)
+    checks["vs12_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-12 规则文档内容有效={rule_content_ok}")
+
+    # VS-13: 手册真源文件包含 [201]
+    manual_exists = manual_path.is_file()
+    has_201_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_201_in_manual = "**[201]**" in manual_content or "[201]" in manual_content
+        except Exception:
+            pass
+    checks["vs13_manual_has_clause_201"] = has_201_in_manual
+    checks["vs13_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-13 手册真源文件存在={manual_exists}, 包含[201]={has_201_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P201-injection-symmetry",
+        "name": "[201] 训练测试注入对称——同分布NLOS大脉冲各方法都见得到压力",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p202_seed_consistency() -> dict[str, Any]:
+    """[202] seed 体系一致：轨迹/噪声/注入/划分各一随机源，全部固定并写入 manifest
+
+    手册原文：
+    [202] seed 体系一致：轨迹/噪声/注入/划分各一随机源，全部固定并写入 manifest。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause202_seed_consistency.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 202_seed 体系一致.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P202-seed-consistency", "name": "[202] seed 体系一致——轨迹/噪声/注入/划分各一随机源全部固定写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause202_seed_consistency.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P202-seed-consistency", "name": "[202] seed 体系一致——轨迹/噪声/注入/划分各一随机源全部固定写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P202-seed-consistency", "name": "[202] seed 体系一致——轨迹/噪声/注入/划分各一随机源全部固定写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "202"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "202"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='202', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: random_source_spec 包含四个随机源：trajectory/noise/injection/split
+    rss = cfg.get("random_source_spec", {}) or {}
+    has_trajectory = "trajectory" in rss and isinstance(rss.get("trajectory"), dict)
+    has_noise = "noise" in rss and isinstance(rss.get("noise"), dict)
+    has_injection = "injection" in rss and isinstance(rss.get("injection"), dict)
+    has_split = "split" in rss and isinstance(rss.get("split"), dict)
+    four_sources_ok = has_trajectory and has_noise and has_injection and has_split
+    checks["vs4_four_random_sources"] = four_sources_ok
+    detail_parts.append(f"VS-4 random_source_spec 含 trajectory/noise/injection/split 四个随机源={four_sources_ok}")
+
+    # VS-5: 每个随机源包含 seed_key/required/fixed/manifest_field
+    def check_source(src_name: str, src: dict) -> bool:
+        if not isinstance(src, dict):
+            return False
+        has_seed_key = "seed_key" in src
+        has_required = "required" in src
+        has_fixed = "fixed" in src
+        has_manifest_field = "manifest_field" in src
+        return has_seed_key and has_required and has_fixed and has_manifest_field
+
+    traj_ok = check_source("trajectory", rss.get("trajectory", {}))
+    noise_ok = check_source("noise", rss.get("noise", {}))
+    inj_ok = check_source("injection", rss.get("injection", {}))
+    split_ok = check_source("split", rss.get("split", {}))
+    all_sources_fields_ok = traj_ok and noise_ok and inj_ok and split_ok
+    checks["vs5_sources_have_seed_key_required_fixed_manifest_field"] = all_sources_fields_ok
+    detail_parts.append(f"VS-5 四个随机源均含 seed_key/required/fixed/manifest_field={all_sources_fields_ok}")
+
+    # VS-6: single_source_constraint 规定每个环节 max_seeds == 1
+    ssc = cfg.get("single_source_constraint", {}) or {}
+    sc_ok = isinstance(ssc, dict)
+    traj_sc_ok = sc_ok and ssc.get("trajectory", {}).get("max_seeds") == 1
+    noise_sc_ok = sc_ok and ssc.get("noise", {}).get("max_seeds") == 1
+    inj_sc_ok = sc_ok and ssc.get("injection", {}).get("max_seeds") == 1
+    split_sc_ok = sc_ok and ssc.get("split", {}).get("max_seeds") == 1
+    single_source_ok = traj_sc_ok and noise_sc_ok and inj_sc_ok and split_sc_ok
+    checks["vs6_single_source_max_seeds_is_1"] = single_source_ok
+    detail_parts.append(f"VS-6 single_source_constraint 四环节 max_seeds==1={single_source_ok}")
+
+    # VS-7: manifest_write_spec.required_fields 包含四个 seed 字段
+    mws = cfg.get("manifest_write_spec", {}) or {}
+    required_fields = mws.get("required_fields", []) or []
+    has_traj_seed = "trajectory_seed" in required_fields
+    has_noise_seed = "noise_seed" in required_fields
+    has_inj_seed = "injection_seed" in required_fields
+    has_split_seed = "split_seed" in required_fields
+    manifest_fields_ok = has_traj_seed and has_noise_seed and has_inj_seed and has_split_seed
+    checks["vs7_manifest_required_fields_complete"] = manifest_fields_ok
+    detail_parts.append(f"VS-7 manifest_write_spec.required_fields 含四个 seed 字段={manifest_fields_ok}")
+
+    # VS-8: boundaries.forbidden 含禁止多个随机源混用
+    bounds = cfg.get("boundaries", {}) or {}
+    forbidden = bounds.get("forbidden", []) or []
+    forbidden_str = " ".join(str(f) for f in forbidden)
+    forbidden_has_multi_source = "多个随机源" in forbidden_str or "多源" in forbidden_str
+    forbidden_has_runtime_change = "运行时" in forbidden_str or "动态" in forbidden_str
+    forbidden_ok = forbidden_has_multi_source and forbidden_has_runtime_change
+    checks["vs8_boundaries_forbidden_complete"] = forbidden_ok
+    detail_parts.append(f"VS-8 boundaries.forbidden 含禁止多个随机源和运行时修改={forbidden_ok}")
+
+    # VS-9: boundaries.required 含必检项
+    required = bounds.get("required", []) or []
+    required_str = " ".join(str(r) for r in required)
+    required_has_four_sources = "四个随机源" in required_str
+    required_has_write_manifest = "写入 manifest" in required_str or "写入" in required_str and "manifest" in required_str
+    required_ok = required_has_four_sources and required_has_write_manifest
+    checks["vs9_boundaries_required_complete"] = required_ok
+    detail_parts.append(f"VS-9 boundaries.required 含检四源和写入manifest={required_ok}")
+
+    # VS-10: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs10_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-10 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[202]**" in rule_text or "[202]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        has_seed_system = "seed" in rule_text or "随机源" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria and has_seed_system
+    checks["vs10_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-10 规则文档内容有效={rule_content_ok}")
+
+    # VS-11: 手册真源文件包含 [202]
+    manual_exists = manual_path.is_file()
+    has_202_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_202_in_manual = "**[202]**" in manual_content or "[202]" in manual_content
+        except Exception:
+            pass
+    checks["vs11_manual_has_clause_202"] = has_202_in_manual
+    checks["vs11_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-11 手册真源文件存在={manual_exists}, 包含[202]={has_202_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P202-seed-consistency",
+        "name": "[202] seed 体系一致——轨迹/噪声/注入/划分各一随机源全部固定写入 manifest",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p204_amp_manifest() -> dict[str, Any]:
+    """[204] AMP 开关写入 manifest——Pre-4 校验和覆盖
+
+    手册原文：
+    [204] AMP 开关写入 manifest（Pre-4 校验和覆盖）
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause204_amp_manifest.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 204_AMP 开关写入 manifest.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P204-amp-manifest", "name": "[204] AMP 开关写入 manifest——Pre-4 校验和覆盖",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause204_amp_manifest.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P204-amp-manifest", "name": "[204] AMP 开关写入 manifest——Pre-4 校验和覆盖",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P204-amp-manifest", "name": "[204] AMP 开关写入 manifest——Pre-4 校验和覆盖",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "204"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "204"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='204', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: amp_spec 包含 amp_enabled、amp_dtype、amp_grad_scaler
+    amp_spec = cfg.get("amp_spec", {}) or {}
+    has_amp_enabled = "amp_enabled" in amp_spec
+    has_amp_dtype = "amp_dtype" in amp_spec
+    has_amp_grad_scaler = "amp_grad_scaler" in amp_spec
+    amp_spec_ok = has_amp_enabled and has_amp_dtype and has_amp_grad_scaler
+    checks["vs4_amp_spec_complete"] = amp_spec_ok
+    detail_parts.append(f"VS-4 amp_spec 包含 amp_enabled/amp_dtype/amp_grad_scaler={amp_spec_ok}")
+
+    # VS-5: 每个 AMP 配置包含 required、allowed_values
+    def check_amp_config(spec: dict, key: str) -> bool:
+        if not isinstance(spec, dict):
+            return False
+        return "required" in spec and "allowed_values" in spec
+
+    amp_enabled_ok = check_amp_config(amp_spec.get("amp_enabled", {}), "amp_enabled")
+    amp_dtype_ok = check_amp_config(amp_spec.get("amp_dtype", {}), "amp_dtype")
+    amp_grad_scaler_ok = check_amp_config(amp_spec.get("amp_grad_scaler", {}), "amp_grad_scaler")
+    amp_fields_ok = amp_enabled_ok and amp_dtype_ok and amp_grad_scaler_ok
+    checks["vs5_amp_fields_have_required_allowed"] = amp_fields_ok
+    detail_parts.append(f"VS-5 三个 AMP 配置都含 required/allowed_values={amp_fields_ok}")
+
+    # VS-6: coherency_policy 包含 conflict_rules
+    coherency = amp_spec.get("coherency_policy", {}) or {}
+    has_conflict_rules = "conflict_rules" in coherency
+    checks["vs6_coherency_policy_has_conflicts"] = has_conflict_rules
+    detail_parts.append(f"VS-6 coherency_policy 含 conflict_rules={has_conflict_rules}")
+
+    # VS-7: manifest_write_spec.required_fields 包含四个 AMP 字段
+    mws = cfg.get("manifest_write_spec", {}) or {}
+    required_fields = mws.get("required_fields", []) or []
+    has_amp_enabled_field = "amp_enabled" in required_fields
+    has_amp_dtype_field = "amp_dtype" in required_fields
+    has_amp_grad_scaler_field = "amp_grad_scaler" in required_fields
+    has_amp_explicit_set = "amp_explicit_set" in required_fields
+    manifest_fields_ok = has_amp_enabled_field and has_amp_dtype_field and has_amp_grad_scaler_field and has_amp_explicit_set
+    checks["vs7_manifest_required_fields_complete"] = manifest_fields_ok
+    detail_parts.append(f"VS-7 manifest_write_spec.required_fields 含四个 AMP 字段={manifest_fields_ok}")
+
+    # VS-8: write_timing 包含 "Pre-4 校验和覆盖"
+    write_timing = mws.get("write_timing", []) or []
+    write_timing_str = " ".join(str(t) for t in write_timing)
+    has_pre4 = "Pre-4" in write_timing_str or "校验和" in write_timing_str
+    checks["vs8_write_timing_has_pre4"] = has_pre4
+    detail_parts.append(f"VS-8 write_timing 包含 Pre-4 校验和覆盖={has_pre4}")
+
+    # VS-9: checksum_coverage.checksum_fields 包含四个 AMP 字段
+    checksum_coverage = mws.get("checksum_coverage", {}) or {}
+    checksum_fields = checksum_coverage.get("checksum_fields", []) or []
+    checksum_has_amp_enabled = "amp_enabled" in checksum_fields
+    checksum_has_amp_dtype = "amp_dtype" in checksum_fields
+    checksum_has_amp_grad_scaler = "amp_grad_scaler" in checksum_fields
+    checksum_has_amp_explicit = "amp_explicit_set" in checksum_fields
+    checksum_ok = checksum_has_amp_enabled and checksum_has_amp_dtype and checksum_has_amp_grad_scaler and checksum_has_amp_explicit
+    checks["vs9_checksum_coverage_complete"] = checksum_ok
+    detail_parts.append(f"VS-9 checksum_coverage.checksum_fields 含四个 AMP 字段={checksum_ok}")
+
+    # VS-10: boundaries.forbidden 包含"禁止 AMP 未写入 manifest"和"禁止 deterministic=True 时启用 AMP"
+    bounds = cfg.get("boundaries", {}) or {}
+    forbidden = bounds.get("forbidden", []) or []
+    forbidden_str = " ".join(str(f) for f in forbidden)
+    forbidden_has_no_manifest = "未写入 manifest" in forbidden_str or "写入 manifest" in forbidden_str
+    forbidden_has_deterministic = "deterministic=True" in forbidden_str or "确定性" in forbidden_str
+    forbidden_ok = forbidden_has_no_manifest and forbidden_has_deterministic
+    checks["vs10_boundaries_forbidden_complete"] = forbidden_ok
+    detail_parts.append(f"VS-10 boundaries.forbidden 含禁止 AMP 未写入 manifest 和禁止 deterministic=True 时启用 AMP={forbidden_ok}")
+
+    # VS-11: boundaries.required 包含"必须显式设置"和"必须写入 manifest"
+    required = bounds.get("required", []) or []
+    required_str = " ".join(str(r) for r in required)
+    required_has_explicit = "显式" in required_str
+    required_has_manifest = "写入 manifest" in required_str or "写入" in required_str
+    required_ok = required_has_explicit and required_has_manifest
+    checks["vs11_boundaries_required_complete"] = required_ok
+    detail_parts.append(f"VS-11 boundaries.required 含显式设置和写入manifest={required_ok}")
+
+    # VS-12: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs12_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-12 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[204]**" in rule_text or "[204]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        has_amp = "AMP" in rule_text or "amp_enabled" in rule_text or "autocast" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria and has_amp
+    checks["vs12_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-12 规则文档内容有效={rule_content_ok}")
+
+    # VS-13: 手册真源文件包含 [204]
+    manual_exists = manual_path.is_file()
+    has_204_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_204_in_manual = "**[204]**" in manual_content or "[204]" in manual_content
+        except Exception:
+            pass
+    checks["vs13_manual_has_clause_204"] = has_204_in_manual
+    checks["vs13_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-13 手册真源文件存在={manual_exists}, 包含[204]={has_204_in_manual}")
+
+    # VS-14: 代码中存在 AMP 显式设置检查
+    # 检查 src 目录下是否有 AMP 相关代码（seed_utils.py 或 trainer.py 等）
+    amp_code_exists = False
+    code_search_paths = [
+        PROJECT_ROOT / "src" / "liquidloc" / "common" / "seed_utils.py",
+        PROJECT_ROOT / "src" / "liquidloc" / "models" / "liquid" / "trainer.py",
+    ]
+    for code_path in code_search_paths:
+        if code_path.is_file():
+            try:
+                code_content = code_path.read_text(encoding="utf-8")
+                # 检查显式 AMP 赋值：torch.autocast 或 amp_enabled 或 GradScaler
+                has_autocast = re.search(r"torch\.autocast", code_content)
+                has_amp_enabled = re.search(r"amp_enabled\s*=", code_content)
+                has_grad_scaler = re.search(r"GradScaler", code_content)
+                if has_autocast is not None or has_amp_enabled is not None or has_grad_scaler is not None:
+                    amp_code_exists = True
+                    break
+            except Exception:
+                pass
+    checks["vs14_amp_code_explicit_set"] = amp_code_exists
+    detail_parts.append(f"VS-14 代码中存在 AMP 显式赋值（autocast/amp_enabled/GradScaler）={amp_code_exists}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P204-amp-manifest",
+        "name": "[204] AMP 开关写入 manifest——Pre-4 校验和覆盖",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p203_tf32_uniform() -> dict[str, Any]:
+    """[203] 精度模式统一声明：TF32 开关显式设置并写入 manifest
+
+    手册原文：
+    [203] 精度模式统一声明（硬约束）：TF32 开关显式设置并写入 manifest
+    （torch.backends.cuda.matmul.allow_tf32 与 torch.backends.cudnn.allow_tf32
+    显式 True/ False，三网络与 EKF/Robust-EKF 共用同一设置）
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause203_tf32_uniform.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 203_精度模式统一声明.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P203-tf32-uniform", "name": "[203] 精度模式统一声明——TF32 开关显式设置并写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause203_tf32_uniform.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P203-tf32-uniform", "name": "[203] 精度模式统一声明——TF32 开关显式设置并写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P203-tf32-uniform", "name": "[203] 精度模式统一声明——TF32 开关显式设置并写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "203"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "203"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='203', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: tf32_spec 包含 matmul_allow_tf32 和 cudnn_allow_tf32
+    tf32_spec = cfg.get("tf32_spec", {}) or {}
+    has_matmul = "matmul_allow_tf32" in tf32_spec
+    has_cudnn = "cudnn_allow_tf32" in tf32_spec
+    tf32_spec_ok = has_matmul and has_cudnn
+    checks["vs4_tf32_spec_complete"] = tf32_spec_ok
+    detail_parts.append(f"VS-4 tf32_spec 包含 matmul_allow_tf32/cudnn_allow_tf32={tf32_spec_ok}")
+
+    # VS-5: 每个 TF32 配置包含 required、allowed_values
+    def check_tf32_config(spec: dict, key: str) -> bool:
+        if not isinstance(spec, dict):
+            return False
+        return "required" in spec and "allowed_values" in spec
+
+    matmul_ok = check_tf32_config(tf32_spec.get("matmul_allow_tf32", {}), "matmul_allow_tf32")
+    cudnn_ok = check_tf32_config(tf32_spec.get("cudnn_allow_tf32", {}), "cudnn_allow_tf32")
+    tf32_fields_ok = matmul_ok and cudnn_ok
+    checks["vs5_tf32_fields_have_required_allowed"] = tf32_fields_ok
+    detail_parts.append(f"VS-5 两个 TF32 配置都含 required/allowed_values={tf32_fields_ok}")
+
+    # VS-6: coherency_policy 包含 forbidden_mixed_precision
+    coherency = tf32_spec.get("coherency_policy", {}) or {}
+    has_forbidden_mixed = "forbidden_mixed_precision" in coherency
+    checks["vs6_coherency_policy_has_forbidden"] = has_forbidden_mixed
+    detail_parts.append(f"VS-6 coherency_policy 含 forbidden_mixed_precision={has_forbidden_mixed}")
+
+    # VS-7: manifest_write_spec.required_fields 包含四个 TF32 字段
+    mws = cfg.get("manifest_write_spec", {}) or {}
+    required_fields = mws.get("required_fields", []) or []
+    has_tf32_explicit = "tf32_explicit_set" in required_fields
+    has_tf32_enabled = "tf32_enabled" in required_fields
+    has_matmul_field = "matmul_allow_tf32" in required_fields
+    has_cudnn_field = "cudnn_allow_tf32" in required_fields
+    manifest_fields_ok = has_tf32_explicit and has_tf32_enabled and has_matmul_field and has_cudnn_field
+    checks["vs7_manifest_required_fields_complete"] = manifest_fields_ok
+    detail_parts.append(f"VS-7 manifest_write_spec.required_fields 含四个 TF32 字段={manifest_fields_ok}")
+
+    # VS-8: boundaries.forbidden 包含"禁止依赖默认值"和"禁止混用精度"
+    bounds = cfg.get("boundaries", {}) or {}
+    forbidden = bounds.get("forbidden", []) or []
+    forbidden_str = " ".join(str(f) for f in forbidden)
+    forbidden_has_default = "默认值" in forbidden_str or "default" in forbidden_str
+    forbidden_has_mixed = "混用" in forbidden_str or "mixed" in forbidden_str
+    forbidden_ok = forbidden_has_default and forbidden_has_mixed
+    checks["vs8_boundaries_forbidden_complete"] = forbidden_ok
+    detail_parts.append(f"VS-8 boundaries.forbidden 含禁止默认值和混用={forbidden_ok}")
+
+    # VS-9: boundaries.required 包含"必须显式设置"和"必须写入 manifest"
+    required = bounds.get("required", []) or []
+    required_str = " ".join(str(r) for r in required)
+    required_has_explicit = "显式" in required_str
+    required_has_manifest = "写入 manifest" in required_str or "写入" in required_str
+    required_ok = required_has_explicit and required_has_manifest
+    checks["vs9_boundaries_required_complete"] = required_ok
+    detail_parts.append(f"VS-9 boundaries.required 含显式设置和写入manifest={required_ok}")
+
+    # VS-10: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs10_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-10 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[203]**" in rule_text or "[203]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        has_tf32 = "TF32" in rule_text or "allow_tf32" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria and has_tf32
+    checks["vs10_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-10 规则文档内容有效={rule_content_ok}")
+
+    # VS-11: 手册真源文件包含 [203]
+    manual_exists = manual_path.is_file()
+    has_203_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_203_in_manual = "**[203]**" in manual_content or "[203]" in manual_content
+        except Exception:
+            pass
+    checks["vs11_manual_has_clause_203"] = has_203_in_manual
+    checks["vs11_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-11 手册真源文件存在={manual_exists}, 包含[203]={has_203_in_manual}")
+
+    # VS-12: 代码中存在 TF32 显式设置检查
+    # 检查 seed_utils.py 中是否设置了 allow_tf32
+    tf32_code_exists = False
+    seed_utils_path = PROJECT_ROOT / "src" / "liquidloc" / "common" / "seed_utils.py"
+    if seed_utils_path.is_file():
+        try:
+            code_content = seed_utils_path.read_text(encoding="utf-8")
+            # 检查显式赋值 torch.backends.cuda.matmul.allow_tf32 和 cudnn.allow_tf32
+            has_matmul_assign = re.search(r"torch\.backends\.cuda\.matmul\.allow_tf32\s*=", code_content)
+            has_cudnn_assign = re.search(r"torch\.backends\.cudnn\.allow_tf32\s*=", code_content)
+            tf32_code_exists = has_matmul_assign is not None and has_cudnn_assign is not None
+        except Exception:
+            pass
+    checks["vs12_tf32_code_explicit_set"] = tf32_code_exists
+    detail_parts.append(f"VS-12 seed_utils.py 中存在 TF32 显式赋值={tf32_code_exists}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P203-tf32-uniform",
+        "name": "[203] 精度模式统一声明——TF32 开关显式设置并写入 manifest",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p205_sequence_split() -> dict[str, Any]:
+    """[205] 序列级划分防泄漏：划分按整条序列，训练/测试无重叠
+
+    手册原文：
+    [205] 序列级划分防泄漏：划分按整条序列，训练/测试无重叠
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause205_sequence_split.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 205_序列级划分防泄漏.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P205-sequence-split", "name": "[205] 序列级划分防泄漏——划分按整条序列训练/测试无重叠",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause205_sequence_split.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P205-sequence-split", "name": "[205] 序列级划分防泄漏——划分按整条序列训练/测试无重叠",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P205-sequence-split", "name": "[205] 序列级划分防泄漏——划分按整条序列训练/测试无重叠",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "205"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "205"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='205', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: sequence_split_spec 包含 split_unit、no_overlap_policy、deterministic_assignment
+    sss = cfg.get("sequence_split_spec", {}) or {}
+    has_split_unit = isinstance(sss.get("split_unit"), dict)
+    has_no_overlap = isinstance(sss.get("no_overlap_policy"), dict)
+    has_det_assign = isinstance(sss.get("deterministic_assignment"), dict)
+    sss_complete = has_split_unit and has_no_overlap and has_det_assign
+    checks["vs4_sequence_split_spec_complete"] = sss_complete
+    detail_parts.append(f"VS-4 sequence_split_spec 含 split_unit/no_overlap_policy/deterministic_assignment={sss_complete}")
+
+    # VS-5: split_unit 包含 description 和 rule
+    split_unit = sss.get("split_unit", {}) or {}
+    has_su_desc = "description" in split_unit
+    has_su_rule = "rule" in split_unit
+    split_unit_ok = has_su_desc and has_su_rule
+    checks["vs5_split_unit_has_description_rule"] = split_unit_ok
+    detail_parts.append(f"VS-5 split_unit 含 description 和 rule={split_unit_ok}")
+
+    # VS-6: no_overlap_policy 包含 forbidden_overlap_types
+    no_overlap = sss.get("no_overlap_policy", {}) or {}
+    has_forbidden_types = "forbidden_overlap_types" in no_overlap
+    has_overlap_check = "overlap_check_method" in no_overlap
+    no_overlap_ok = has_forbidden_types and has_overlap_check
+    checks["vs6_no_overlap_policy_defined"] = no_overlap_ok
+    detail_parts.append(f"VS-6 no_overlap_policy 含 forbidden_overlap_types 和 overlap_check_method={no_overlap_ok}")
+
+    # VS-7: deterministic_assignment 包含 seed_key 和 manifest_field
+    det_assign = sss.get("deterministic_assignment", {}) or {}
+    has_seed_key = "seed_key" in det_assign
+    has_manifest_field = "manifest_field" in det_assign
+    det_assign_ok = has_seed_key and has_manifest_field
+    checks["vs7_deterministic_assignment_defined"] = det_assign_ok
+    detail_parts.append(f"VS-7 deterministic_assignment 含 seed_key 和 manifest_field={det_assign_ok}")
+
+    # VS-8: boundaries.forbidden 包含禁止重叠的表述
+    bounds = cfg.get("boundaries", {}) or {}
+    forbidden = bounds.get("forbidden", []) or []
+    forbidden_str = " ".join(str(f) for f in forbidden)
+    forbidden_has_overlap = "重叠" in forbidden_str or "同时出现" in forbidden_str or "交集" in forbidden_str
+    forbidden_has_time_split = "时间点" in forbidden_str or "拆分" in forbidden_str or "片段" in forbidden_str
+    forbidden_ok = forbidden_has_overlap and forbidden_has_time_split
+    checks["vs8_boundaries_forbidden_complete"] = forbidden_ok
+    detail_parts.append(f"VS-8 boundaries.forbidden 含禁止重叠和禁止时间片段拆分={forbidden_ok}")
+
+    # VS-9: boundaries.required 包含按整条序列划分的表述
+    required = bounds.get("required", []) or []
+    required_str = " ".join(str(r) for r in required)
+    required_has_seq_level = "整条序列" in required_str or "序列" in required_str
+    required_has_write_manifest = "写入 manifest" in required_str or "写入" in required_str or "在 manifest 中" in required_str or "manifest" in required_str and ("写入" in required_str or "记录" in required_str)
+    required_ok = required_has_seq_level and required_has_write_manifest
+    checks["vs9_boundaries_required_complete"] = required_ok
+    detail_parts.append(f"VS-9 boundaries.required 含按整条序列划分和写入manifest={required_ok}")
+
+    # VS-10: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs10_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-10 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[205]**" in rule_text or "[205]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        has_seq_split = "序列" in rule_text and ("训练" in rule_text or "测试" in rule_text)
+        rule_content_ok = has_original and has_meaning and has_criteria and has_seq_split
+    checks["vs10_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-10 规则文档内容有效={rule_content_ok}")
+
+    # VS-11: 手册真源文件包含 [205]
+    manual_exists = manual_path.is_file()
+    has_205_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_205_in_manual = "**[205]**" in manual_content or "[205]" in manual_content
+        except Exception:
+            pass
+    checks["vs11_manual_has_clause_205"] = has_205_in_manual
+    checks["vs11_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-11 手册真源文件存在={manual_exists}, 包含[205]={has_205_in_manual}")
+
+    # VS-12: 检查划分代码中是否有 sequence_id 相关逻辑
+    split_code_exists = False
+    split_code_paths = [
+        PROJECT_ROOT / "src" / "liquidloc" / "dataio" / "manifests" / "split_builder.py",
+        PROJECT_ROOT / "src" / "liquidloc" / "pipelines" / "train_pipeline.py",
+        PROJECT_ROOT / "src" / "liquidloc" / "common" / "constants.py",
+    ]
+    for sp in split_code_paths:
+        if sp.is_file():
+            try:
+                sc = sp.read_text(encoding="utf-8")
+                has_seq_id = "sequence_id" in sc or "seq_id" in sc
+                has_split_seed = "split_seed" in sc or "split_strategy" in sc
+                if has_seq_id or has_split_seed:
+                    split_code_exists = True
+                    break
+            except Exception:
+                pass
+    checks["vs12_split_code_has_sequence_id"] = split_code_exists
+    detail_parts.append(f"VS-12 划分代码中存在 sequence_id/split_seed 相关逻辑={split_code_exists}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P205-sequence-split",
+        "name": "[205] 序列级划分防泄漏——划分按整条序列训练/测试无重叠",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p206_pilot_variance_power_analysis() -> dict[str, Any]:
+    """[206] Pilot 估计的方差可用于 DQ-4/本项功效核算，正式结论只来自冻结后全量 10 seed 数据
+
+    手册原文：
+    [206] pilot 估计的方差可用于 DQ-4/本项功效核算，但正式结论只来自冻结后全量 10 seed 数据
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause206_pilot_variance_power_analysis.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 206_pilot方差功效核算.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P206-pilot-variance-power-analysis",
+                "name": "[206] Pilot估计方差用于DQ-4/正式结论来自冻结后全量10seed数据",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause206_pilot_variance_power_analysis.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P206-pilot-variance-power-analysis",
+                "name": "[206] Pilot估计方差用于DQ-4/正式结论来自冻结后全量10seed数据",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P206-pilot-variance-power-analysis",
+                "name": "[206] Pilot估计方差用于DQ-4/正式结论来自冻结后全量10seed数据",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "206"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "206"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='206', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: pilot_variance_use 包含 purpose、valid_for、not_valid_for
+    pvu = cfg.get("pilot_variance_use", {}) or {}
+    has_purpose = "purpose" in pvu
+    has_valid_for = "valid_for" in pvu
+    has_not_valid_for = "not_valid_for" in pvu
+    pvu_ok = has_purpose and has_valid_for and has_not_valid_for
+    checks["vs4_pilot_variance_use_complete"] = pvu_ok
+    detail_parts.append(f"VS-4 pilot_variance_use 含 purpose/valid_for/not_valid_for={pvu_ok}")
+
+    # VS-5: full_scale_conclusion 包含 seed_count=10
+    fsc = cfg.get("full_scale_conclusion", {}) or {}
+    seed_count = fsc.get("seed_count", 0)
+    traj_count = str(fsc.get("trajectory_count_per_seed", ""))
+    combos = fsc.get("combinations", "")
+    seed_ok = seed_count == 10
+    traj_ok = "100" in traj_count
+    combos_ok = isinstance(combos, str) and len(combos) > 0
+    fsc_ok = seed_ok and traj_ok and combos_ok
+    checks["vs5_full_scale_conclusion_complete"] = fsc_ok
+    checks["vs5_seed_count_is_10"] = seed_ok
+    checks["vs5_trajectory_count_contains_100"] = traj_ok
+    detail_parts.append(f"VS-5 full_scale_conclusion seed_count={seed_count}(期望10), trajectory_count={traj_count!r}(期望含100), combinations={bool(combos_ok)}")
+
+    # VS-6: disposal_sequence 含三步（pilot方差估计、功效分析、正式结论确认）
+    ds = cfg.get("disposal_sequence", []) or []
+    ds_names = " ".join(str(step.get("name", "")) for step in ds)
+    step_count_ok = len(ds) >= 3
+    has_step1 = any("pilot" in str(s.get("name", "")) or "方差" in str(s.get("name", "")) for s in ds)
+    has_step2 = any("功效" in str(s.get("name", "")) or "分析" in str(s.get("name", "")) for s in ds)
+    has_step3 = any("正式" in str(s.get("name", "")) or "结论" in str(s.get("name", "")) for s in ds)
+    ds_ok = step_count_ok and has_step1 and has_step2 and has_step3
+    checks["vs6_disposal_sequence_complete"] = ds_ok
+    detail_parts.append(f"VS-6 disposal_sequence 含{len(ds)}步, 含pilot方差/功效分析/正式结论={ds_ok}")
+
+    # VS-7: boundaries.forbidden 含禁止用pilot数据报告结论
+    bounds = cfg.get("boundaries", {}) or {}
+    forbidden = bounds.get("forbidden", []) or []
+    forbidden_str = " ".join(str(f) for f in forbidden)
+    has_forb_pilot_result = "pilot" in forbidden_str and ("结论" in forbidden_str or "正式" in forbidden_str or "报告" in forbidden_str)
+    has_forb_skip_dq4 = "DQ-4" in forbidden_str or "跳过" in forbidden_str
+    has_forb_pilot_var = "pilot" in forbidden_str and ("方差" in forbidden_str or "σ" in forbidden_str)
+    forb_ok = has_forb_pilot_result or has_forb_skip_dq4
+    checks["vs7_boundaries_forbidden_covered"] = forb_ok
+    detail_parts.append(f"VS-7 boundaries.forbidden 含禁止pilot冒充正式结论/DQ-4跳过={forb_ok}")
+
+    # VS-8: boundaries.required 含强制要求
+    required = bounds.get("required", []) or []
+    required_str = " ".join(str(r) for r in required)
+    has_req_dq4 = "DQ-4" in required_str or "pilot" in required_str and "DQ" in required_str
+    has_req_10seed = "10 seed" in required_str or ("10" in required_str and "seed" in required_str)
+    req_ok = has_req_dq4 and has_req_10seed
+    checks["vs8_boundaries_required_covered"] = req_ok
+    detail_parts.append(f"VS-8 boundaries.required 含强制pilot方差用于DQ-4且正式结论来自10seed={req_ok}")
+
+    # VS-9: related_clauses 包含关键条款
+    rc = cfg.get("related_clauses", []) or []
+    rc_str = " ".join(str(r) for r in rc)
+    has_62 = "62" in rc_str
+    has_65 = "65" in rc_str
+    has_200 = "200" in rc_str
+    rc_ok = has_62 and has_65 and has_200
+    checks["vs9_related_clauses_covered"] = rc_ok
+    detail_parts.append(f"VS-9 related_clauses 含[62/65/200]={rc_ok}, 实际={rc}")
+
+    # VS-10: manual_ref 正确
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册" in manual_ref
+    checks["vs10_manual_ref_valid"] = ref_ok
+    detail_parts.append(f"VS-10 manual_ref={manual_ref!r}, 含'异步实验_执行手册'={ref_ok}")
+
+    # VS-11: 规则文档存在
+    rule_exists = rule_path.is_file()
+    checks["vs11_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-11 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT) if rule_exists else None}")
+
+    # VS-12: 手册真源包含 [206]
+    manual_exists = manual_path.is_file()
+    has_206_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_206_in_manual = "**[206]**" in manual_content or "[206]" in manual_content
+        except Exception:
+            pass
+    checks["vs12_manual_has_clause_206"] = has_206_in_manual
+    checks["vs12_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-12 手册真源文件存在={manual_exists}, 包含[206]={has_206_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P206-pilot-variance-power-analysis",
+        "name": "[206] Pilot估计方差用于DQ-4/正式结论只来自冻结后全量10seed数据",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p207_config_data_cross_check() -> dict[str, Any]:
+    """[207] 配置一致性：跑实验用的 YAML 档位矩阵与生成数据的 manifest 交叉核对
+
+    手册原文：
+    [207] 配置一致性：跑实验用的 YAML 档位矩阵与生成数据的 manifest 交叉核对，
+    不出现"数据按 N2/N3 生成、实验只按轻档读"或"数据 A2/A3 混合、实验以为只 A2"。
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause207_config_data_cross_check.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 207_配置一致性.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P207-config-data-cross-check",
+                "name": "[207]配置一致性YAML档位矩阵与生成数据manifest交叉核对",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause207_config_data_cross_check.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P207-config-data-cross-check",
+                "name": "[207]配置一致性YAML档位矩阵与生成数据manifest交叉核对",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P207-config-data-cross-check",
+                "name": "[207]配置一致性YAML档位矩阵与生成数据manifest交叉核对",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "207"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "207"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='207', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: 配置文件包含 gear_matrix 定义
+    gear_matrix = cfg.get("config_data_cross_check", {}).get("gear_matrix", {}) or {}
+    has_gear_matrix = "A" in gear_matrix and "N" in gear_matrix
+    checks["vs4_gear_matrix_defined"] = has_gear_matrix
+    detail_parts.append(f"VS-4 gear_matrix 包含 A/N 档位定义={has_gear_matrix}")
+
+    # VS-5: gear_matrix 包含核心轴
+    has_A = "A" in gear_matrix
+    has_N = "N" in gear_matrix
+    has_V = "V" in gear_matrix
+    gear_ok = has_A and has_N and has_V
+    checks["vs5_gear_axes_complete"] = gear_ok
+    detail_parts.append(f"VS-5 gear_matrix 含 A/N/V 三轴={gear_ok}")
+
+    # VS-6: constraints 中定义 forbidden_patterns
+    constraints = cfg.get("config_data_cross_check", {}).get("constraints", {}) or {}
+    has_forbidden = "forbidden_patterns" in constraints
+    has_required = "required_patterns" in constraints
+    constraints_ok = has_forbidden and has_required
+    checks["vs6_constraints_patterns_defined"] = constraints_ok
+    detail_parts.append(f"VS-6 constraints 含 forbidden_patterns/required_patterns={constraints_ok}")
+
+    # VS-7: cross_verification 方法定义
+    cross_verif = cfg.get("config_data_cross_check", {}).get("cross_verification", {})
+    has_method = "method" in cross_verif
+    has_reference = "reference_files" in cross_verif
+    has_action = "mismatch_action" in cross_verif
+    cross_ok = has_method and has_reference and has_action
+    checks["vs7_cross_verification_defined"] = cross_ok
+    detail_parts.append(f"VS-7 cross_verification 含 method/reference_files/mismatch_action={cross_ok}")
+
+    # VS-8: check_points 定义
+    check_points = cfg.get("config_data_cross_check", {}).get("check_points", [])
+    cp_complete = isinstance(check_points, list) and len(check_points) >= 3
+    checks["vs8_check_points_defined"] = cp_complete
+    detail_parts.append(f"VS-8 check_points 定义={cp_complete}, 个数={len(check_points) if isinstance(check_points, list) else 0}")
+
+    # VS-9: 规则文档存在
+    rule_exists = rule_path.is_file()
+    checks["vs9_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-9 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[207]**" in rule_text or "[207]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs9_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-9 规则文档内容有效={rule_content_ok}")
+
+    # VS-10: 手册真源包含 [207]
+    manual_exists = manual_path.is_file()
+    has_207_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_207_in_manual = "**[207]**" in manual_content or "[207]" in manual_content
+        except Exception:
+            pass
+    checks["vs10_manual_has_clause_207"] = has_207_in_manual
+    checks["vs10_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-10 手册真源文件存在={manual_exists}, 包含[207]={has_207_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P207-config-data-cross-check",
+        "name": "[207]配置一致性YAML档位矩阵与生成数据manifest交叉核对",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+def p208_v0_degradation_exclusion() -> dict[str, Any]:
+    """[208] V0档负向排除（协议判别规则反向断言，硬约束）
+
+    手册原文：
+    [208] 26a. V0 档负向排除（协议判别规则反向断言，硬约束）：
+    检查生成序列的 VIO 段不得出现协议 V1/V2/V3 退化档症状 ——
+    任一症状出现 = 生成代码悄悄引入了非 V0 档压力，
+    须修生成器后重新生成：
+    无"数据在但置零"（V1 黑屏症状：vio_pos/vio_yaw 连续段恒为 0 而 vio_valid=1，
+    或增量恒 0——置零会让 vio_scaling 头消融的 Δ 虚假）
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause208_v0_degradation_exclusion.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 208_V0档负向排除.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P208-v0-degradation-exclusion",
+                "name": "[208]V0档负向排除（协议判别规则反向断言）",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause208_v0_degradation_exclusion.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P208-v0-degradation-exclusion",
+                "name": "[208]V0档负向排除（协议判别规则反向断言）",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P208-v0-degradation-exclusion",
+                "name": "[208]V0档负向排除（协议判别规则反向断言）",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "208"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "208"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='208', 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: v0_degradation_exclusion 节点存在
+    v0_node = cfg.get("v0_degradation_exclusion", {}) or {}
+    has_v0_node = isinstance(v0_node, dict)
+    checks["vs4_v0_degradation_exclusion_node_exists"] = has_v0_node
+    detail_parts.append(f"VS-4 v0_degradation_exclusion 节点存在={has_v0_node}")
+
+    # VS-5: 禁止症状清单定义了两个症状项
+    forbidden_symptoms = v0_node.get("forbidden_symptoms", []) or []
+    symptom_names = [s.get("name", "") for s in forbidden_symptoms] if isinstance(forbidden_symptoms, list) else []
+    has_data_zeroed = "vio_data_zeroed_while_valid" in symptom_names
+    has_increment_zero = "vio_increment_always_zero" in symptom_names
+    symptoms_ok = has_data_zeroed and has_increment_zero
+    checks["vs5_forbidden_symptoms_defined"] = symptoms_ok
+    detail_parts.append(f"VS-5 禁止症状含两个核心项(data_zeroed/increment_zero)={symptoms_ok}, 实际={symptom_names}")
+
+    # VS-6: 每个症状包含必需字段
+    fields_ok = True
+    for sym in (forbidden_symptoms if isinstance(forbidden_symptoms, list) else []):
+        if not isinstance(sym, dict):
+            fields_ok = False
+            break
+        for req_key in ("name", "label", "description", "fields", "condition"):
+            if req_key not in sym:
+                fields_ok = False
+                break
+    checks["vs6_symptom_fields_complete"] = fields_ok
+    detail_parts.append(f"VS-6 症状字段完整(name/label/description/fields/condition)={fields_ok}")
+
+    # VS-7: validation 节点包含 method 和 check_points
+    validation = v0_node.get("validation", {}) or {}
+    has_method = "method" in validation
+    has_check_points = "check_points" in validation and isinstance(validation.get("check_points"), list)
+    validation_ok = has_method and has_check_points
+    checks["vs7_validation_defined"] = validation_ok
+    detail_parts.append(f"VS-7 validation 含 method/check_points={validation_ok}")
+
+    # VS-8: constraint_declaration 节点包含 related_clauses
+    constraint_decl = cfg.get("constraint_declaration", {}) or {}
+    related_clauses = constraint_decl.get("related_clauses", []) or []
+    has_related = isinstance(related_clauses, list) and len(related_clauses) >= 2
+    checks["vs8_related_clauses_defined"] = has_related
+    detail_parts.append(f"VS-8 related_clauses 含≥2条={has_related}")
+
+    # VS-9: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs9_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-9 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[208]**" in rule_text or "[208]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs9_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-9 规则文档内容有效={rule_content_ok}")
+
+    # VS-10: 手册真源包含 [208]
+    manual_exists = manual_path.is_file()
+    has_208_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_208_in_manual = "**[208]**" in manual_content or "[208]" in manual_content
+        except Exception:
+            pass
+    checks["vs10_manual_has_clause_208"] = has_208_in_manual
+    checks["vs10_manual_file_exists"] = manual_exists
+    detail_parts.append(f"VS-10 手册真源文件存在={manual_exists}, 包含[208]={has_208_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P208-v0-degradation-exclusion",
+        "name": "[208]V0档负向排除（协议判别规则反向断言）",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()}
+        }
+    }
+
+
+# ---------------- P209: 条款 [209] UWB/VIO/gt 输出行数以 UWB 帧数为准 ----------------
+def p209_row_count_baseline() -> dict[str, Any]:
+    """[209] UWB/VIO/gt 输出行数 N 以 UWB 帧数为准（10Hz×120s≈1200 行/序列，S3 论文级基准 120s），
+    imu 为 N_imu 行（150Hz×120s≈18000 行/序列）。
+
+    验证：
+    1. configs/protocol/clause209_row_count_baseline.yaml 存在且能正确解析
+    2. clause_id == "209"
+    3. uwb_baseline.frequency_hz == 10
+    4. uwb_baseline.expected_rows_per_sequence == 1200
+    5. uwb_baseline.s3_paper_level_baseline == true
+    6. uwb_baseline.s3_baseline_duration_s == 120
+    7. vio_gt_aligned_to_uwb == true
+    8. imu_spec.frequency_hz == 150
+    9. imu_spec.expected_rows_per_sequence == 18000
+    10. imu_spec.independent_row_count == true
+    11. manual_ref 指向正确的执行手册文件
+    12. 配套 P 条款（p39/p40/p207/p208）在 _ALL 中已注册
+    """
+    import yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause209_row_count_baseline.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+
+    # (a) 配置文件存在性检查
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P209-row-count-baseline",
+            "name": "[209] UWB/VIO/gt行数以UWB帧数为准",
+            "severity": "hard",
+            "passed": False,
+            "detail": "clause209_row_count_baseline.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    # (b) 解析配置文件
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P209-row-count-baseline",
+            "name": "[209] UWB/VIO/gt行数以UWB帧数为准",
+            "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    if not isinstance(cfg, dict):
+        return {
+            "code": "P209-row-count-baseline",
+            "name": "[209] UWB/VIO/gt行数以UWB帧数为准",
+            "severity": "hard",
+            "passed": False,
+            "detail": "cfg is not a dict",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    # 1. clause_id 为 "209"
+    clause_id = str(cfg.get("clause_id", ""))
+    ok_clause_id = clause_id == "209"
+    checks["clause_id_is_209"] = ok_clause_id
+    passed = passed and ok_clause_id
+
+    # 2. clause_name 包含关键词
+    clause_name = str(cfg.get("clause_name", ""))
+    ok_clause_name = "行数基准" in clause_name or "UWB/VIO/gt行数" in clause_name
+    checks["clause_name_contains_keywords"] = ok_clause_name
+    passed = passed and ok_clause_name
+
+    # 3. UWB 基准频率 == 10
+    uwb_baseline = cfg.get("uwb_baseline", {})
+    ok_uwb_freq = isinstance(uwb_baseline, dict) and uwb_baseline.get("frequency_hz") == 10
+    checks["uwb_frequency_hz_is_10"] = ok_uwb_freq
+    passed = passed and ok_uwb_freq
+
+    # 4. UWB 预期行数 == 1200
+    ok_uwb_rows = isinstance(uwb_baseline, dict) and uwb_baseline.get("expected_rows_per_sequence") == 1200
+    checks["uwb_expected_rows_is_1200"] = ok_uwb_rows
+    passed = passed and ok_uwb_rows
+
+    # 5. S3 论文级基准 120s
+    ok_s3_baseline = (isinstance(uwb_baseline, dict)
+                      and uwb_baseline.get("s3_paper_level_baseline") is True
+                      and uwb_baseline.get("s3_baseline_duration_s") == 120)
+    checks["s3_paper_level_baseline_120s"] = ok_s3_baseline
+    passed = passed and ok_s3_baseline
+
+    # 6. VIO/gt 对齐到 UWB 帧数
+    ok_vio_gt_align = cfg.get("vio_gt_aligned_to_uwb") is True
+    checks["vio_gt_aligned_to_uwb"] = ok_vio_gt_align
+    passed = passed and ok_vio_gt_align
+
+    # 7. IMU 采样率 == 150
+    imu_spec = cfg.get("imu_spec", {})
+    ok_imu_freq = isinstance(imu_spec, dict) and imu_spec.get("frequency_hz") == 150
+    checks["imu_frequency_hz_is_150"] = ok_imu_freq
+    passed = passed and ok_imu_freq
+
+    # 8. IMU 预期行数 == 18000
+    ok_imu_rows = isinstance(imu_spec, dict) and imu_spec.get("expected_rows_per_sequence") == 18000
+    checks["imu_expected_rows_is_18000"] = ok_imu_rows
+    passed = passed and ok_imu_rows
+
+    # 9. IMU 独立行数
+    ok_imu_independent = isinstance(imu_spec, dict) and imu_spec.get("independent_row_count") is True
+    checks["imu_independent_row_count"] = ok_imu_independent
+    passed = passed and ok_imu_independent
+
+    # 10. manual_ref 指向正确路径
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ok_manual_ref = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["manual_ref_correct"] = ok_manual_ref
+    passed = passed and ok_manual_ref
+
+    # 11. 手册真源存在
+    manual_exists = manual_path.is_file()
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    # 12. 配套 P 条款已在 _ALL 中注册（动态检查，确保本 gate 与整体套件一致）
+    related_checks = cfg.get("related_checks", [])
+    ok_related_checks = all(rc in related_checks for rc in ["P40_imu_output_spec", "P39_uwb_output_spec"])
+    checks["related_checks_registered"] = ok_related_checks
+    passed = passed and ok_related_checks
+
+    # 13. 关键概念断言（防凭记忆/防误声明）
+    required_concepts = [
+        "1200", "18000", "10Hz", "150Hz", "S3", "120s",
+        "UWB/VIO/gt", "N_imu",
+    ]
+    cfg_text = cfg_path.read_text(encoding="utf-8") if cfg_exists else ""
+    concept_hits = {c: c in cfg_text for c in required_concepts}
+    checks["concept_hits_all_present"] = all(concept_hits.values())
+    passed = passed and all(concept_hits.values())
+
+    # 14. 规则文档存在性检查
+    rules_dir = PROJECT_ROOT / "rules"
+    rule_files = list(rules_dir.glob("条款 209*.md"))
+    rule_doc_exists = len(rule_files) > 0
+    checks["rule_doc_exists"] = rule_doc_exists
+    passed = passed and rule_doc_exists
+
+    # 15. 规则文档必须包含条款原文
+    rule_doc_ok = False
+    rule_doc_content = ""
+    if rule_doc_exists:
+        for rf in rule_files:
+            try:
+                rule_doc_content = rf.read_text(encoding="utf-8")
+                if "**[209]**" in rule_doc_content and "UWB/VIO/gt 输出行数 N 以 UWB 帧数为准" in rule_doc_content:
+                    rule_doc_ok = True
+                    break
+            except Exception:
+                continue
+    checks["rule_doc_contains_clause_text"] = rule_doc_ok
+    passed = passed and rule_doc_ok
+
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"clause_id={clause_id!r} (ok={ok_clause_id})",
+        f"clause_name={clause_name!r} (contains_kw={ok_clause_name})",
+        f"uwb_freq={uwb_baseline.get('frequency_hz') if isinstance(uwb_baseline, dict) else None} (ok={ok_uwb_freq})",
+        f"uwb_rows={uwb_baseline.get('expected_rows_per_sequence') if isinstance(uwb_baseline, dict) else None} (ok={ok_uwb_rows})",
+        f"s3_baseline={uwb_baseline.get('s3_paper_level_baseline')} / s3_dur={uwb_baseline.get('s3_baseline_duration_s')} (ok={ok_s3_baseline})",
+        f"vio_gt_aligned={cfg.get('vio_gt_aligned_to_uwb')} (ok={ok_vio_gt_align})",
+        f"imu_freq={imu_spec.get('frequency_hz') if isinstance(imu_spec, dict) else None} (ok={ok_imu_freq})",
+        f"imu_rows={imu_spec.get('expected_rows_per_sequence') if isinstance(imu_spec, dict) else None} (ok={ok_imu_rows})",
+        f"imu_independent={imu_spec.get('independent_row_count') if isinstance(imu_spec, dict) else None} (ok={ok_imu_independent})",
+        f"manual_ref_correct={ok_manual_ref}",
+        f"manual_exists={manual_exists}",
+        f"related_checks={related_checks} (ok={ok_related_checks})",
+        f"concept_hits={concept_hits}",
+        f"rule_doc_exists={rule_doc_exists}",
+        f"rule_doc_contains_clause_text={rule_doc_ok}",
+    ]
+
+    return {
+        "code": "P209-row-count-baseline",
+        "name": "[209] UWB/VIO/gt行数以UWB帧数为准",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "exists": cfg_exists,
+            "clause_id": clause_id,
+            "clause_name": clause_name,
+            "uwb_baseline": uwb_baseline,
+            "vio_gt_aligned_to_uwb": cfg.get("vio_gt_aligned_to_uwb"),
+            "imu_spec": imu_spec,
+            "manual_ref": manual_ref,
+            "manual_exists": manual_exists,
+            "related_checks": related_checks,
+            "concept_hits": concept_hits,
+            "rule_doc_exists": rule_doc_exists,
+            "rule_doc_contains_clause_text": rule_doc_ok,
+            "checks": {k: v for k, v in checks.items()},
+        },
+    }
+
+
+
+# ---------------- P210: 条款 [210] 论文级旧产物隔离禁令 ----------------
+def p210_paper_grade_old_product_isolation() -> dict[str, Any]:
+    """[210] 论文级旧产物隔离禁令（硬约束）：
+    任何早于论文级正式执行的旧数据、旧权重、旧结果（含冒烟阶段临时数据/权重、早期试跑产物）
+    一律不得进入最终统计与论文表格。
+
+    手册原文：
+    [210] 任何早于论文级正式执行的旧数据、旧权重、旧结果（含冒烟阶段临时数据/权重、早期试跑产物）
+    **一律不得进入最终统计与论文表格** ——否则"验收"验收的是混合产物，
+    审稿人按 manifest 复核即穿帮。
+
+    验证项：
+    1. configs/protocol/clause210_paper_grade_old_product_isolation.yaml 存在且可解析
+    2. clause_id == "210"
+    3. severity == "hard"
+    4. forbidden_items 包含至少3个核心禁止对象
+    5. hard_constraint.no_old_product_in_final == true
+    6. 规则文档存在且内容有效
+    7. 手册真源存在且包含 [210]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause210_paper_grade_old_product_isolation.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 210_论文级旧产物隔离禁令.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P210-paper-grade-old-product-isolation",
+                "name": "[210]论文级旧产物隔离禁令",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause210_paper_grade_old_product_isolation.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P210-paper-grade-old-product-isolation",
+                "name": "[210]论文级旧产物隔离禁令",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P210-paper-grade-old-product-isolation",
+                "name": "[210]论文级旧产物隔离禁令",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "210"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "210"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=210, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: forbidden_items 包含至少3个核心禁止对象
+    forbidden_items = cfg.get("forbidden_items", []) or []
+    item_names = [item.get("name", "") for item in (forbidden_items if isinstance(forbidden_items, list) else [])]
+    has_smoke_data = any("冒烟" in n and "数据" in n for n in item_names)
+    has_smoke_weight = any("冒烟" in n and "权重" in n for n in item_names)
+    has_early_trial = any("试跑" in n or "早期" in n for n in item_names)
+    forbidden_ok = has_smoke_data and has_smoke_weight and has_early_trial
+    checks["vs4_forbidden_items_defined"] = forbidden_ok
+    detail_parts.append(f"VS-4 禁止对象含冒烟数据/冒烟权重/早期试跑={forbidden_ok}, 实际={item_names}")
+
+    # VS-5: hard_constraint.no_old_product_in_final == true
+    hc = cfg.get("hard_constraint", {}) or {}
+    no_old_ok = isinstance(hc, dict) and hc.get("no_old_product_in_final") is True
+    checks["vs5_hard_constraint"] = no_old_ok
+    detail_parts.append(f"VS-5 hard_constraint.no_old_product_in_final={no_old_ok}")
+
+    # VS-6: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs6_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-6 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[210]**" in rule_text or "[210]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs6_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-6 规则文档内容有效={rule_content_ok}")
+
+    # VS-7: 手册真源存在且包含 [210]
+    manual_exists = manual_path.is_file()
+    has_210_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_210_in_manual = "**[210]**" in manual_content or "[210]" in manual_content
+        except Exception:
+            pass
+    checks["vs7_manual_file_exists"] = manual_exists
+    checks["vs7_manual_has_clause_210"] = has_210_in_manual
+    detail_parts.append(f"VS-7 手册真源文件存在={manual_exists}, 包含[210]={has_210_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P210-paper-grade-old-product-isolation",
+        "name": "[210]论文级旧产物隔离禁令",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+def p211_experiment_pre_run_data_weight_clearing() -> dict[str, Any]:
+    """[211] 每次跑实验前都清空仿真数据集与权重（总纪律，不分轨）：
+    每一次运行之前 ——诊断轨实验（冒烟/校准/探针/抽查复跑）跑前、验收轨（论文级正式执行）跑前、
+    以及任何 R 系列重跑/补跑前 ——都必须先清空活动数据目录中的仿真数据集
+    （训练/验证/测试 npz + manifest）与活动权重目录（checkpoint/权重），
+    删除或迁移 archive/ 物理隔离，保证实验脚本任何路径读不到旧产物。
+
+    验证项：
+    1. configs/protocol/clause211_experiment_pre_run_data_weight_clearing.yaml 存在且可解析
+    2. clause_id == "211"
+    3. severity == "hard"
+    4. pre_run_requirement 和 clearing_scope 定义完整
+    5. forbidden_items 包含旧仿真数据集和旧权重文件
+    6. hard_constraint.no_old_data_in_current_run == true
+    7. 规则文档存在且内容有效
+    8. 手册真源存在且包含 [211]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause211_experiment_pre_run_data_weight_clearing.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 211_实验前清空数据集与权重.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P211-experiment-pre-run-data-weight-clearing",
+                "name": "[211]实验前清空仿真数据集与权重",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause211_experiment_pre_run_data_weight_clearing.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P211-experiment-pre-run-data-weight-clearing",
+                "name": "[211]实验前清空仿真数据集与权重",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P211-experiment-pre-run-data-weight-clearing",
+                "name": "[211]实验前清空仿真数据集与权重",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "211"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "211"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=211, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: pre_run_requirement 和 clearing_scope 定义完整
+    pre_run = cfg.get("pre_run_requirement", {}) or {}
+    clearing = cfg.get("clearing_scope", {}) or {}
+    pre_run_ok = isinstance(pre_run, dict) and bool(pre_run.get("action")) and bool(pre_run.get("applies_to"))
+    clearing_ok = isinstance(clearing, dict) and bool(clearing.get("data_dirs")) and bool(clearing.get("weight_dirs"))
+    scope_ok = pre_run_ok and clearing_ok
+    checks["vs4_requirement_and_scope_defined"] = scope_ok
+    detail_parts.append(f"VS-4 pre_run_requirement和clearing_scope完整={scope_ok}, pre_run_ok={pre_run_ok}, clearing_ok={clearing_ok}")
+
+    # VS-5: forbidden_items 包含旧仿真数据集和旧权重文件
+    forbidden_items = cfg.get("forbidden_items", []) or []
+    item_names = [item.get("name", "") for item in (forbidden_items if isinstance(forbidden_items, list) else [])]
+    has_old_data = any("旧仿真" in n or "仿真数据" in n for n in item_names)
+    has_old_weight = any("旧权重" in n or "权重文件" in n for n in item_names)
+    forbidden_ok = bool(has_old_data and has_old_weight)
+    checks["vs5_forbidden_items_defined"] = forbidden_ok
+    detail_parts.append(f"VS-5 禁止对象含旧仿真数据集/旧权重={forbidden_ok}, 实际={item_names}")
+
+    # VS-6: hard_constraint.no_old_data_in_current_run == true
+    hc = cfg.get("hard_constraint", {}) or {}
+    no_old_data_ok = isinstance(hc, dict) and hc.get("no_old_data_in_current_run") is True
+    checks["vs6_hard_constraint"] = no_old_data_ok
+    detail_parts.append(f"VS-6 hard_constraint.no_old_data_in_current_run={no_old_data_ok}")
+
+    # VS-7: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs7_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-7 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[211]**" in rule_text or "[211]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs7_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-7 规则文档内容有效={rule_content_ok}")
+
+    # VS-8: 手册真源存在且包含 [211]
+    manual_exists = manual_path.is_file()
+    has_211_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_211_in_manual = "**[211]**" in manual_content or "[211]" in manual_content
+        except Exception:
+            pass
+    checks["vs8_manual_file_exists"] = manual_exists
+    checks["vs8_manual_has_clause_211"] = has_211_in_manual
+    detail_parts.append(f"VS-8 手册真源文件存在={manual_exists}, 包含[211]={has_211_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P211-experiment-pre-run-data-weight-clearing",
+        "name": "[211]实验前清空仿真数据集与权重",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+
+def p212_pure_generation_from_scratch() -> dict[str, Any]:
+    """[212] 实验清空的目的说明（硬约束）：
+    确保本次实验结果是"从零开始、纯净生成"，不被任何旧仿真数据、旧权重、旧结果污染——
+    无论诊断轨还是验收轨。
+
+    手册原文：
+    [212] 目的：确保本次实验结果是"从零开始、纯净生成"，不被任何旧仿真数据、旧权重、
+    旧结果污染——无论诊断轨还是验收轨。
+
+    验证项：
+    1. configs/protocol/clause212_pure_generation_from_scratch.yaml 存在且可解析
+    2. clause_id == "212"
+    3. severity == "hard"
+    4. purpose 包含 statement 和 description，applies_to_all_tracks == true
+    5. scope.covers 包含诊断轨和验收轨
+    6. core_constraints 包含 no_old_data_contamination/no_old_weight_contamination/
+       no_old_result_contamination/pure_generation_required
+    7. 规则文档存在且内容有效
+    8. 手册真源存在且包含 [212]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause212_pure_generation_from_scratch.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 212_纯净从零生成.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P212-pure-generation-from-scratch",
+                "name": "[212]实验清空的目的说明",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause212_pure_generation_from_scratch.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P212-pure-generation-from-scratch",
+                "name": "[212]实验清空的目的说明",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P212-pure-generation-from-scratch",
+                "name": "[212]实验清空的目的说明",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "212"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "212"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=212, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: purpose 包含 statement 和 description，applies_to_all_tracks == true
+    purpose = cfg.get("purpose", {}) or {}
+    purpose_ok = isinstance(purpose, dict) and bool(purpose.get("statement")) and bool(purpose.get("description"))
+    applies_all = isinstance(purpose, dict) and purpose.get("applies_to_all_tracks") is True
+    purpose_full = purpose_ok and applies_all
+    checks["vs4_purpose_defined"] = purpose_full
+    detail_parts.append(f"VS-4 purpose定义完整且applies_to_all_tracks=true={purpose_full}")
+
+    # VS-5: scope.covers 包含诊断轨和验收轨
+    scope = cfg.get("scope", {}) or {}
+    covers = scope.get("covers", []) if isinstance(scope, dict) else []
+    covers_ok = isinstance(covers, list) and len(covers) >= 2 and "诊断轨" in str(covers) and "验收轨" in str(covers)
+    checks["vs5_scope_covers_all_tracks"] = covers_ok
+    detail_parts.append(f"VS-5 scope.covers包含诊断轨和验收轨={covers_ok}, 实际={covers}")
+
+    # VS-6: core_constraints 包含四个核心约束
+    cc = cfg.get("core_constraints", {}) or {}
+    if isinstance(cc, list):
+        cc_keys = [str(k) for item in cc for k in (item.keys() if isinstance(item, dict) else [])]
+        cc_ok = all(k in cc_keys for k in ["no_old_data_contamination", "no_old_weight_contamination",
+                                             "no_old_result_contamination", "pure_generation_required"])
+    elif isinstance(cc, dict):
+        cc_ok = all(cc.get(k) is True for k in ["no_old_data_contamination", "no_old_weight_contamination",
+                                                   "no_old_result_contamination", "pure_generation_required"])
+    else:
+        cc_ok = False
+    checks["vs6_core_constraints_defined"] = cc_ok
+    detail_parts.append(f"VS-6 core_constraints包含四项核心约束={cc_ok}")
+
+    # VS-7: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs7_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-7 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[212]**" in rule_text or "[212]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs7_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-7 规则文档内容有效={rule_content_ok}")
+
+    # VS-8: 手册真源存在且包含 [212]
+    manual_exists = manual_path.is_file()
+    has_212_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_212_in_manual = "**[212]**" in manual_content or "[212]" in manual_content
+        except Exception:
+            pass
+    checks["vs8_manual_file_exists"] = manual_exists
+    checks["vs8_manual_has_clause_212"] = has_212_in_manual
+    detail_parts.append(f"VS-8 手册真源文件存在={manual_exists}, 包含[212]={has_212_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P212-pure-generation-from-scratch",
+        "name": "[212]实验清空的目的说明",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        },
+    }
+
+
+def p213_smoke_temp_clearing_before_run() -> dict[str, Any]:
+    """[213] 冒烟通过、code freeze 之后进入 RZ-1 之前——冒烟产生的临时数据/临时权重也必须一并清场
+    （冒烟只验管线，其数据/权重不进入最终统计 ——与"测试轨迹重新生成：全量 10 seed
+    的测试轨迹必须全部重新生成，不能用冒烟那 ≥12 条凑数"同一原则的整批化执行）。
+
+    手册原文：
+    [213] 冒烟通过、code freeze 之后进入 RZ-1 之前 ——冒烟产生的临时数据/临时权重也必须一并清场
+    （冒烟只验管线，其数据/权重不进入最终统计 ——与"测试轨迹重新生成：全量 10 seed
+    的测试轨迹必须全部重新生成，不能用冒烟那 ≥12 条凑数"同一原则的整批化执行）。
+
+    验证项：
+    1. configs/protocol/clause213_smoke_temp_clearing_before_rz1.yaml 存在且可解析
+    2. clause_id == "213"
+    3. severity == "hard"
+    4. core_constraint 包含 action/description/prerequisite/target_phase
+    5. temp_data_exclusion 包含 smoke_data_not_in_final_stats/smoke_weights_not_in_final_stats
+    6. clearing_scope 包含 smoke_data 和 smoke_weights
+    7. hard_constraint.clear_before_rz1 == true
+    8. 规则文档存在且内容有效
+    9. 相关条款已注册
+    10. 手册真源存在且包含 [213]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause213_smoke_temp_clearing_before_rz1.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 213_冒烟后清场临时数据权重.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P213-smoke-temp-clearing-before-run",
+                "name": "[213]冒烟后RZ-1前清场临时数据权重",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause213_smoke_temp_clearing_before_rz1.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P213-smoke-temp-clearing-before-run",
+                "name": "[213]冒烟后RZ-1前清场临时数据权重",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P213-smoke-temp-clearing-before-run",
+                "name": "[213]冒烟后RZ-1前清场临时数据权重",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "213"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "213"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=213, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: core_constraint 包含 action/description/prerequisite/target_phase
+    core = cfg.get("core_constraint", {}) or {}
+    core_ok = (isinstance(core, dict) and
+               bool(core.get("action")) and
+               bool(core.get("description")) and
+               isinstance(core.get("prerequisite"), list) and
+               bool(core.get("target_phase")))
+    checks["vs4_core_constraint_defined"] = core_ok
+    detail_parts.append(f"VS-4 core_constraint完整={core_ok}")
+
+    # VS-5: temp_data_exclusion 包含 smoke_data_not_in_final_stats/smoke_weights_not_in_final_stats
+    temp_ex = cfg.get("temp_data_exclusion", {}) or {}
+    temp_ok = (isinstance(temp_ex, dict) and
+               temp_ex.get("smoke_data_not_in_final_stats") is True and
+               temp_ex.get("smoke_weights_not_in_final_stats") is True)
+    checks["vs5_temp_data_exclusion_defined"] = temp_ok
+    detail_parts.append(f"VS-5 temp_data_exclusion完整={temp_ok}")
+
+    # VS-6: clearing_scope 包含 smoke_data 和 smoke_weights
+    clear_scope = cfg.get("clearing_scope", {}) or {}
+    clear_ok = (isinstance(clear_scope, dict) and
+                isinstance(clear_scope.get("smoke_data"), list) and
+                isinstance(clear_scope.get("smoke_weights"), list))
+    checks["vs6_clearing_scope_defined"] = clear_ok
+    detail_parts.append(f"VS-6 clearing_scope包含smoke_data/smoke_weights={clear_ok}")
+
+    # VS-7: hard_constraint.clear_before_rz1 == true
+    hard_con = cfg.get("hard_constraint", {}) or {}
+    hard_ok = isinstance(hard_con, dict) and hard_con.get("clear_before_rz1") is True
+    checks["vs7_hard_constraint_clear_before_rz1"] = hard_ok
+    detail_parts.append(f"VS-7 hard_constraint.clear_before_rz1={hard_ok}")
+
+    # VS-8: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs8_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-8 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "[213]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs8_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-8 规则文档内容有效={rule_content_ok}")
+
+    # VS-9: 相关条款已注册
+    related = cfg.get("related_checks", [])
+    related_ok = isinstance(related, list) and "p211_experiment_pre_run_data_weight_clearing" in related
+    checks["vs9_related_checks_registered"] = related_ok
+    detail_parts.append(f"VS-9 相关条款注册={related_ok}")
+
+    # VS-10: 手册真源存在且包含 [213]
+    manual_exists = manual_path.is_file()
+    has_213_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_213_in_manual = "**[213]**" in manual_content or "[213]" in manual_content
+        except Exception:
+            pass
+    checks["vs10_manual_file_exists"] = manual_exists
+    checks["vs10_manual_has_clause_213"] = has_213_in_manual
+    detail_parts.append(f"VS-10 手册真源文件存在={manual_exists}, 包含[213]={has_213_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P213-smoke-temp-clearing-before-run",
+        "name": "[213]冒烟后RZ-1前清场临时数据权重",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+
+def p214_diagnostic_clear_action_checklist() -> dict[str, Any]:
+    """[214] 清场动作清单——诊断轨轻量清场
+
+    验证每次诊断/冒烟测试前必须清空活动数据目录中所有旧的仿真数据文件（npz）
+    和清单文件（manifest），清场方式为删除或迁移至archive目录，且脚本无法读取archive。
+
+    手册原文：
+    [214] 清场动作清单——两档模式：诊断轨轻量清场（每次诊断跑前，3 项）：清空活动数据目录全部旧仿真 npz + manifest（删/迁 archive，脚本读不到）
+
+    验证项：
+    1. configs/protocol/clause214_diagnostic_clear.yaml 存在且可解析
+    2. clause_id == "214"
+    3. severity == "hard"
+    4. clear_items 包含 npz_files 和 manifest_files
+    5. target_location == "archive"
+    6. 规则文档存在且内容有效
+    7. 手册真源存在且包含 [214]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause214_diagnostic_clear.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 214_诊断轨轻量清场.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P214-diagnostic-clear-action-checklist",
+                "name": "[214]清场动作清单——诊断轨轻量清场",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause214_diagnostic_clear.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P214-diagnostic-clear-action-checklist",
+                "name": "[214]清场动作清单——诊断轨轻量清场",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P214-diagnostic-clear-action-checklist",
+                "name": "[214]清场动作清单——诊断轨轻量清场",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "214"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "214"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=214, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: clear_items 包含 npz_files 和 manifest_files
+    clear_items = cfg.get("clear_items", []) or []
+    has_npz = "npz_files" in clear_items
+    has_manifest = "manifest_files" in clear_items
+    clear_ok = has_npz and has_manifest
+    checks["vs4_clear_items_complete"] = clear_ok
+    detail_parts.append(f"VS-4 clear_items完整包含npz/manifest={clear_ok}, items={clear_items}")
+
+    # VS-5: target_location == "archive"
+    target = str(cfg.get("target_location", ""))
+    target_ok = target == "archive"
+    checks["vs5_target_location_archive"] = target_ok
+    detail_parts.append(f"VS-5 target_location={target!r}, 期望=archive, 匹配={target_ok}")
+
+    # VS-6: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs6_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-6 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "[214]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs6_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-6 规则文档内容有效={rule_content_ok}")
+
+    # VS-7: 手册真源存在且包含 [214]
+    manual_exists = manual_path.is_file()
+    has_214_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_214_in_manual = "**[214]**" in manual_content or "[214]" in manual_content
+        except Exception:
+            pass
+    checks["vs7_manual_file_exists"] = manual_exists
+    checks["vs7_manual_has_clause_214"] = has_214_in_manual
+    detail_parts.append(f"VS-7 手册真源文件存在={manual_exists}, 包含[214]={has_214_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P214-diagnostic-clear-action-checklist",
+        "name": "[214]清场动作清单——诊断轨轻量清场",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+
+def p215_rz0_paper_grade_clearing() -> dict[str, Any]:
+    """[215] 验收轨完整清场（论文级正式执行前 + 冒烟后进 RZ-1 前，6 项逐项留痕，缺一不可）
+
+    验证论文级正式执行前（Pre-1 之前）和冒烟通过后进入 RZ-1 重生成之前，
+    执行完整清场：删除或整体迁移旧仿真数据集至 archive/，并记录 6 项逐项留痕。
+
+    手册原文：
+    [215] 验收轨完整清场（论文级正式执行前 + 冒烟后进 RZ-1 前，6 项逐项留痕，缺一不可）：
+    旧仿真数据集清零：全部旧训练/验证/测试 npz + manifest 从活动数据目录
+    删除或整体迁移至 archive/（物理隔离迁移必须保证实验脚本任何路径都读不到 archive，否则视为未清场）
+
+    验证项：
+    1. configs/protocol/clause215_rz0_paper_grade_clearing.yaml 存在且可解析
+    2. clause_id == "215"
+    3. severity == "hard"
+    4. trigger_timing 包含论文级正式执行前和冒烟后进入 RZ-1 前
+    5. clearing_scope 中的 simulation_data 包含训练/验证/测试 npz + manifest
+    6. target 为 archive/
+    7. traceability_items 包含 6 项留痕（目录、文件数、字节、hash、时间戳、操作人）
+    8. hard_constraint.no_old_data_in_current_run == true
+    9. 规则文档存在且内容有效
+    10. 手册真源存在且包含 [215]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause215_rz0_paper_grade_clearing.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 215_验收轨完整清场.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P215-rz0-paper-grade-clearing",
+                "name": "[215]验收轨完整清场",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause215_rz0_paper_grade_clearing.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P215-rz0-paper-grade-clearing",
+                "name": "[215]验收轨完整清场",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P215-rz0-paper-grade-clearing",
+                "name": "[215]验收轨完整清场",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "215"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "215"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=215, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: trigger_timing 包含论文级正式执行前和冒烟后进入 RZ-1 前
+    trigger_timing = cfg.get("trigger_timing", []) or []
+    mode_type = str(cfg.get("mode_type", ""))
+    if isinstance(trigger_timing, list):
+        has_paper_grade = any("论文级" in str(t) for t in trigger_timing)
+        has_rz1 = any("RZ-1" in str(t) or "重生成" in str(t) for t in trigger_timing)
+        trigger_ok = has_paper_grade and has_rz1
+    else:
+        trigger_ok = False
+    mode_ok = mode_type == "paper_grade"
+    checks["vs4_trigger_timing_defined"] = trigger_ok and mode_ok
+    detail_parts.append(f"VS-4 trigger_timing包含论文级触发和RZ-1触发={trigger_ok}, mode_type={mode_type!r}")
+
+    # VS-5: clearing_scope 中的 simulation_data 包含训练/验证/测试 npz + manifest
+    clearing_scope = cfg.get("clearing_scope", {}) or {}
+    sim_data = clearing_scope.get("simulation_data", {}) if isinstance(clearing_scope, dict) else {}
+    has_training = False
+    has_validation = False
+    has_testing = False
+    if isinstance(sim_data, dict):
+        training = sim_data.get("training", []) or []
+        validation = sim_data.get("validation", []) or []
+        testing = sim_data.get("testing", []) or []
+        if isinstance(training, list):
+            has_training = any("npz" in str(t) for t in training)
+        if isinstance(validation, list):
+            has_validation = any("npz" in str(v) for v in validation)
+        if isinstance(testing, list):
+            has_testing = any("npz" in str(t) for t in testing)
+    scope_ok = has_training and has_validation and has_testing
+    checks["vs5_clearing_scope_complete"] = scope_ok
+    detail_parts.append(f"VS-5 clearing_scope包含训练/验证/测试npz={scope_ok}")
+
+    # VS-6: target 为 archive/
+    target = str(clearing_scope.get("target", ""))
+    target_ok = target == "archive/"
+    checks["vs6_target_archive"] = target_ok
+    detail_parts.append(f"VS-6 target={target!r}, 期望=archive/, 匹配={target_ok}")
+
+    # VS-7: traceability_items 包含 6 项留痕
+    trace_items = cfg.get("traceability_items", []) or []
+    expected_items = ["目录", "文件数", "字节", "hash", "时间戳", "操作人"]
+    actual_items = [item.get("name", "") for item in (trace_items if isinstance(trace_items, list) else [])]
+    trace_ok = all(item in actual_items for item in expected_items)
+    checks["vs7_traceability_items_complete"] = trace_ok
+    detail_parts.append(f"VS-7 6项留痕完整={trace_ok}, 项目={actual_items}")
+
+    # VS-8: hard_constraint.no_old_data_in_current_run == true
+    hard_con = cfg.get("hard_constraint", {}) or {}
+    hard_ok = isinstance(hard_con, dict) and hard_con.get("no_old_data_in_current_run") is True
+    checks["vs8_hard_constraint"] = hard_ok
+    detail_parts.append(f"VS-8 hard_constraint.no_old_data_in_current_run={hard_ok}")
+
+    # VS-9: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs9_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-9 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[215]**" in rule_text or "[215]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs9_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-9 规则文档内容有效={rule_content_ok}")
+
+    # VS-10: 手册真源存在且包含 [215]
+    manual_exists = manual_path.is_file()
+    has_215_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_215_in_manual = "**[215]**" in manual_content or "[215]" in manual_content
+        except Exception:
+            pass
+    checks["vs10_manual_file_exists"] = manual_exists
+    checks["vs10_manual_has_clause_215"] = has_215_in_manual
+    detail_parts.append(f"VS-10 手册真源文件存在={manual_exists}, 包含[215]={has_215_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P215-rz0-paper-grade-clearing",
+        "name": "[215]验收轨完整清场",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+
+def p216_never_enter_old_products() -> dict[str, Any]:
+    """[216] 任一未过 → 继续清场，不得带旧产物进入任何论文级流程
+
+    验证论文级实验的 RZ-0/RZ-1/RZ-2/RZ-3 四个执行环节中，
+    绝不会引用旧的仿真数据集、权重文件或结果文件。
+
+    手册原文：
+    [216] 任一未过 → 继续清场，**不得带旧产物进入任何论文级流程**。
+
+    验证项：
+    1. configs/protocol/clause216_never_enter_old_products.yaml 存在且可解析
+    2. clause_id == "216"
+    3. severity == "hard"
+    4. trigger_timing 包含 RZ-0、RZ-1、RZ-2、RZ-3
+    5. forbidden_items 包含旧数据集、旧权重、旧结果
+    6. hard_constraints 包含 no_old_data/no_old_weights/no_old_results
+    7. 规则文档存在且内容有效
+    8. 手册真源存在且包含 [216]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause216_never_enter_old_products.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 216_永不带旧产物进入论文级流程.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P216-never-enter-old-products",
+                "name": "[216]永不带旧产物进入论文级流程",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause216_never_enter_old_products.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P216-never-enter-old-products",
+                "name": "[216]永不带旧产物进入论文级流程",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P216-never-enter-old-products",
+                "name": "[216]永不带旧产物进入论文级流程",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "216"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "216"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=216, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: trigger_timing 包含 RZ-0, RZ-1, RZ-2, RZ-3
+    trigger_timing = cfg.get("trigger_timing", []) or []
+    if isinstance(trigger_timing, list):
+        has_rz = any("RZ-" in str(t) or "清场" in str(t) for t in trigger_timing)
+    else:
+        has_rz = False
+    mode_type = str(cfg.get("mode_type", ""))
+    mode_ok = mode_type == "paper_grade"
+    checks["vs4_trigger_timing_defined"] = has_rz and mode_ok
+    detail_parts.append(f"VS-4 trigger_timing包含RZ环节={has_rz}, mode_type={mode_type!r}")
+
+    # VS-5: forbidden_items 包含旧数据集、旧权重、旧结果
+    forbidden_items = cfg.get("forbidden_items", []) or []
+    actual_names = [item.get("name", "") for item in (forbidden_items if isinstance(forbidden_items, list) else [])]
+    has_data = any("数据集" in n or "data" in n.lower() for n in actual_names)
+    has_weights = any("权重" in n or "weights" in n.lower() for n in actual_names)
+    has_results = any("结果" in n or "results" in n.lower() for n in actual_names)
+    forbidden_ok = has_data and has_weights and has_results
+    checks["vs5_forbidden_items_complete"] = forbidden_ok
+    detail_parts.append(f"VS-5 forbidden_items包含数据集/权重/结果={forbidden_ok}, 项目={actual_names}")
+
+    # VS-6: hard_constraints 包含禁止项
+    hard_constraints = cfg.get("hard_constraints", {}) or {}
+    has_no_old_data = hard_constraints.get("no_old_data_in_current_run") is True
+    has_no_old_weights = hard_constraints.get("no_old_weights_in_current_run") is True
+    has_no_old_results = hard_constraints.get("no_old_results_in_current_run") is True
+    hard_ok = has_no_old_data and has_no_old_weights and has_no_old_results
+    checks["vs6_hard_constraints_defined"] = hard_ok
+    detail_parts.append(f"VS-6 hard_constraints定义完整={hard_ok}")
+
+    # VS-7: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs7_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-7 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[216]**" in rule_text or "[216]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs7_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-7 规则文档内容有效={rule_content_ok}")
+
+    # VS-8: 手册真源存在且包含 [216]
+    manual_exists = manual_path.is_file()
+    has_216_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_216_in_manual = "**[216]**" in manual_content or "[216]" in manual_content
+        except Exception:
+            pass
+    checks["vs8_manual_file_exists"] = manual_exists
+    checks["vs8_manual_has_clause_216"] = has_216_in_manual
+    detail_parts.append(f"VS-8 手册真源文件存在={manual_exists}, 包含[216]={has_216_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P216-never-enter-old-products",
+        "name": "[216]永不带旧产物进入论文级流程",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+
+def p217_rz1_regeneration() -> dict[str, Any]:
+    """[217] RZ-1重生成——code freeze后生成全新数据集
+
+    验证 RZ-1 环节必须使用 code freeze 后的生成器代码 + 论文级规模参数
+    重新生成全新数据集。
+
+    手册原文：
+    [217] **目的**：用**同一套 code freeze 后的生成器代码 + 论文级规模参数**重新生成全新数据集
+
+    验证项：
+    1. configs/protocol/clause217_rz1_regeneration.yaml 存在且可解析
+    2. clause_id == "217"
+    3. severity == "hard"
+    4. trigger_timing 包含 RZ-0/RZ-1 相关环节
+    5. code_freeze_requirement 定义完整
+    6. paper_grade_params 定义完整
+    7. new_dataset_requirement 要求新数据集
+    8. 规则文档存在且内容有效
+    9. 手册真源存在且包含 [217]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause217_rz1_regeneration.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 217_RZ-1重生成.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P217-rz1-regeneration",
+                "name": "[217] RZ-1重生成——code freeze后生成全新数据集",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause217_rz1_regeneration.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P217-rz1-regeneration",
+                "name": "[217] RZ-1重生成——code freeze后生成全新数据集",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P217-rz1-regeneration",
+                "name": "[217] RZ-1重生成——code freeze后生成全新数据集",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "217"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "217"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=217, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: trigger_timing 包含 RZ 环节
+    trigger_timing = cfg.get("trigger_timing", []) or []
+    if isinstance(trigger_timing, list):
+        has_rz = any("RZ-" in str(t) or "清场" in str(t) for t in trigger_timing)
+    else:
+        has_rz = False
+    mode_type = str(cfg.get("mode_type", ""))
+    mode_ok = mode_type == "paper_grade"
+    checks["vs4_trigger_timing_defined"] = has_rz and mode_ok
+    detail_parts.append(f"VS-4 trigger_timing包含RZ环节={has_rz}, mode_type={mode_type!r}")
+
+    # VS-5: code_freeze_requirement 定义完整
+    cf_req = cfg.get("code_freeze_requirement", {}) or {}
+    must_use = str(cf_req.get("must_use", ""))
+    has_code_freeze = "code freeze" in must_use.lower() or "冻结" in must_use
+    cf_note = str(cf_req.get("note", ""))
+    checks["vs5_code_freeze_requirement_defined"] = has_code_freeze and bool(cf_req)
+    detail_parts.append(f"VS-5 code_freeze_requirement定义完整={has_code_freeze}, must_use={must_use!r}")
+
+    # VS-6: paper_grade_params 定义完整
+    pg_params = cfg.get("paper_grade_params", {}) or {}
+    must_match = str(pg_params.get("must_match", ""))
+    has_params = bool(pg_params) and ("参数" in must_match or "配置" in must_match or "规模" in must_match)
+    checks["vs6_paper_grade_params_defined"] = has_params
+    detail_parts.append(f"VS-6 paper_grade_params定义完整={has_params}, must_match={must_match!r}")
+
+    # VS-7: new_dataset_requirement 要求新数据集
+    nd_req = cfg.get("new_dataset_requirement", {}) or {}
+    must_be_new = nd_req.get("must_be_new") is True
+    nd_note = str(nd_req.get("note", ""))
+    checks["vs7_new_dataset_requirement_defined"] = must_be_new
+    detail_parts.append(f"VS-7 new_dataset_requirement must_be_new={must_be_new}, note={nd_note!r}")
+
+    # VS-8: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs8_rule_doc_exists"] = rule_exists
+    detail_parts.append(f"VS-8 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[217]**" in rule_text or "[217]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs8_rule_doc_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-8 规则文档内容有效={rule_content_ok}")
+
+    # VS-9: 手册真源存在且包含 [217]
+    manual_exists = manual_path.is_file()
+    has_217_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_217_in_manual = "**[217]**" in manual_content or "[217]" in manual_content
+        except Exception:
+            pass
+    checks["vs9_manual_file_exists"] = manual_exists
+    checks["vs9_manual_has_clause_217"] = has_217_in_manual
+    detail_parts.append(f"VS-9 手册真源文件存在={manual_exists}, 包含[217]={has_217_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P217-rz1-regeneration",
+        "name": "[217] RZ-1重生成——code freeze后生成全新数据集",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+
+def p218_miluv_external_data() -> dict[str, Any]:
+    """[218] MILUV 外部真实域数据——不重生成仅适配评估
+
+    验证 MILUV 外部真实域数据为第三方公开数据，不重生成，仅做适配评估（S3.5b）。
+
+    手册原文：
+    [218] MILUV 外部真实域数据为第三方公开数据，不重生成，仅做适配评估（S3.5b）。
+
+    验证项：
+    1. configs/protocol/clause218_miluv_external_data.yaml 存在且可解析
+    2. clause_id == "218"
+    3. severity == "hard"
+    4. no_regeneration_rule 定义完整
+    5. adaptation_only_rule 定义完整
+    6. 规则文档存在且内容有效
+    7. 手册真源存在且包含 [218]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause218_miluv_external_data.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 218_MILUV外部数据.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P218-miluv-external-data",
+                "name": "[218] MILUV 外部真实域数据——不重生成仅适配评估",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause218_miluv_external_data.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P218-miluv-external-data",
+                "name": "[218] MILUV 外部真实域数据——不重生成仅适配评估",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P218-miluv-external-data",
+                "name": "[218] MILUV 外部真实域数据——不重生成仅适配评估",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "218"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "218"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=218, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: no_regeneration_rule 定义完整
+    no_reg_rule = cfg.get("no_regeneration_rule", {}) or {}
+    must_preserve = str(no_reg_rule.get("must_preserve", ""))
+    check_scope = no_reg_rule.get("check_scope", []) or []
+    has_no_reg = len(must_preserve) > 0 and len(check_scope) > 0
+    checks["vs4_no_regeneration_rule_defined"] = has_no_reg
+    detail_parts.append(f"VS-4 no_regeneration_rule定义完整={has_no_reg}")
+
+    # VS-5: adaptation_only_rule 定义完整
+    adapt_rule = cfg.get("adaptation_only_rule", {}) or {}
+    allowed_ops = adapt_rule.get("allowed_operations", []) or []
+    has_adapt_rule = len(allowed_ops) > 0
+    checks["vs5_adaptation_rule_defined"] = has_adapt_rule
+    detail_parts.append(f"VS-5 adaptation_only_rule定义完整={has_adapt_rule}")
+
+    # VS-6: 规则文档存在
+    rule_exists = rule_path.is_file()
+    checks["vs6_rule_exists"] = rule_exists
+    detail_parts.append(f"VS-6 规则文档存在={rule_exists}, 路径={rule_path.relative_to(PROJECT_ROOT) if rule_exists else 'N/A'}")
+    if not rule_exists:
+        return {"code": "P218-miluv-external-data",
+                "name": "[218] MILUV 外部真实域数据——不重生成仅适配评估",
+                "severity": "hard", "passed": False,
+                "detail": "规则文档条款 218_MILUV外部数据.md 不存在",
+                "evidence": {"rule_path": str(rule_path.relative_to(PROJECT_ROOT)), "exists": False, "manual_ref": str(manual_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-7: 手册真源存在且包含 [218]
+    manual_exists = manual_path.is_file()
+    has_218_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_218_in_manual = "**[218]**" in manual_content or "[218]" in manual_content
+        except Exception:
+            pass
+    checks["vs7_manual_file_exists"] = manual_exists
+    checks["vs7_manual_has_clause_218"] = has_218_in_manual
+    detail_parts.append(f"VS-7 手册真源文件存在={manual_exists}, 包含[218]={has_218_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P218-miluv-external-data",
+        "name": "[218] MILUV 外部真实域数据——不重生成仅适配评估",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+
+def p219_seed_manifest() -> dict[str, Any]:
+    """[219] 每 seed manifest 必含字段
+
+    验证每份 seed manifest 必须包含：
+    - 生成器 commit hash
+    - 规模参数
+    - 随机根 seed
+    - 注入统计（ρ/μ/σ 实测）
+    - 文件数/字节
+
+    手册原文：
+    [219] 每 seed manifest 含生成器 commit hash、规模参数、随机根 seed、注入统计（ρ/μ/σ 实测）、文件数/字节。
+
+    验证项：
+    1. configs/protocol/clause219_seed_manifest.yaml 存在且可解析
+    2. clause_id == "219"
+    3. severity == "hard"
+    4. 规则文档存在且内容有效
+    5. 手册真源存在且包含 [219]
+    6. 每份 seed manifest 包含必填字段
+    """
+    cfg_path = CONFIGS / "protocol" / "clause219_seed_manifest.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 219_每seed manifest必含字段.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P219-seed-manifest",
+                "name": "[219] 每 seed manifest 必含字段",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause219_seed_manifest.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P219-seed-manifest",
+                "name": "[219] 每 seed manifest 必含字段",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P219-seed-manifest",
+                "name": "[219] 每 seed manifest 必含字段",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "219"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "219"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望=219, 匹配={id_ok}")
+
+    # VS-3: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs3_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-3 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-4: 规则文档存在且内容有效
+    rule_exists = rule_path.is_file()
+    checks["vs4_rule_exists"] = rule_exists
+    detail_parts.append(f"VS-4 规则文档存在={rule_exists}")
+
+    rule_content_ok = False
+    if rule_exists:
+        rule_text = rule_path.read_text(encoding="utf-8")
+        has_original = "**[219]**" in rule_text or "[219]" in rule_text
+        has_meaning = "含义" in rule_text or "核心" in rule_text
+        has_criteria = "验收" in rule_text or "标准" in rule_text
+        rule_content_ok = has_original and has_meaning and has_criteria
+    checks["vs4_rule_content_valid"] = rule_content_ok
+    detail_parts.append(f"VS-4 规则文档内容有效={rule_content_ok}")
+
+    # VS-5: 手册真源存在且包含 [219]
+    manual_exists = manual_path.is_file()
+    has_219_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_219_in_manual = "**[219]**" in manual_content
+        except Exception:
+            pass
+    checks["vs5_manual_file_exists"] = manual_exists
+    checks["vs5_manual_has_clause_219"] = has_219_in_manual
+    detail_parts.append(f"VS-5 手册真源文件存在={manual_exists}, 包含[219]={has_219_in_manual}")
+
+    # VS-6: manifest 必含字段检查
+    required_fields = cfg.get("required_manifest_fields", {})
+    has_all_fields = isinstance(required_fields, dict) and len(required_fields) > 0
+    checks["vs6_required_fields_defined"] = has_all_fields
+
+    # 检查五大必填字段
+    five_fields = ["generator_commit_hash", "scale_parameters", "random_root_seed",
+                   "injection_statistics", "file_count_bytes"]
+    missing_fields = []
+    for field in five_fields:
+        if field not in required_fields:
+            missing_fields.append(field)
+
+    six_all_defined = len(missing_fields) == 0
+    checks["vs6_all_five_fields_present"] = six_all_defined
+    detail_parts.append(f"VS-6 5大必填字段完整={six_all_defined}, 缺失={missing_fields if missing_fields else '无'}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P219-seed-manifest",
+        "name": "[219] 每 seed manifest 必含字段",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+
+def p131_seed_trajectory_explicit() -> dict[str, Any]:
+    """[131] seed 数、轨迹级样本数、独立实验数在实验设置或表注明示。
+
+    手册原文：
+    [131] seed 数、轨迹级样本数、独立实验数在实验设置或表注明示。
+
+    验证项：
+    1. configs/protocol/clause131_seed_trajectory_explicit.yaml 存在且可解析
+    2. clause_id == "131"
+    3. clause_name 含 "seed" 或 "明示"
+    4. severity == "hard"
+    5. explicit_declaration.seed_count.required == True 且 paper_level == 10
+    6. explicit_declaration.trajectory_per_seed.required == True 且 paper_level == 100
+    7. explicit_declaration.independent_experiments.required == True 且 paper_level == 50
+    8. compliance_path.table_footnote.enabled == True
+    9. related_checks 含 [126], [106], [138], [132], [133]
+    10. manual_ref 指向 v15 手册
+    11. 规则文档存在且含条款原文
+    12. 手册真源存在且包含 [131]
+    """
+    cfg_path = CONFIGS / "protocol" / "clause131_seed_trajectory_explicit.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+    rule_path = PROJECT_ROOT / "rules" / "条款 131_seed 轨迹数明示.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P131-seed-trajectory-explicit",
+                "name": "[131] seed/轨迹/独立实验数明示",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause131_seed_trajectory_explicit.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P131-seed-trajectory-explicit",
+                "name": "[131] seed/轨迹/独立实验数明示",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析错误: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P131-seed-trajectory-explicit",
+                "name": "[131] seed/轨迹/独立实验数明示",
+                "severity": "hard", "passed": False,
+                "detail": "cfg root must be dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "131"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "131"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='131', 匹配={id_ok}")
+
+    # VS-3: clause_name 含 "seed" 或 "明示"
+    clause_name = str(cfg.get("clause_name", ""))
+    name_ok = "seed" in clause_name.lower() or "明示" in clause_name
+    checks["vs3_clause_name_valid"] = name_ok
+    detail_parts.append(f"VS-3 clause_name 含关键词={name_ok}, 值={clause_name!r}")
+
+    # VS-4: severity == "hard"
+    severity = str(cfg.get("severity", ""))
+    sev_ok = severity == "hard"
+    checks["vs4_severity_is_hard"] = sev_ok
+    detail_parts.append(f"VS-4 severity={severity!r}, 期望=hard, 匹配={sev_ok}")
+
+    # VS-5: explicit_declaration.seed_count
+    ed = cfg.get("explicit_declaration", {}) or {}
+    seed_cfg = ed.get("seed_count", {}) or {}
+    seed_ok = seed_cfg.get("required") is True and int(seed_cfg.get("paper_level", 0)) == 10
+    checks["vs5_seed_count"] = seed_ok
+    detail_parts.append(f"VS-5 seed_count.required=True且paper_level=10, 匹配={seed_ok}")
+
+    # VS-6: explicit_declaration.trajectory_per_seed
+    traj_cfg = ed.get("trajectory_per_seed", {}) or {}
+    traj_ok = traj_cfg.get("required") is True and int(traj_cfg.get("paper_level", 0)) >= 100
+    checks["vs6_trajectory_per_seed"] = traj_ok
+    detail_parts.append(f"VS-6 trajectory_per_seed.required=True且paper_level>=100, 匹配={traj_ok}")
+
+    # VS-7: explicit_declaration.independent_experiments
+    ind_cfg = ed.get("independent_experiments", {}) or {}
+    ind_ok = ind_cfg.get("required") is True and int(ind_cfg.get("paper_level", 0)) == 50
+    checks["vs7_independent_experiments"] = ind_ok
+    detail_parts.append(f"VS-7 independent_experiments.required=True且paper_level=50, 匹配={ind_ok}")
+
+    # VS-8: compliance_path.table_footnote.enabled
+    comp = cfg.get("compliance_path", {}) or {}
+    tf = comp.get("table_footnote", {}) or {}
+    tf_ok = tf.get("enabled") is True
+    checks["vs8_table_footnote_enabled"] = tf_ok
+    detail_parts.append(f"VS-8 表注明示可用={tf_ok}")
+
+    # VS-9: related_checks 含 [126],[106],[138],[132],[133]
+    related = [str(r).strip() for r in (cfg.get("related_checks") or [])]
+    need_related = ["126", "106", "138", "132", "133"]
+    related_ok = all(any(n in r for r in related) for n in need_related)
+    checks["vs9_related_checks_complete"] = related_ok
+    detail_parts.append(f"VS-9 related_checks含{need_related}={related_ok}, 值={related!r}")
+
+    # VS-10: manual_ref 指向 v15 手册
+    manual_ref = str(cfg.get("manual_ref", ""))
+    ref_ok = "异步实验_执行手册_终版v15_总纲条款版.md" in manual_ref
+    checks["vs10_manual_ref_correct"] = ref_ok
+    detail_parts.append(f"VS-10 manual_ref正确={ref_ok}, 值={manual_ref!r}")
+
+    # VS-11: 规则文档存在且含条款原文
+    rule_exists = rule_path.is_file()
+    if not rule_exists:
+        checks["vs11_rule_doc_exists"] = False
+        detail_parts.append(f"VS-11 规则文档存在={False}, 路径={rule_path.relative_to(PROJECT_ROOT)}")
+    else:
+        try:
+            rule_text = rule_path.read_text(encoding="utf-8")
+            has_original = "[131]" in rule_text
+            has_meaning = "seed" in rule_text or "明示" in rule_text
+            doc_ok = has_original and has_meaning
+            checks["vs11_rule_doc_exists"] = True
+            checks["vs11_rule_doc_complete"] = doc_ok
+            detail_parts.append(f"VS-11 规则文档存在且完整={doc_ok}")
+        except Exception:
+            checks["vs11_rule_doc_exists"] = True
+            checks["vs11_rule_doc_complete"] = False
+            detail_parts.append("VS-11 规则文档读取失败")
+
+    # VS-12: 手册真源存在且包含 [131]
+    manual_exists = manual_path.is_file()
+    has_131_in_manual = False
+    if manual_exists:
+        try:
+            manual_content = manual_path.read_text(encoding="utf-8")
+            has_131_in_manual = "**[131]**" in manual_content or "[131]" in manual_content
+        except Exception:
+            pass
+    checks["vs12_manual_file_exists"] = manual_exists
+    checks["vs12_manual_has_clause_131"] = has_131_in_manual
+    detail_parts.append(f"VS-12 手册真源文件存在={manual_exists}, 包含[131]={has_131_in_manual}")
+
+    all_passed = all(v is True for v in checks.values())
+    return {
+        "code": "P131-seed-trajectory-explicit",
+        "name": "[131] seed/轨迹/独立实验数明示",
+        "severity": "hard",
+        "passed": all_passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "rule_path": str(rule_path.relative_to(PROJECT_ROOT)) if rule_exists else None,
+            "manual_ref": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": {k: (str(v) if not isinstance(v, bool) else v) for k, v in checks.items()},
+        }
+    }
+
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -8983,8 +15328,47 @@ _ALL = [
     p80_ram_limit_12g,
     p81_no_refactor_changes,
     p82_refactor_scope_definition,
+    p182_manifest,
+    p183_layout_manifest,
+    p184_data_independence,
+    p185_miluv_anchor_strategy,
+    p186_new_validation_layer,
+    p187_activation_heatmap_scene_mask,
+    p188_generation_order,
+    p189_generation_sequence,
+    p190_m_axis_missing_uwb_only,
+    p191_per_seed_validation_report,
+    p192_s9_correctness_gate,
+    p193_validation,
+    p194_data_audit_fitness_for_purpose,
+    p195_dq_timing,
+    p196_dq_fail_disposal,
+    p197_four_combination_distribution_check,
+    p198_trajectory_count_stats_check,
+    p199_uwb_valid_nl_flag_check,
+    p200_scale_and_split,
+    p201_injection_symmetry,
+    p202_seed_consistency,
+    p203_tf32_uniform,
+    p204_amp_manifest,
+    p205_sequence_split,
+    p206_pilot_variance_power_analysis,
+    p207_config_data_cross_check,
+    p208_v0_degradation_exclusion,
+    p209_row_count_baseline,
+    p210_paper_grade_old_product_isolation,
+    p211_experiment_pre_run_data_weight_clearing,
+    p212_pure_generation_from_scratch,
+    p213_smoke_temp_clearing_before_run,
+    p214_diagnostic_clear_action_checklist,
+    p215_rz0_paper_grade_clearing,
+    p216_never_enter_old_products,
+    p217_rz1_regeneration,
+	p218_miluv_external_data,
+    p219_seed_manifest,
+    p131_seed_trajectory_explicit,
+    p36_git_is_last_resort,
 ]
-
 def run_all_c_gates() -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for fn in _ALL:

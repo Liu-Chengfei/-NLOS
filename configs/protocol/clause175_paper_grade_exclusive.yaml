@@ -1,0 +1,91 @@
+# 条款 [175] 论文级独占 + 资源闸门合并核算（线程级）
+# 手册原文：论文级（RZ-1 重生成/RZ-2 重训/全量 10 seed × 5 方法 = 50 单元）永远只由主控线程独占运行（同纪律），论文级运行期间其余线程只做不占训练资源的只读工作
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 570 行
+
+clause_id: "175"
+clause_name: "论文级独占 + 资源闸门合并核算（线程级）"
+severity: hard
+
+# 论文级规模定义
+paper_grade_scale:
+  rzu_chain:
+    rz1_regen: "RZ-1 重生成"
+    rz2_retrain: "RZ-2 重训"
+  # 论文级满额规模（硬约束）
+  seed_count: 10
+  method_count: 5
+  total_units: 50
+  description: "论文级规模 = RZ-1 重生成 + RZ-2 重训 + 全量 10 seed × 5 方法 = 50 单元"
+
+# 主控线程独占
+exclusive_thread:
+  # 论文级永远只由主控线程独占运行
+  paper_grade_exclusive_to_main_thread: true
+  # 同纪律（与 [174] 主执行通道独占同原则）
+  same_discipline_as_clause174: true
+  description: >
+    论文级（RZ-1 重生成/RZ-2 重训/全量 10 seed × 5 方法 = 50 单元）
+    永远只由主控线程独占运行，不得被其他线程抢占或共享训练资源。
+
+# 其余线程只读约束
+other_thread_readonly:
+  allowed_work: "不占训练资源的只读工作"
+  forbidden_work:
+    - "占用 GPU 训练资源"
+    - "占用显存做训练"
+    - "启动新的训练单元"
+    - "占用数据生成器写入活动目录"
+  allowed_work_list:
+    - "结果评估（只读）"
+    - "统计计算（只读，不占 GPU）"
+    - "代码审计（只读）"
+    - "日志记录（只读）"
+  description: "论文级运行期间，其余线程只做不占训练资源的只读工作"
+
+# 资源闸门
+resource_gate:
+  gate_name: "论文级独占资源闸门"
+  merge_accounting: true
+  merge_clause: "[174] 论文级实验唯一归属 + 资源闸门合并核算"
+  description: >
+    论文级独占（线程级 [175]）与主执行通道独占（[174]）合并核算，
+    确保论文级区间内无任何非论文级任务占用训练资源。
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "论文级期间其他线程占用 GPU 做训练"
+    - "论文级期间其他线程抢占主控线程资源"
+    - "非论文级任务在论文级运行期间启动新训练单元"
+  required:
+    - "paper_grade_exclusive_to_main_thread = true"
+    - "other_thread_readonly.allowed_work 仅含只读工作"
+    - "resource_gate.merge_accounting = true"
+
+# 相关条款映射
+related_checks:
+  - "35"    # 主执行通道独占重跑（同纪律来源）
+  - "174"   # 论文级实验唯一归属 + 资源闸门合并核算（通道级）
+  - "213"   # 冒烟通过后清场（进入 RZ-1 前）
+  - "235"   # 论文级区间互斥（两实验不同时跑论文级）
+
+# 约束声明
+constraint_declaration:
+  clause_id: "175"
+  binding_level: "hard"
+  violation_consequence: "论文级独占违反 → 该次论文级运行作废，须回到 RZ-0 清场后重跑"
+  related_clauses:
+    - "[35] 主执行通道独占重跑"
+    - "[174] 论文级实验唯一归属 + 资源闸门合并核算（通道级）"
+    - "[213] 冒烟通过后清场"
+    - "[235] 论文级区间互斥"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: >
+  本条款与 [174] 互补：[174] 从"通道"视角约束论文级唯一归属（主执行通道独占），
+  [175] 从"线程"视角约束论文级独占运行（主控线程独占，其余线程只读）。
+  论文级运行期间（RZ-1→RZ-3），任何线程不得占用训练资源启动新的论文级或全量单元，
+  其余线程只能做评估、统计、审计等只读不占训练资源的工作。

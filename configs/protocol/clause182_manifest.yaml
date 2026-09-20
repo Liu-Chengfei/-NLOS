@@ -1,0 +1,172 @@
+# 条款 [182] · 每个 seed 的 manifest JSON 内容要求
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 584 行
+
+clause_id: "182"
+clause_name: "manifest 内容要求"
+severity: hard
+
+# 核心约束：每个 seed 一个 JSON manifest，包含完整场景与注入信息
+manifest:
+  # 必须包含的字段
+  required_fields:
+    - "场景图"
+    - "锚点坐标"
+    - "档位"
+    - "各组合轨迹数"
+    - "注入统计_ρ_μ_σ"
+    - "随机源_seed"
+    - "外参_T_cam_imu"
+    - "杆臂_lever_arm"
+
+  # 各字段说明
+  field_definitions:
+    场景图:
+      description: "当前 seed 的场景图（tag 位置、数量、拓扑）"
+      type: "object"
+      required: true
+
+    锚点坐标:
+      description: "所有锚点在该 seed 场景下的坐标（S2 坐标系）"
+      type: "array"
+      required: true
+
+    档位:
+      description: "A2/A3（LOS/NLOS 注入档位）与 N2/N3（无迹/带迹注入档位）的组合，四组合各占 25%"
+      type: "string"
+      enum:
+        - "A2N2"
+        - "A2N3"
+        - "A3N2"
+        - "A3N3"
+      required: true
+      distribution_note: "A2/A3 与 N2/N3 两两组合，共四组合，各组合轨迹数应各占 25%"
+
+    各组合轨迹数:
+      description: "四个档位组合（A2N2/A2N3/A3N2/A3N3）各自的轨迹数量"
+      type: "object"
+      required: true
+      expected_keys:
+        - "A2N2"
+        - "A2N3"
+        - "A3N2"
+        - "A3N3"
+
+    注入统计_ρ_μ_σ:
+      description: "实际注入的 LOS/NLOS 统计参数（ρ 比例、μ 均值、σ 标准差）"
+      type: "object"
+      required: true
+      fields:
+        - "ρ"
+        - "μ"
+        - "σ"
+
+    随机源_seed:
+      description: "该 seed 的随机数生成器种子"
+      type: "integer"
+      required: true
+
+    外参_T_cam_imu:
+      description: "相机到 IMU 的外参变换矩阵 T_cam_imu（4x4 齐次矩阵）"
+      type: "matrix"
+      required: true
+      note: "按理想值固定，与 S4.2 依据 4 一致"
+
+    杆臂_lever_arm:
+      description: "IMU 相对 tag 中心的杆臂（lever arm，单位：米）"
+      type: "vector"
+      required: true
+      note: "按理想值固定，与 S4.2 依据 4 一致"
+
+# 档位分布约束
+gear_distribution:
+  required_combinations:
+    - "A2N2"
+    - "A2N3"
+    - "A3N2"
+    - "A3N3"
+  expected_ratio: "各 25%"
+  tolerance: 0.05  # 允许 ±5% 偏差
+
+# 外参/杆臂约束
+extrinsic_lever_arm:
+  cam_imu_extrinsic:
+    name: "T_cam_imu"
+    type: "fixed_ideal"
+    note: "与 S4.2 依据 4 一致"
+  lever_arm:
+    name: "IMU_to_tag_center"
+    type: "fixed_ideal"
+    note: "与 S4.2 依据 4 一致"
+
+# 验证项
+verification_items:
+  # 1. manifest JSON 文件存在（每个 seed 一个）
+  manifest_json_exists_per_seed: true
+
+  # 2. 所有 required_fields 非空
+  all_required_fields_present: true
+
+  # 3. 档位为四组合之一
+  gear_is_valid_combination: true
+
+  # 4. 四组合比例各约 25%
+  gear_distribution_25_each: true
+
+  # 5. 注入统计包含 ρ/μ/σ
+  injection_stats_has_rmu_sigma: true
+
+  # 6. 随机源 seed 为整数
+  seed_is_integer: true
+
+  # 7. 外参 T_cam_imu 存在且非空
+  cam_imu_extrinsic_present: true
+
+  # 8. 杆臂 lever arm 存在且非空
+  lever_arm_present: true
+
+# 相关条款映射
+related_checks:
+  - "179"   # 10 seed 为论文级唯一执行基线
+  - "180"   # 时空对齐是紧耦合成立的前置条件
+  - "181"   # 未裁决期间照常按 K1 档执行
+  - "183"   # 每布局全部参数 + 随机根种子写入该布局 manifest
+  - "506"   # S2 锚点实测非对称无共线，GDOP≈1.19
+  - "S4.2"  # S4.2 依据 4（外参/杆臂理想值固定）
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "seed manifest 缺失任何 required_fields"
+    - "档位非 A2N2/A2N3/A3N2/A3N3 四组合之一"
+    - "四组合轨迹数比例偏离 25% 超过 ±5%"
+    - "注入统计缺少 ρ/μ/σ 任一参数"
+    - "外参 T_cam_imu 或杆臂 lever arm 未写入 manifest"
+    - "随机源 seed 缺失或非整数"
+  required:
+    - "每个 seed 必须有一个对应的 manifest JSON"
+    - "manifest 必须包含所有 required_fields"
+    - "档位必须为四组合之一且各约 25%"
+    - "注入统计必须包含 ρ/μ/σ 实际值"
+    - "外参/杆臂按 S4.2 依据 4 理想值固定并写入 manifest"
+
+# 约束声明
+constraint_declaration:
+  clause_id: "182"
+  binding_level: "hard"
+  violation_consequence: "manifest 缺少 required_fields → 该 seed 数据不完整，须 RZ-1 重生成；档位比例严重偏离 → 检查数据生成管线；外参/杆臂未写入 → 数据不可追溯，须补充"
+  related_clauses:
+    - "[179] 10 seed 为论文级唯一执行基线"
+    - "[180] 时空对齐是紧耦合成立的前置条件"
+    - "[181] 未裁决期间照常按 K1 档执行"
+    - "[183] 每布局全部参数 + 随机根种子写入该布局 manifest"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: >
+  本条款规定每个 seed 的 manifest JSON 必须包含完整的场景与注入信息。
+  核心要求包括：场景图、锚点坐标、档位四组合（A2N2/A2N3/A3N2/A3N3 各 25%）、
+  各组合轨迹数、注入统计（ρ/μ/σ 实际值）、随机源 seed、
+  外参 T_cam_imu 与杆臂 lever arm（按 S4.2 依据 4 理想值固定）。
+  manifest 是数据可追溯性的核心载体，缺失字段将导致该 seed 数据不可审计。

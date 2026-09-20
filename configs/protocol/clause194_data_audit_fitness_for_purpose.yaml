@@ -1,0 +1,67 @@
+# 条款 [194] · 数据审计与 fitness-for-purpose 评估（data-centric 核心共识）
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 615 行
+
+clause_id: "194"
+clause_name: "数据审计与fitness-for-purpose：数据为中心方法论核心共识"
+severity: hard
+
+purpose: |
+  数据审计（data audit）与"数据集是否适配研究问题"（fitness-for-purpose）评估
+  是数据为中心（data-centric）方法论的核心共识：
+  数据质量（缺失/噪声/偏差/污染/泄漏）是评估虚高与负结果的首要风险源，
+  数据审计必须前置到实验准备/数据生成阶段，
+  负结果报告须区分"方法失败"与"数据不支持该问题"。
+
+data_audit_spec:
+  purpose: "数据审计前置到实验准备/数据生成阶段"
+  quality_dimensions:
+    - "缺失（missing data）"
+    - "噪声（noise）"
+    - "偏差（bias）"
+    - "污染（contamination）"
+    - "泄漏（leakage）"
+  risk_source: "数据质量问题是评估虚高与负结果的首要风险源"
+  timing:
+    requirement: "前置到实验准备/数据生成阶段"
+    not_allowed_after: "全量训练完成后"
+    forbidden_timing:
+      - "负结果分析时才开始数据审计"
+      - "DQ 检查阶段才开始数据审计"
+
+  fitness_for_purpose:
+    description: "数据集是否适配研究问题（fitness-for-purpose）评估"
+    relation_to_dq: "DQ-1–DQ-4 为 fitness-for-purpose 的具体实现"
+    negative_result_distinction:
+      - "方法失败：执行/代码根因确认后的结论"
+      - "数据不支持该问题：数据本身缺陷导致的结论"
+
+verification_items:
+  data_audit_prerequisite:
+    description: "数据审计必须前置到实验准备/数据生成阶段"
+    checks:
+      - data_audit_before_training
+      - data_quality_dimensions_specified
+      - negative_result_distinction_defined
+
+related_clauses:
+  - "192"
+  - "193"
+  - "195"
+  - "196"
+  - "206"
+  - "220"
+  - "268"
+
+boundaries:
+  forbidden:
+    - "后置数据审计（训练后才检查数据质量）"
+    - "不区分方法失败与数据不支持该问题"
+    - "忽略数据质量维度（缺失/噪声/偏差/污染/泄漏）"
+    - "用 fitness-for-purpose 替代数据审计"
+  required:
+    - "数据审计在 S9 校验之前或同时执行"
+    - "负结果报告须明确标注是'方法失败'还是'数据不支持该问题'"
+    - "DQ-1–DQ-4 构成 fitness-for-purpose 的具体核对项"
+    - "数据质量各维度须在数据生成阶段可追溯"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

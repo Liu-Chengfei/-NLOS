@@ -1,0 +1,20 @@
+# [136] N1.5 排除声明 — N1.5 属于同机另一实验体系档位
+# 对应手册第 136 条 (docs/异步实验_执行手册_终版 v15_总纲条款版.md 第 486 行)
+clause_id: "136"
+clause_name: "N1.5 排除（同机另一实验体系档位）"
+scope_note: "N1.5 属于同机另一实验体系按其各自对应协议文件执行的档位（消融版协议 N 轴标准档），不在本手册档位协议条款（本手册引用版协议 N 轴为 N0–N3）档位表内"
+n15_classification:
+  belongs_to: "同机另一实验体系"
+  type: "消融版协议 N 轴标准档"
+  in_this_manual_gears_table: false
+this_manual_n_axis: [N0, N1, N2, N3]
+n15_params:
+  rho: "20-25%"
+  mu: "1.5-2.5m"
+  sigma: "0.5m"
+exclusion_scope:
+  experiment_config_check: "不涉及 N1.5"
+  precheck_config_check: "不涉及 N1.5"
+  config_verification: "不涉及 N1.5"
+reason: "本手册引用协议 N 轴为 N0–N3，不包含 N1.5；N1.5 按同机另一实验体系各自协议文件执行"
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第 486 行"

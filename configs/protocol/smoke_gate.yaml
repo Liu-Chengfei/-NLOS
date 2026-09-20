@@ -1,0 +1,69 @@
+# 条款 [81] 冒烟；验收人/验收机制配置
+# 手册原文：冒烟；验收人/验收机制（自交自验 = 未过）：冒烟运行脚本 exit 码 + 日志断言探针（d：批形状/loss 轨迹/梯度范数）+ 统计 gate 自动输出比对
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第309行
+
+clause_id: "81"
+clause_name: "冒烟；验收人/验收机制"
+
+# 验收机制声明
+acceptance_mechanism:
+  self_judge_is_failure: true
+  description: "自交自验 = 未过：执行者不可自行判定自己的工作通过验收"
+  independent_verifier_required: true
+
+# 冒烟运行脚本验证
+smoke_test:
+  required: true
+  description: "冒烟运行脚本必须存在且可执行"
+
+  # exit 码验证
+  exit_code_assertion:
+    required: true
+    description: "冒烟运行脚本 exit 码必须为 0（成功）"
+    expected_exit_code: 0
+
+  # 日志断言探针
+  log_assertion_probes:
+    required: true
+    description: "日志中必须包含断言探针"
+    probe_items:
+      - name: "batch_shape"
+        description: "批形状断言（如 shape[0]=16）"
+        required: true
+        check_method: "grep 日志中的 shape 关键字"
+
+      - name: "loss_trajectory"
+        description: "loss 轨迹断言（监控 loss 下降趋势）"
+        required: true
+        check_method: "grep 日志中的 loss 关键字"
+
+      - name: "gradient_norm"
+        description: "梯度范数断言（监控梯度范数不爆炸）"
+        required: true
+        check_method: "grep 日志中的 gradient 或 grad_norm 关键字"
+
+    minimum_probe_types: 2
+    required_probe_types:
+      - "loss_trajectory"
+      - "gradient_norm"
+
+# 统计 gate 自动输出比对
+statistical_gate:
+  required: true
+  description: "统计 gate 必须自动输出比对结果"
+  automatic_output: true
+  comparison_method: "statistical_gate_auto_compare"
+
+# 验收人声明
+verifier_declaration:
+  independent_verifier:
+    required: true
+    description: "必须有独立复核者（非执行者本人）"
+    self_judgment_prohibited: true
+
+  executor_cannot_pass_own_work:
+    required: true
+    description: "执行者不可自行判定自己的工作通过验收"
+
+# 手册引用
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第309行"

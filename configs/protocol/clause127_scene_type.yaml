@@ -1,0 +1,21 @@
+# [127] 场景类型为工业/商业混合遮挡环境
+# 对应手册条款 [127]
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+
+clause_id: "127"
+clause_name: "[127] 场景类型为工业/商业混合遮挡环境"
+constraint_level: "硬约束"
+scene_type: "工业/商业混合遮挡环境"
+scene_components:
+  - "货架区"
+  - "隔断墙"
+  - "开放区"
+obstruction_distribution: "固定"
+manifest_recording: true
+description: "场景类型为工业/商业混合遮挡环境（货架区 + 隔断墙 + 开放区），遮挡物分布固定且记录在场景图（manifest）中。"
+manual_ref: "最终交付_异步手册_424条_20260917.md"
+manual_line: 360
+verification_gate: "p127_scene_type"
+paper_reference: "数据契约"
+enforcement: "场景类型声明 + manifest 场景图记录"
+hard_constraint: true

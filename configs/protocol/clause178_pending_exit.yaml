@@ -1,0 +1,86 @@
+# 条款 [178] · 未决期间出口（消除悬空）
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md
+
+clause_id: "178"
+clause_name: "未决期间出口（消除悬空）——协议裁决未完成前按 K1 档执行并写入 GDOP 与几何特征"
+severity: hard
+
+# 核心约束：未裁决期间照常执行 K1 档，但需记录实测 GDOP 与几何特征
+pending_exit:
+  # 协议裁决未完成期间允许的执行档位
+  execution_gear: "K1"
+  # 该档位的布局描述
+  layout_description: "4 锚非对称欠定布局"
+  # 参考坐标系统
+  coordinate_system: "S2"
+  # 必须记录的实测 GDOP 值（均值，允许 ±10% 偏差）
+  gdop_target: 1.19
+  gdop_tolerance: 0.10  # 相对偏差 ≤10%
+  # 几何特征描述（必须逐字写入 manifest 和论文方法节）
+  geometry_features:
+    - "非对称"
+    - "无共线"
+  # 必须写入的位置
+  required_records:
+    - "每 seed manifest（S6）"
+    - "论文方法节"
+  description: >
+    协议裁决未完成前，异步高NLOS实验照常按 K1 档执行（4 锚非对称欠定布局，S2 坐标），
+    但必须将锚点实测 GDOP≈1.19 与"几何特征：非对称、无共线"写入每 seed manifest（S6）与论文方法节。
+    此条款旨在消除"悬空"——裁决未定时不能停摆，也不能静默断言档位。
+
+# manifest 要求
+manifest:
+  required_fields:
+    - "gdop_measured"
+    - "geometry_features"
+    - "execution_gear"
+    - "layout_description"
+  description: "每个 seed 的 manifest.json 必须包含 gdop_measured、geometry_features、execution_gear、layout_description 字段"
+
+# 相关条款映射
+related_checks:
+  - "176"   # 场景类型为工业/商业混合遮挡环境
+  - "177"   # 机体系为 FLU/RFU 二选一
+  - "180"   # 时空对齐是紧耦合成立的前置条件
+  - "181"   # 未裁决期间照常按 K1 档执行（同义条款）
+  - "510"   # K1 GDOP：锚点坐标算 GDOP 直方图，与 S2 实测一致
+  - "506"   # S2 锚点实测非对称无共线，GDOP≈1.19
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "裁决未完成即停止执行（悬空）"
+    - "静默断言档位而不记录 GDOP 与几何特征"
+    - "gdop_measured 字段缺失或为空"
+    - 'geometry_features 字段缺失或未包含"非对称"和"无共线"'
+    - "execution_gear 非 K1（未裁决期间）"
+  required:
+    - "execution_gear 在未裁决期间必须为 K1"
+    - "gdop_target = 1.19（±10%）"
+    - 'geometry_features 必须同时包含"非对称"和"无共线"'
+    - "manifest 必须包含 gdop_measured、geometry_features、execution_gear、layout_description"
+    - "论文方法节必须记录 GDOP 值与几何特征描述"
+
+# 约束声明
+constraint_declaration:
+  clause_id: "178"
+  binding_level: "hard"
+  violation_consequence: "未裁决期间停摆或静默断言档位 → 违反本条款，须记录裁决项（S2 裁决项登记表），GDOP 与几何特征缺失 → 该 seed 数据作废，须 RZ-1 重生成"
+  related_clauses:
+    - "[176] 场景类型为工业/商业混合遮挡环境"
+    - "[177] 机体系为 FLU/RFU 二选一，全流程固定并写入 manifest"
+    - "[181] 未裁决期间照常按 K1 档执行（同义条款）"
+    - "[506] S2 锚点实测非对称无共线，GDOP≈1.19"
+    - "[510] K1 GDOP 测算要求"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: >
+  本条款解决"协议裁决未完成期间实验是否停摆"的问题。核心原则是：裁决未完成不代表不能执行——
+  允许按 K1 档（4 锚非对称欠定布局，S2 坐标）继续跑，但必须将实测 GDOP（≈1.19，允许±10%偏差）
+  和几何特征（"非对称、无共线"）完整写入每个 seed 的 manifest（S6）与论文方法节，消除悬空。
+  与 [181] 为同义条款，[178] 为正式条款表述，[181] 为补充执行说明。
+  与 [506]/[510] 共同构成 GDOP 测算与几何特征记录的完整约束链。

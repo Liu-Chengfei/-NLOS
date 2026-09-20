@@ -587,6 +587,32 @@ def main() -> int:
     for seed_root in seeds:
         result = validate_seed(seed_root, anchor_positions=anchor_positions)
         validations.append(result)
+        # [191] 每 seed 一份校验报告（JSON），与 manifest 并存
+        per_seed_report = {
+            "seed": result.seed,
+            "n_sequences": result.n_sequences,
+            "composition": result.composition,
+            "composition_pass": result.composition_pass,
+            "nlos_injection": result.nlos_injection,
+            "nlos_pass": result.nlos_pass,
+            "missing_stats": result.missing_stats,
+            "missing_pass": result.missing_pass,
+            "gdop": result.gdop,
+            "gdop_pass": result.gdop_pass,
+            "boundary_violations": result.boundary_violations,
+            "boundary_pass": result.boundary_pass,
+            "timestamp_monotonic": result.timestamp_monotonic,
+            "imu_rate_hz": result.imu_rate_hz,
+            "imu_rate_pass": result.imu_rate_pass,
+            "schema_pass": result.schema_pass,
+            "schema_failures": result.schema_failures,
+            "overall_pass": result.overall_pass,
+        }
+        per_seed_report_path = seed_root / "s9_validation_report.json"
+        per_seed_report_path.write_text(
+            json.dumps(per_seed_report, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
         status = "PASS" if result.overall_pass else "FAIL"
         print(
             f"[S9] seed={result.seed} status={status} "

@@ -1,0 +1,79 @@
+# 条款 [183] · 每布局全部参数 + 随机根种子写入该布局 manifest
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 586 行
+
+clause_id: "183"
+clause_name: "布局 manifest 参数与种子写入"
+severity: hard
+
+# 核心约束：每个布局的 manifest 必须包含该布局的全部参数与随机根种子
+manifest:
+  # 必须包含的字段
+  required_fields:
+    - "布局参数"
+    - "随机根种子"
+
+  # 各字段说明
+  field_definitions:
+    布局参数:
+      description: "当前布局的全部参数（锚点坐标、tag 位置、场景拓扑等）"
+      type: "object"
+      required: true
+
+    随机根种子:
+      description: "驱动该布局所有轨迹生成的随机数根种子（root seed）"
+      type: "integer"
+      required: true
+      note: "用于复现该布局下所有 seed/轨迹的生成结果"
+
+# 布局 manifest 结构
+layout_manifest:
+  root_seed_required: true
+  all_parameters_required: true
+  no_truncation_allowed: true
+
+# 验证项
+verification_items:
+  # 1. 布局 manifest 文件存在
+  layout_manifest_exists: true
+  # 2. 布局参数完整写入
+  layout_parameters_complete: true
+  # 3. 随机根种子写入 manifest
+  root_seed_in_manifest: true
+
+# 相关条款映射
+related_checks:
+  - "182"   # 每 seed manifest：场景图、锚点坐标、档位等
+  - "184"   # 每布局必须重新生成，禁止复用主场景轨迹
+  - "506"   # S2 锚点实测非对称无共线，GDOP≈1.19
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "布局 manifest 缺少布局参数"
+    - "布局 manifest 缺少随机根种子"
+    - "布局参数被截断或省略"
+    - "随机根种子缺失或非整数"
+  required:
+    - "每个布局必须有一个对应的 manifest"
+    - "manifest 必须完整记录该布局全部参数"
+    - "manifest 必须包含随机根种子"
+
+# 约束声明
+constraint_declaration:
+  clause_id: "183"
+  binding_level: "hard"
+  violation_consequence: "布局 manifest 缺少参数或根种子 → 该布局数据不可复现，须 RZ-1 重生成"
+  related_clauses:
+    - "[182] 每 seed 的 manifest 内容要求"
+    - "[184] 每布局必须重新生成，禁止复用主场景轨迹"
+    - "[506] S2 锚点实测非对称无共线，GDOP≈1.19"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: >
+  本条款规定每个布局的 manifest 必须记录该布局的全部参数以及用于驱动轨迹生成的随机根种子。
+  核心要求包括：layout_parameters（布局参数，含锚点坐标、tag 位置、场景拓扑等）和
+  root_seed（随机根种子，用于复现该布局下所有生成结果）。
+  布局 manifest 是布局级别数据可追溯性的核心载体，缺失参数或根种子将导致该布局数据不可复现。

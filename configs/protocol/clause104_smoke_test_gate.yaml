@@ -1,0 +1,73 @@
+# 条款 [104] 统计口径冒烟验证 Gate 配置
+# 手册原文：统计口径→统计脚本冒烟验证 gate；统计口径变更 → 重新冒烟验证（gate）
+# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 331 行
+
+clause_id: "104"
+clause_name: "统计口径冒烟验证 Gate"
+
+# 核心断言：统计口径必须有冒烟验证 gate
+smoke_test_gate_required: true
+
+# 统计口径定义
+statistical_methodology:
+  description: "统计脚本冒烟验证 gate 机制"
+  scope:
+    - "误差指标计算口径"
+    - "聚合方式（mean/median/mode）"
+    - "置信区间计算方法"
+    - "假设检验方法选择"
+
+# Gate 条件
+gate_conditions:
+  initial_validation: true  # 初始统计脚本必须通过冒烟验证
+  re_validation_on_change: true  # 统计口径变更时必须重新冒烟验证
+  gate_exit_requirement: "green"  # 必须绿色才能进入下一环节
+
+# 冒烟验证内容
+smoke_test_components:
+  - "单条已知序列验证"
+  - "已知期望值比对"
+  - "边界情况测试（空序列、极短序列）"
+  - "维度检查（shape 一致性）"
+  - "dtype 检查（数值类型正确）"
+  - "异常值处理验证"
+
+# 验证流程
+verification_flow:
+  steps:
+    - step: 1
+      action: "统计口径冻结声明"
+      description: "在方案冻结时明确统计口径"
+    - step: 2
+      action: "冒烟脚本编写"
+      description: "基于已知数据编写冒烟验证脚本"
+    - step: 3
+      action: "冒烟验证执行"
+      description: "运行冒烟脚本并记录结果"
+    - step: 4
+      action: "Gate 判定"
+      description: "冒烟通过后才能进入正式实验"
+    - step: 5
+      action: "口径变更检测"
+      description: "检测统计口径是否有变更"
+    - step: 6
+      action: "重新冒烟验证"
+      description: "口径变更后必须重新验证"
+
+# 约束声明（包含 related_clauses）
+constraint_declaration:
+  clause_id: "104"
+  binding_level: "hard"
+  violation_consequence: "统计口径变更未重验 → 数据作废，重新跑"
+  related_clauses:
+    - "[54] 两两比较附 Holm-Bonferroni 多重比较校正"
+    - "[56] 分析单位与样本独立性声明"
+    - "[62] 论文级规模参数"
+
+# 手册引用
+manual_ref: "docs/最终交付_异步手册_424 条_20260917.md 第 331 行"
+
+# 实施说明
+implementation_note: >
+  统计口径变更包括：指标定义改变、聚合方法调整、检验方法更换、
+  置信水平修改、数据处理流程变动等任何可能影响统计结论的改动。

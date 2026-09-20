@@ -1,0 +1,55 @@
+# Clause [156] Configuration: 临时文件治理
+clause_id: "156"
+clause_name: "临时文件治理"
+
+# 触发场景
+trigger_scenarios:
+  - "bash_tool_*.py 调试脚本"
+  - "一次性数据探针"
+  - "临时测试脚本"
+  - "快速验证脚本"
+
+# 处置方式
+disposal_methods:
+  - "立即删除"
+  - "移入 sandbox/ 并标注用途"
+
+# 禁止行为
+forbidden:
+  - "临时脚本留在实验代码目录"
+  - "未标注用途的临时文件"
+  - "累积临时文件污染工作区"
+
+# 清理范围
+cleanup_scope:
+  - "bash_tool_*.py"
+  - "*_temp_*.py"
+  - "*_debug_*.py"
+  - "*.tmp"
+  - "*.bak"
+
+# 例外情况
+exceptions:
+  - reason: "sandbox/ 目录内允许保留"
+    condition: "已明确标注用途和创建日期"
+  - reason: "可复用的工具脚本"
+    condition: "移入 tools/ 并添加文档注释"
+
+# 痕迹要求
+trace_requirement:
+  cleanup_log: true             # 记录清理动作
+  file_listing: true            # 列出被清理文件
+  retention_reason: true        # 若保留需说明原因
+
+# 手动参照
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 相关条款检查
+related_checks:
+  - "C-1"      # 文件命名规范
+  - "P-2"      # 工作区整洁性
+  - "C-2"      # 文件组织
+
+# 手册源文件（用于验证）
+manual_path: "docs/异步实验_执行手册_终版 v15_总纲条款版.md"
+rule_path: "rules/条款 156_临时文件治理.md"

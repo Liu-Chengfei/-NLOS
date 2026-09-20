@@ -1,0 +1,44 @@
+clause_id: "138"
+clause_name: "统计口径核验"
+status: enforced
+
+# 条款原文
+clause_text: |
+  **[138]** **统计口径核验**：10 seed 配对（每方法 ≥1000 轨迹级样本）、四组合切片、
+  Holm 校正、bootstrap CI ——全部基于新数据重跑（P22），**不沿用任何旧统计输出**。
+
+requirements:
+  seed_pairing:
+    n_seeds_min: 10                    # 至少 10 seed
+    n_test_per_seed_min: 100           # 每 seed ≥100 条
+    total_trajectory_min: 1000         # 每方法 ≥1000 轨迹级样本
+    pairing_keys: ["scene_id", "seq_id"]  # 配对键
+
+  four_way_slicing:
+    combos: ["A2N2", "A2N3", "A3N2", "A3N3"]  # 四组合切片
+    min_per_combo: 250                 # 每组合 ≥250 轨迹级样本
+
+  multiple_comparison_correction:
+    method: "holm_bonferroni"          # Holm-Bonferroni（非 BH-FDR）
+    num_comparisons: 10                # 五方法 C(5,2)=10 对
+    alpha: 0.05                        # 显著性水平
+
+  bootstrap_ci:
+    n_resamples: 2000                  # bootstrap 重采样次数
+    ci_level: 0.95                     # 95% CI
+    seed: 0                            # 固定随机种子（跨机可复现）
+
+  fresh_run:
+    p22_required: true                 # 必须基于 P22 新数据重跑
+    no_reuse_old_statistics: true      # 不沿用任何旧统计输出
+    rerun_rounds_max: 2                # 重跑轮次上限（R-3 纪律）
+
+related_checks:
+  - "P6: 训练/测试划分"
+  - "P19: seed 体系"
+  - "P22: 统计方法"
+  - "DQ-4: 样本量充分"
+  - "G-1: 单元齐全性"
+  - "R-3: 重跑轮次"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

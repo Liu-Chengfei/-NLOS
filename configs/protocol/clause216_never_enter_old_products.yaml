@@ -1,0 +1,78 @@
+clause_id: "216"
+clause_name: "永不带旧产物进入论文级流程"
+severity: hard
+
+# 触发时机
+trigger_timing:
+  - "RZ-0 清场后"
+  - "RZ-1 重生成后"
+  - "RZ-2 重训后"
+  - "RZ-3 验收后"
+  - "论文级正式执行期间"
+mode_type: "paper_grade"
+description: "任一未过 → 继续清场，不得带旧产物进入任何论文级流程"
+
+# 禁止对象详述
+forbidden_items:
+  - name: "旧仿真数据集"
+    label: "old_simulation_data"
+    description: "训练/验证/测试 npz + manifest，不能进入当前实验读取"
+    contexts:
+      - "RZ-0 清场后"
+      - "RZ-1 重生成后"
+      - "RZ-2 重训后"
+      - "RZ-3 验收后"
+      - "论文级正式执行期间"
+  - name: "旧权重文件"
+    label: "old_weights"
+    description: "checkpoint/权重文件，不能进入当前实验读取"
+    contexts:
+      - "RZ-0 清场后"
+      - "RZ-1 重生成后"
+      - "RZ-2 重训后"
+      - "RZ-3 验收后"
+      - "论文级正式执行期间"
+  - name: "旧结果文件"
+    label: "old_results"
+    description: "旧指标/日志/统计输出/验收表，不能进入最终统计"
+    contexts:
+      - "RZ-0 清场后"
+      - "RZ-1 重生成后"
+      - "RZ-2 重训后"
+      - "RZ-3 验收后"
+      - "论文级正式执行期间"
+
+# 核心约束
+hard_constraints:
+  no_old_data_in_current_run: true
+  no_old_weights_in_current_run: true
+  no_old_results_in_current_run: true
+  zero_tolerance_for_old_products: true
+  continue_clearing_if_any_fail: true
+
+# 清场要求
+clearing_requirements:
+  - "RZ-0：论文级正式执行前完整清场"
+  - "RZ-1：重生成，必须全新数据"
+  - "RZ-2：重训，必须全新模型"
+  - "RZ-3：验收，必须全新结果"
+
+# 验证方式
+verification_method:
+  - "检查数据目录：无旧 npz/manifest 残留"
+  - "检查权重目录：无旧 checkpoint 残留"
+  - "检查结果目录：无旧指标/日志/验收表残留"
+  - "检查 decision log：记录清场动作与时间戳"
+  - "检查 RZ 链：每阶段清场动作留痕"
+
+# 相关检查
+related_checks:
+  - "p215_rz0_paper_grade_clearing"
+  - "p211_experiment_pre_run_data_weight_clearing"
+  - "p213_smoke_temp_clearing_before_run"
+
+# 手册参考
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+manual_section: "论文级验收执行规范（RZ-0–RZ-3）"
+manual_clause: "[216]"
+manual_line: 661

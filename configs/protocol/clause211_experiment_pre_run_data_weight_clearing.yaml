@@ -1,0 +1,64 @@
+# 条款 [211] 每次跑实验前都清空仿真数据集与权重（总纪律，不分轨）
+# 手册原文：
+# 每一次运行之前 ——诊断轨实验（冒烟/校准/探针/抽查复跑）跑前、验收轨（论文级正式执行）跑前、
+# 以及任何 R 系列重跑/补跑前 ——都必须先清空活动数据目录中的仿真数据集
+# （训练/验证/测试 npz + manifest）与活动权重目录（checkpoint/权重），
+# 删除或迁移 archive/ 物理隔离，保证实验脚本任何路径读不到旧产物
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 651 行
+
+clause_id: "211"
+clause_name: "每次跑实验前都清空仿真数据集与权重"
+severity: hard
+
+# 核心约束定义
+pre_run_requirement:
+  action: "clear_simulation_data_and_weights"
+  description: "每一次运行实验前必须清空活动数据集和权重"
+  applies_to:
+    - "诊断轨实验"
+    - "验收轨正式执行"
+    - "R系列重跑/补跑"
+
+# 数据清除范围
+clearing_scope:
+  data_dirs:
+    - "训练数据集 (npz + manifest)"
+    - "验证数据集 (npz + manifest)"
+    - "测试数据集 (npz + manifest)"
+  weight_dirs:
+    - "checkpoint"
+    - "权重文件"
+  isolation_required: "archive/ 物理隔离"
+
+# 禁止对象
+forbidden_items:
+  - name: "旧仿真数据集"
+    label: "old_simulation_data"
+    description: "训练/验证/测试 npz + manifest，不能进入当前实验读取"
+  - name: "旧权重文件"
+    label: "old_weights"
+    description: "checkpoint/权重文件，不能进入当前实验读取"
+
+# 核心约束
+hard_constraint:
+  no_old_data_in_current_run: true
+  no_old_weights_in_current_run: true
+  archive_physical_isolation: true
+  note: "实验脚本任何路径读不到旧产物"
+
+# 验证方式
+verification_method:
+  - "运行清空脚本前检查活动目录是否为空"
+  - "确认 archive/ 物理隔离"
+  - "记录清空操作日志"
+
+# 相关检查
+related_checks:
+  - "p210_paper_grade_old_product_isolation"
+  - "c9_pre_run_cleanup"
+
+# 手册参考
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+manual_section: "训练（条款 [346-456]）"
+manual_clause: "[211]"
+manual_line: 651

@@ -1,0 +1,45 @@
+# Clause [164] 模式明确（论文级/非全量）写入 manifest
+# Source: docs/异步实验_执行手册_终版v15_总纲条款版.md, [164]
+
+clause_id: "164"
+clause_name: "模式明确（论文级/非全量）写入 manifest"
+severity: hard
+
+# 模式定义
+mode_definition:
+  paper_level:
+    name: "paper_level"
+    description: "论文级实验：全量数据、完整训练、确定性运行"
+    requirements:
+      - "全量数据集"
+      - "完整训练 epoch"
+      - "deterministic=True"
+  non_full_scale:
+    name: "non_full_scale"
+    description: "非全量实验：冒烟/quick 校准/预达标"
+    requirements:
+      - "子集数据"
+      - "快速迭代"
+      - "用于校准验证"
+
+# manifest 要求
+manifest_requirements:
+  mode_required: true
+  mode_field: "experiment_mode"
+  allowed_values:
+    - "paper_level"
+    - "non_full_scale"
+
+# 检查方式
+check_method:
+  type: "manifest_declaration"
+  description: "本批任务声明写入 manifest"
+
+# 相关条款
+related_checks:
+  - "159"    # 学习率分阶段调度
+  - "160"    # 分阶段 lr 冻结
+  - "166"    # 每步当场验证产物
+
+# 手册参照
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

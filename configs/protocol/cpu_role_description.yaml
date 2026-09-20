@@ -1,0 +1,27 @@
+# 条款 [69] CPU 仅限非训练负载与 CPU 空闲协助训练的关系
+# 手册原文：CPU 仅限非训练负载 vs CPU 空闲协助训练：GPU 有空的按前者，GPU 排满的按后者
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第296行
+
+clause_id: "69"
+clause_name: "CPU 角色分层"
+
+cpu_non_training_only:
+  enabled: true
+  scope: "GPU 空闲时 CPU 默认分工"
+  tasks:
+    - "数据生成"
+    - "评估"
+    - "预处理"
+  description: "GPU 空闲时，CPU 仅做数据生成/评估/预处理，不做训练"
+
+cpu_idle_training:
+  enabled: true
+  scope: "GPU 排满后 CPU 追加自由度"
+  tasks:
+    - "剩余训练单元"
+  description: "GPU 排满后，CPU 可承接剩余训练单元"
+
+no_conflict: true
+priority_rule: "GPU 有空 → 默认分工；GPU 排满 → 追加自由度"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第296行"

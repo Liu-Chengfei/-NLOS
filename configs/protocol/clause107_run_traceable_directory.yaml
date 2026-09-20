@@ -1,0 +1,59 @@
+# 条款 [107] 目录级实现与数据校验和配置
+# 手册原文：每个 run 的配置/指标/日志与目录一一对应（可追溯的目录级实现）；每个 npz / manifest 生成时记录 SHA-256 校验和
+# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 337 行
+
+clause_id: "107"
+clause_name: "目录级实现与数据校验和"
+
+# 核心断言：每个 run 的配置/指标/日志与目录一一对应
+run_traceability:
+  required: true
+  description: "每个 run 的配置/指标/日志与目录一一对应（可追溯的目录级实现）"
+  one_to_one: true
+  scope:
+    - "配置"
+    - "指标"
+    - "日志"
+  traceable: true
+
+# 数据校验和要求
+checksum_spec:
+  required: true
+  algorithm: "SHA-256"
+  trigger: "每个 npz / manifest 生成时"
+  records:
+    - "npz 文件"
+    - "manifest 文件"
+  record_fields:
+    - "文件路径"
+    - "SHA-256 校验和"
+    - "生成时间"
+
+# 目录结构要求
+directory_structure:
+  one_to_one_mapping: true
+  per_run:
+    - "config 目录"
+    - "metrics 目录"
+    - "logs 目录"
+    - "output 目录"
+
+# 相关条款
+constraint_declaration:
+  clause_id: "107"
+  binding_level: "hard"
+  violation_consequence: "目录结构不规范或校验和缺失 → 数据不可追溯，影响实验可复现性"
+  related_clauses:
+    - "[105] 生成器代码冻结确认"
+    - "[106] 决策日志"
+    - "[32] 所有改动必须留痕"
+    - "[120] 每步当场验证产物"
+
+# 手册引用
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第 337 行"
+
+# 实施说明
+implementation_note: >
+  Stage 2 写码阶段的目录级实现要求。每个 run 必须建立独立的目录结构，
+  配置/指标/日志与目录一一对应。每个 npz/manifest 生成时必须记录 SHA-256 校验和，
+  确保数据的完整性和可追溯性。若无校验和记录，该数据文件视为无效。

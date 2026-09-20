@@ -1,0 +1,44 @@
+# 条款 [150] C-6 RAM ≤12G 硬上限（并发调度器 RAM 闸门）
+# 手册原文：第C-6项 RAM ≤12G 硬上限（Pre-5 细化第 3 条/执行模式·RAM ≤12G 硬上限）；代码实现要求（细化）：并发调度器按"并发单元数 × 单单元峰值内存 ≤ 12GB"计算 RAM 闸门
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第150条
+
+clause_id: "150"
+clause_name: "C-6 RAM ≤12G 硬上限（并发调度器 RAM 闸门）"
+
+# RAM 硬上限
+ram_limit:
+  hard_limit_gb: 12           # 硬上限 12GB，不可突破
+  pre5_item: 3                # Pre-5 细化第 3 条
+  execution_mode: true        # 执行模式核心约束
+  no_fuzzy_coefficient: true  # 禁止 0.8 等模糊系数打擦边球
+
+# 并发调度器 RAM 闸门
+scheduler_ram_gate:
+  formula: "并发单元数 × 单单元峰值内存 ≤ 12GB"  # 公式化核算
+  pre_check: true            # 事前核算，启动前计算
+  on_exceed: "降低并发度"      # 超过则降低并发度
+  per_unit_peak_memory_estimate: "单单元峰值内存由 estimate_unit_peak_memory_mb() 提供（neural=3500MB/classical=1500MB/默认=2500MB），实际峰值由运行时 psutil 探针覆盖"
+  # 公式化核算的代码实现位置
+  formula_impl:
+    - "src/liquidloc/common/resource_budget.py::compute_parallel_limits() → ram_parallel = int(RAM_LIMIT_GB / unit_peak_gb)"
+    - "src/liquidloc/common/resource_budget.py::assert_ram_budget() → n_units × unit_peak_mb / 1024 > RAM_LIMIT_GB → ValueError"
+
+# 超限处置
+over_limit_strategy:
+  action: "降低并发度"
+  fallback: "串行排队"         # 若无法降低并发度，转为串行排队
+
+# 关联条款
+related_checks:
+  - "C-6"       # RAM ≤12G 硬上限
+  - "Pre-5"     # Pre-5 资源门控（第 3 条 = RAM）
+  - "P148"      # 执行前检查清单（含 RAM 核算）
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第150条"
+
+# 实施说明
+implementation_note: >
+  并发调度器必须按"并发单元数 × 单单元峰值内存 ≤ 12GB"公式事前核算 RAM 预算，
+  启动前计算允许的最大并发度。禁止拍脑袋设并发度，禁止使用 0.8 等模糊系数。
+  超过 12GB 时必须降低并发度或转为串行排队，确保不突破硬上限。

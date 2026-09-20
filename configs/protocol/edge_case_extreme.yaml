@@ -1,0 +1,25 @@
+# 条款 [60] 边界/极端情况配置
+# 手册原文：[60] 边界/极端情况：空轨迹、极短序列、M1 长间隙落在首尾，不产生人工尖峰/除零。
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第287行
+
+clause_id: "60"
+clause_name: "边界/极端情况"
+
+# 空轨迹处理
+empty_trajectory_handling: true
+
+# 极短序列处理
+short_sequence_handling: true
+
+# M1 长间隙落在首尾处理
+m1_long_gap_at_boundaries: true
+
+# 不产生人工尖峰
+no_artificial_peak: true
+
+# 不除零
+no_division_by_zero: true
+
+description: "边界极端情况处理：空轨迹、极短序列、M1长间隙落在首尾，不产生人工尖峰/除零"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第287行"

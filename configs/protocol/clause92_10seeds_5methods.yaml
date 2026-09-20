@@ -1,0 +1,46 @@
+# Clause 92: 10 repeats (seed) × 5 methods
+# This configuration defines the experimental scale requirements
+
+clause_id: "92"
+title: 10 repeats（seed）× 5 方法
+
+# Seed configuration
+seed_config:
+  # 10 independent seeds for statistical robustness
+  n_seeds: 10
+  seed_range: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  seed_repeats: 1  # Each seed used once per method
+
+# Method configuration
+method_config:
+  # 5 methods to be compared
+  methods:
+    - LNN  # Liquid Neural Network (proposed method)
+    - LSTM # Long Short-Term Memory baseline
+    - EKF  # Extended Kalman Filter baseline
+    - Transformer
+    - Other_method  # Placeholder for additional method
+  n_methods: 5
+
+# Experiment units
+experiment_units:
+  # 10 seeds × 5 methods = 50 units
+  total_units: 50
+  seeds_per_method: 10
+  methods_per_seed: 5
+
+# Compliance requirements
+compliance:
+  # All 50 units must be completed
+  min_required_units: 50
+  # Each unit must be properly tracked
+  unit_tracking: required
+  # Seed initialization must be consistent
+  same_seed_init: true
+  # Methods must be fairly compared
+  baseline_consistent: true
+
+# Reference
+reference:
+  manual: docs/最终交付_异步手册_424 条_20260917.md
+  manual_line: 319

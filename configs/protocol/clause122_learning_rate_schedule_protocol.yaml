@@ -1,0 +1,57 @@
+# 条款 122 学习率三段式调度协议（配置）
+# 手册原文（docs/最终交付_异步手册_424条_20260917.md 第 355 行）：
+# [122] **学习率三段式调度协议（硬约束，训练充分性 + 公平性统一；"前大后小"的正式落地神经网络方法适用，
+# 滤波方法（EKF/Robust-EKF）无训练不适用）**：LNN/LSTM/Transformer 三网络统一采用**三段式 lr 调度**：
+# **warm-up 线性升**（0 → lr_max，warm-up 步数 W_up ≤ 总步数 5%，写入 manifest）
+clause_id: "122"
+clause_title: "学习率三段式调度协议（硬约束，训练充分性 + 公平性统一）"
+manual_source:
+  file: "docs/最终交付_异步手册_424条_20260917.md"
+  line: 355
+
+learning_rate_schedule:
+  # 三段式 lr 调度结构
+  schedule_type: three_stage
+  
+  # Stage 1: warm-up 线性上升
+  warmup:
+    type: linear_increase
+    start_lr: 0
+    end_lr: lr_max
+    steps_ratio: 0.05  # warm-up 步数 ≤ 总步数 5%
+    must_write_to_manifest: true
+  
+  # Stage 2: 峰值 lr（由条款 123 定义）
+  peak:
+    type: constant_or_plateau
+    value: lr_peak
+    must_write_to_manifest: true
+  
+  # Stage 3: 后段 lr 退火（由条款 124 定义）
+  decay:
+    type: cosine_annealing_or_piecewise_constant  # 二选一，写入 manifest
+    start: lr_peak
+    end: lr_end
+    must_write_to_manifest: true
+
+# 适用范围
+applicable_methods:
+  neural_networks:
+    - LNN
+    - LSTM
+    - Transformer
+  filter_methods:
+    excluded:
+      - EKF
+      - Robust-EKF
+    reason: "滤波方法无训练过程，不适用 lr 调度"
+
+# 公平性要求
+fairness:
+  unified_schedule: true  # 三网络统一采用相同调度策略
+  training_fully_sufficient: true  # 训练充分性保障
+  equal_tuning_budget: true  # 调优预算一致
+
+compliance:
+  hard_constraint: true
+  verification_function: "p122_learning_rate_schedule_protocol"

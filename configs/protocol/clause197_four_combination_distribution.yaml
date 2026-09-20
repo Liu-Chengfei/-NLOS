@@ -1,0 +1,92 @@
+# 条款 [197] · 四组合各 >= 设计轨迹数 分布不一致 -> 重生成训练集补足组合覆盖
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 622 行
+
+clause_id: "197"
+clause_name: "四组合分布不一致重生成训练集补足覆盖"
+severity: hard
+
+purpose: |
+  本条是四组合（A2N2/A2N3/A3N2/A3N3）轨迹数分布一致性的硬约束。
+  核心原则：四组合各 >= 设计轨迹数，分布必须均衡；若分布不一致（不均衡），
+  必须重生成训练集补足组合覆盖。
+  本条与 DQ-3（分布一致性）、[198]（轨迹数与 rho/mu/sigma 打印）、[200]（规模与划分）衔接，
+  构成数据生成环节的覆盖完整性纪律链。
+
+four_combinations:
+  - "A2N2"
+  - "A2N3"
+  - "A3N2"
+  - "A3N3"
+
+design_trajectory_count:
+  description: "设计轨迹数（每组合）"
+  training_per_seed: "12-15 条/seed（总训练轨迹）"
+  test_per_seed: ">=100 条/seed（四组合各 >=25 条）"
+  note: "训练集四组合应各 25%，测试集四组合各 >=25 条/seed"
+
+distribution_check:
+  check_items:
+    - name: "四组合各 >= 设计轨迹数"
+      description: "每组合实际轨迹数 >= 该组合设计轨迹数"
+      threshold: "每个组合的实际数量 >= 设计数量"
+    - name: "分布一致性"
+      description: "四组合之间轨迹数分布不出现显著偏斜"
+      method: "各组合比例偏差 <= 设计比例 +-5%"
+
+disposal_sequence:
+  - step: 1
+    name: "分布不一致判定"
+    actions:
+      - "统计四组合各组合实际轨迹数"
+      - "检查每组合是否 >= 设计轨迹数"
+      - "检查四组合比例偏差是否 > 5%"
+    output: "分布一致/不一致判定"
+    prerequisite: "数据生成完成，manifest 存在"
+  - step: 2
+    name: "重生成训练集补足组合覆盖"
+    actions:
+      - "对不均衡组合定向重生成轨迹"
+      - "保持四组合各 25% 均衡分布"
+      - "重新验证分布一致性"
+    prerequisite: "Step 1 判定为分布不一致"
+    forbidden_before: "未判定分布不一致就重生成"
+
+boundaries:
+  forbidden:
+    - "分布不一致时不重生成直接继续训练"
+    - "只补单一组合而不顾整体分布均衡性"
+    - "用旧数据补足新组合覆盖"
+    - "分布偏差超 5% 仍接受不重生成"
+    - "跳过分布检查直接进入训练"
+  required:
+    - "分布不一致时必须重生成训练集"
+    - "重生成须补足所有不足的 comb 覆盖"
+    - "重生成后须重新验证四组合分布一致性"
+    - "四组合须各 >= 设计轨迹数"
+    - "分布偏差须 <= 5%"
+
+verification_items:
+  four_combination_distribution_check:
+    description: "四组合各 >= 设计轨迹数且分布一致性判定"
+    checks:
+      - four_combination_defined
+      - design_trajectory_count_specified
+      - distribution_inconsistency_triggers_regenerate
+      - balance_requirement_specified
+      - forbidden_distribution_skip_specified
+      - required_regenerate_after_fail_specified
+
+related_clauses:
+  - "192"
+  - "194"
+  - "195"
+  - "196"
+  - "198"
+  - "200"
+  - "240"
+  - "273"
+  - "276"
+  - "321"
+  - "414"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

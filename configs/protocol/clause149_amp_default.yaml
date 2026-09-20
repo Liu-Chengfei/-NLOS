@@ -1,0 +1,51 @@
+# 条款 149: AMP 混合精度默认启用 — 配置文件
+# 第 C-3 项：AMP 混合精度默认启用（P19，三网络同一设置）；代码实现要求（细化）：AMP 开关写入 manifest
+# 验证函数：src/liquidloc/analysis/clause_gates.py::p149_amp_default()
+
+clause_id: "149"
+name: AMP 混合精度默认启用
+severity: hard
+description: >
+  第 C-3 项 AMP 混合精度默认启用（P19，三网络同一设置）；
+  代码实现要求（细化）：AMP 开关写入 manifest。
+  本配置细化 C-3 族 gate (c3_amp_enabled) 的要求，
+  要求 AMP 开关与精度类型在 manifest 中记录。
+
+# 配置要求
+config_requirements:
+  # 三网络 YAML 必须包含 amp_enabled 字段
+  amp_enabled_required: true
+  # 三网络 YAML 必须包含 amp_dtype 字段
+  amp_dtype_required: true
+  # 三网络 amp_enabled 值必须一致
+  same_setting_across_networks: true
+  # amp_enabled 默认值（auto/true/True）
+  default_value: auto
+  # amp_dtype 默认值
+  default_dtype: bf16
+  # AMP 开关必须写入 manifest
+  amp_in_manifest: true
+  # manifest 中 AMP 字段名称
+  manifest_fields:
+    - amp_enabled
+    - amp_dtype
+
+# 验证范围
+verification:
+  # 需检查的模型 YAML
+  model_yamls:
+    - liquid_ekf
+    - lstm_ekf
+    - transformer_ekf
+  # 需检查 manifest 写入的脚本
+  manifest_writers:
+    - scripts/_train_neural_methods.py
+    - scripts/_run_25unit.py
+  # 需检查 AMP 实现的源目录
+  amp_impl_source:
+    - src/liquidloc/models
+
+# 条款引用
+references:
+  - C-3: AMP 混合精度默认启用
+  - P19: TF32 开关显式设置并写入 manifest

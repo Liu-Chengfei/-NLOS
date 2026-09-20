@@ -1,0 +1,104 @@
+# 条款 [185] · MILUV 锚点数量策略声明
+
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 590 行
+
+clause_id: "185"
+clause_name: "MILUV 锚点数量策略声明"
+severity: hard
+
+# MILUV 系统描述
+miluv_system:
+  # 传感器组成
+  sensors:
+    uwb_range: true       # UWB 测距
+    imu_hz: 150           # IMU 150Hz 级
+    vicon_mm_gt: true     # Vicon 毫米级真值
+  # 锚点总数
+  anchor_count: 6
+
+# 锚点策略：二选一，必须明确声明其一
+anchor_strategy:
+  # 选项 A：固定 4 锚子集（GDOP 择优）
+  option_a:
+    # 固定使用 4 个锚点的子集
+    fixed_anchor_subset: 4
+    # GDOP 择优方式选择子集
+    gdop_selection: true
+    # GDOP 择优结果必须写入 manifest
+    gdop_result_in_manifest: true
+  # 选项 B：全量使用 6 锚（模型锚数无关后）
+  option_b:
+    # 确认模型锚数无关后使用全量
+    anchor_count_independent: true
+    # 全量使用 6 锚
+    full_anchor_count: 6
+
+  # 必须在论文中声明选择的策略
+  paper_declaration_required: true
+
+# manifest 写入要求
+manifest_requirements:
+  # 锚点数量策略必须写入 manifest
+  anchor_strategy_in_manifest: true
+  # 若选 A：GDOP 择优结果写入 manifest
+  gdop_selection_in_manifest: true
+  # 若选 B：锚数无关确认记录写入 manifest
+  anchor_independence_confirmation_in_manifest: true
+
+# 论文声明要求
+paper_declaration:
+  # 必须在论文中明确声明选择的策略（A 或 B）
+  required: true
+  # 声明内容：策略选择 + 理由（GDOP 择优 / 锚数无关确认）
+  content_requirements:
+    - "明确声明选择固定 4 锚子集（GDOP 择优）或全量 6 锚"
+    - "若选 A：说明 GDOP 择优方法"
+    - "若选 B：说明锚数无关确认过程"
+
+# 验证项
+verification_items:
+  config_exists: true
+  rule_doc_exists: true
+  validator_exists: true
+  manifest_contains_anchor_strategy: true
+  paper_declaration_present: true
+
+# 相关条款映射
+related_checks:
+  - "183"   # 每布局全部参数 + 随机根种子写入该布局 manifest
+  - "184"   # 与主场景的数据独立性
+  - "186"   # 新增验证层，复用 I-1–I-5/P22 脚手架
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "未声明锚点策略"
+    - "锚点策略在 manifest 中缺失"
+    - "论文中未声明锚点数量策略"
+    - "GDOP 择优结果未写入 manifest"
+  required:
+    - "二选一并声明（固定 4 锚子集 or 全量 6 锚）"
+    - "GDOP 择优结果写入 manifest"
+    - "锚数无关确认记录写入 manifest"
+    - "论文中明确声明"
+
+# 约束声明
+constraint_declaration:
+  clause_id: "185"
+  binding_level: "hard"
+  violation_consequence: "锚点策略未声明或未写入 manifest → 违反本条款，须补充 manifest 记录并在论文中声明"
+  related_clauses:
+    - "[183] 每布局全部参数 + 随机根种子写入该布局 manifest"
+    - "[184] 与主场景的数据独立性"
+    - "[186] 新增验证层，复用 I-1–I-5/P22 脚手架"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: >
+  本条款规定 MILUV 系统的锚点数量策略必须明确选择其一并声明：
+  1. MILUV 系统由 UWB 测距 + IMU（150Hz）+ Vicon 毫米级真值组成，锚点共 6 个
+  2. 若模型输入按固定锚数设计：取固定 4 锚子集（GDOP 择优），GDOP 结果写入 manifest 并声明
+  3. 若确认模型锚数无关：全量使用 6 锚
+  4. 二选一必须在论文中声明

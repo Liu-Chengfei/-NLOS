@@ -1,0 +1,157 @@
+clause_id: "204"
+clause_name: "AMP 开关写入 manifest——Pre-4 校验和覆盖"
+severity: hard
+
+purpose: |
+  本条是 AMP 开关可追溯性硬约束，核心要求：
+  （1）AMP（自动混合精度）开关状态必须写入 manifest，确保实验可追溯；
+  （2）写入时序为 Pre-4 校验和覆盖阶段（即数据生成/训练启动前的校验点）；
+  （3）AMP 开关（torch.autocast 启用状态、amp_dtype 等）与 [203] TF32 开关
+      共同构成精度模式声明，二者必须协调一致（deterministic=True 时
+      TF32=False 且 AMP 状态需显式声明）。
+  本条与 [203]（TF32 显式设置并写入 manifest）衔接：[203] 负责 TF32，
+  [204] 负责 AMP 的 manifest 写入；[182] 负责 manifest 字段完整性。
+
+# AMP 显式设置规范
+amp_spec:
+  amp_enabled:
+    description: "torch.autocast('cuda', enabled=True/False) 的显式值"
+    required: true
+    allowed_values:
+      - true
+      - false
+    default_policy: "由确定性要求决定：deterministic=True → False（可复现），deterministic=False → True（性能优先，与 [203] TF32 协调）"
+  amp_dtype:
+    description: "AMP 计算 dtype（torch.float16 / torch.bfloat16）"
+    required: true
+    allowed_values:
+      - "float16"
+      - "bfloat16"
+    default_policy: "float16（与 [203] 协调，TF32 场景下 AMP 可关闭）"
+  amp_grad_scaler:
+    description: "GradScaler 是否启用（仅 fp16 需要，bf16 不需要）"
+    required: true
+    allowed_values:
+      - true
+      - false
+    default_policy: "amp_dtype=float16 时 True，amp_dtype=bfloat16 时 False"
+  coherency_policy:
+    description: "AMP 与 TF32 设置协调性"
+    required: true
+    rule: "deterministic=True 时 TF32 必须为 False 且 AMP 必须为 False（全 FP32，保证逐 bit 可复现）"
+    conflict_rules:
+      - "deterministic=True 且 amp_enabled=True → 违反（AMP 引入非确定性）"
+      - "amp_dtype=float16 且 amp_grad_scaler=False → 警告（fp16 无 GradScaler 易溢出）"
+
+# manifest 写入要求（Pre-4 校验和覆盖）
+manifest_write_spec:
+  required_fields:
+    - "amp_enabled"
+    - "amp_dtype"
+    - "amp_grad_scaler"
+    - "amp_explicit_set"
+  write_timing:
+    - "Pre-4 校验和覆盖阶段（数据生成完成、训练启动前）"
+    - "训练启动前 manifest 中必须已包含上述字段"
+  write_location:
+    - "seed_utils.py 的 set_global_seed 返回报告中包含 amp 字段"
+    - "prepare_pipeline.py 的 manifest_payload 中必须包含 amp 相关字段"
+  checksum_coverage:
+    description: "Pre-4 校验和覆盖：manifest 写入后计算校验和，确保字段完整性"
+    checksum_fields:
+      - "amp_enabled"
+      - "amp_dtype"
+      - "amp_grad_scaler"
+      - "amp_explicit_set"
+
+# 验证计划
+verification_plan:
+  - step: 1
+    name: "检查配置文件存在"
+    actions:
+      - "读取 configs/protocol/clause204_amp_manifest.yaml"
+      - "验证 YAML 格式正确"
+    output: "配置文件解析成功"
+  - step: 2
+    name: "验证 clause_id 与 severity"
+    actions:
+      - "检查 clause_id == '204'"
+      - "检查 severity == 'hard'"
+    output: "字段校验通过"
+  - step: 3
+    name: "验证 AMP 显式设置规范"
+    actions:
+      - "检查 amp_spec 包含 amp_enabled、amp_dtype、amp_grad_scaler"
+      - "检查每个键包含 required 和 allowed_values"
+      - "检查 coherency_policy 包含 conflict_rules"
+    output: "AMP 规范定义完整"
+  - step: 4
+    name: "验证 manifest 写入要求"
+    actions:
+      - "检查 manifest_write_spec.required_fields 包含四个 AMP 字段"
+      - "检查 write_timing 包含 Pre-4 校验和覆盖阶段"
+      - "检查 checksum_coverage.checksum_fields 包含四个字段"
+    output: "manifest 写入要求定义完整"
+  - step: 5
+    name: "检查代码实现"
+    actions:
+      - "检查 seed_utils.py 中 AMP 显式赋值（torch.autocast / GradScaler）"
+      - "检查 manifest_payload 包含 AMP 字段"
+    output: "代码实现检查通过"
+  - step: 6
+    name: "检查规则文档"
+    actions:
+      - "检查 rules/条款 204_AMP 开关写入 manifest.md 是否存在"
+      - "检查规则文档包含条款原文、含义、验收标准"
+    output: "规则文档检查通过"
+  - step: 7
+    name: "检查手册真源"
+    actions:
+      - "检查 docs/异步实验_执行手册_终版v15_总纲条款版.md 是否存在"
+      - "检查手册包含 [204] 条目"
+    output: "手册真源检查通过"
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "禁止 AMP 开关未写入 manifest（Pre-4 校验和覆盖失败）"
+    - "禁止 deterministic=True 时启用 AMP（破坏逐 bit 可复现）"
+    - "禁止 AMP 与 TF32 设置冲突（如 AMP=float16 但 TF32 开启导致精度不一致）"
+    - "禁止 manifest 中 AMP 字段缺失或值与实际设置不符"
+  required:
+    - "必须显式设置 amp_enabled / amp_dtype / amp_grad_scaler"
+    - "必须在 Pre-4 校验和覆盖阶段将 AMP 字段写入 manifest"
+    - "必须保证 AMP 与 TF32 设置协调（deterministic=True 时全 FP32）"
+    - "必须计算 manifest 校验和覆盖 AMP 字段"
+
+# 验证项
+verification_items:
+  explicit_setting_check:
+    description: "检查 AMP 是否显式设置"
+    checks:
+      - amp_enabled_explicit
+      - amp_dtype_explicit
+      - amp_grad_scaler_explicit
+      - amp_tf32_coherent
+  manifest_write_check:
+    description: "检查 AMP 状态是否写入 manifest（Pre-4 校验和覆盖）"
+    checks:
+      - amp_enabled_in_manifest
+      - amp_dtype_in_manifest
+      - amp_grad_scaler_in_manifest
+      - manifest_checksum_covers_amp
+  code_implementation_check:
+    description: "检查代码实现是否符合规范"
+    checks:
+      - seed_utils_has_amp_assignment
+      - manifest_payload_contains_amp
+      - pre4_checksum_includes_amp
+
+# 关联条款
+related_clauses:
+  - "19"
+  - "182"
+  - "202"
+  - "203"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

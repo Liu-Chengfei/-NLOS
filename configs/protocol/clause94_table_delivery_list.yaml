@@ -1,0 +1,58 @@
+# [94] 表（Table）交付清单——每个表必须注明：数据层来源（主场景/布局随机化/MILUV）、分析单位（轨迹级/帧级）、是否 10 seed 聚合、是否校正后 p 值
+# 对应手册条款 [94]
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+
+clause_id: "94"
+clause_name: "[94] 表交付清单"
+constraint_level: "硬约束"
+description: "每个交付表必须注明表的源数据层、分析单位、是否进行10 seed聚合、是否使用校正后p值。"
+manual_ref: "最终交付_异步手册_424条_20260917.md"
+manual_line: 321
+verification_gate: "p94_table_delivery_list"
+
+# 表格交付清单要求
+table_delivery_requirements:
+  data_layer_source:
+    - "主场景"
+    - "布局随机化"
+    - "MILUV"
+  analysis_unit:
+    - "轨迹级"
+    - "帧级"
+  seed_aggregation:
+    - "10 seed 聚合"
+    - "非聚合"
+  corrected_p_value:
+    - "是"
+    - "否"
+
+# 表格清单（交付的具体表格）
+tables_expected:
+  - table_name: "布局参数 vs 排序散点"
+    data_layer: "布局随机化"
+    analysis_unit: "轨迹级"
+    seed_aggregated: true
+    p_value_corrected: false
+    expected_in: "Section: 布局参数 vs 排序散点 布局随机化层"
+    
+  - table_name: "MILUV外部域布局随机化层 seed/超参稳健性表"
+    data_layer: "MILUV"
+    analysis_unit: "轨迹级"
+    seed_aggregated: true
+    p_value_corrected: true
+    expected_in: "Section: seed/超参稳健性表"
+    
+  - table_name: "10seed间LNN最低成立频次"
+    data_layer: "主场景"
+    analysis_unit: "轨迹级"
+    seed_aggregated: true
+    p_value_corrected: true
+    expected_in: "Section: 10seed间'LNN最低'成立频次"
+
+# 验证检查项
+checks:
+  - table_metadata_specified      # 表格元数据完整标注
+  - data_layer_declared           # 数据层来源声明
+  - analysis_unit_specified       # 分析单位声明
+  - seed_aggregation_declared     # seed 聚合声明
+  - p_value_correction_declared   # p 值校正声明

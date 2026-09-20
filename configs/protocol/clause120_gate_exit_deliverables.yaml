@@ -1,0 +1,12 @@
+# [120] 每个 gate 出口（必交物表）
+# 对应产物必须在 git 提交中（或随 manifest 归档），commit hash 可回溯
+
+clause_id: "120"
+clause_title: "[120] 每个 gate 出口（必交物表）"
+
+gate_exit_deliverables:
+  description: "每个 gate 出口对应的必交物表，产物必须在 git 提交中或随 manifest 归档"
+  traceability: "commit hash 可回溯"
+
+compliance:
+  hard_constraint: true

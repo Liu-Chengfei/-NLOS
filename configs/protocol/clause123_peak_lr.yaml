@@ -1,0 +1,30 @@
+# 条款 123 峰值学习率 lr_peak（配置）
+# 手册原文（docs/最终交付_异步手册_424条_20260917.md 第 356 行）：
+# [123] 峰值 lr（lr_peak）；论文级值：写入 manifest（文献区间 1e-4–1e-3；LTC 原文 0.001–0.02 上限内）
+clause_id: "123"
+clause_title: "[123] 峰值 lr（lr_peak）"
+manual_source:
+  file: "docs/最终交付_异步手册_424条_20260917.md"
+  line: 356
+
+peak_learning_rate:
+  parameter_name: lr_peak
+  paper_level_value: true
+  must_write_to_manifest: true
+  literature_range:
+    lower: 0.0001
+    upper: 0.001
+  ltc_original_range:
+    lower: 0.001
+    upper: 0.02
+    note: "LTC 原文上限 0.02，论文级取值 1e-4–1e-3 在此区间内"
+
+applicable_methods:
+  neural_networks:
+    - LNN
+    - LSTM
+    - Transformer
+
+compliance:
+  hard_constraint: true
+  verification_function: "p123_lr_peak"

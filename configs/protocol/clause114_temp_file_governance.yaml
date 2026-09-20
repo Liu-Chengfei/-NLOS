@@ -1,0 +1,58 @@
+# 文件职责：声明手册第 114 条配置落点 —— 临时文件治理
+# 本文件是手册第 [114] 条的配置落点，规定临时调试脚本的清理要求
+# 第 114 条要求：临时调试脚本跑完立即删除或移入 sandbox/ 并标注用途，不留在实验代码目录
+
+# 核心配置：临时文件治理
+clause_id: "114"
+clause_title: "临时文件治理"
+severity: "hard"
+
+# 临时文件模式
+temporary_file_patterns:
+  - "bash_tool_*.py"
+  - "tmp_*"
+  - "temp_*"
+
+# 临时文件类型
+temporary_file_types:
+  - "一次性探针脚本"
+  - "调试探针"
+  - "临时验证脚本"
+  - "临时测试脚本"
+
+# 处理要求
+handling_requirements:
+  post_execution_action: "立即删除或移入 sandbox/"
+  sandbox_directory: "sandbox/"
+  purpose_annotation_required: true
+  location_restriction: "实验代码目录外"
+
+# 禁止清单
+forbidden_locations:
+  - "实验代码目录根目录"
+  - "实验代码目录子目录"
+  - "data/ 目录"
+  - "configs/ 目录"
+  - "outputs/ 目录"
+
+# 允许位置
+allowed_locations:
+  - "sandbox/"
+  - "archive/"
+  - ".temp_working/"
+
+# 清理时间窗口
+cleanup_timing:
+  action_deadline: "脚本执行后立即"
+  grace_period_seconds: 0
+
+# 验证要求
+verification_requirements:
+  pre_import_check: false
+  post_execution_check: true
+  allowed_patterns_after_run: []
+
+# 配置文件路径
+config_version: "1.0"
+last_updated: "2026-09-18"
+manual_reference: "docs/最终交付_异步手册_424条_20260917.md 第 344 行"

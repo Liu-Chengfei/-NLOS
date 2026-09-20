@@ -1,0 +1,30 @@
+# 条款 [88] · 执行偏差怀疑主义立场
+# 手册原文：长流程人工实验的执行偏差（漏跑单元、改码未重新冒烟、gate 走过场、日志与结果对不上、记录靠回忆）是常态而非例外——默认立场：执行存在偏差，直到本条 E 项被证据排除
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第315行
+
+clause_id: "88"
+clause_name: "执行偏差怀疑主义立场"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第315行"
+
+execution_bias:
+  default_assumption: "bias_exists_until_evidence_excludes"
+  description: "长流程人工实验的执行偏差（漏跑单元、改码未重新冒烟、gate 走过场、日志与结果对不上、记录靠回忆）是常态而非例外——默认立场：执行存在偏差，直到本条 E 项被证据排除"
+
+  bias_types:
+    - "漏跑单元"
+    - "改码未重新冒烟"
+    - "gate 走过场"
+    - "日志与结果对不上"
+    - "记录靠回忆"
+
+  evidence_requirement: "必须提供证据排除偏差"
+
+  exclusion_protocol:
+    description: "偏差默认存在，必须通过证据逐项排除才能推翻默认立场"
+    evidence_documentation_required: true
+    evidence_types:
+      - "实验日志"
+      - "提交记录"
+      - "结果文件完整性校验"
+      - "人工记录核查"

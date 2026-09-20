@@ -1,0 +1,13 @@
+clause_id: "214"
+clause_name: "清场动作清单——诊断轨轻量清场"
+severity: "hard"
+description: "诊断轨轻量清场（每次诊断跑前，3 项）：清空活动数据目录全部旧仿真 npz + manifest"
+mode_type: "diagnostic"
+clear_items:
+  - npz_files
+  - manifest_files
+target_location: "archive"
+validation_rule: "scripts_cannot_read_archive"
+related_clauses:
+  - "[213]"
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

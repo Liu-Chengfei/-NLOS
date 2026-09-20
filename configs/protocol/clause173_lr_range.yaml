@@ -1,0 +1,75 @@
+# 条款 [173] 写入 manifest（学习率区间 1e-4–1e-3）
+
+# 手册原文：写入 manifest（学习率区间 1e-4–1e-3）
+# 对应 docs/异步实验_执行手册_终版 v15_总纲条款版.md 第 173 条
+
+clause_id: "173"
+clause_name: "写入 manifest（学习率区间 1e-4–1e-3）"
+
+# 核心断言：学习率区间 [1e-4, 1e-3] 必须明确写入 manifest
+lr_range:
+  # 必填：学习率下限（论文级值）
+  lr_min: 0.0001  # 1e-4
+  # 必填：学习率上限（论文级值）
+  lr_max: 0.001   # 1e-3
+  # 必填：该区间必须写入 manifest
+  must_write_to_manifest: true
+  # 必填：该区间属于论文级超参值
+  paper_level_value: true
+  # 必填：数值精度声明
+  precision_note: "科学计数法或小数表示均可，但值必须严格等于 1e-4 至 1e-3 区间内"
+
+# 约束：学习率必须在指定区间内
+constraints:
+  # 必填：lr_start/warmup_start 应在区间内
+  lr_start_in_range: true
+  # 必填：lr_peak 应在区间内
+  lr_peak_in_range: true
+  # 必填：lr_end 应在区间内
+  lr_end_in_range: true
+  # 必填：所有学习率参数必须显式定义
+  all_lr_params_must_be_defined: true
+
+# 边界约束
+boundaries:
+  # 禁止：学习率超出 1e-4–1e-3 区间
+  forbidden:
+    - "lr < 1e-4"
+    - "lr > 1e-3"
+    - "学习率未写入 manifest"
+    - "使用默认值而不显式声明"
+  # 必需字段
+  required:
+    - "lr_range.lr_min = 1e-4"
+    - "lr_range.lr_max = 1e-3"
+    - "lr_range.must_write_to_manifest = true"
+
+# 相关条款映射
+related_checks:
+  - "167"  # 学习率三段式调度协议
+  - "168"  # 训练超参显式表
+  - "169"  # 峰值 lr（lr_peak）
+  - "170"  # 后段 lr 衰减
+  - "171"  # 切换 epoch 点
+  - "172"  # 非全量规模（冒烟/quick）
+  - "174"  # 论文级实验唯一归属
+
+# 约束声明
+constraint_declaration:
+  clause_id: "173"
+  binding_level: "hard"
+  violation_consequence: "学习率区间未写入 manifest 或超出 1e-4–1e-3 范围 → 该次训练配置无效，需修正后重验"
+  related_clauses:
+    - "[167] 学习率三段式调度协议"
+    - "[169] 峰值 lr（lr_peak）"
+    - "[170] 后段 lr 衰减"
+    - "[171] 切换 epoch 点"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: >
+  本条款约束学习率参数的取值范围和 manifest 写入要求。
+  所有学习率相关参数（lr_start、lr_peak、lr_end）必须在 1e-4 至 1e-3 区间内，
+  且必须显式写入 manifest 文件中，不得使用默认值隐式推算。

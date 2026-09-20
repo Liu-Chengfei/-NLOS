@@ -1,0 +1,78 @@
+# 条款 [137] · 头实现一致性配置
+# 手册位置：docs/异步实验_执行手册_终版v15_总纲条款版.md 第 488 行
+# 条款原文：头实现一致性：三个网络的 4 个头参数结构逐层一致，只骨干不同（防止实现偏差污染对比）。
+
+# 条款标识（顶层）
+clause_id: "137"
+clause_name: "头实现一致性"
+
+# 核心约束
+head_consistency:
+  # 三个网络：LNN / LSTM / Transformer
+  networks:
+    - LNN
+    - LSTM
+    - Transformer
+
+  # 四个头：bias / risk / uwb_scaling / vio_scaling（见条款 [42]）
+  heads:
+    - bias
+    - risk
+    - uwb_scaling
+    - vio_scaling
+
+  # 约束 1: 参数结构逐层一致
+  layer_structure_consistent: true
+  structure_note: "三个网络的 4 个头在各对应层的参数形状、初始化方式、激活函数必须完全一致"
+
+  # 约束 2: 只骨干不同
+  backbone_only_different: true
+  backbone_note: "LNN/LSTM/Transformer的唯一差异是骨干网络结构，头参数结构必须保持一致"
+
+  # 约束 3: 防止实现偏差污染对比
+  prevent_bias_contamination: true
+  bias_prevention_note: "头参数不一致会导致 LNN vs LSTM/Transformer 的对比被头实现差异污染，而非真正反映骨干效果"
+
+# 头结构定义
+head_structure:
+  class: "LiquidOutputHeadLinear"
+  components:
+    - name: "projection"
+      type: "nn.Linear"
+      input_dim: "hidden_dim + context_dim + filter_context_dim"
+      output_dim: 1
+    - name: "residual_projection"
+      type: "nn.Linear"
+      input_dim: "2 * hidden_dim"
+      output_dim: 1
+
+# 验证项
+verification_items:
+  # 1. 三个网络的头配置文件存在
+  head_config_files_exist: true
+
+  # 2. 头的参数形状逐层一致
+  head_shapes_match_across_networks: true
+
+  # 3. 头的初始化方式一致
+  head_initialization_consistent: true
+
+  # 4. 头的激活函数一致
+  head_activation_consistent: true
+
+  # 5. 骨干网络结构确实不同（否则无需对比）
+  backbones_are_actually_different: true
+
+# 约束声明
+constraint_declaration:
+  clause_id: "137"
+  clause_name: "头实现一致性"
+  source_file: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+  source_line: 488
+  enforce_level: "hard"
+  rationale: "防止实现偏差污染对比，确保 LNN vs LSTM/Transformer 的差异仅来自骨干网络"
+  related_clauses:
+    - "[42] 四个输出头"  # 头机制链定义
+    - "[52] 基线不是裸模型"  # 基线也带头
+    - "[61] 同 seed 初始化"  # 同种子初始化权重
+    - "[100] 头实现一致性"  # 历史配置引用（已废弃）

@@ -1,0 +1,106 @@
+clause_id: "200"
+clause_name: "规模与划分——训练12-15条/seed测试>=100条seed各组合>=25条"
+severity: hard
+
+purpose: |
+  本条是数据规模硬约束。核心原则：
+  （1）训练序列数每 seed 在 12–15 条范围内（含 A2N2/A2N3/A3N2/A3N3 四组合）；
+  （2）测试序列数每 seed >= 100 条，且四组合（A2N2/A2N3/A3N2/A3N3）各 >= 25 条；
+  （3）本条与 [197]（四组合分布）、[198]（轨迹数打印）、[201]（注入对称）
+      衔接，构成数据规模与划分的质量闭环。
+
+four_combinations:
+  - "A2N2"
+  - "A2N3"
+  - "A3N2"
+  - "A3N3"
+
+train_spec:
+  description: "训练序列数规格"
+  count_per_seed:
+    lo: 12
+    hi: 15
+  note: "每 seed 训练序列数应在 [12, 15] 范围内，含四组合分布"
+  check_scope:
+    - "每个 seed 的训练目录（如 train/A2N2/、train/A2N3/ 等）"
+    - "seed manifest 中 train_count 字段"
+
+test_spec:
+  description: "测试序列数规格"
+  total_min: 100
+  per_combination_min: 25
+  note: "每 seed 测试序列总数 >= 100，四组合各 >= 25"
+  check_scope:
+    - "每个 seed 的测试目录（如 test/A2N2/、test/A2N3/ 等）"
+    - "seed manifest 中 test_count 字段"
+    - "各组合 npz 文件数量"
+
+verification_plan:
+  - step: 1
+    name: "读取 seed 列表与 manifest"
+    actions:
+      - "遍历 manifests/ 目录下的所有 JSON manifest 文件"
+      - "读取每个 manifest 中的 train_count、test_count 字段"
+      - "读取四组合分布信息（各组合轨迹数）"
+    output: "各 seed 训练/测试序列数汇总表"
+  - step: 2
+    name: "训练序列数判定"
+    actions:
+      - "检查每个 seed 的 train_count 是否在 [12, 15] 范围内"
+      - "统计超限 seed 数量与具体数值"
+    output: "训练序列数是否合规判定"
+  - step: 3
+    name: "测试序列数判定"
+    actions:
+      - "检查每个 seed 的 test_count 是否 >= 100"
+      - "检查每个 seed 各组合测试轨迹数是否 >= 25"
+      - "统计超限 seed 数量与具体数值"
+    output: "测试序列数是否合规判定"
+  - step: 4
+    name: "处置"
+    actions:
+      - "若训练序列数不在 [12,15] 范围 -> 检查数据生成脚本，必要时重生成"
+      - "若测试序列数 < 100 或某组合 < 25 -> 检查数据生成脚本补足缺失组合"
+      - "记录偏差详情到 decision log"
+    prerequisite: "step 2 或 step 3 判定为不通过"
+
+boundaries:
+  forbidden:
+    - "跳过训练序列数检查直接进入训练"
+    - "跳过测试序列数检查直接进入训练"
+    - "训练序列数 < 12 或 > 15 仍继续训练"
+    - "测试序列数 < 100 仍继续训练"
+    - "任一组合测试轨迹 < 25 仍继续训练"
+    - "仅检查部分 seed 不检查全部 seed"
+  required:
+    - "必须检查所有 seed 的训练序列数"
+    - "必须检查所有 seed 的测试序列数"
+    - "必须检查四组合各组合的测试轨迹数是否 >= 25"
+    - "训练序列数必须在 [12, 15] 范围内"
+    - "测试序列数必须 >= 100"
+    - "不通过时必须记录偏差并触发重生成"
+
+verification_items:
+  scale_check:
+    description: "训练/测试规模核查"
+    checks:
+      - train_count_per_seed_in_range
+      - test_count_per_seed_total_min
+      - test_count_per_combination_min
+  manifest_check:
+    description: "manifest 字段完整性核查"
+    checks:
+      - manifest_has_train_count
+      - manifest_has_test_count
+      - manifest_has_four_combination_counts
+
+related_clauses:
+  - "197"
+  - "198"
+  - "201"
+  - "202"
+  - "240"
+  - "321"
+  - "414"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

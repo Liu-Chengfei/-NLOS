@@ -1,0 +1,39 @@
+# 条款 [152] C-6 RAM ≤12G 硬上限（无 0.8 模糊系数）
+# 手册原文：第C-6项 RAM ≤12G 硬上限（Pre-5 细化第 3 条/执行模式·RAM ≤12G 硬上限）；代码实现要求（细化）：**无 0.8 模糊系数**
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第152条
+
+clause_id: "152"
+clause_name: "C-6 RAM ≤12G 硬上限（无 0.8 模糊系数）"
+
+# RAM 硬上限
+ram_limit:
+  hard_limit_gb: 12           # 硬上限 12GB，不可突破
+  pre5_item: 3                # Pre-5 细化第 3 条
+  execution_mode: true        # 执行模式核心约束
+
+# 禁止模糊系数
+no_fuzzy_coefficient:
+  forbidden_coefficients: [0.8, 0.9, 0.75, 0.85, 0.95]  # 所有模糊系数都禁止
+  safe_coefficient: 1.0       # 唯一允许的系数 = 1.0，即 12GB 就是 12GB
+  enforcement: "12GB 是硬上限，必须严格执行，不能打折"
+
+# 关联条款
+related_checks:
+  - "C-6"      # RAM ≤12G 硬上限
+  - "Pre-5"    # Pre-5 资源门控（第 3 条 = RAM）
+  - "P148"     # 执行前检查清单（含 RAM 核算）
+  - "P150"     # RAM硬上限与并发调度器闸门
+  - "P151"     # RAM超限降并发串行排队
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: >
+  12GB 是硬上限，绝不能使用模糊系数（如 0.8×12GB=9.6GB）来"打擦边球"。
+  所有 RAM 预算核算必须严格按 12GB 为准：
+  - 并发单元数 × 单单元峰值内存 ≤ 12GB
+  - 当使用 compute_parallel_limits() 时：ram_parallel = int(12GB / unit_peak_gb)
+  - 当使用 assert_ram_budget() 时：n_units × unit_peak_mb > 12GB → ValueError
+  - 禁止在任何代码路径中出现 0.8, 0.9 等模糊系数作为 RAM 限制的缩放因子
+  - 超限时必须走 P150/P151 的降级机制，而不是用模糊系数的安全阈值

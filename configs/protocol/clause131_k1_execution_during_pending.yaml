@@ -1,0 +1,66 @@
+# 文件职责：声明 [131] 未裁决期间照常按 K1 档执行
+# 本文件是手册第 131 条的配置落点。
+# 条款原文（docs/最终交付_异步手册_424 条_20260917.md:364）：
+# [131] 未裁决期间照常按 K1 档执行（锚点坐标），实测 GDOP≈1.19 与几何特征写入每 seed manifest 与论文方法节
+
+clause_id: "131"
+clause_title: "[131] 未裁决期间照常按 K1 档执行"
+clause_source: "docs/最终交付_异步手册_424条_20260917.md:364"
+
+# 核心声明
+core_principle: "未裁决期间照常按 K1 档执行（锚点坐标）"
+hard_constraint: true
+
+# K1 档执行要求
+k1_gear_execution:
+  description: "未裁决期间维持 K1 档位锚点坐标布局不变"
+  anchor_layout: "K1"
+  anchor_count: 4
+  gdop_target: 1.19
+  geometry_features:
+    - "非对称布局"
+    - "无共线锚点"
+  execution_during_pending: true
+
+# GDOP 与几何特征记录要求
+gdop_geometry_recording:
+  description: "实测 GDOP 与几何特征写入每 seed manifest 与论文方法节"
+  gdop_required: true
+  gdop_value: 1.19
+  geometry_features_required: true
+  manifest_recording: true
+  paper_methods_section_recording: true
+  features_to_record:
+    - "GDOP 实测值"
+    - "布局几何特征（非对称、无共线）"
+    - "锚点坐标"
+
+# 验证约束
+validation:
+  # 配置文件字段完整性
+  cfg_fields_required:
+    - clause_id
+    - clause_title
+    - core_principle
+    - hard_constraint
+    - k1_gear_execution
+    - gdop_geometry_recording
+  # K1 档位维持
+  k1_gear_maintained: true
+  # GDOP 记录要求
+  gdop_recorded: true
+  gdop_expected_value: 1.19
+  # 几何特征记录要求
+  geometry_features_recorded: true
+  # Manifest 记录要求
+  manifest_recording_required: true
+  # 论文方法节记录要求
+  paper_methods_recording_required: true
+
+# 条款归属
+clause_governance:
+  source_manual: "docs/最终交付_异步手册_424条_20260917.md:364"
+  stage: "Stage 3 · 生成数据"
+  clause_number: 131
+  type: "代码落实类"
+  verification_function: "p131_k1_execution_during_pending"

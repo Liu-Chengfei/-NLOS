@@ -1,0 +1,84 @@
+# 条款 [179] · 10 seed 为论文级唯一执行基线（硬约束，不再下调）
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md
+
+clause_id: "179"
+clause_name: "10 seed 为论文级唯一执行基线（硬约束，不再下调）"
+severity: hard
+
+# 核心约束：10 seed 为唯一基线，不设低于该基线的执行档/可接受档/降级路径
+paper_baseline:
+  # 唯一执行基线值
+  baseline_seeds: 10
+  # 禁止的降级/可接受档
+  forbidden_below_baseline: true
+  # 说明：5 seed 为领域最低可接受线，10 为推荐下限，20 更稳健；但本文取 10 为唯一基线
+  baseline_description: "5 seed 是领域最低可接受线、10 为推荐下限、20 更稳健，本文档取 10 seed 为唯一基线，不设任何低于该基线的执行档/可接受档/降级路径"
+  # 验证要求：配对检验功效与四组合切片统计
+  sample_requirements:
+    # 每方法 ≥1000 轨迹级样本
+    min_trajectories_per_method: 1000
+    # 四组合各 ≥250
+    min_per_combination: 250
+  # 统计要求
+  statistical_tests:
+    - "配对检验"
+    - "四组合切片统计"
+
+# manifest 要求
+manifest:
+  required_fields:
+    - "seed_count"
+    - "baseline_seeds"
+  description: "每个实验的 manifest 必须包含 seed_count、baseline_seeds 字段，声明使用的 seed 数量及基线要求"
+
+# 验收标准
+acceptance_criteria:
+  seed_count_minimum: 10
+  no_degraded_modes: true
+  description: "所有论文级实验必须使用 ≥10 seed，且不得使用 5 seed 或更低的降级/可接受档"
+
+# 相关条款映射
+related_checks:
+  - "176"   # 场景类型为工业/商业混合遮挡环境
+  - "178"   # 未决期间出口
+  - "180"   # 时空对齐是紧耦合成立的前置条件
+  - "181"   # 未裁决期间照常按 K1 档执行
+  - "510"   # K1 GDOP：锚点坐标算 GDOP 直方图
+  - "506"   # S2 锚点实测非对称无共线，GDOP≈1.19
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "使用 5 seed 作为执行基线"
+    - "设置低于 10 seed 的可接受档"
+    - "设置 5 seed 或更低的降级路径"
+    - "未达标后降级到 5 seed 执行"
+  required:
+    - "seed_count >= 10（论文级唯一基线）"
+    - "baseline_seeds = 10"
+    - "不得有低于 10 seed 的执行档/可接受档/降级路径"
+    - "manifest 必须包含 seed_count 和 baseline_seeds"
+
+# 约束声明
+constraint_declaration:
+  clause_id: "179"
+  binding_level: "hard"
+  violation_consequence: "使用低于 10 seed 的执行档 → 该实验数据不构成论文级结果，须重跑 ≥10 seed"
+  related_clauses:
+    - "[176] 场景类型为工业/商业混合遮挡环境"
+    - "[177] 机体系为 FLU/RFU 二选一"
+    - "[178] 未决期间出口（消除悬空）"
+    - "[180] 时空对齐是紧耦合成立的前置条件"
+    - "[181] 未裁决期间照常按 K1 档执行"
+    - "[506] S2 锚点实测非对称无共线，GDOP≈1.19"
+    - "[510] K1 GDOP 测算要求"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: >
+  通行做法为"5 seed 是领域最低可接受线、10 为推荐下限、20 更稳健"，本文档取 10 seed 为唯一基线，
+  不设任何低于该基线的"执行档/可接受档/降级路径"。
+  配对检验功效与四组合切片统计（每方法 ≥1000 轨迹级样本、四组合各 ≥250）只在论文级规模下成立（P22/DQ-4）。
+  这是一道硬性约束，任何实验若使用 5 seed 或更低，直接不构成论文级数据。

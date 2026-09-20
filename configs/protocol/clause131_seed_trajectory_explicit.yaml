@@ -1,0 +1,72 @@
+# 文件职责：声明 [131] seed 数、轨迹级样本数、独立实验数在实验设置或表注明示
+# 本文件是手册第 131 条的配置落点。
+# 条款原文（docs/异步实验_执行手册_终版v15_总纲条款版.md:476）：
+# [131] seed 数、轨迹级样本数、独立实验数在实验设置或表注明示。
+
+clause_id: "131"
+clause_name: "seed/轨迹级样本数/独立实验数明示"
+severity: "hard"
+hard_constraint: true
+
+# 核心声明：三类关键参数必须明示
+explicit_declaration:
+  seed_count:
+    required: true
+    paper_level: 10
+    # 10 seed（seed 0-9），见 [126]
+  trajectory_per_seed:
+    required: true
+    paper_level: 100
+    # 每 seed 测试轨迹 >=100 条，见 [106]、[138]
+    min_per_method: 1000
+    # 每方法 >=1000 轨迹级样本（10 seed × 100 条），见 [138]
+  independent_experiments:
+    required: true
+    paper_level: 50
+    # 10 seed × 5 方法 = 50 单元，见 [126]、[106]
+    formula: "10 seed × 5 methods"
+
+# 高兼容默认：表注或实验设置
+compliance_path:
+  table_footnote:
+    enabled: true
+    required_fields:
+      - "seed_count"
+      - "trajectory_per_seed"
+      - "independent_experiments"
+  experiment_settings_section:
+    enabled: true
+    required_fields:
+      - "seed_count"
+      - "trajectory_per_seed"
+      - "independent_experiments"
+      - "layout_configuration"
+      - "gear_levels"
+
+# 明示格式示例
+example_declaration:
+  table_footnote_example: |
+    表注：本文实验基于 10 个独立随机种子（seed 0-9），每个种子包含 >=100 条测试轨迹，
+    每方法 >=1000 轨迹级样本。50 个独立单元（10 seed × 5 方法）构成论文级规模。
+  experiment_settings_example: |
+    实验设置：seed 数=10，测试轨迹/seed>=100 条，每方法轨迹级样本>=1000，
+    独立实验数=50（10 seed × 5 方法）。
+
+# 关联条款
+related_checks:
+  - "126"  # 10 repeats（seed）× 5 方法
+  - "106"  # 全量 = 论文级
+  - "138"  # 统计口径核验：10 seed 配对、每方法 >=1000 轨迹级样本
+  - "132"  # 第J-10项 seed/轨迹数/独立实验数是否明示
+  - "133"  # 不满足时：补明示
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 条款归属
+clause_governance:
+  source_manual: "docs/异步实验_执行手册_终版v15_总纲条款版.md:476"
+  stage: "Stage 1 · 定义"
+  clause_number: 131
+  type: "代码落实类"
+  verification_function: "p131_seed_trajectory_explicit"

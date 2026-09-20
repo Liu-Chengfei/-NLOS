@@ -1,0 +1,58 @@
+# 条款 [151] C-6 RAM ≤12G 硬上限（超限降并发/串行排队）
+# 手册原文：第C-6项 RAM ≤12G 硬上限（Pre-5 细化第 3 条/执行模式·RAM ≤12G 硬上限）；代码实现要求（细化）：超限降并发或降为串行排队
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第151条
+
+clause_id: "151"
+clause_name: "C-6 RAM ≤12G 硬上限（超限降并发/串行排队）"
+
+# RAM 硬上限（与第 150 条共用同一数值）
+ram_limit:
+  hard_limit_gb: 12
+  pre5_item: 3
+  execution_mode: true
+
+# 超限处置机制（条款 151 的核心：不是只报错，而是有降级路径）
+escalation:
+  trigger: "并发单元数 × 单单元峰值内存 > 12GB"
+  # 优先级：先降并发，再降为串行
+  priority:
+    - "strategy_1"
+    - "strategy_2"
+  strategy_1:
+    name: "降并发"
+    action: "减少并发单元数"
+    condition: "降并发后预算 ≤ 12GB"
+    formula: "新并发数 = floor(12GB / 单单元峰值内存)"
+    code_impl: "compute_ram_escalation(n_pending, unit_peak_mb) → strategy='reduce_parallel'"
+  strategy_2:
+    name: "降为串行排队"
+    action: "所有单元串行执行（并发=1）"
+    condition: "降并发仍无法满足 ≤ 12GB"
+    note: "单单元峰值内存 > 12GB 时强制串行"
+    code_impl: "compute_ram_escalation(n_pending, unit_peak_mb) → strategy='serial_queue'"
+
+# 与第 150 条的区别
+vs_clause_150:
+  clause_150_focus: "事前核算（并发调度器按公式计算 RAM 闸门）"
+  clause_151_focus: "超限处置（超过 12GB 时有明确降级路径，不直接报错退出）"
+  clause_150_impl: "compute_parallel_limits() / assert_ram_budget()"
+  clause_151_impl: "compute_ram_escalation() → 返回降级策略"
+
+# 关联检查
+related_checks:
+  - "C-6"
+  - "Pre-5"
+  - "P148"
+  - "P150"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第151条"
+
+# 实施说明
+implementation_note: >
+  第 151 条是第 150 条的补充：150 负责事前核算（闸门），151 负责超限后的降级处置。
+  两者配合形成完整的 RAM 预算保障：
+    - 事前：compute_parallel_limits() 按公式计算允许的最大并发度
+    - 超限后：compute_ram_escalation() 按优先级执行降级策略
+  降级优先级：先尝试降并发（reduce_parallel），降并发仍不够则降为串行排队（serial_queue）。
+  禁止直接报错退出（ValueError 仅作为最后的硬断言，降级路径优先尝试）。

@@ -1,0 +1,38 @@
+# 条款 [77] 大修不是降级出口 — 配置
+# 手册位置：docs/最终交付_异步手册_424条_20260917.md 第304行
+
+clause_id: "77"
+clause_name: "大修不是降级出口"
+
+refactor_goal:
+  description: "大修目标是让代码与手册严格一致（回到正轨），不得借大修缩小实验声明/降seed/降轨迹/降精度（降级边界不变）"
+  goal: "code_and_manual_strict_consistency"
+
+forbidden_degradations:
+  - no_reduce_seed: true
+    description: "禁止借大修降低 seed 数量"
+  - no_reduce_trajectory: true
+    description: "禁止借大修降低轨迹数量"
+  - no_downscale_precision: true
+    description: "禁止借大修降低精度（如降低样本数、减少验证单元等）"
+  - no_narrow_scope: true
+    description: "禁止借大修缩小实验声明范围"
+
+forbidden_actions:
+  - "借大修缩小实验声明"
+  - "借大修降 seed"
+  - "借大修降轨迹"
+  - "借大修降精度"
+
+degradation_boundary:
+  unchanged: true
+  description: "降级边界不变：论文级规模参数（10 seed × >=100 测试轨迹/seed）为硬约束，大修不得改变"
+
+paper_level_params:
+  seeds: 10
+  trajectories_per_seed_min: 100
+  methods: 5
+  total_units_min: 50
+  source: "条款62_论文级规模参数"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第304行"

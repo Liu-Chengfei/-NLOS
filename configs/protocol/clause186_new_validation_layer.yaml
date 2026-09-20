@@ -1,0 +1,87 @@
+# 条款 [186] 新增验证层配置
+# 手册原文：为新增验证层，其实现/冒烟/统计校验复用同一套 I-1–I-5/P22 脚手架（场景 manifest 化后 S9 校验按各布局专属期望执行）
+
+clause_id: "186"
+clause_name: "新增验证层复用 I-1-I-5/P22 脚手架"
+severity: hard
+
+# 核心断言：新增验证层必须复用已有脚手架，不得自创
+scaffold_fork_required: true
+supported_scaffolds:
+  - "I-1"
+  - "I-2"
+  - "I-3"
+  - "I-4"
+  - "I-5"
+  - "P22"
+new_layer_must_reuse: true
+
+# 三项复用验证
+reused_components:
+  implementation: true     # 实现复用脚手架
+  smoke_test: true         # 冒烟验证复用脚手架
+  statistical_validation: true  # 统计校验复用脚手架
+
+# 场景 manifest 化要求
+scene_manifest_required: true
+scene_manifest_spec:
+  description: "每个布局场景需有专属 manifest"
+  fields:
+    - "layout_id"
+    - "seed"
+    - "expected_outputs"
+    - "s9_check_spec"
+
+# S9 校验按布局专属期望执行
+s9_layout_specific:
+  enabled: true
+  per_layout_expected: true
+  manifest_driven: true
+
+# 相关检查项
+related_checks:
+  - "183"   # 布局 manifest 参数写入
+  - "184"   # 数据独立性
+  - "185"   # MILUV 锚点策略声明
+  - "I-1"
+  - "I-2"
+  - "I-3"
+  - "I-4"
+  - "I-5"
+  - "P22"
+  - "S9"
+
+# 验证流程
+verification_flow:
+  steps:
+    - step: 1
+      action: "确认脚手架复用"
+      description: "验证新增验证层的实现、冒烟、统计校验均引用 I-1-I-5/P22 代码"
+    - step: 2
+      action: "场景 manifest 检查"
+      description: "验证每个布局场景有专属 manifest 文件"
+    - step: 3
+      action: "S9 布局专属校验检查"
+      description: "验证 S9 校验脚本支持按布局读取专属期望值"
+    - step: 4
+      action: "冒烟验证"
+      description: "运行冒烟测试确认新增验证层可用"
+
+# 约束声明
+constraint_declaration:
+  clause_id: "186"
+  binding_level: "hard"
+  violation_consequence: "新增验证层未复用脚手架 → 重构，不得保留自创实现"
+  related_clauses:
+    - "[183] 布局 manifest 参数写入"
+    - "[184] 数据独立性"
+    - "[185] MILUV 锚点策略声明"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: >
+  新增验证层指在现有 I-1–I-5/P22 脚手架之上增加的验证功能模块。
+  必须通过 import 引用或组合方式复用已有代码，禁止 fork 一份新的实现。
+  场景 manifest 化确保 S9 校验能按布局加载对应的期望输出，实现布局专属验证。

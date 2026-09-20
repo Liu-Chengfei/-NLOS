@@ -1,0 +1,73 @@
+# Clause [165] 对照基线引用
+# Source: docs/异步实验_执行手册_终版v15_总纲条款版.md, [165]
+
+clause_id: "165"
+clause_name: "对照基线引用"
+
+# 检查方式定义
+check_method:
+  type: "manifest_declaration_with_baseline_run"
+  description: "manifest 中对照组声明 + baseline_run 记录"
+
+# 核心要求
+baseline_reference_requirements:
+  # 1. manifest 中声明对照组
+  control_group_declaration:
+    required: true
+    field: "baseline_method"
+    expected_values:
+      - "ekf"
+      - "robust_ekf"
+      - "lin"
+    description: "实验必须在 manifest 中声明使用的对照基线方法"
+
+  # 2. baseline_run 记录文件
+  baseline_run_record:
+    required: true
+    file_pattern: "baseline_run_*.json"
+    description: "必须存在 baseline_run 记录文件，记录基线方法的运行结果"
+
+  # 3. 变体方法
+  comparison_methods:
+    required: true
+    min_count: 1
+    description: "必须至少一种方法与对照基线进行对比"
+
+# 变体方法定义
+methods:
+  lstm:
+    name: "lstm"
+    description: "LSTM 方法"
+    used_as_comparison: true
+  transformer:
+    name: "transformer"
+    description: "Transformer 方法"
+    used_as_comparison: true
+  fgo:
+    name: "fgo"
+    description: "FGO 方法"
+    used_as_comparison: true
+  ekf:
+    name: "ekf"
+    description: "扩展卡尔曼滤波器（基线）"
+    baseline: true
+  robust_ekf:
+    name: "robust_ekf"
+    description: "鲁棒扩展卡尔曼滤波器（备选基线）"
+    baseline: true
+
+# 检查项
+checks:
+  - control_group_manifest_declaration
+  - baseline_run_record_exists
+  - comparison_methods_valid
+
+# 相关条款
+related_checks:
+  - "93"    # 基线一致
+  - "129"   # 10_seed 为论文级唯一执行基线
+  - "83"    # 基线网络带头运行无爆炸行
+
+# 手册参照
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+source_line: 165

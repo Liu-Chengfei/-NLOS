@@ -1,0 +1,50 @@
+# Clause 118: Dataset mmap/disk re-read to reduce resident memory
+# Source: docs/最终交付_异步手册_424 条_20260917.md, line 351
+# [118] 数据集可 mmap/磁盘重读降低驻留（12GB RAM 闸门内，worker 数按 核定写入 manifest）
+
+clause_id: "118"
+clause_title: "数据集可 mmap/磁盘重读降低驻留"
+description: "数据集可 mmap/磁盘重读降低驻留（12GB RAM 闸门内，worker 数按 核定写入 manifest）"
+manual_line: 351
+
+dataset_loading_requirements:
+  mmap_support: true
+  disk_reread_enabled: true
+  resident_memory_reduction: true
+  ram_gate_limit_gb: 12.0
+
+worker_specification:
+  worker_count:
+    determined_by: "RAM 与数据集驻留核定"
+    written_to_manifest: true
+  max_total_ram_gb: 12.0
+  no_harmful_upper_limit: true  # 非越高越好，按实际核定
+
+verification_rules:
+  check_mmap_configured:
+    description: "检查 DataLoader 是否启用 mmap 或磁盘重读模式"
+    required: true
+  check_worker_count_in_manifest:
+    description: "检查 manifest 中是否记录了 worker 数"
+    required: true
+  check_ram_gate_within_12gb:
+    description: "检查 worker 数核定在 12GB RAM 闸门内"
+    required: true
+  check_ram_limit_reference:
+    description: "检查是否引用 RAM 限制条款 (如 clause110_ram_limit)"
+    required: true
+
+manifest_fields_required:
+  - worker_count
+  - ram_limit_gb
+  - dataset_loading_mode
+  - mmap_enabled
+
+compliance:
+  hard_constraint: true
+  description: "数据集可 mmap/磁盘重读降低驻留，12GB RAM 闸门内，worker 数按核定写入 manifest"
+  related_clauses:
+    - clause_id: "110"
+      name: "RAM ≤12G 硬上限"
+    - clause_id: "169"
+      name: "num_workers 按 RAM 与数据集驻留核定"

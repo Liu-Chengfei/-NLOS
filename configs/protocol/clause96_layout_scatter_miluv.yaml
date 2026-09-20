@@ -1,0 +1,61 @@
+# 条款 [96] 布局参数 vs 排序散点 & MILUV 分段误差图配置
+# 手册原文：布局参数 vs 排序散点 布局随机化层 MILUV 分段误差图 方法级对比在 MILUV 的 LOS/NLOS 分段误差（整体 + 分段）布局随机化层
+# 对应手册 docs/最终交付_异步手册_424条_20260917.md:323
+
+clause_id: "96"
+clause_name: "布局参数 vs 排序散点与 MILUV 分段误差图"
+
+# 布局参数 vs 排序散点配置
+layout_parameter_scatter:
+  enabled: true
+  chart_types:
+    - "scatter"
+    - "boxplot"
+  x_axis: "布局参数 (layout_id)"
+  y_axis: "方法排序 (RMSE)"
+  method_comparison:
+    - "LNN"
+    - "LSTM"
+    - "Transformer"
+    - "Robust-EKF"
+    - "EKF"
+
+# MILUV 分段误差图配置  
+miluv_segmented_error_plot:
+  enabled: true
+  dataset: "MILUV"
+  segments:
+    - "overall"      # 整体
+    - "LOS"          # LOS 段
+    - "NLOS"         # NLOS 段
+    - "missing"      # 缺失帧
+  metric: "RMSE"
+  unit: "trajectory_level"  # 轨迹级分析单位
+  methods:
+    - "LNN"
+    - "LSTM"
+    - "Transformer"
+    - "Robust-EKF"
+    - "EKF"
+
+# 布局随机化层声明
+layout_randomization_layer: true
+
+# 可视化规范
+visualization_spec:
+  scatter_plot:
+    title: "布局参数 vs 方法排序散点图"
+    x_label: "布局参数"
+    y_label: "RMSE (m)"
+    color_by: "method"
+    marker: "o"
+    size: 50
+    
+  segmented_bar_plot:
+    title: "MILUV 分段误差图 (LOS/NLOS/缺失/整体)"
+    x_label: "方法"
+    y_label: "RMSE (m)"
+    fill_by: "segment"
+    
+# 参考路径
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md:323"

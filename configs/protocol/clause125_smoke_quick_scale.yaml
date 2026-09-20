@@ -1,0 +1,49 @@
+# 条款 [125] 非全量规模（冒烟/quick）配置
+# 手册原文：非全量规模（冒烟/quick）；论文级值：冒烟：1 序列/seed 级临时小数据（实现口径），quick 校准按 Part 2 冒烟合格标准
+# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 358 行
+
+clause_id: "125"
+clause_title: "[125] 非全量规模（冒烟/quick）"
+
+# 冒烟规模定义
+smoke_scale:
+  description: "冒烟实验规模定义"
+  sequences_per_seed: 1
+  scale_level: "non-full-scale"
+  purpose: "临时小数据，用于快速验证方案可行性"
+  implementation_scope: "实现口径"
+
+# Quick 校准定义
+quick_calibration:
+  description: "Quick 校准机制"
+  reference_standard: "Part 2 冒烟合格标准"
+  calibration_required: true
+  pass_criteria_from_part2: true
+
+# Part 2 冒烟合格标准引用（来自手册第 619 行）
+part2_smoke_pass_standard:
+  lnn_error_range: "3-4m"
+  ekf_error_range: "6-8m"
+  scenario: "N2+N3 混合池预期"
+  lnn_improvement_over_ekf: "40-62.5%"
+  note: "冒烟只作量级参考不作最终结论"
+
+# 约束声明
+constraint_declaration:
+  clause_id: "125"
+  binding_level: "hard"
+  violation_consequence: "冒烟未通过则不能进入全量实验"
+  related_clauses:
+    - "[66] 禁止把冒烟数据并入全量测试集"
+    - "[81] 冒烟；验收人/验收机制"
+
+# 手册引用
+manual_ref: "docs/最终交付_异步手册_424 条_20260917.md 第 358 行"
+
+# 实施说明
+implementation_note: >
+  冒烟实验是非全量规模的临时小数据，仅用于方案冻结前的可行性验证。
+  quick 校准必须参照 Part 2 冒烟合格标准进行预达标判定。
+  冒烟数据严禁并入全量测试集（见条款 [66]）。
+
+hard_constraint: true

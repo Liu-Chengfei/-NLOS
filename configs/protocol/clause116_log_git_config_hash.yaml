@@ -1,0 +1,30 @@
+# Clause 116: Log must include git commit + config hash
+# Source: docs/最终交付_异步手册_424 条_20260917.md, line 346
+
+clause_id: "116"
+clause_title: "日志含 git commit + 配置 hash"
+description: "检查训练/评估日志是否包含 git commit hash 和配置 hash，用于确保结果可复现、可追溯"
+
+log_requirements:
+  git_commit_required: true
+  config_hash_required: true
+  hash_fields:
+    - git_commit_hash
+    - config_hash
+
+verification_rules:
+  log_file_patterns:
+    - "*.log"
+    - "*.json"
+    - "manifest.json"
+  required_in_log:
+    git_commit: "git commit hash at training start"
+    config_hash: "config hash from manifest"
+
+manifests_required:
+  - config_hash  # From config hash binding
+  - git_commit   # From git commit tracking
+
+compliance:
+  hard_constraint: true
+  description: "日志必须包含 git commit + 配置 hash，否则结果不可复现"

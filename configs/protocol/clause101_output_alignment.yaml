@@ -1,0 +1,94 @@
+# 条款 [101] · 输出对齐配置
+# 手册位置：docs/最终交付_异步手册_424 条_20260917.md 第 328 行
+# 条款原文：输出对齐；合格标准：五个方法的评估输入为同一批测试轨迹（配对），RMSE 口径一致（Sim 对齐/2D/世界系/warm-up 剔除，///）
+
+# 条款标识（顶层）
+clause_id: "101"
+clause_name: "输出对齐"
+
+# 核心约束
+output_alignment:
+  # 评估输入对齐：五个方法使用同一批测试轨迹
+  paired_trajectories:
+    # 五个方法：LNN / LSTM / Transformer / EKF / Robust-EKF
+    methods:
+      - LNN
+      - LSTM
+      - Transformer
+      - EKF
+      - Robust-EKF
+    # 每个方法在同一批测试轨迹上评估
+    same_test_set: true
+    # 配对语义：同一轨迹 × 同 seed 为配对样本
+    pairing_unit: "trajectory_seed"
+    pairing_note: "各方法评估按同一测试轨迹同 seed 配对（与条款 [53] 配对样本对齐一致）"
+
+  # RMSE 口径一致
+  rmse_consistency:
+    # 对齐方式：Sim/Umeyama 轨迹对齐
+    alignment_method: "Sim"
+    alignment_note: "使用 Sim/Umeyama 算法进行轨迹对齐"
+
+    # 维度：2D（x, y）
+    dimension: "2D"
+    dimensions_used:
+      - x
+      - y
+
+    # 坐标系：世界系
+    coordinate_system: "world"
+    coordinate_system_note: "误差以世界系计算，不依赖机体系"
+
+    # warm-up 前 10s 剔除
+    warmup_removal:
+      enabled: true
+      duration_seconds: 10
+      note: "warm-up 前 10s 数据不参与 RMSE 计算，与条款 [20] 评估口径一致"
+
+    # 轨迹级汇总
+    aggregation_unit: "trajectory"
+    aggregation_note: "每条测试轨迹汇总为一个 RMSE 值，不以帧级直接计算统计检验"
+
+# 合格标准
+qualifying_criteria:
+  # 五个方法的评估输入必须是同一批测试轨迹
+  same_test_trajectory:
+    requirement: "五个方法的评估输入为同一批测试轨迹（配对）"
+    enforce: true
+    violation_type: "V101-1"
+    violation_note: "若某方法使用不同轨迹评估，则配对检验失效，统计结论无效"
+
+  # RMSE 口径必须一致
+  consistent_rmse:
+    requirement: "RMSE 口径一致（Sim 对齐/2D/世界系/warm-up 剔除）"
+    enforce: true
+    violation_type: "V101-2"
+    violation_note: "若各方法 RMSE 口径不同，则方法间对比无效"
+
+# 验证项
+verification_items:
+  # 1. 五个方法都从同一测试轨迹集读取
+  same_test_set_for_all_methods: true
+
+  # 2. 每方法每轨迹只有一个 RMSE 值（不重复计算）
+  single_rmse_per_trajectory: true
+
+  # 3. 配对样本：同一轨迹 × 同 seed
+  paired_sample_per_trajectory_seed: true
+
+  # 4. RMSE 口径：Sim 对齐 + 2D + 世界系 + warm-up 10s 剔除
+  rmse_alignment_sim_2d_world_warmup_10s: true
+
+# 约束声明
+constraint_declaration:
+  clause_id: "101"
+  clause_name: "输出对齐"
+  source_file: "docs/最终交付_异步手册_424 条_20260917.md"
+  source_line: 328
+  enforce_level: "hard"
+  rationale: "五个方法必须在同一批测试轨迹、同一 RMSE 口径下评估，配对检验才有效；口径不一致会导致比较失真"
+  related_clauses:
+    - "[20] 评估口径"
+    - "[53] 配对样本对齐"
+    - "[56] 分析单位与样本独立性声明"
+    - "[62] 论文级规模参数"

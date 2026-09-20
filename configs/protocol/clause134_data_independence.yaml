@@ -1,0 +1,25 @@
+clause_id: 134
+title: 数据独立性
+status: enforced
+
+validation:
+  # 分析单位必须在受试者级别
+  analysis_unit: "subject"
+  
+  # 禁止成簇测量
+  forbid_clustered_measurement: true
+  
+  # 每个 K×M 组合只能有一个独立观测 per subject
+  one_observation_per_subject_per_condition: true
+  
+  # 若需重复测量，必须预先声明聚合方式
+  aggregation_if_repeated:
+    allowed_methods: ["mean", "median", "max", "first"]
+    must_be_declared_in_design: true
+    
+  # 独立性检验要求
+  independence_check:
+    required_for: ["imu_raw", "uwb_raw", "time_series"]
+    methods: ["autocorrelation_lag1", "variance_partitioning"]
+    threshold_autocorrelation: 0.3
+    threshold_variance_ratio: 0.8  # 组内/总方差比

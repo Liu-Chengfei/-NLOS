@@ -1,0 +1,71 @@
+# 条款 [90] · 学习率三段式协议全局唯一
+
+# 手册位置：docs/最终交付_异步手册_424条_20260917.md 第317行
+# 对应 Part 0 三段式学习率协议全局约束
+
+clause_id: "90"
+clause_name: "学习率三段式协议全局唯一"
+
+learning_rate_three_phase_protocol:
+  # Part 0 全局唯一约束
+  unique_global: true
+  unique_global_description: "三段式 lr 形态（warm-up 线性升 → 平台恒定 → 后 1/3 段衰减到 lr_max×0.1）全局唯一，禁止任何网络自定义形态"
+
+  # 三段式 phases 定义
+  phases:
+    - name: "warmup_linear_up"
+      description: "warm-up 线性升：0 → lr_max，W_up ≤ 总步数 5%"
+      type: "linear_ramp"
+      from_value: 0
+      to_value: "lr_max"
+      max_fraction_of_total_steps: 0.05
+
+    - name: "plateau_constant"
+      description: "平台恒定：保持 lr_max 不变"
+      type: "constant"
+      value: "lr_max"
+
+    - name: "last_third_decay_to_lr_max_x_0.1"
+      description: "后 1/3 段衰减到 lr_max×0.1"
+      type: "decay"
+      target_value: "lr_max * 0.1"
+      start_fraction: "2/3"
+      end_fraction: 1.0
+
+  # 可调参数白名单
+  adjustable_parameters:
+    - name: "W_up"
+      description: "warm-up 步数，上限为总步数 5%"
+      constraint: "W_up <= total_steps * 0.05"
+    - name: "lr_max"
+      description: "峰值学习率，论文级区间 1e-4 – 1e-3"
+      constraint: "1e-4 <= lr_max <= 1e-3"
+    - name: "decay_ratio"
+      description: "衰减目标比例，固定为 0.1（即衰减到 lr_max×0.1）"
+      constraint: "decay_ratio == 0.1"
+
+  # 训练不充分时 lr 调整限制
+  training_inadequate_lr_tuning_allowed: true
+  training_inadequate_lr_tuning_description: "三网络同形态同预算训练不充分时允许调 lr，但必须受严格限制"
+  max_lr_tuning_rounds: 2
+  max_lr_tuning_rounds_description: "同一失败最多调 lr 2 轮，每轮必须写入 decision log 并重新冒烟验证"
+  bug_masking_forbidden: true
+  bug_masking_forbidden_description: "禁止通过调 lr 反复试探掩盖 bug（如 NaN/Inf 根因未查清时不得靠 lr 调小掩盖）"
+
+  # 三网络统一要求
+  three_networks_same_schedule: true
+  three_networks_same_schedule_description: "LNN/LSTM/Transformer 三网络必须使用完全相同的学习率三段式形态"
+  three_networks_same_budget: true
+  three_networks_same_budget_description: "三网络 lr 调优预算一致，调优预算一致（见诊断项十）"
+
+  # manifest 记录要求
+  manifest_required: true
+  manifest_fields:
+    - "lr_max"
+    - "W_up"
+    - "total_training_steps"
+    - "schedule_type"
+    - "decay_target_ratio"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第317行"
+source_line: 317

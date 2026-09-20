@@ -1,0 +1,68 @@
+# 条款 [196] · DQ 不合格处置顺序：先修数据，修不通才允许缩小声明范围
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 619 行
+
+clause_id: "196"
+clause_name: "DQ不合格处置顺序：先修数据后考虑缩小声明范围"
+severity: hard
+
+purpose: |
+  本条是数据适配性检查（DQ-1–DQ-4）不合格时的处置顺序铁律。
+  核心原则：不合格时，必须先尝试修复数据本身（重生成/调轨迹设计/走协议变更），
+  只有在所有数据修复手段均不可行时，才允许"缩小声明范围"。
+  本条与 R-1（数据性失败）、R-5（降级出口）衔接，构成 DQ 失败处置的完整纪律链。
+
+disposal_sequence:
+  - step: 1
+    name: "先修数据（第一优先）"
+    actions:
+      - "重生成：对该 seed 重新生成数据（RZ-1 纪律）"
+      - "调轨迹设计：调整轨迹参数以改善数据分布/难度梯度"
+      - "走协议变更：按协议走正式的协议变更流程"
+    prerequisite: "DQ-1–DQ-4 任一未过"
+    forbidden_before: "先修数据未尝试或未通过前，不得进入缩小声明范围"
+
+  - step: 2
+    name: "修不通才允许缩小声明范围（第二优先，仅当 Step 1 穷尽后）"
+    actions:
+      - "诚实声明：当前数据不支持该研究问题/该结论外推范围"
+      - "附 DQ 证据：需附完整 DQ 不合格证据链"
+      - "区分失败类型：数据性失败 ≠ 方法性失败（见 R-1、R-4）"
+    prerequisite: "Step 1 所有修数据手段已穷尽，仍无法通过 DQ"
+    requires_approval: "须提交用户裁决（R-5 降级出口决策纪律）"
+
+boundaries:
+  forbidden:
+    - "DQ 不合格后跳过修数据直接缩小声明范围"
+    - "未经 R-1/R-5 决策流程自行缩小声明范围"
+    - "把数据性失败伪装成方法性失败"
+    - "缩小声明范围不附 DQ 证据"
+    - "在修数据手段尚未穷尽时执行缩小声明"
+  required:
+    - "DQ 不合格后第一动作必须是修数据（重生成/调轨迹/协议变更）"
+    - "缩小声明范围仅在修数据穷尽后才允许"
+    - "缩小声明须附完整 DQ 不合格证据链"
+    - "区分并明确标注数据性失败与方法性失败"
+    - "R-5 降级出口须经独立复核者核签"
+
+verification_items:
+  dq_fail_disposal_order:
+    description: "DQ 不合格处置顺序：先修数据，后缩小声明"
+    checks:
+      - repair_data_first_action_specified
+      - narrow_scope_only_after_exhausted
+      - data_failure_separated_from_method_failure
+      - dq_evidence_required_for_narrow_scope
+      - r5_approval_required
+
+related_clauses:
+  - "192"
+  - "193"
+  - "194"
+  - "195"
+  - "279"
+  - "601"
+  - "646"
+  - "732"
+  - "759"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

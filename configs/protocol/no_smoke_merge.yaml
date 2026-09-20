@@ -1,0 +1,14 @@
+# 条款 [66] 禁止冒烟测试数据并入全量测试集
+# 手册原文：禁止把冒烟 ≥12 条测试数据并入全量测试集
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第293行
+
+clause_id: "66"
+clause_name: "禁止冒烟数据并入全量测试集"
+
+smoke_data:
+  hard_constraint: true
+  max_smoke_trajectories: 12
+  no_merge_into_full_test: true
+  description: "冒烟测试数据（≤12条）禁止并入全量测试集，与'测试轨迹重新生成'一致，整批化执行"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第293行"

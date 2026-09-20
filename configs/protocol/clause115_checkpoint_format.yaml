@@ -1,0 +1,88 @@
+# 文件职责：声明手册第 115 条配置落点 —— checkpoint 落盘格式细则
+# 本文件是手册第 [115] 条的配置落点，规定 checkpoint 结果的持久化落盘格式要求
+# 第 115 条要求：checkpoint 落盘必须符合规定的格式细则，确保结果持久化可追溯
+
+# 核心配置：checkpoint 落盘格式
+clause_id: "115"
+clause_title: "checkpoint 落盘格式细则"
+severity: "hard"
+
+# checkpoint 文件格式要求
+checkpoint_format_requirements:
+  # 文件命名规范
+  filename_pattern: "ckpt_{method}_{seed}_{layout}_{timestamp}.pt"
+  required_fields:
+    - "method"       # 方法名（LNN/LSTM/Transformer/EKF/FGO）
+    - "seed"         # 随机种子编号
+    - "layout"       # 布局编号（如有）
+    - "timestamp"    # 生成时间戳（YYYYMMDD_HHMMSS 格式）
+  
+  # 文件格式
+  file_extension: ".pt"
+  storage_format: "torch.save()"  # PyTorch 二进制格式
+
+# checkpoint 内容结构
+checkpoint_content_structure:
+  required_keys:
+    - "model_state_dict"     # 模型状态字典
+    - "optimizer_state_dict" # 优化器状态字典
+    - "epoch"                # 训练轮数
+    - "loss_history"         # 损失历史（列表）
+    - "metrics"              # 评估指标字典
+    - "config_hash"          # 配置文件的 git hash
+    - "git_commit"           # git commit 哈希
+    - "seed"                 # 训练所用随机种子
+    - "training_timestamp"   # 训练开始/结束时间戳
+    - "hardware_info"        # 硬件环境信息（GPU/CPU 型号）
+  
+  optional_keys:
+    - "lr_schedule"          # 学习率调度历史
+    - "gradient_stats"       # 梯度统计信息
+    - "validation_metrics"   # 验证集指标
+
+# 持久化存储要求
+persistence_requirements:
+  # 存储位置
+  storage_directory: "checkpoints/"
+  
+  # 完整性校验
+  integrity_check: true
+  checksum_algorithm: "sha256"
+  
+  # 元数据嵌入
+  metadata_embedding: true
+  
+  # 不可变性约束
+  immutability: "checkpoint 写入后禁止修改"
+
+# 清理与归档规则
+cleanup_and_archival:
+  # 临时 checkpoint 清理
+  temp_checkpoint_patterns:
+    - "tmp_ckpt_*"
+    - "temp_ckpt_*"
+  
+  # 归档策略
+  archival_policy:
+    keep_all_seeds: true
+    archive_after_validation: true
+    archive_directory: "archive/checkpoints/"
+
+# 验证要求
+verification_requirements:
+  # 加载测试
+  load_test_required: true
+  
+  # 内容校验
+  content_validation:
+    check_model_state: true
+    check_optimizer_state: true
+    check_metadata: true
+  
+  # 完整性验证
+  integrity_verification: true
+
+# 配置文件路径
+config_version: "1.0"
+last_updated: "2026-09-18"
+manual_reference: "docs/最终交付_异步手册_424 条_20260917.md 第 345 行"

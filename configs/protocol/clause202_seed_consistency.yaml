@@ -1,0 +1,177 @@
+clause_id: "202"
+clause_name: "seed 体系一致——轨迹/噪声/注入/划分各一随机源全部固定写入 manifest"
+severity: hard
+
+purpose: |
+  本条是 seed 体系一致性硬约束。核心原则：
+  （1）轨迹、噪声、注入、划分四个环节的随机源必须各只有一个（各一随机源）；
+  （2）所有随机种子必须固定（固定 seed）；
+  （3）所有随机种子必须写入 manifest（写入 manifest）；
+  （4）本条与 [200]（规模与划分）、[201]（注入对称）、[203]（TF32 精度声明）衔接。
+
+# 四个环节的随机源要求
+random_source_spec:
+  trajectory:
+    description: "轨迹生成的随机源"
+    seed_key: "trajectory_seed"
+    required: true
+    fixed: true
+    manifest_field: "trajectory_seed"
+  noise:
+    description: "噪声注入的随机源"
+    seed_key: "noise_seed"
+    required: true
+    fixed: true
+    manifest_field: "noise_seed"
+  injection:
+    description: "数据注入的随机源"
+    seed_key: "injection_seed"
+    required: true
+    fixed: true
+    manifest_field: "injection_seed"
+  split:
+    description: "训练/测试划分的随机源"
+    seed_key: "split_seed"
+    required: true
+    fixed: true
+    manifest_field: "split_seed"
+
+# 各一随机源约束：每个环节只能有一个 seed
+single_source_constraint:
+  trajectory:
+    max_seeds: 1
+    reason: "轨迹生成只能用一个随机源，禁止多个独立随机源混用"
+  noise:
+    max_seeds: 1
+    reason: "噪声注入只能用一个随机源，禁止多个独立随机源混用"
+  injection:
+    max_seeds: 1
+    reason: "数据注入只能用一个随机源，禁止多个独立随机源混用"
+  split:
+    max_seeds: 1
+    reason: "划分只能用一个随机源，禁止多个独立随机源混用"
+
+# manifest 写入要求
+manifest_write_spec:
+  required_fields:
+    - "trajectory_seed"
+    - "noise_seed"
+    - "injection_seed"
+    - "split_seed"
+  write_timing:
+    - "数据生成完成后立即写入"
+    - "训练开始前必须包含上述字段"
+  fixed_values:
+    note: "seed 值必须在整个实验生命周期内保持固定，禁止运行时动态变化"
+    check: "同一 seed 的多次运行必须使用相同 seed 值"
+
+# 固定 seed 验证
+seed_fixed_verification:
+  check_same_seed_across_runs:
+    enabled: true
+    description: "验证同一 seed 的多次运行是否使用相同 seed 值"
+    method: "读取 manifest 中的 seed 字段，对比同一 seed 的不同运行日志"
+  check_no_runtime_change:
+    enabled: true
+    description: "验证 seed 值在运行时未被修改"
+    method: "检查代码中是否有可能修改 seed 值的动态赋值语句"
+
+# 验证计划
+verification_plan:
+  - step: 1
+    name: "检查配置文件存在"
+    actions:
+      - "读取 configs/protocol/clause202_seed_consistency.yaml"
+      - "验证 YAML 格式正确"
+    output: "配置文件解析成功"
+  - step: 2
+    name: "验证四个随机源字段定义"
+    actions:
+      - "检查 random_source_spec 包含 trajectory/noise/injection/split 四个键"
+      - "检查每个键包含 seed_key/required/fixed/manifest_field 字段"
+    output: "四个随机源字段定义完整"
+  - step: 3
+    name: "验证单源约束"
+    actions:
+      - "检查每个环节的 max_seeds == 1"
+      - "检查 single_source_constraint 覆盖全部四个环节"
+    output: "单源约束检查通过"
+  - step: 4
+    name: "验证 manifest 写入要求"
+    actions:
+      - "检查 manifest_write_spec.required_fields 包含四个 seed 字段"
+      - "检查 write_timing 包含数据生成完成后立即写入"
+    output: "manifest 写入要求定义完整"
+  - step: 5
+    name: "验证 seed 固定检查项"
+    actions:
+      - "检查 seed_fixed_verification.check_same_seed_across_runs.enabled == true"
+      - "检查 seed_fixed_verification.check_no_runtime_change.enabled == true"
+    output: "seed 固定验证检查项定义完整"
+  - step: 6
+    name: "验证边界约束"
+    actions:
+      - "检查 boundaries.forbidden 包含禁止多个随机源混用"
+      - "检查 boundaries.forbidden 包含禁止运行时修改 seed"
+      - "检查 boundaries.required 包含必须检查四个随机源"
+      - "检查 boundaries.required 包含必须写入 manifest"
+    output: "边界约束定义完整"
+  - step: 7
+    name: "检查规则文档"
+    actions:
+      - "检查 rules/条款 202_seed 体系一致.md 是否存在"
+      - "检查规则文档包含条款原文、含义、验收标准"
+    output: "规则文档检查通过"
+  - step: 8
+    name: "检查手册真源"
+    actions:
+      - "检查 docs/异步实验_执行手册_终版v15_总纲条款版.md 是否存在"
+      - "检查手册包含[202] 条目"
+    output: "手册真源检查通过"
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "禁止多个随机源混用"
+    - "禁止同一环节使用多个 seed 混用"
+    - "禁止 seed 值在运行时动态修改"
+    - "禁止 seed 值未写入 manifest"
+    - "禁止跳过 manifest 写入直接训练"
+  required:
+    - "必须检查轨迹/噪声/注入/划分四个随机源各一"
+    - "必须检查所有 seed 值固定"
+    - "必须检查所有 seed 值写入 manifest"
+    - "必须检查 manifest 包含四个 seed 字段"
+    - "必须检查同一 seed 的多次运行使用相同 seed 值"
+
+# 验证项
+verification_items:
+  source_count_check:
+    description: "检查四个随机源各一"
+    checks:
+      - trajectory_single_source
+      - noise_single_source
+      - injection_single_source
+      - split_single_source
+  manifest_check:
+    description: "检查 manifest 写入要求"
+    checks:
+      - manifest_has_trajectory_seed
+      - manifest_has_noise_seed
+      - manifest_has_injection_seed
+      - manifest_has_split_seed
+  fixed_check:
+    description: "检查 seed 固定要求"
+    checks:
+      - seed_values_fixed
+      - no_runtime_seed_modification
+
+# 关联条款
+related_clauses:
+  - "200"
+  - "201"
+  - "203"
+  - "182"
+  - "183"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

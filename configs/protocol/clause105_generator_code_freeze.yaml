@@ -1,0 +1,45 @@
+# 条款 [105] 生成器代码冻结确认 配置
+# 手册原文：生成器代码冻结确认：数据生成器代码与冒烟通过的 git commit 一致（code freeze 覆盖训练/评估/统计/数据生成四类代码）
+# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 335 行
+
+clause_id: "105"
+clause_name: "生成器代码冻结确认"
+
+# 核心断言：数据生成器代码必须与冒烟通过的 git commit 一致
+code_freeze:
+  required: true
+  description: "代码冻结覆盖训练/评估/统计/数据生成四类代码"
+  freeze_scope:
+    - "训练"
+    - "评估"
+    - "统计"
+    - "数据生成"
+  freeze_mode: "git commit 一致"
+  smoke_passed_commit_required: true
+
+# 冻结确认项
+freeze_verification:
+  generator_code_locked: true
+  description: "数据生成器代码必须锁定，与冒烟通过的 git commit 完全一致"
+  allowed_changes: "无（除非走变更流程并重新冒烟验证）"
+  commit_hash_required: true
+
+# 相关条款
+constraint_declaration:
+  clause_id: "105"
+  binding_level: "hard"
+  violation_consequence: "生成器代码变更未重新冒烟 → 数据作废，必须重新跑全部实验"
+  related_clauses:
+    - "[104] 统计口径冒烟验证 Gate"
+    - "[106] 决策日志（decision log）"
+    - "[57] 先导实验"
+    - "[64] 重新生成全部 seed 数据"
+
+# 手册引用
+manual_ref: "docs/最终交付_异步手册_424 条_20260917.md 第 335 行"
+
+# 实施说明
+implementation_note: >
+  Stage 2 写码阶段的第一道门。数据生成器代码（流水线 7 步注入顺序）必须
+  与冒烟通过的 git commit 完全一致，任何代码变更都必须记录在决策日志（[106]）
+  中，并通过重新冒烟验证 gate（[104]）后方可生效。

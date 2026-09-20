@@ -1,0 +1,89 @@
+# 文件职责：声明 [130] 时空对齐是紧耦合成立的前置条件
+# 本文件是手册第130条的配置落点。
+# 条款原文（docs/最终交付_异步手册_424条_20260917.md:363）：
+# [130] 时空对齐是紧耦合成立的前置条件：时间戳对齐与坐标系统一必须先行
+# ——A2/A3 异步偏移在重采样前注入、世界系/机体系约定固定（世界系约定）、
+# 相机-IMU 外参与杆臂（lever arm）在数据生成仿真中按理想值固定并写入 manifest
+
+clause_id: "130"
+clause_title: "[130] 时空对齐是紧耦合成立的前置条件"
+clause_source: "docs/最终交付_异步手册_424条_20260917.md:363"
+
+# 核心声明
+core_principle: "时空对齐是紧耦合成立的前置条件"
+hard_constraint: true
+
+# 时空对齐要求（逐句对应条款原文）
+requirements:
+  # 要求1：时间戳对齐与坐标系统一必须先行
+  requirement_1_timestamp_and_coord_system:
+    description: "时间戳对齐与坐标系统一必须先行"
+    priority: "before_any_spatial_alignment"
+    hard_constraint: true
+
+  # 要求2：A2/A3 异步偏移在重采样前注入
+  requirement_2_a_axis_before_resample:
+    description: "A2/A3 异步偏移在重采样前注入"
+    hard_constraint: true
+    notes:
+      - "UWB时钟偏移 20–50ms (A2) / 100–200ms (A3)"
+      - "UWB往返延迟 40–80ms (A2) / 120–250ms (A3)"
+      - "IMU时钟偏移 5–15ms (A2) / 20–50ms (A3)"
+      - "IMU采样抖动 ±3ms (A2) / ±10ms (A3)"
+      - "VIO时钟偏移 20–50ms (A2) / 100–200ms (A3)"
+      - "VIO处理延迟 30–80ms (A2) / 150–300ms (A3)"
+    injection_order: "重采样前"
+
+  # 要求3：世界系/机体系约定固定（世界系约定）
+  requirement_3_world_frame_convention:
+    description: "世界系/机体系约定固定（世界系约定）"
+    hard_constraint: true
+    convention: "世界系约定"
+    notes:
+      - "世界坐标系与机体坐标系关系固定"
+      - "约定写入数据生成仿真与 manifest"
+
+  # 要求4：相机-IMU 外参与杆臂按理想值固定并写入 manifest
+  requirement_4_extrinsic_and_lever_arm:
+    description: "相机-IMU 外参与杆臂（lever arm）在数据生成仿真中按理想值固定并写入 manifest"
+    hard_constraint: true
+    fixed: true
+    ideal_value: true
+    params:
+      T_cam_imu:
+        description: "相机-IMU 外参变换矩阵"
+        fixed: true
+        ideal_value: true
+      lever_arm:
+        description: "IMU 相对 tag 中心的杆臂"
+        fixed: true
+        ideal_value: true
+    manifest_required: true
+
+# 验证约束
+validation:
+  # 配置文件字段完整性
+  cfg_fields_required:
+    - clause_id
+    - clause_title
+    - core_principle
+    - hard_constraint
+    - requirements
+  # 时间戳对齐要求
+  timestamp_alignment_required: true
+  # 坐标系统一要求
+  coordinate_system_unified: true
+  # A2/A3 异步偏移注入顺序
+  a_axis_injection_before_resample: true
+  # 相机-IMU 外参写入 manifest
+  cam_imu_extrinsic_in_manifest: true
+  # 杆臂写入 manifest
+  lever_arm_in_manifest: true
+
+# 条款归属
+clause_governance:
+  source_manual: "docs/最终交付_异步手册_424条_20260917.md:363"
+  stage: "Stage 3 · 生成数据"
+  clause_number: 130
+  type: "代码落实类"
+  verification_function: "p130_spatiotemporal_alignment"

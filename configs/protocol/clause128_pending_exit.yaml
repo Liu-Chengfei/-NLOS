@@ -1,0 +1,28 @@
+# [128] 未决期间出口（消除悬空）
+# 对应手册条款 [128]
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+
+clause_id: "128"
+clause_name: "[128] 未决期间出口"
+constraint_level: "硬约束"
+protocol_decision_pending_behavior: "照常按 K1 档执行"
+execution_gear: "K1"
+anchor_layout: "4 锚非对称欠定布局"
+anchor_coordinates_required: true
+gdop_requirement: "≈1.19"
+geometric_features:
+  - "非对称"
+  - "无共线"
+manifest_requirements:
+  gdop_value: true
+  geometric_features_record: true
+  per_seed_manifest: true
+paper_method_section_requirements:
+  gdop_value: true
+  geometric_features_record: true
+description: "协议裁决未完成前，异步高 NLOS 实验照常按 K1 档执行（4 锚非对称欠定布局，锚点坐标），但必须：锚点实测 GDOP ≈1.19 与'几何特征：非对称、无共线'写入每 seed manifest（数据契约）与论文方法节"
+manual_ref: "最终交付_异步手册_424条_20260917.md"
+manual_line: 361
+verification_gate: "p128_pending_exit"
+enforcement: "GDOP 值 + 几何特征写入 manifest 与论文方法节"
+hard_constraint: true

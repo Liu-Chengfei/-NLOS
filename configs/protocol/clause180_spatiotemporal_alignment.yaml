@@ -1,0 +1,43 @@
+clause_id: '180'
+clause_name: 时空对齐是紧耦合成立的前置条件
+severity: hard
+spatiotemporal_alignment:
+  is_prerequisite: true
+  description: 时空对齐是紧耦合成立的前置条件：时间戳对齐与坐标系统一必须先行
+  timestamp_alignment:
+    required: true
+    description: 时间戳对齐与坐标系统一必须先行
+    priority: before_any_spatial_alignment
+  a_axis_injection_before_resample:
+    required: true
+    description: A2/A3 异步偏移在重采样前注入（P28）
+    injection_order: 重采样前
+  coordinate_frame_convention:
+    required: true
+    description: 世界系/机体系约定固定（S1）
+    fixed: true
+  cam_imu_extrinsic_and_lever_arm:
+    required: true
+    description: 相机-IMU 外参与杆臂（lever arm）在数据生成仿真中按理想值固定并写入 manifest
+    fixed: true
+    ideal_value: true
+    manifest_required: true
+manifest:
+  required_fields:
+  - timestamp_alignment
+  - coordinate_frame_convention
+  - cam_imu_extrinsic
+  - lever_arm
+validation:
+  timestamp_alignment_verified: true
+  coordinate_system_unified: true
+  a_axis_before_resample: true
+  extrinsic_fixed_in_simulation: true
+  lever_arm_fixed_in_simulation: true
+  parameters_in_manifest: true
+related_checks:
+- '181'
+- '182'
+- P28
+- S1
+manual_ref: docs/异步实验_执行手册_终版v15_总纲条款版.md

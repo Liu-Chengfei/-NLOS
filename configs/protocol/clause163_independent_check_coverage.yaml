@@ -1,0 +1,41 @@
+# Clause [163] 独立检查同样适用于配套脚本
+# Source: docs/异步实验_执行手册_终版v15_总纲条款版.md, [163]
+
+clause_id: "163"
+clause_name: "独立检查同样适用于配套脚本"
+severity: hard
+
+# 独立检查适用范围
+independent_check_scope:
+  script_categories:
+    - "data_generation"      # 数据生成脚本
+    - "s9_validation"        # S9 校验脚本
+    - "statistics_summary"   # 统计汇总脚本
+    - "chart_pipeline"       # 图表产线脚本
+    - "training_main"        # 训练主程序（已有）
+  independent_check_required: true  # 所有这些脚本都必须通过独立检查
+
+# 配套脚本清单
+accompanying_scripts:
+  data_generation:
+    - "scripts/generate_data.py"
+    - "scripts/audit_data.py"
+    - "scripts/validate_data.py"
+  s9_validation:
+    - "scripts/validate_s9.py"
+    - "scripts/check_s9_metrics.py"
+  statistics_summary:
+    - "scripts/summary_statistics.py"
+    - "scripts/calculate_metrics.py"
+  chart_pipeline:
+    - "scripts/plot_results.py"
+    - "scripts/generate_charts.py"
+
+# 与相关条款关联
+related_checks:
+  - "P144"    # 代码实现正确性独立检查
+  - "144"     # 代码实现正确性独立检查
+  - "C-3"     # AMP 混合精度默认启用
+
+# 手册参照
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

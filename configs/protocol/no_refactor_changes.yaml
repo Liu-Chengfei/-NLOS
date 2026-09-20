@@ -1,0 +1,15 @@
+# 条款 [75] 禁止借大修变口径
+# 手册原文：禁止借大修变口径——大修只改代码组织与可维护性（模块拆分/常量收敛/断言补齐/命名统一），不得改变任何论文级数值、不得改数据生成/评估/统计口径、不得为了好写而改协议
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第302行
+
+clause_id: "75"
+clause_name: "禁止借大修变口径"
+
+refactor_restriction:
+  no_change_paper_level_values: true
+  no_change_data_gen: true
+  no_change_eval: true
+  no_change_protocol: true
+  description: "大修只改代码组织与可维护性，不得改变论文级数值与数据/评估/统计口径"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第302行"

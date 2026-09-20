@@ -1,0 +1,87 @@
+# 条款 [88] 执行偏离怀疑论配置
+# 手册条款：[88] 凡改动执行参数（温度/top-k/采样策略）必须重新标定校准集。
+clause_id: "88"
+
+execution_parameter_skepticism:
+  # 核心原则
+  core_principle: "任何执行参数改动必须重新标定校准集"
+  
+  # 受监控的执行参数
+  monitored_params:
+    temperature:
+      description: "采样温度"
+      default: 0.7
+      range: [0.0, 2.0]
+      requires_calibration: true
+      
+    top_k:
+      description: "Top-K 采样"
+      default: 50
+      range: [1, 500]
+      requires_calibration: true
+      
+    top_p:
+      description: "核采样概率阈值"
+      default: 0.95
+      range: [0.0, 1.0]
+      requires_calibration: true
+      
+    sampling_strategy:
+      description: "采样策略"
+      default: "multinomial"
+      allowed_values:
+        - greedy
+        - multinomial
+        - beam_search
+        - nucleus
+      requires_calibration: true
+      
+    repetition_penalty:
+      description: "重复惩罚"
+      default: 1.0
+      range: [1.0, 3.0]
+      requires_calibration: false  # 一般不影响分布
+      
+  calibration_requirements:
+    # 重新标定的触发条件
+    triggers:
+      - any_param_changed: true
+        min_calibration_samples: 100
+        calibration_metric: "distribution_similarity"
+        threshold: 0.95
+        
+    # 校准方法
+    methods:
+      - name: "KL 散度检验"
+        description: "对比改动前后输出分布"
+        max_kl_divergence: 0.1
+        
+      - name: "统计显著性检验"
+        description: "t 检验或卡方检验"
+        max_p_value: 0.05
+        
+      - name: "回归测试"
+        description: "在标准测试集上运行"
+        required_pass_rate: 1.0  # 100% 通过
+        
+  forbidden_actions:
+    - action: "未经标定直接改动温度"
+      consequence: "禁止，必须重新标定"
+      
+    - action: "未经标定直接改动 top-k"
+      consequence: "禁止，必须重新标定"
+      
+    - action: "未经标定切换采样策略"
+      consequence: "禁止，必须重新标定"
+      
+  rollback_policy:
+    on_calibration_failure: "回滚至上一已知稳定参数组合"
+    retain_calibration_history: true
+    max_calibration_history: 10
+    
+# 验证文件路径
+validation_files:
+  calibration_set: "data/calibration_sets/"
+  parameter_history: "logs/parameter_history.json"
+  calibration_records: "logs/calibration_records/"
+  distribution_comparison: "outputs/distribution_comparison/"

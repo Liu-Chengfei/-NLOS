@@ -1,0 +1,48 @@
+# 条款 [83] · LSTM/Transformer 带头运行；无 >10m 爆炸行
+# 手册位置：docs/最终交付_异步手册_424条_20260917.md 第310行
+# 通过标准：LSTM 和 Transformer 网络带头正常运行（不崩溃/不NaN），且所有方法无 >10m 的爆炸行（爆炸定位点）
+
+clause_id: "83"
+clause_name: "baseline_network_health"
+
+# LSTM/Transformer 基线健康检查配置
+lstm_transformer_baseline_run:
+  description: "LSTM 和 Transformer 基线网络必须带头正常运行，不能崩溃或产生 NaN"
+  lstm_with_head:
+    required: true
+    note: "LSTM 必须运行带头版本（带 UWB/VIO 融合头），否则与 LNN 比较不公平"
+  transformer_with_head:
+    required: true
+    note: "Transformer 必须运行带头版本（带 UWB/VIO 融合头），否则与 LNN 比较不公平"
+  no_nan_allowed:
+    required: true
+    note: "训练和推理过程中禁止出现 NaN 值"
+  no_crash_allowed:
+    required: true
+    note: "训练和推理过程中禁止崩溃"
+
+# 爆炸行阈值配置
+explosion_row_threshold:
+  description: "无爆炸行——测试结果中不存在 RMSE 超过阈值的异常行"
+  explosion_row_threshold_m: 10.0
+  unit: "m"
+  no_exploding_rows_required: true
+  note: "所有方法的评估结果中不能出现 RMSE 超过 10m 的爆炸行"
+
+# 统计显著性检查
+statistical_check:
+  description: "对爆炸行的统计检查"
+  check_method: "trajectory_level_rmse"
+  aggregation: "per_trajectory"
+  max_allowed_outliers: 0
+
+# 手册原文路径
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第310行"
+source_line: 310
+
+# 验证方法
+validation:
+  lstm_check_fn: "check_lstm_baseline_health"
+  transformer_check_fn: "check_transformer_baseline_health"
+  explosion_check_fn: "check_no_exploding_rows"
+  all_methods_check_fn: "check_all_methods_no_explosion"

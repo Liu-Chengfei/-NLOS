@@ -43,7 +43,7 @@ def collect_targets():
 def main() -> int:
     lines = []
     lines.append(f"清场时间: {datetime.datetime.now().isoformat(timespec='seconds')}")
-    lines.append(f"归档目标目录: {DEST_ROOT.relative_to(ROOT)}")
+    lines.append(f"归档目标目录: {DEST_ROOT.relative_to(ROOT).as_posix()}")
     targets = collect_targets()
     moved = 0
     for f in targets:
@@ -53,6 +53,8 @@ def main() -> int:
         shutil.move(str(f), str(dst))
         lines.append(f"移动: {rel.as_posix()} -> {dst.relative_to(ROOT).as_posix()}")
         moved += 1
+    # 无论是否移动文件，均创建归档目录（保证 DEST_ROOT 路径真实存在）
+    DEST_ROOT.mkdir(parents=True, exist_ok=True)
     lines.append(f"共移动 {moved} 项（0 项 = 工作区本无待清场的仿真数据集/权重）")
     # 清场后复核：确认扫描范围内已无匹配残留
     residual = [str(p.relative_to(ROOT)) for p in collect_targets()]

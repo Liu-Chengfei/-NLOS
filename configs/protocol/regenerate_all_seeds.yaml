@@ -1,0 +1,14 @@
+# 条款 [64] 重新生成全部 seed 数据
+# 手册原文：重新生成全部 seed 数据：主场景 10 seed 全部重新生成
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第291行
+
+clause_id: "64"
+clause_name: "重新生成全部 seed 数据"
+
+regenerate:
+  scope: "主场景"
+  seed_count: 10
+  regenerate_all: true
+  description: "主场景 10 seed 全部重新生成"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第291行"

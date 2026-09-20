@@ -1,0 +1,99 @@
+# 条款 [207] 配置一致性：跑实验用的 YAML 档位矩阵与生成数据的 manifest 交叉核对
+# 手册位置：docs/异步实验_执行手册_终版v15_总纲条款版.md 第 642 行
+# 条款原文：跑实验用的 YAML 档位矩阵与生成数据的 manifest 交叉核对， 不出现"数据按 N2/N3 生成、实验只按轻档读"或"数据 A2/A3 混合、实验以为只 A2"。
+
+clause_id: "207"
+clause_name: "配置一致性"
+severity: "hard"
+
+purpose: |
+  本条款要求跑实验用的 YAML 档位矩阵（frozen_axes 配置）必须与生成数据的 manifest 中实际记录的 axes_override 完全一致。
+  核心约束：
+  - 不允许"数据按 N2/N3 生成、实验只按轻档读"这种数据-配置错配
+  - 不允许"数据 A2/A3 混合、实验以为只 A2"的情况
+  - 确保数据生成时使用的档位协议与实验读取的档位完全匹配
+
+config_data_cross_check:
+  description: "YAML 档位矩阵与 manifest 数据交叉核对"
+  
+  # 核心约束声明
+  constraints:
+    forbidden_patterns:
+      - "数据按 N2/N3 生成、实验只按轻档读"  # 数据-配置错配
+      - "数据 A2/A3 混合、实验以为只 A2"     # 混合档位读取
+    
+    required_patterns:
+      - "YAML frozen_axes 与 manifest axes_override 完全一致"
+      - "数据生成档位 = 实验读取档位"
+      - "无权重/数据混合读取"
+
+  # 档位矩阵定义（从 experiment_protocol.yaml 中的 frozen_axes 提取）
+  gear_matrix:
+    A: "A2"  # 异步程度档位
+    N: "N2"  # NLOS 档位
+    V: "V0"  # VIO 退化档位
+    K: "K1"  # 锚点配置档位
+    M: "M1"  # 缺失模态档位
+
+  # A/N 轴的主要档位要求
+  A_axis:
+    allowed_levels: ["A2", "A3"]
+    primary_check: "同步匹配 manifest 中的 A 档位"
+    
+  N_axis:
+    allowed_levels: ["N2", "N3"]
+    primary_check: "同步匹配 manifest 中的 N 档位"
+    
+  V_axis:
+    allowed_levels: ["V0"]
+    primary_check: "V0 为实验主档，必须与 manifest 一致"
+
+  # 交叉核对机制
+  cross_verification:
+    method: "manifest-gear-cross-match"
+    reference_files:
+      - "configs/experiments/*.yaml"  # YAML 档位配置
+      - "data/*/sim_meta.json"         # 生成数据的 manifest
+    mismatch_action: "stop_and_investigate"
+
+  # 检查点
+  check_points:
+    - name: "yaml_frozen_axes_exists"
+      description: "检查 YAML 配置中是否存在 frozen_axes 定义"
+      file_pattern: "configs/experiments/*.yaml"
+      
+    - name: "manifest_axes_override_exists"
+      description: "检查 manifest 中是否存在 axes_override 字段"
+      file_pattern: "data/*/sim_meta.json"
+      
+    - name: "gear_level_consistency"
+      description: "核对 YAML frozen_axes 与 manifest axes_override 的档位等级一致性"
+      check_items:
+        - "A 档位一致"
+        - "N 档位一致"
+        - "V 档位一致"
+        - "K 档位一致"
+        - "M 档位一致"
+
+# 约束声明
+constraint_declaration:
+  clause_id: "207"
+  clause_name: "配置一致性"
+  source_file: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+  source_line: 642
+  bind_level: "hard"
+  violation_consequence: "数据-配置错配导致实验结果不可靠，必须停止并回溯到正确配置"
+  related_clauses:
+    - "[206] 试点方差功效分析"
+    - "[197] 四组合分布不一致"
+    - "[7] K 档位协议"
+
+# 手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 实施说明
+implementation_note: |
+  1. 每次运行实验前，必须核对 configs/experiments/*.yaml 中 frozen_axes 的值
+  2. 检查对应数据集的 data/*/sim_meta.json 中的 axes_override 是否与之匹配
+  3. 不匹配时必须：① 使用正确的 YAML 配置 ② 或重新生成数据 ③ 或调整 manifest
+  4. 禁止直接修改 manifest 绕过配置检查

@@ -1,0 +1,58 @@
+# 条款 [91] · 锚固定 4 且缺失 M1 成簇协议
+# 来源：docs/最终交付_异步手册_424条_20260917.md 第 318 行
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+#
+# 内容：
+# - 协议 K 轴全档固定 4 锚，异步高 NLOS 实验按协议 K1=4 锚执行
+# - M 轴主表 M1（UWB 5% 成簇丢包，含 NLOS 不可解帧统一归缺失）
+
+protocol_version: 27
+clause_id: "91"
+clause_title: "锚固定 4 且缺失 M1 成簇"
+clause_source: "docs/最终交付_异步手册_424条_20260917.md 第 318 行"
+
+axis_k_anchor_protocol:
+  description: "协议 K 轴全档固定 4 锚"
+  anchor_count_fixed: 4
+  execution_gear: "K1"
+  execution_description: "异步高 NLOS 实验按协议 K1=4 锚执行（锚点坐标 A1–A4 即 4 锚）"
+  
+  # K 轴档位引用
+  gear_reference: "configs/protocol/axis_k_anchor.yaml"
+  
+  # K1 档位参数（4 锚非对称欠定）
+  k1_spec:
+    label: "4 锚非对称欠定"
+    anchor_layout: "4 锚非对称欠定"
+    gdop_range: [3, 5]
+    geometric_feature: "锚点分布不均、存在共线倾向"
+    
+  # 与协议一致性声明
+  consistency_with_protocol: true
+
+axis_m_missing_protocol:
+  description: "M 轴主表 M1"
+  
+  # M 轴档位引用
+  gear_reference: "configs/protocol/axis_m_missing.yaml"
+  
+  # M1 档位参数
+  m1_spec:
+    label: "UWB 成簇丢包"
+    description: "UWB 5% 成簇丢包（含 NLOS 引起的不可解帧，统一为缺失注入；成簇产生长间隙 0.3–2 s）"
+    uwb_missing_rate: 0.05
+    vio_missing_rate: 0.00
+    imu_missing_rate: 0.00
+    missing_definition: "UWB 5% 成簇丢包（含 NLOS 不可解帧统一归缺失）"
+    injection_type: "clustered"
+    cluster_gap_seconds: [0.3, 2.0]
+    
+  # 与协议一致性声明
+  consistency_with_protocol: true
+
+# 联合约束
+joint_constraints:
+  k_and_m_together: true
+  k_anchor_fixed_at_4: true
+  m_missing_at_m1_clustered: true
+  no_deviation_from_protocol: true

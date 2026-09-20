@@ -1,0 +1,60 @@
+# Clause 133: 每布局全部参数 + 随机根种子写入该布局 manifest
+# 手册 [133]（docs/最终交付_异步手册_424 条_20260917.md:366）：
+# 每布局全部参数 + 随机根种子写入该布局 manifest。
+
+clause_id: "133"
+clause_title: "[133] 每布局全部参数 + 随机根种子写入该布局 manifest"
+
+# 每布局 manifest 必须包含的字段
+manifest_fields:
+  layout_id: "布局 ID（唯一标识，如 L001、L002）"
+  scene_graph: "场景图（场景布局描述）"
+  anchor_coordinates: "锚点坐标（N_layout 个锚点位置）"
+  anchor_count: "锚点数量（≥6 入门 / ≥10 推荐）"
+  gear_configuration:
+    description: "档位配置（A2/A3 与 N2/N3 四组合）"
+    combinations:
+      - "A2N2"
+      - "A2N3"
+      - "A3N2"
+      - "A3N3"
+    distribution: "各组合各占 25%"
+  trajectory_count_per_combination: "各组合轨迹数量"
+  injection_statistics:
+    rho: "丢包率实际值"
+    mu: "NLOS 偏差均值实际值"
+    sigma: "NLOS 偏差标准差实际值"
+  random_source_seed: "随机源 seed 值（用于该布局数据生成）"
+  layout_parameters:
+    description: "布局专属参数（GDOP、几何特征、遮挡区分布）"
+    gdop: "几何精度因子 GDOP"
+    geometry_description: "几何特征描述"
+    occlusion_zones: "遮挡区列表"
+  extrinsic_arm:
+    T_cam_imu: "相机-IMU 外参（按理想值固定）"
+    lever_arm: "IMU 相对 tag 中心的杆臂（按理想值固定）"
+
+# 验证约束
+constraints:
+  mandatory_fields:
+    - "layout_id"
+    - "scene_graph"
+    - "anchor_coordinates"
+    - "anchor_count"
+    - "gear_configuration"
+    - "trajectory_count_per_combination"
+    - "injection_statistics"
+    - "random_source_seed"
+    - "layout_parameters"
+    - "extrinsic_arm"
+  four_combinations_equal_distribution: true
+  random_seed_must_be_recorded: true
+  layout_parameters_must_be_recorded: true
+  no_shared_trajectory_with_main_scene: true
+
+# 与主场景的数据独立性（引用 [134]）
+independence_from_main_scene:
+  trajectories_must_be_regenerated: true
+  same_protocol_same_code_only_different_scene_params: true
+
+hard_constraint: true

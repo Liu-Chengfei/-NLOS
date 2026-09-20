@@ -1,0 +1,139 @@
+clause_id: "203"
+clause_name: "精度模式统一声明——TF32 开关显式设置并写入 manifest"
+severity: hard
+
+purpose: |
+  本条是精度模式硬约束，核心要求：
+  （1）torch.backends.cuda.matmul.allow_tf32 与 torch.backends.cudnn.allow_tf32
+      必须显式 True 或 False（禁止依赖 PyTorch 默认值）；
+  （2）三网络（liquid_ekf / lstm_ekf / transformer_ekf）与 EKF/Robust-EKF
+      共用同一 TF32 设置，禁止混用（如 LNN FP32 + LSTM TF32）；
+  （3）TF32 状态必须写入 manifest，确保可追溯。
+  本条与 [19]（TF32/AMP 显式）衔接：[19] 负责代码实现位置，[203] 负责
+  配置与 manifest 写入声明的统一性约束。
+
+# TF32 显式设置规范
+tf32_spec:
+  matmul_allow_tf32:
+    description: "torch.backends.cuda.matmul.allow_tf32 的显式值"
+    required: true
+    allowed_values:
+      - true
+      - false
+    default_policy: "由 deterministic 参数决定：deterministic=True → False（可复现），deterministic=False → True（性能优先）"
+  cudnn_allow_tf32:
+    description: "torch.backends.cudnn.allow_tf32 的显式值"
+    required: true
+    allowed_values:
+      - true
+      - false
+    default_policy: "与 matmul_allow_tf32 保持一致"
+  coherency_policy:
+    description: "多网络共用同一 TF32 设置，禁止精度混用"
+    required: true
+    rule: "三网络与 EKF/Robust-EKF 必须使用相同的 tf32 设置值"
+    forbidden_mixed_precision:
+      - "liquid_ekf TF32 + lstm_ekf FP32"
+      - "lstm_ekf TF32 + transformer_ekf FP32"
+      - "任意网络使用不同 tf32 值"
+
+# manifest 写入要求
+manifest_write_spec:
+  required_fields:
+    - "tf32_explicit_set"
+    - "tf32_enabled"
+    - "matmul_allow_tf32"
+    - "cudnn_allow_tf32"
+  write_timing:
+    - "训练启动前必须已写入"
+    - "数据生成完成后 manifest 中必须包含上述字段"
+  write_location:
+    - "seed_utils.py 的 set_global_seed 返回报告中包含 tf32 字段"
+    - "prepare_pipeline.py 的 manifest_payload 中必须包含 tf32 相关字段"
+
+# 验证计划
+verification_plan:
+  - step: 1
+    name: "检查配置文件存在"
+    actions:
+      - "读取 configs/protocol/clause203_tf32_uniform.yaml"
+      - "验证 YAML 格式正确"
+    output: "配置文件解析成功"
+  - step: 2
+    name: "验证 clause_id 与 severity"
+    actions:
+      - "检查 clause_id == '203'"
+      - "检查 severity == 'hard'"
+    output: "字段校验通过"
+  - step: 3
+    name: "验证 TF32 显式设置规范"
+    actions:
+      - "检查 tf32_spec 包含 matmul_allow_tf32 和 cudnn_allow_tf32"
+      - "检查每个键包含 required 和 allowed_values"
+      - "检查 coherency_policy 包含 forbidden_mixed_precision"
+    output: "TF32 规范定义完整"
+  - step: 4
+    name: "验证 manifest 写入要求"
+    actions:
+      - "检查 manifest_write_spec.required_fields 包含四个 TF32 字段"
+      - "检查 write_timing 包含训练启动前写入"
+    output: "manifest 写入要求定义完整"
+  - step: 5
+    name: "检查代码实现"
+    actions:
+      - "检查 seed_utils.py 中 allow_tf32 显式赋值"
+      - "检查三网络共用同一 tf32 设置"
+    output: "代码实现检查通过"
+  - step: 6
+    name: "检查规则文档"
+    actions:
+      - "检查 rules/条款 203_精度模式统一声明.md 是否存在"
+      - "检查规则文档包含条款原文、含义、验收标准"
+    output: "规则文档检查通过"
+  - step: 7
+    name: "检查手册真源"
+    actions:
+      - "检查 docs/异步实验_执行手册_终版v15_总纲条款版.md 是否存在"
+      - "检查手册包含[203] 条目"
+    output: "手册真源检查通过"
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "禁止依赖 PyTorch 默认值（Ampere+ 上 allow_tf32 默认为 True）"
+    - "禁止三网络混用不同 TF32 设置"
+    - "禁止 TF32 状态未写入 manifest"
+    - "禁止 deterministic=True 时开启 TF32（破坏逐 bit 可复现）"
+  required:
+    - "必须显式设置 matmul.allow_tf32 和 cudnn.allow_tf32"
+    - "必须保证三网络共用同一 TF32 设置"
+    - "必须将 TF32 状态写入 manifest"
+    - "必须检查 deterministic 模式与 TF32 设置的协调性"
+
+# 验证项
+verification_items:
+  explicit_setting_check:
+    description: "检查 TF32 是否显式设置"
+    checks:
+      - matmul_allow_tf32_explicit
+      - cudnn_allow_tf32_explicit
+      - tf32_values_coherent
+  manifest_write_check:
+    description: "检查 TF32 状态是否写入 manifest"
+    checks:
+      - tf32_explicit_set_in_manifest
+      - tf32_enabled_in_manifest
+  code_implementation_check:
+    description: "检查代码实现是否符合规范"
+    checks:
+      - seed_utils_has_tf32_assignment
+      - no_mixed_precision_across_networks
+
+# 关联条款
+related_clauses:
+  - "19"
+  - "202"
+  - "204"
+  - "182"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

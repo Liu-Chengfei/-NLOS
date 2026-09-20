@@ -1,0 +1,38 @@
+# 条款 [212] 实验清空的目的说明
+# 手册原文：确保本次实验结果是"从零开始、纯净生成"，不被任何旧仿真数据、旧权重、旧结果污染——无论诊断轨还是验收轨。
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 653 行
+
+clause_id: "212"
+clause_name: "实验清空的目的说明"
+severity: hard
+
+# 条款核心约束
+purpose:
+  statement: "确保本次实验结果是'从零开始、纯净生成'"
+  description: "实验结果必须从零开始、纯净生成，不被任何旧仿真数据、旧权重、旧结果污染"
+  applies_to_all_tracks: true
+
+# 适用范围
+scope:
+  covers:
+    - "诊断轨"
+    - "验收轨"
+  requirement: "无论诊断轨还是验收轨，都必须确保从零开始、纯净生成"
+
+# 核心约束定义
+core_constraints:
+  no_old_data_contamination: true
+  no_old_weight_contamination: true
+  no_old_result_contamination: true
+  pure_generation_required: true
+
+# 关联条款
+related_checks:
+  - "p211_row_clear_before_run"
+  - "p210_paper_grade_old_product_isolation"
+  - "P65_no_old_data_in_analysis"
+
+# 手册参考
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+manual_clause: "[212]"
+manual_line: 653

@@ -1,0 +1,37 @@
+# 文件职责：声明手册第 112 条配置落点 —— 禁止注释掉的代码
+# 本文件是手册第 [112] 条的配置落点，回答「如何处理注释掉的代码/死代码路径」。
+# 第 112 条要求：禁止注释掉的代码；死代码路径使评审无法判定是否静默生效；确有历史需要 → 移入 sandbox/ 并注明 git commit
+
+# 禁止注释掉的代码（对应手册第 [112] 条）
+clause_id: "112"
+clause_title: "禁止注释掉的代码"
+severity: "hard"
+
+# 核心约束：禁止注释掉的代码
+# 死代码路径使评审无法判定是否静默生效
+forbid_commented_out_code: true
+commented_out_code_handling: "移入 sandbox/ 并注明 git commit"
+
+# 处理流程
+handling_protocol:
+  action: "移入 sandbox/ 并注明 git commit"
+  requires_git_commit_note: true
+  must_not_remain_in_source: true
+  sandbox_directory: "sandbox/"
+
+# 触发检查
+check_scope:
+  - "src/"
+  - "configs/"
+  - "scripts/"
+
+# 豁免条件（仅 sandbox/ 内允许）
+sandbox_exemption:
+  allowed: true
+  requires_git_commit_reference: true
+  requires_historical_note: true
+
+# 验证要求
+enforcement:
+  block_on_commented_code_in_source: true
+  require_sandbox_relocation: true

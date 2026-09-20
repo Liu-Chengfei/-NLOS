@@ -1,0 +1,16 @@
+# [51] 划分按整条序列、训练与测试无重叠
+# 对应手册条款 [51]
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+
+clause_name: "[51] 划分按整条序列、训练与测试无重叠"
+constraint_level: "硬约束"
+split_by_full_sequence: true
+train_test_no_overlap: true
+split_unit: "整条序列"
+overlap_check_method: "轨迹ID唯一性检验"
+description: "数据集划分必须按整条序列进行，训练集与测试集之间不存在任何序列级别的重叠。禁止在同一序列内随机采样部分帧/窗口作为训练、部分帧/窗口作为测试，防止数据泄漏。"
+manual_ref: "最终交付_异步手册_424条_20260917.md"
+manual_line: 278
+verification_gate: "p51_sequence_split_no_overlap"
+paper_reference: "P6"
+enforcement: "序列级划分 + 轨迹ID唯一性双重校验"

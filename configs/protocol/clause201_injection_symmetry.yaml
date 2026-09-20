@@ -1,0 +1,109 @@
+clause_id: "201"
+clause_name: "训练测试注入对称——同分布NLOS大脉冲各方法都见得到压力"
+severity: hard
+
+purpose: |
+  本条是数据注入对称性硬约束。核心原则：
+  （1）训练集与测试集必须包含同分布的 NLOS 大脉冲；
+  （2）各方法都必须见到足够数量的 NLOS 大脉冲压力样本；
+  （3）注入对称性确保训练/测试分布一致，防止分布偏移导致的性能评估失真；
+  （4）本条与 [200]（规模与划分）、[202]（seed 体系一致）、[240]（S9 校验脚本）衔接。
+
+four_combinations:
+  - "A2N2"
+  - "A2N3"
+  - "A3N2"
+  - "A3N3"
+
+nlos_injection_spec:
+  description: "NLOS 大脉冲注入规格"
+  nlos_large_pulse_threshold:
+    note: "定义大脉冲的阈值标准（需写入 manifest）"
+    check_scope:
+      - "NLOS 大脉冲判定阈值（如 SNR 低于某值的样本）"
+      - "各组合的训练/测试集大脉冲数量统计"
+  min_count: 5
+  min_nlos_large_pulses_per_combination:
+    note: "每个组合至少要有足够的 NLOS 大脉冲样本"
+    min_count: 5
+    reason: "确保各方法都能见到压力，避免样本不足导致的评估偏差"
+  train_test_distribution_match:
+    note: "训练集与测试集的 NLOS 大脉冲分布应一致"
+    checks:
+      - "训练集大脉冲占比 ≈ 测试集大脉冲占比（允许 ±10% 偏差）"
+      - "大脉冲强度分布（ρ/μ/σ）训练/测试相近"
+
+injection_symmetry_check:
+  description: "注入对称性检查项"
+  required_checks:
+    train_has_nlos_large_pulses: "训练集含 NLOS 大脉冲"
+    test_has_nlos_large_pulses: "测试集含 NLOS 大脉冲"
+    train_test_same_distribution: "训练/测试 NLOS 大脉冲分布一致"
+    each_method_sees_pressure: "各方法都见到压力（NLOS 大脉冲样本）"
+    distribution_match_within_threshold: "分布匹配在阈值内（±10%）"
+
+verification_plan:
+  - step: 1
+    name: "读取 manifest 中的 NLOS 注入统计"
+    actions:
+      - "遍历 manifests/ 目录下的所有 JSON manifest 文件"
+      - "读取每个 manifest 中的 nlos_large_pulse_count 字段"
+      - "分别读取训练集和测试集的大脉冲数量"
+    output: "各 seed 训练/测试 NLOS 大脉冲数量表"
+  - step: 2
+    name: "四组合分布对称性判定"
+    actions:
+      - "检查每个组合（A2N2/A2N3/A3N2/A3N3）的训练/测试大脉冲数量"
+      - "计算训练/测试大脉冲占比偏差"
+      - "判定偏差是否 ≤ 10%"
+    output: "四组合注入对称性判定结果"
+  - step: 3
+    name: "各方法压力可见性判定"
+    actions:
+      - "检查每个组合的训练/测试大脉冲数量 ≥ 阈值（min_count=5）"
+      - "确认各方法都见得到压力样本"
+    output: "各方法压力可见性判定"
+  - step: 4
+    name: "处置"
+    actions:
+      - "若某组合大脉冲数量不足 -> 重生成补足"
+      - "若训练/测试分布偏差 > 10% -> 检查数据生成脚本，重新划分"
+      - "记录偏差详情到 decision log"
+    prerequisite: "step 2 或 step 3 判定为不通过"
+
+boundaries:
+  forbidden:
+    - "跳过 NLOS 大脉冲数量检查直接进入训练"
+    - "训练集有 NLOS 大脉冲但测试集没有"
+    - "训练/测试分布偏差 > 10% 仍继续训练"
+    - "某组合大脉冲数量 < min_count 仍继续训练"
+    - "仅检查部分 seed 不检查全部 seed"
+  required:
+    - "必须检查所有 seed 的训练/测试 NLOS 大脉冲数量"
+    - "必须检查四组合的注入对称性"
+    - "必须确认各方法都见得到压力"
+    - "训练/测试分布偏差必须在 ±10% 以内"
+    - "不通过时必须记录偏差并触发重生成"
+
+verification_items:
+  injection_symmetry_check:
+    description: "注入对称性核查"
+    checks:
+      - nlos_large_pulses_in_train
+      - nlos_large_pulses_in_test
+      - train_test_distribution_match
+      - each_method_sees_pressure
+  manifest_check:
+    description: "manifest 字段完整性核查"
+    checks:
+      - manifest_has_nlos_large_pulse_count
+      - manifest_has_nlos_large_pulse_ratio
+
+related_clauses:
+  - "200"
+  - "202"
+  - "240"
+  - "321"
+  - "414"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

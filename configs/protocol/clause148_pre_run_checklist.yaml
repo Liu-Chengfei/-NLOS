@@ -1,0 +1,127 @@
+# 条款 [148] 跑前第一道门：实现项清单逐项确认配置
+# 手册原文：此清单是**跑前第一道门**：逐项确认并留痕（检查记录 + git commit），全过才允许进入 Step 1。
+# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第 [148] 条
+# 实现项 I-1–I-5 完成标准摘录自手册 [239]/[240]/[241]/[242]/[243]/[290]/[291]/[463]/[464]/[465]/[466] 等条款
+
+clause_id: "148"
+clause_name: "跑前第一道门：实现项清单逐项确认"
+
+# 第一部分：跑前第一道门声明
+pre_run_gate:
+  purpose: "所有实现项确认通过后才允许进入 Step 1（正式实验）"
+  gate_type: "跑前第一道门"
+  entry_requirement: "全过才允许进入 Step 1"
+  severity: "hard"
+  exit_clause_ref: "[153]"  # 出口声明：C-1–C-10 与 I-1–I-5 全部通过并留痕 → 进入 Step 1
+
+# 第二部分：实现项清单（从手册逐项摘录）
+implementation_checklist:
+  items:
+    I-1:
+      name: "数据生成器"
+      spec: "S8 流水线 7 步注入顺序"
+      completion_standard:
+        - "生成 1 条 120s 基准（S3 论文级）序列"
+        - "npz 字段与 S6 契约逐一对照（t/uwb_ranges/uwb_valid/imu(N_imu行,150Hz)/imu_t/vio_pos/vio_yaw/vio_cov/vio_valid/gt_pos/gt_yaw/scene_mask/nl_flag 全齐）"
+        - "IMU 150Hz 原生不降采样"
+        - "A2/A3 偏移注入在重采样前（P28 语义，UWB/VIO 与 imu_t 各自按协议偏移）"
+        - "组件级单测：对数据加载器/坐标变换/滑窗/重采样/评估脚本各写 ≥1 个单测并留痕，用构造的已知答案数据验证输出"
+      manual_refs:
+        - "[239]"
+        - "[290]"
+        - "[291]"
+        - "[463]"
+      self_test_proof: "自测留痕：单测记录 + 序列生成日志 + npz 字段校验报告"
+
+    I-2:
+      name: "S9 校验脚本"
+      spec: "S9 数据校验"
+      completion_standard:
+        - "在 I-1 的序列上跑通，输出校验报告 JSON"
+        - "四组合构成/N 注入统计/缺失来源/M 成簇/GDOP/出域/时间戳 7 项全部可输出判定"
+        - "含第 26a 项 V0 档负向排除断言（VIO 段无 V1 置零/V2 σ×5/V3 质量中断+恢复跳变症状，vio_valid 语义正确）"
+      manual_refs:
+        - "[239]"
+        - "[240]"
+        - "[241]"
+      self_test_proof: "自测留痕：S9 校验报告 JSON + 26a 项 V0 档负向排除断言通过记录"
+
+    I-3:
+      name: "5 方法脚本"
+      spec: "LNN/LSTM/Transformer 训练脚本 + EKF/Robust-EKF 滤波脚本"
+      completion_standard:
+        - "LNN/LSTM/Transformer 各在 1 条序列上冒烟跑通（loss 下降、无 NaN）"
+        - "EKF/Robust-EKF 各在 1 条序列上跑通（状态不发散、无 NaN/Inf——滤波方法无 loss，冒烟标准为状态有限性与残差有界，不套用训练标准）"
+        - "过拟合单批测试（overfit-one-batch）：每个训练网络先在 1 个 batch 上跑通并确认 loss 显著下降"
+        - "LNN/LSTM/Transformer 共享同一套 4 头代码（P14/P35），只换骨干"
+      manual_refs:
+        - "[242]"
+        - "[243]"
+        - "[379]"
+        - "[380]"
+      self_test_proof: "自测留痕：冒烟日志 + overfit-one-batch 日志 + 4 头共享验证"
+
+    I-4:
+      name: "统计脚本"
+      spec: "P22 统计脚本：mean±std/P95/P50/Wilcoxon/Holm-Bonferroni/四组合切片/2×2 ANOVA/C1 vs C4 对角"
+      completion_standard:
+        - "在造数（含已知差异的假数据）上跑通并输出正确符号"
+        - "配对索引（P20）验证通过"
+        - "LNN/LSTM/Transformer 共享同一套 4 头代码（P14/P35），只换骨干 I-4 统计脚本在造数上跑通并输出正确符号"
+      manual_refs:
+        - "[464]"
+        - "[465]"
+        - "[466]"
+      self_test_proof: "自测留痕：造数测试通过记录 + 配对索引验证日志"
+
+    I-5:
+      name: "代码工程规范与实现审计"
+      spec: "CODE-1~5 / BUG-2 / AUD-1 全量审计"
+      completion_standard:
+        - "CODE-1 架构分层（禁止单文件大杂烩）：config.py 唯一常量表，数据/模型/训练/评估/统计/调度模块清晰"
+        - "CODE-5 断言规范（把手册不可执行句变成可执行断言）：加载后断言字段齐全/dtype/shape（S6/S9）"
+        - "BUG-2 最小复现与黄金测试：任何 Bug 修复先写最小复现（固定 seed + 固定输入 → 复现 → 修复 → 断言不再现）"
+        - "AUD-1 手册-代码比对：独立检查（静态审查/运行断言/单测/手册-代码比对至少两种）"
+      manual_refs:
+        - "[411]"
+        - "[413]"
+        - "[438]"
+      self_test_proof: "自测留痕：CODE 检查记录 + BUG-2 黄金测试 + AUD-1 比对报告 + git commit"
+
+  note: "I-1~I-5 全部通过并留痕（git commit + 自测日志）→ 进入 Step 1（[153] 出口声明）"
+
+# 第三部分：逐项确认并留痕要求
+trace_requirement:
+  check_record: true
+  git_commit: true
+  explanation: "每项确认必须有检查记录 + 对应 git commit；检查记录可与 git commit hash 绑定"
+  sequential: true
+  all_must_pass: true
+
+# 第四部分：相关检查关联
+related_checks:
+  - "P147"  # 目录级可追溯性 + 数据校验和（I-1 序列生成时记录校验和）
+  - "P149"  # AMP 混合精度（I-3 训练脚本 AMP 开关写入 manifest）
+  - "C-1"   # 训练 batch=16（I-3 冒烟标准）
+  - "C-2"   # 推理 batch=16 轨迹不混批（I-3 冒烟标准）
+  - "S8"    # 数据生成流水线（I-1 依赖）
+  - "S9"    # 数据校验（I-2 依赖）
+  - "S3"    # 论文级规模参数（I-1 序列基准）
+  - "P20"   # 配对索引（I-4 依赖）
+  - "P22"   # 统计脚本输出（I-4 依赖）
+  - "P28"   # 重采样方法（I-1 偏移注入顺序依赖）
+  - "Step-1" # 正式实验入口
+
+# 第五部分：手册引用
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"
+
+# 第六部分：实施说明
+implementation_note: >
+  第 148 条是跑前第一道门，必须在 Step 1（正式跑实验）之前逐项确认 I-1~I-5 实现项清单：
+  1. I-1 数据生成器：生成 1 条 120s 基准序列，字段与 S6 契约对照，组件单测全覆盖
+  2. I-2 S9 校验脚本：在 I-1 序列上跑通，7 项输出全部可判定，含 26a 项 V0 档负向排除
+  3. I-3 5 方法脚本：LNN/LSTM/Transformer 冒烟跑通 + EKF/Robust-EKF 跑通 + overfit-one-batch
+  4. I-4 统计脚本：造数测试正确 + 配对索引验证通过
+  5. I-5 代码工程规范与实现审计：CODE-1~5 / BUG-2 / AUD-1 全量审计
+  每项确认后必须留痕（检查记录 + git commit），全过才允许进入 Step 1。
+  出口声明见 [153]：C-1–C-10 与 I-1–I-5 全部通过并留痕 → 进入 Step 1。

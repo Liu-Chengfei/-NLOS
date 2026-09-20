@@ -1,0 +1,99 @@
+# 条款 [36] git 是最后防线配置
+# 手册位置：docs/最终交付_异步手册_424条_20260917.md 第263行
+# 通过标准：git 仓库与工作区一致性 + 禁止 _backup/_old 副本
+
+constraint_configuration:
+  clause_reference: "[36] git 是最后防线"
+  source_file: "docs/最终交付_异步手册_424条_20260917.md"
+  source_line: 263
+
+  # 约束 1：禁止 _backup/_old 副本
+  # 说明：任何版本回退/文件损坏/误改恢复一律走 git，禁止复制 _backup/_old 副本
+  backup_prohibition:
+    forbidden_patterns:
+      - "_backup"
+      - "_old"
+    forbidden_extensions:
+      - ".bak"
+      - "~$"
+    forbidden_directories:
+      - "_backup/"
+      - "_old/"
+      - "_copy/"
+    # anova_robustness.yaml 为 ANOVA 稳健性配置，pre-commit 行 35-36 豁免
+    exceptions:
+      - "configs/protocol/anova_robustness.yaml"
+    enforcement: "hard"
+    action_on_violation: "必须通过 git checkout/revert 更正，或归档至 archive/redundancy/"
+
+  # 约束 2：强制 git 恢复流程
+  # 说明：版本回退/文件损坏/误改恢复一律走 git（checkout/revert），禁止手动复制
+  git_recovery_mandatory:
+    allowed_recovery_methods:
+      - "git checkout -- <file>"
+      - "git restore <file>"
+      - "git checkout HEAD -- <file>"
+      - "git revert <commit>"
+      - "git checkout <commit> -- <path>"
+    forbidden_recovery_methods:
+      - "复制 _backup 目录"
+      - "复制 _old 目录"
+      - "手动恢复副本文件"
+    enforcement: "hard"
+    verification_command: "git status --porcelain | wc -l"
+    pass_criteria: "0 (工作区干净)"
+
+  # 约束 3：工作区与 git 仓库一致性
+  # 说明：git 仓库与工作区实际内容必须一致（禁止改了文件没 commit 就进下一 gate）
+  working_tree_synchronization:
+    check_pre_commit: true
+    check_gate_entry: true
+    required_command_before_gate:
+      - "git add ."
+      - "git commit -m 'fix: sync working tree'"
+    forbidden_states:
+      - "未提交的修改"
+      - "未跟踪的核心文件"
+    enforcement: "hard"
+
+  # 约束扫描范围
+  scan_scope:
+    include:
+      - "configs/protocol/"
+      - "scripts/"
+      - "."
+    exclude:
+      - ".git/"
+      - ".venv-gpu/"
+      - ".venv/"
+      - "__pycache__/"
+      - "archive/"
+      - "outputs/"
+      - "checkpoints/"
+      - "data/"
+
+  # 验证方法
+  verification:
+    commands:
+      - description: "检查 _backup/_old 已跟踪文件"
+        command: "git ls-files | grep -E '_backup|_old'"
+        expected_output: "anova_robustness.yaml (豁免)"
+      - description: "检查未跟踪 .bak 文件"
+        command: "git ls-files --others --exclude-standard | grep '\\.bak'"
+        expected_output: "scripts/verify_all_clauses.py.bak"
+      - description: "检查 pre-commit 钩子防护"
+        command: "grep -c 'redundant=' E:/异步高NLOS/.git/hooks/pre-commit"
+        expected_output: "3 (backup/old/copy 目录 + .bak/~$"
+    pass_criteria: "所有检查通过后，违规文件通过 git checkout/revert 移除"
+
+# 依赖的 pre-commit 钩子
+pre_commit_hook:
+  location: ".git/hooks/pre-commit"
+  line_numbers:
+    - 21-25  # 临时产物残留检查
+    - 27-30  # 未决标记检查
+    - 32-40  # 冗余旧文件名检查
+    - 35-36  # anova_robustness.yaml 豁免声明
+    - 42-55  # 冗余文件后缀/目录检查
+    - 57-61  # 冗余目录检查
+    - 97-159 # 前置依赖检查

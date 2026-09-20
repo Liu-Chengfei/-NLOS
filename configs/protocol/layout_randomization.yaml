@@ -1,0 +1,14 @@
+clause_id: "63"
+title: "布局随机化泛化层"
+category: generalization
+
+layout_randomization:
+  enabled: true
+  min_layouts_entry: 6
+  min_layouts_recommended: 10
+  methods_per_layout: 5
+  seeds_per_layout_min: 2
+  seeds_per_layout_max: 3
+  description: "布局随机化泛化层：N_layout >= 6（入门）/ 10（推荐）、每布局 5 方法 x 2-3 seed"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第290行"

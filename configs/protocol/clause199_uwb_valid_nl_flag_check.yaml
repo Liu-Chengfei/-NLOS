@@ -1,0 +1,119 @@
+clause_id: "199"
+clause_name: "uwb_valid分布与M1缺失率一致且nl_flag与N注入交叉验证"
+severity: hard
+
+purpose: |
+  本条是数据生成环节的分布一致性硬约束。核心原则：
+  （1）训练/测试数据的 `uwb_valid=0` 分布与 M1 缺失率一致，即 UWB 测距缺失
+      的实际比例落在 M1 协议规定的 5% ± 容差区间内；
+  （2）`nl_flag`（NLOS 真值标记）与 N 轴注入统计可交叉验证，即各组合的
+      NLOS 标记比例与 N 档注入的 rho 值区间一致。
+  本条与 [190]（M 轴缺失只作用于 UWB）、[197]（四组合分布）、
+  [198]（轨迹数与统计量打印）、[200]（规模与划分）衔接，
+  构成数据生成环节的分布质量闭环。
+
+four_combinations:
+  - "A2N2"
+  - "A2N3"
+  - "A3N2"
+  - "A3N3"
+
+uwb_valid_check:
+  description: "uwb_valid=0 分布与 M1 缺失率一致性检查"
+  m1_missing_rate_target: 0.05
+  m1_missing_rate_tolerance: 0.02
+  valid_rate_range:
+    lo: 0.93
+    hi: 0.97
+  check_scope:
+    - "训练集（train seed 目录）"
+    - "测试集（test seed 目录）"
+  note: "M1 档 UWB 缺失率 5%，容差 +-2%，即 valid_rate 应在 [0.93, 0.97]"
+
+nl_flag_check:
+  description: "nl_flag 与 N 注入统计交叉验证"
+  n2_nlos_ratio_range:
+    lo: 0.25
+    hi: 0.30
+  n3_nlos_ratio_range:
+    lo: 0.35
+    hi: 0.40
+  check_scope:
+    - "A2N2 组合：nl_flag=1 比例应在 N2 区间 [0.25, 0.30]"
+    - "A2N3 组合：nl_flag=1 比例应在 N3 区间 [0.35, 0.40]"
+    - "A3N2 组合：nl_flag=1 比例应在 N2 区间 [0.25, 0.30]"
+    - "A3N3 组合：nl_flag=1 比例应在 N3 区间 [0.35, 0.40]"
+  note: "nl_flag=1 表示 NLOS，与 N 轴注入的 rho 值交叉验证"
+
+disposal_sequence:
+  - step: 1
+    name: "读取 npz 数据计算 uwb_valid 分布与 nl_flag 统计"
+    actions:
+      - "遍历训练/测试 seed 目录，读取各序列 npz 文件"
+      - "计算 uwb_valid=0 比例（M1 缺失率）"
+      - "计算 nl_flag=1 比例（NLOS 比例）"
+      - "按四组合分组统计"
+    output: "uwb_valid 分布 + nl_flag 统计汇总表"
+    prerequisite: "数据生成完成，npz 文件存在"
+  - step: 2
+    name: "一致性判定"
+    actions:
+      - "检查 uwb_valid=0 比例是否在 M1 容差区间内"
+      - "检查各组合 nl_flag 比例是否在对应 N 档区间内"
+    output: "通过/不通过"
+  - step: 3
+    name: "不通过处置"
+    actions:
+      - "uwb_valid 分布不符 M1 缺失率 -> 检查 M1 缺失注入逻辑，必要时重生成"
+      - "nl_flag 与 N 注入统计不符 -> 检查 N 轴注入逻辑，必要时重生成"
+      - "记录偏差详情到 decision log"
+    prerequisite: "step 2 判定为不通过"
+
+boundaries:
+  forbidden:
+    - "跳过 uwb_valid 分布检查直接进入训练"
+    - "跳过 nl_flag 交叉验证直接进入训练"
+    - "uwb_valid=0 分布偏离 M1 缺失率容差仍继续训练"
+    - "nl_flag 比例与 N 注入统计不符仍继续训练"
+    - "仅检查训练集，不检查测试集"
+  required:
+    - "必须检查训练集和测试集的 uwb_valid 分布"
+    - "必须检查 nl_flag 与各组合 N 注入统计的交叉验证"
+    - "uwb_valid=0 比例必须在 M1 容差区间内"
+    - "各组合 nl_flag 比例必须在对应 N 档区间内"
+    - "不通过时必须记录偏差并触发重生成"
+
+verification_items:
+  uwb_valid_distribution_check:
+    description: "uwb_valid=0 分布与 M1 缺失率一致性核查"
+    checks:
+      - uwb_valid_missing_rate_in_m1_tolerance
+      - check_both_train_and_test
+      - m1_missing_rate_target_specified
+  nl_flag_cross_validation_check:
+    description: "nl_flag 与 N 注入统计交叉验证核查"
+    checks:
+      - nl_flag_n2_ratio_in_range
+      - nl_flag_n3_ratio_in_range
+      - check_all_four_combinations
+  related_clauses_covered:
+    description: "相关条款引用完整性核查"
+    checks:
+      - related_190_m_axis_uwb_only
+      - related_197_four_combination
+      - related_198_trajectory_stats
+      - related_200_scale_and_split
+
+related_clauses:
+  - "190"
+  - "192"
+  - "194"
+  - "197"
+  - "198"
+  - "200"
+  - "201"
+  - "240"
+  - "321"
+  - "414"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

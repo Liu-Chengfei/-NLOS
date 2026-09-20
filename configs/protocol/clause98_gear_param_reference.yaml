@@ -1,0 +1,51 @@
+# 条款 [98] 档位参数回查 Stage 1 档位协议条款
+# 手册原文：任何涉及档位参数的检查（档位检查项等）一律回查 Stage 1 档位协议条款。
+# 对应手册 docs/最终交付_异步手册_424条_20260917.md:325
+
+clause_id: "98"
+clause_name: "档位参数回查 Stage 1 档位协议条款"
+
+# 唯一权威来源声明
+sole_authority:
+  reference: "Stage 1 档位协议条款"
+  reason: "档位参数为本实验场景规格唯一权威定义"
+  prohibition: "禁止自行定义插值档或新档位，禁止使用档位空间外参数值"
+
+# 需要回查的档位参数清单
+gear_param_checks:
+  - name: "A 轴同步精度"
+    reference: "configs/protocol/axis_a_sync.yaml"
+    rule: "rules/条款协议_A轴_同步精度.md"
+  - name: "N 轴 NLOS 偏差"
+    reference: "configs/protocol/axis_n_nlos.yaml"
+    rule: "rules/条款协议_N轴_NLOS偏差.md"
+  - name: "V 轴视觉退化"
+    reference: "configs/protocol/axis_v_visual.yaml"
+    rule: "rules/条款协议_V轴_视觉退化.md"
+  - name: "K 轴锚分布"
+    reference: "configs/protocol/axis_k_anchor.yaml"
+    rule: "rules/条款协议_K轴_锚分布.md"
+  - name: "M 轴数据缺失"
+    reference: "configs/protocol/axis_m_missing.yaml"
+    rule: "rules/条款协议_M轴_数据缺失.md"
+
+# 验证要求
+requirements:
+  - "所有档位参数检查必须引用 Stage 1 档位协议条款"
+  - "禁止复制参数数值形成第二权威副本"
+  - "档位表以 configs/protocol/axis_*.yaml 为唯一权威"
+  - "引用时必须标明出自该条款"
+
+# 禁用行为
+prohibitions:
+  - "禁止在配置中直接硬编码档位参数值"
+  - "禁止在代码注释中引用非协议条款的档位数值"
+  - "禁止通过复制粘贴创建与协议不一致的参数副本"
+
+# 参考路径
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md:325"
+related_clauses:
+  - "37"
+  - "43"
+  - "44"
+  - "46"

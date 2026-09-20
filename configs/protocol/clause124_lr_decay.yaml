@@ -1,0 +1,35 @@
+# 条款 124 后段 lr 衰减策略（配置）
+# 手册原文（docs/最终交付_异步手册_424条_20260917.md 第 357 行）：
+# [124] 后段 lr；论文级值：lr_peak → lr_end（余弦退火或分段常数衰减二选一，写入 manifest）
+clause_id: "124"
+clause_title: "[124] 后段 lr 衰减策略（余弦退火或分段常数）"
+manual_source:
+  file: "docs/最终交付_异步手册_424条_20260917.md"
+  line: 357
+
+lr_decay:
+  parameter_name: lr_decay
+  paper_level_value: true
+  must_write_to_manifest: true
+  decay_options:
+    - cosine_annealing
+    - piecewise_constant
+  note: "余弦退火或分段常数衰减二选一，具体选择写入 manifest"
+  lr_peak_to_lr_end:
+    description: "后段 lr 从峰值衰减至终止值"
+    from: "lr_peak"
+    to: "lr_end"
+
+applicable_methods:
+  neural_networks:
+    - LNN
+    - LSTM
+    - Transformer
+
+fairness:
+  unified_decay_strategy: true
+  note: "三网络共用同一种衰减策略（余弦或分段常数），不得混用"
+
+compliance:
+  hard_constraint: true
+  verification_function: "p124_lr_decay"

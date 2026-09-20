@@ -1,0 +1,20 @@
+# 条款 [68] 执行偏差（deviation）
+# 手册原文：执行层面与方案的偏差（漏跑/换机/中断恢复）→ 记 execution deviation 表（E 系列审计覆盖），不影响协议与分析定义
+# 实验目录结构 run 目录命名规范：run-<日期>-<seed>-<method>-<config_hash>
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第295行
+
+clause_id: "68"
+clause_name: "执行偏差（deviation）"
+
+execution_deviation:
+  table_name: "execution_deviation"
+  audit_series: "E"
+  scope: "执行层面偏差（漏跑/换机/中断恢复）"
+  does_not_affect_protocol_definition: true
+  description: "执行偏差记入E系列审计表，不影响协议与分析定义"
+
+experiment_dir_structure:
+  naming_pattern: "run-<日期>-<seed>-<method>-<config_hash>"
+  description: "run目录命名规范"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第295行"

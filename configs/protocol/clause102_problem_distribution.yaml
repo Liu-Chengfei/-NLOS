@@ -1,0 +1,71 @@
+# 条款 [102] · 问题分布统计配置
+# 手册位置：docs/最终交付_异步手册_424 条_20260917.md 第 329 行
+# 条款原文：七成情况是"假象"（评估口径/单 seed 偶然）或"任务压力不足"，两成是"实现/机制未生效"，一成才是真问题。
+
+# 条款标识（顶层）
+clause_id: "102"
+clause_name: "问题分布统计"
+
+# 核心约束：问题分布的统计认知
+problem_distribution:
+  # 七成（70%）是"假象"
+  fake_effect:
+    proportion: 0.7
+    proportion_note: "七成情况"
+    categories:
+      - 评估口径偏差  # 评估口径问题导致的结果假象
+      - 单 seed 偶然  # 单一 seed 的偶然性结果
+      - 任务压力不足  # 测试任务对方法差异的区分度不够
+    enforce: true
+    note: "大部分表面差异源于评估或统计问题，非方法真实优劣"
+
+  # 两成（20%）是"实现/机制未生效"
+  implementation_mechanism:
+    proportion: 0.2
+    proportion_note: "两成情况"
+    categories:
+      - 头机制未生效  # 输出头（uwb_scaling/bias/vio_scaling/risk）未真正影响融合
+      - 鲁棒门控失效  # NLOS 识别后的协方差调制/降权未生效
+      - 激活函数失效  # LNN 的液态动力学机制未激活
+    enforce: true
+    note: "机制存在但运行中未真正生效，需逐项排查机制链"
+
+  # 一成（10%）是"真问题"
+  real_problem:
+    proportion: 0.1
+    proportion_note: "一成情况"
+    categories:
+      - 算法理论局限  # 方法本身的处理能力上限
+      - 数据特性不匹配  # 数据分布与方法假设不一致
+      - 硬件约束  # 传感器精度、延迟等物理限制
+    enforce: true
+    note: "真正的算法或数据问题，需要实质性改进"
+
+# 验证项
+verification_items:
+  # 1. 问题分布统计认知正确
+  correct_distribution_ratio: true
+  distribution_note: "70% 假象 / 20% 实现/机制 / 10% 真问题"
+
+  # 2. 假象类别覆盖评估口径、单 seed 偶然、任务压力不足
+  fake_effect_categories_complete: true
+
+  # 3. 实现/机制类别覆盖头机制、鲁棒门控、激活函数
+  implementation_mechanism_categories_complete: true
+
+  # 4. 真问题类别覆盖算法局限、数据不匹配、硬件约束
+  real_problem_categories_complete: true
+
+# 约束声明
+constraint_declaration:
+  clause_id: "102"
+  clause_name: "问题分布统计"
+  source_file: "docs/最终交付_异步手册_424 条_20260917.md"
+  source_line: 329
+  enforce_level: "hard"
+  rationale: "正确理解问题分布是科学归因的基础——避免将假象当差异、将机制失效当算法优劣、错过真正的改进点"
+  related_clauses:
+    - "[20] 评估口径"  # 评估口径偏差是假象的主要来源
+    - "[42] 四个输出头"  # 头机制未生效属于两成实现/机制问题
+    - "[53] 配对样本对齐"  # 配对样本问题可能导致假象
+    - "[56] 分析单位与样本独立性声明"  # 样本非 i.i.d. 导致的统计假象

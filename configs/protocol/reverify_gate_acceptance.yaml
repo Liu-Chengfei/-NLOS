@@ -1,0 +1,84 @@
+# 条款 [82] · 预达标判定；验收人/验收机制
+# 手册原文：预达标判定；验收人/验收机制（自交自验 = 未过）：独立复核者对照 Part 0 合格基准逐项勾选（落窗量级/无爆炸行 + LNN 排序最低/提升方向/A3N3 切片，不许执行者自判自过）+ 统计断言复核
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第309行
+
+clause_id: "82"
+clause_name: "预达标判定；验收人/验收机制"
+
+# reverify gate 配置
+reverify_gate:
+  min_pass_ratio: 2
+  min_total: 3
+  required_pass_rate: 0.6667
+  description: "reverify gate 通过要求：至少 2/3 的检查项通过（共3项），即独立复核者至少 2 项达标才可通过预达标判定"
+
+# 独立复核者声明
+independent_reviewer:
+  required: true
+  description: "独立复核者必须为实验执行者以外的人员，不得由执行者自行判定"
+  self_judge_is_failure: true
+  executor_cannot_self_pass: true
+  declaration_required: true
+
+# 合格基准检查项（Part 0 合格基准）
+acceptance_criteria:
+  - name: "window_size_level"
+    description: "落窗量级检查——评估窗口大小符合协议规定（滑窗 W=128 步，步长 1 帧）"
+    mandatory: true
+    type: "window_level"
+
+  - name: "no_exploding_rows"
+    description: "无爆炸行——测试结果中不存在 RMSE 超过 10m 的异常行（爆炸行）"
+    mandatory: true
+    threshold: 10.0
+    unit: "m"
+    type: "outlier_check"
+
+  - name: "lnn_lowest_ranking"
+    description: "LNN 排序最低——在所有方法中，LNN 的 RMSE 排序最低（即 LNN 优于或等于其他方法）"
+    mandatory: true
+    type: "ranking_check"
+    target_method: "LNN"
+    comparison: "lowest_rmse"
+
+  - name: "improvement_direction"
+    description: "提升方向正确——LNN 相对于基线（EKF/LSTM/Transformer）的提升方向为正（RMSE 更低）"
+    mandatory: true
+    type: "direction_check"
+
+  - name: "a3n3_slice"
+    description: "A3N3 切片——异步轴 A3 + NLOS 轴 N3 的切片结果符合预期趋势"
+    mandatory: true
+    type: "slice_check"
+    axis_a_level: "A3"
+    axis_n_level: "N3"
+
+# 统计断言复核
+statistical_assertion_review:
+  required: true
+  description: "统计断言复核——对论文中声明的统计检验结果（p 值、CI、效应量）进行独立复核"
+  checks:
+    - name: "p_value_verification"
+      description: "p 值复核——原始 p 值与报告中声明的 p 值一致"
+      mandatory: true
+
+    - name: "confidence_interval_verification"
+      description: "置信区间复核——置信区间计算正确且与报告一致"
+      mandatory: true
+
+    - name: "effect_size_verification"
+      description: "效应量复核——效应量计算正确且方向与报告一致"
+      mandatory: true
+
+    - name: "multiple_comparison_correction"
+      description: "多重比较校正复核——Holm-Bonferroni 校正正确应用"
+      mandatory: true
+
+# 自交自验禁令
+self_judgment_prohibition:
+  is_failure_if_self_judges: true
+  executor_cannot_pass_own_work: true
+  only_independent_reviewer_can_pass: true
+  description: "自交自验 = 未过——执行者对自己工作结果的验收判定一律视为未通过，必须由独立复核者重新验证"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第309行"

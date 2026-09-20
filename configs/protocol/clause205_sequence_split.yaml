@@ -1,0 +1,116 @@
+clause_id: "205"
+clause_name: "序列级划分防泄漏——划分按整条序列，训练/测试无重叠"
+severity: hard
+
+purpose: |
+  本条是数据划分防泄漏硬约束，核心要求：
+  （1）序列划分必须按整条序列（sequence-level），禁止按时间点拆分同一条序列；
+  （2）训练集和测试集之间不允许有任何时间/序列重叠，防止数据泄漏；
+  （3）每条完整序列只能属于训练或测试其中一个集合，不得同时出现于两个集合。
+  本条与 [200]（规模与划分）衔接：[200] 规定整体规模和各档位占比，
+  [205] 规定具体划分方式——按整条序列、零重叠。
+
+# 序列级划分规范
+sequence_split_spec:
+  split_unit:
+    description: "最小划分单位必须为整条序列（sequence-level），不可拆分为时间点片段"
+    required: true
+    rule: "每条序列作为一个原子单位，不允许一条序列出现在训练/测试两个集合中"
+  no_overlap_policy:
+    description: "训练集和测试集之间禁止任何序列重叠"
+    required: true
+    forbidden_overlap_types:
+      - "同一条序列同时出现在训练集和测试集"
+      - "同一条序列的时间片段分别出现在训练集和测试集"
+      - "跨实验间共享同一序列"
+    overlap_check_method: "基于 sequence_id 集合求交集，交集必须为空"
+  deterministic_assignment:
+    description: "序列到训练/测试的分配必须完全由划分 seed 决定，不依赖其他随机因素"
+    required: true
+    seed_key: "split_seed"
+    manifest_field: "split_seed"
+
+# 验证计划
+verification_plan:
+  - step: 1
+    name: "检查配置文件存在"
+    actions:
+      - "读取 configs/protocol/clause205_sequence_split.yaml"
+      - "验证 YAML 格式正确"
+    output: "配置文件解析成功"
+  - step: 2
+    name: "验证 clause_id 与 severity"
+    actions:
+      - "检查 clause_id == '205'"
+      - "检查 severity == 'hard'"
+    output: "字段校验通过"
+  - step: 3
+    name: "验证序列级划分规范"
+    actions:
+      - "检查 sequence_split_spec.split_unit 包含 description 和 rule"
+      - "检查 sequence_split_spec.no_overlap_policy 包含 forbidden_overlap_types 列表"
+      - "检查 sequence_split_spec.deterministic_assignment 包含 seed_key 和 manifest_field"
+    output: "序列级划分规范定义完整"
+  - step: 4
+    name: "检查边界约束"
+    actions:
+      - "检查 boundaries.forbidden 包含禁止重叠的表述"
+      - "检查 boundaries.required 包含必须按整条序列划分的表述"
+    output: "边界约束定义完整"
+  - step: 5
+    name: "检查代码实现"
+    actions:
+      - "检查划分代码中按 sequence_id 分配训练/测试集"
+      - "检查划分后是否有交集验证逻辑"
+    output: "代码实现检查通过"
+  - step: 6
+    name: "检查规则文档"
+    actions:
+      - "检查 rules/条款 205_序列级划分防泄漏.md 是否存在"
+      - "检查规则文档包含条款原文、含义、验收标准"
+    output: "规则文档检查通过"
+  - step: 7
+    name: "检查手册真源"
+    actions:
+      - "检查 docs/异步实验_执行手册_终版v15_总纲条款版.md 是否存在"
+      - "检查手册包含 [205] 条目"
+    output: "手册真源检查通过"
+
+# 边界约束
+boundaries:
+  forbidden:
+    - "禁止按时间点拆分同一条序列（训练/测试各取片段）"
+    - "禁止同一条序列同时出现在训练集和测试集"
+    - "禁止序列级划分结果存在交集（训练集 sequence_ids ∩ 测试集 sequence_ids ≠ 空集）"
+    - "禁止划分依赖除 split_seed 以外的随机因素"
+  required:
+    - "必须按整条序列作为划分单位"
+    - "必须保证训练集和测试集的 sequence_ids 交集为空"
+    - "必须在 manifest 中记录 split_seed"
+    - "必须在划分完成后验证无重叠"
+
+# 验证项
+verification_items:
+  sequence_unit_check:
+    description: "检查划分单位是否为整条序列"
+    checks:
+      - split_unit_is_sequence_level
+      - no_time_level_split
+  overlap_check:
+    description: "检查训练/测试序列是否无重叠"
+    checks:
+      - train_test_disjoint
+      - intersection_empty
+  deterministic_check:
+    description: "检查划分是否由 split_seed 确定性决定"
+    checks:
+      - split_seed_in_manifest
+      - no_other_randomness
+
+# 关联条款
+related_clauses:
+  - "19"
+  - "200"
+  - "202"
+
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md"

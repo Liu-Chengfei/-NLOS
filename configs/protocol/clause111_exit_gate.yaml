@@ -1,0 +1,29 @@
+# 文件职责：声明手册第 111 条配置落点 —— 出口协议
+# 本文件是手册第 [111] 条的配置落点，回答「什么条件下才能进入 Step 1」。
+# 第 111 条要求：代码项与实现项全部通过并留痕（git commit + 自测日志）→ 进入 Step 1
+
+# 出口协议（对应手册第 [111] 条）
+clause_id: "111"
+clause_title: "出口"
+gate_type: "hard_exit"
+
+# 出口条件：代码项与实现项全部通过并留痕
+exit_condition: "代码项与实现项全部通过并留痕"
+
+# 必要条件 1：代码项全部通过（git commit）
+require_git_commit: true
+git_commit_message_contains: "clause 111"
+
+# 必要条件 2：实现项通过（自测日志）
+require_self_test_log: true
+self_test_log_type: "run log / smoke log / validation log"
+
+# 进入 Step 1 的前置条件
+pre_step1_checklist:
+  - "所有 clause 105–110 实现项完成"
+  - "代码项 git commit 已记录"
+  - "自测日志已生成并留痕"
+
+# 不可跳过此出口
+enforce_hard_exit: true
+enforcement_reason: "未通过出口直接进 Step 1 = 违反本条"
