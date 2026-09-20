@@ -1,0 +1,34 @@
+# 条款[16]：第1阶段附加义务（治理层）
+# 版本: 2026-05-04 (初始版本)
+# 修订: 2026-05-04 (补全规则文件)
+
+clause_id: 16
+clause_name: 第1阶段附加义务
+constraint_level: 硬约束
+governance_phase: 零
+
+# 核心判据
+criterion:
+  - 落实中发现bug→顺手修根因（禁止留TODO/绕开/注释掉旧实现）
+  - bug检查范围=Stage 1-6条款映射代码（正在落实+已落实+依赖同体系模块）
+  - 不扩大到条款映射范围之外
+  - 每条条款落实完成时做一次bug检查（静态审查/运行断言/单测至少一种）
+  - 发现即修根因
+  - 修复检查结果写入八字段报告"审查:"字段并留痕（git commit + decision log）
+
+# 禁止项
+forbidden:
+  - 留TODO
+  - 绕开
+  - 注释掉旧实现
+  - 擅自修改范围外bug
+
+# 执行保障
+execution:
+  rule_file: rules/第1阶段附加义务.md
+  config_file: configs/protocol/clause16_stage1_obligation.yaml
+  check_function: clause_gates.py:p16_resource_conflict_scheduler
+  precommit_hook: .git/hooks/pre-commit
+  agents_md: AGENTS.md
+  status_table: rules/指令状态表.md
+  report: outputs/compliance_report_16.md

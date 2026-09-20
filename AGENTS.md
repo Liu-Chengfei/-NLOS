@@ -877,7 +877,18 @@ PASSED: True | manual_exists=True; manual_has_criterion=True; manual_has_line_a=
 
 ## [76]
 
-## [15] 底线：解冻纪律与数据纯净性（治理层）
+## [15]
+
+## [16] 底线：第 1 阶段附加义务（治理层）
+**状态**: ✅ 已落实
+**文件**:
+- `rules/第1阶段附加义务.md` — 第1阶段附加义务规则文件（核心判据加禁止项加执行保障）
+- `configs/protocol/clause16_stage1_obligation.yaml` — 第1阶段附加义务配置（clause_id=16, constraint_level=硬约束）
+- `src/liquidloc/analysis/clause_gates.py` — 验证函数 `p16_resource_conflict_scheduler()`
+- `.git/hooks/pre-commit` — 第1阶段附加义务检查调用点
+- `outputs/compliance_report_16.md` — 八字段落实报告
+**判据**: 落实中发现bug→顺手修根因（禁止留TODO/绕开/注释旧实现）；bug检查范围=Stage 1-6条款映射代码；每条条款落实完成时做bug检查
+ 底线：解冻纪律与数据纯净性（治理层）
 **状态**: ✅ 已落实
 **文件**:
 - 规则目录解冻纪律规则文件 — 解冻纪律规则文件（核心判据加禁止项加执行保障）
