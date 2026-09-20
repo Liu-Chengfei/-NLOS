@@ -80,6 +80,17 @@
 
 **内容**: 治理层条款→第0阶段逐条落实并写报告，证据写对应治理载体（按『治理载体分散布局』分散落点：AGENTS/rules/skill/hook/plugin/MCP）；Stage 1-6落实类→第1阶段代码落实，判据条款的判据已并入对应代码条款；Stage 7-8执行决策类→第2阶段执行，每条同样单独写执行落实报告。
 
+## [12] 手册目标（治理层·最终检查只看这个）
+**状态**: ✅ 已落地
+**文件**:
+- `rules/手册目标.md` — 核心判据唯一判据（主线A/B必须同时达成）
+- `configs/protocol/clause12_manual_objectives.yaml` — 约束配置（硬约束声明、判据标志）
+- `src/liquidloc/analysis/clause_gates.py` — p12_manual_objectives() 验证函数
+- `.git/hooks/pre-commit` — pre-commit 手册目标验证调用点（p12调用在p11之后）
+- `outputs/compliance_report_12.md` — 合规报告
+
+**内容**: 防异步高NLOS实验RMSE整体过大（异步+NLOS下误差过大时所有方法一起高）；防LNN（Liquid液态骨干网络，proposed）的RMSE不是最低；两项判据统一为唯一判据，跑前冒烟/预达标与跑后判定共用；验收分级与降级出口：验收表每一项必须在完整验收路径下逐项回查修通，诊断轨/冒烟数据不得以任何形式并入、替代或补充验收轨数据；数据/代码/结果可追溯（manifest + git commit + 验收留痕）；核验通过后最终只看目标是否达成，不看流程勾选。
+
 ## [9] 落实报告格式（治理层·八字段）
 **状态**: ✅ 已落地
 **文件**:

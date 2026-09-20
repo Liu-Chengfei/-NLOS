@@ -16422,6 +16422,144 @@ def p11_clause_attribution() -> dict[str, Any]:
     }
 
 
+
+# ---------------- 条款[12]: 手册目标（治理层·最终检查只看这个） ----------------
+def p12_manual_objectives() -> dict[str, Any]:
+    """[12] 手册目标（治理层·最终检查只看这个）—— 唯一判据：主线 A 和主线 B 必须同时达成，缺一不可
+
+    验证项（8项）：
+    1. rules/手册目标.md 存在且含核心判据说明
+    2. 含主线 A（防 RMSE 整体过大）说明
+    3. 含主线 B（防 full/LNN 非最低）说明
+    4. 含辅助判据说明（可追溯/只看目标不看流程）
+    5. 含违规即作废说明
+    6. configs/protocol/clause12_manual_objectives.yaml 存在且解析成功
+    7. clause_name 包含「[12] 手册目标」
+    8. AGENTS.md 含 [12] 治理载体条目
+    9. rules/指令状态表.md 含 [12] 条目且状态字段合法
+    """
+    import yaml as _yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause12_manual_objectives.yaml"
+    manual_path = PROJECT_ROOT / "rules" / "手册目标.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_12.md"
+    hook_path = PROJECT_ROOT / ".git" / "hooks" / "pre-commit"
+
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception:
+            cfg = {}
+
+    manual_exists = manual_path.is_file()
+    manual_text = manual_path.read_text(encoding="utf-8") if manual_exists else ""
+
+    checks: dict[str, bool] = {}
+
+    # 1. 规则文件存在
+    checks["manual_exists"] = manual_exists
+
+    # 2. 含核心判据说明
+    checks["manual_has_criterion"] = manual_exists and ("核心判据" in manual_text or "唯一判据" in manual_text)
+
+    # 3. 含主线 A（防 RMSE 整体过大）
+    checks["manual_has_line_a"] = manual_exists and ("主线 A" in manual_text or "RMSE" in manual_text) and ("过大" in manual_text or "爆炸" in manual_text)
+
+    # 4. 含主线 B（防 full/LNN 非最低）
+    checks["manual_has_line_b"] = manual_exists and ("主线 B" in manual_text) and ("最低" in manual_text or "LNN" in manual_text)
+
+    # 5. 含辅助判据（可追溯/只看目标不看流程）
+    checks["manual_has_aux"] = manual_exists and ("可追溯" in manual_text or "manifest" in manual_text) and ("只看目标" in manual_text or "不看流程" in manual_text)
+
+    # 6. 含违规即作废说明
+    checks["manual_has_void"] = manual_exists and ("违规" in manual_text or "作废" in manual_text)
+
+    # 7. 配置文件存在且解析成功
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 8. clause_name 包含 [12] 手册目标
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_12"] = isinstance(cn, str) and "[12]" in cn and "手册目标" in cn
+
+    # 9. AGENTS.md 含 [12] 治理载体条目
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_12"] = "## [12]" in agents_text
+    else:
+        checks["agents_md_has_clause_12"] = False
+
+    # 10. 指令状态表含 [12] 条目
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_12"] = "| [12]" in status_text
+        for line in status_text.splitlines():
+            if "| [12]" in line:
+                parts = [p.strip() for p in line.split("|")]
+                sf = parts[2] if len(parts) >= 3 else ""
+                checks["status_table_clause_12_field_valid"] = "done" in sf or "blocked" in sf or "pending" in sf
+                break
+        else:
+            checks["status_table_clause_12_field_valid"] = False
+    else:
+        checks["status_table_clause_12_field_valid"] = False
+
+    # 可选：报告八字段检查
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        rt = report_path.read_text(encoding="utf-8")
+        checks["report_has_eight_fields"] = all(f in rt for f in ["[12]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"])
+        checks["report_has_done_status"] = "已落实" in rt or "✅" in rt
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    # pre-commit钩子检查（可选）
+    hook_exists = hook_path.is_file()
+    checks["hook_exists"] = hook_exists
+    if hook_exists:
+        ht = hook_path.read_text(encoding="utf-8")
+        checks["hook_contains_p12_call"] = "p12_manual_objectives" in ht or "--check p12" in ht
+    else:
+        checks["hook_contains_p12_call"] = False
+
+    # 核心检查必须通过（报告和钩子为可选）
+    required = [k for k in checks if k not in ("report_has_eight_fields", "report_has_done_status", "hook_contains_p12_call")]
+    passed = all(checks[k] for k in required)
+
+    detail = "; ".join(f"{k}={v}" for k, v in checks.items())
+    return {
+        "code": "P12-manual-objectives",
+        "name": "[12] 手册目标",
+        "severity": "hard",
+        "passed": passed,
+        "detail": detail,
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "cfg_exists": cfg_exists,
+            "cfg_parse_ok": cfg_parse_ok,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)) if manual_exists else "missing",
+            "manual_exists": manual_exists,
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+            "hook_path": str(hook_path.relative_to(PROJECT_ROOT)) if hook_exists else "missing",
+            "checks": checks,
+        },
+    }
+
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -16540,7 +16678,10 @@ _ALL = [
     p8_submit_self_check,
     p10_four_step_closure,
     p11_clause_attribution,
+    p12_manual_objectives,
 ]
+
+
 
 
 
