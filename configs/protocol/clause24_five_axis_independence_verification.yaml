@@ -1,0 +1,36 @@
+# 条款[24]：五轴独立性说明（治理层）
+# 版本: 2026-05-04 (初始版本)
+# 修订: 2026-05-04 (补全规则文件)
+
+clause_id: 24
+clause_name: 五轴独立性说明
+constraint_level: 硬约束
+governance_phase: 零
+
+# 核心判据
+criterion:
+  - 五轴独立性必做
+  - 档位协议条款校验
+  - 五轴配置参数验证
+  - 与手册定义一致性检查
+
+# 禁止项
+forbidden:
+  - 省略五轴独立性验证
+  - 修改五轴配置参数
+  - 混用不同配置数据
+
+# 允许范围
+allowed:
+  - 调整具体参数数值（需在manifest中记录）
+  - 增加额外五轴验证场景
+
+# 执行保障
+execution:
+  rule_file: rules/五轴独立性说明.md
+  config_file: configs/protocol/clause24_five_axis_independence_verification.yaml
+  check_function: clause_gates.py:p24_five_axis_independence_verification
+  precommit_hook: .git/hooks/pre-commit
+  agents_md: AGENTS.md
+  status_table: rules/指令状态表.md
+  report: outputs/compliance_report_24.md

@@ -1,0 +1,36 @@
+# 条款[21]：视觉退化验证（治理层）
+# 版本: 2026-05-04 (初始版本)
+# 修订: 2026-05-04 (补全规则文件)
+
+clause_id: 21
+clause_name: 视觉退化验证
+constraint_level: 硬约束
+governance_phase: 零
+
+# 核心判据
+criterion:
+  - 视觉退化测试必做
+  - 光照变化场景验证
+  - 能见度降低场景验证
+  - 对比实验组与对照组差异
+
+# 禁止项
+forbidden:
+  - 省略视觉退化测试
+  - 修改视觉退化场景参数
+  - 混用不同配置数据
+
+# 允许范围
+allowed:
+  - 调整光照强度具体数值（需在manifest中记录）
+  - 增加额外视觉退化测试场景
+
+# 执行保障
+execution:
+  rule_file: rules/视觉退化验证.md
+  config_file: configs/protocol/clause21_visual_axis_verification.yaml
+  check_function: clause_gates.py:p21_visual_axis_verification
+  precommit_hook: .git/hooks/pre-commit
+  agents_md: AGENTS.md
+  status_table: rules/指令状态表.md
+  report: outputs/compliance_report_21.md

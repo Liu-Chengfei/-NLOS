@@ -482,51 +482,73 @@ def p15_p_hacking_prevention() -> dict[str, Any]:
     - 任何旧数据集一律不得复用（哪怕旧数据本身合格），论文级结论必须来自这批复现可查的全新数据
     - 诊断轨/冒烟数据的任何结果不得以任何形式并入、替代或"补充"验收轨数据（用后即弃或隔离归档，禁止并入任何正式数据）
     """
+    import yaml as _yaml
+    
     cfg_path = CONFIGS / "protocol" / "clause15_thaw_discipline.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_15.md"
+    hook_path = PROJECT_ROOT / ".git" / "hooks" / "pre-commit"
+    
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception:
+            cfg = {}
+    
+    manual_exists = manual_path.is_file()
+    manual_text = manual_path.read_text(encoding="utf-8") if manual_exists else ""
+    
     checks: dict[str, bool] = {}
-    checks["manual_exists"] = MANUAL.exists()
-    checks["manual_has_criterion"] = any(
-        "解冻" in l and "冻结" in l and "清场" in l
-        for l in MANUAL.read_text(encoding="utf-8").splitlines()
-    )
-    checks["manual_has_forbid_selective_rerun"] = any(
-        "选择性补跑" in l or "只挑结果好" in l
-        for l in MANUAL.read_text(encoding="utf-8").splitlines()
-    )
-    checks["manual_has_forbid_data_modification"] = any(
-        "改到满意" in l or "改数据" in l
-        for l in MANUAL.read_text(encoding="utf-8").splitlines()
-    )
-    checks["manual_has_forbid_reuse_old"] = any(
-        "旧数据" in l and "不得复用" in l
-        for l in MANUAL.read_text(encoding="utf-8").splitlines()
-    )
-    checks["manual_has_forbid_diagnostic_into_production"] = any(
-        "诊断轨" in l and "并入" in l
-        for l in MANUAL.read_text(encoding="utf-8").splitlines()
-    )
-    checks["cfg_exists"] = cfg_path.is_file()
-    checks["cfg_parse_ok"] = load_clause_cfg(cfg_path).get("clause_id") == 15 if cfg_path.is_file() else False
-    checks["clause_name_contains_15"] = "15" in MANUAL.read_text(encoding="utf-8")
-    checks["agents_md_exists"] = AGENTS_PATH.is_file()
-    checks["agents_md_has_clause_15"] = AGENTS_PATH.read_text(encoding="utf-8").find("[15]") != -1
-    checks["status_table_exists"] = STATUS_TABLE.exists()
-    checks["status_table_has_clause_15"] = any("| [15]" in l for l in STATUS_TABLE.read_text(encoding="utf-8").splitlines())
-    checks["status_table_clause_15_field_valid"] = any(
-        "| [15] |" in l and ("解冻" in l or "数据纯净" in l or "p-hacking" in l)
-        for l in STATUS_TABLE.read_text(encoding="utf-8").splitlines()
-    )
-    checks["report_exists"] = (REPORT_DIR / "compliance_report_15.md").exists()
-    checks["report_has_eight_fields"] = (
-        (REPORT_DIR / "compliance_report_15.md").exists()
-        and all(f in (REPORT_DIR / "compliance_report_15.md").read_text(encoding="utf-8") for f in ["条款", "状态", "代码", "落实", "审查", "验证", "证据"])
-    )
-    checks["report_has_done_status"] = (
-        (REPORT_DIR / "compliance_report_15.md").exists()
-        and ("已落实" in (REPORT_DIR / "compliance_report_15.md").read_text(encoding="utf-8") or "✅" in (REPORT_DIR / "compliance_report_15.md").read_text(encoding="utf-8"))
-    )
-    checks["hook_exists"] = HOOK.exists()
-    checks["hook_contains_p15_call"] = any("p15_p_hacking_prevention" in l for l in HOOK.read_text(encoding="utf-8").splitlines())
+    checks["manual_exists"] = manual_exists
+    checks["manual_has_criterion"] = manual_exists and any("解冻" in l and "冻结" in l and "清场" in l for l in manual_text.splitlines())
+    checks["manual_has_forbid_selective_rerun"] = manual_exists and any("选择性补跑" in l or "只挑结果好" in l for l in manual_text.splitlines())
+    checks["manual_has_forbid_data_modification"] = manual_exists and any("改到满意" in l or "改数据" in l for l in manual_text.splitlines())
+    checks["manual_has_forbid_reuse_old"] = manual_exists and any("旧数据" in l and "不得复用" in l for l in manual_text.splitlines())
+    checks["manual_has_forbid_diagnostic_into_production"] = manual_exists and any("诊断轨" in l and "并入" in l for l in manual_text.splitlines())
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+    checks["clause_name_contains_15"] = "[15]" in manual_text
+    
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_15"] = "## [15]" in agents_text
+    else:
+        checks["agents_md_has_clause_15"] = False
+    
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_15"] = "| [15]" in status_text
+        checks["status_table_clause_15_field_valid"] = any("| [15] |" in l and ("解冻" in l or "数据纯净" in l) for l in status_text.splitlines())
+    else:
+        checks["status_table_clause_15_field_valid"] = False
+    
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        report_text = report_path.read_text(encoding="utf-8")
+        checks["report_has_eight_fields"] = all(f in report_text for f in ["条款", "状态", "代码", "落实", "审查", "验证", "证据"])
+        checks["report_has_done_status"] = "已落实" in report_text or "✅" in report_text
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+    
+    hook_exists = hook_path.is_file()
+    checks["hook_exists"] = hook_exists
+    if hook_exists:
+        hook_text = hook_path.read_text(encoding="utf-8")
+        checks["hook_contains_p15_call"] = "p15_p_hacking_prevention" in hook_text
+    else:
+        checks["hook_contains_p15_call"] = False
     
     return {
         "code": "P15-thaw",
@@ -535,7 +557,7 @@ def p15_p_hacking_prevention() -> dict[str, Any]:
         "passed": all(checks.values()),
         "status": "rule",
         "detail": f"checks={sum(checks.values())}/{len(checks)}",
-        "evidence": {"checks": checks, "cfg_path": str(cfg_path), "manual_path": str(MANUAL), "report_path": str(REPORT_DIR / "compliance_report_15.md")},
+        "evidence": {"checks": checks, "cfg_path": str(cfg_path), "manual_path": str(manual_path), "report_path": str(report_path)},
     }
 
 
