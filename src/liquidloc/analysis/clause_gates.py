@@ -15619,6 +15619,161 @@ def p6_redundancy_governance() -> dict[str, Any]:
     }
 
 
+# ---------------- 条款[7]: 违反即处置（治理层） ----------------
+def p7_violation_disposition() -> dict[str, Any]:
+    """[7] 违反即处置（治理层）—— 执行中任何环节发现违反本文档
+    （未清场/审计失败/口径不符/数据或权重污染）→ 隔离作废相关产物
+    （archive 留痕）→ 修复根因 → 回到对应回归点重跑，处置证据随结果一并提交；
+    任何'未达预期'的第一解释永远是执行偏差，不是方法不行、不是数据集不行；
+    窗口外先修根因再谈结论。
+
+    验证项：
+    1. configs/protocol/clause07_violation_disposition.yaml 存在且能正确解析
+    2. clause_name 包含「[7] 违反即处置」
+    3. 关键约束字段存在：isolate_violated_artifacts_on_violation、archive_with_trace
+    4. 手册文件含[7]条款原文（违反/隔离/作废/根因/执行偏差等关键词）
+    5. AGENTS.md 治理载体索引含[7]条目
+    6. rules/指令状态表.md 含[7]条目且状态字段合法
+    7. compliance_report_7.md 存在且八字段完整
+    8. 判定铁律.md 含违反即处置章节
+    """
+    import yaml as _yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause07_violation_disposition.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_7.md"
+    paniding_path = PROJECT_ROOT / "rules" / "判定铁律.md"
+
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+    parse_error = ""
+
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception as exc:
+            parse_error = f"yaml parse error: {exc}"
+            cfg = {}
+
+    checks: dict[str, bool] = {}
+
+    # 1. 配置文件存在且解析成功
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 2. clause_name 包含 [7] 违反即处置
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_7"] = isinstance(cn, str) and "[7]" in cn and "违反即处置" in cn
+
+    # 3. 关键约束字段
+    checks["constraint_level_is_hard"] = cfg.get("constraint_level") == "硬约束"
+    checks["isolate_violated_artifacts_on_violation"] = cfg.get("isolate_violated_artifacts_on_violation") is True
+    checks["archive_with_trace"] = cfg.get("archive_with_trace") is True
+    checks["fix_root_cause_before_rerun"] = cfg.get("fix_root_cause_before_rerun") is True
+    checks["first_explanation_is_execution_deviation"] = cfg.get("first_explanation_is_execution_deviation") is True
+    checks["disposal_evidence_must_be_submitted"] = cfg.get("disposal_evidence_must_be_submitted") is True
+
+    # 4. 手册文件存在且含 [7] 条款关键词
+    manual_exists = manual_path.is_file()
+    checks["manual_exists"] = manual_exists
+    if manual_exists:
+        manual_text = manual_path.read_text(encoding="utf-8")
+        checks["manual_contains_7"] = "[7]" in manual_text or "**\\[7\\]**" in manual_text
+        checks["manual_contains_violation_disposition"] = "违反即处置" in manual_text or "违反" in manual_text
+        checks["manual_contains_isolate"] = "隔离" in manual_text
+        checks["manual_contains_archive"] = "archive" in manual_text
+        checks["manual_contains_root_cause"] = "根因" in manual_text
+        checks["manual_contains_execution_deviation"] = "执行偏差" in manual_text or "执行偏差" in manual_text
+    else:
+        checks["manual_contains_7"] = False
+        checks["manual_contains_violation_disposition"] = False
+        checks["manual_contains_isolate"] = False
+        checks["manual_contains_archive"] = False
+        checks["manual_contains_root_cause"] = False
+        checks["manual_contains_execution_deviation"] = False
+
+    # 5. AGENTS.md 治理载体索引含[7]条目
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_7_section"] = "## [7]" in agents_text or "**\\[7\\]**" in agents_text
+    else:
+        checks["agents_md_has_clause_7_section"] = False
+
+    # 6. 指令状态表含[7]条目
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_7"] = "| [7]" in status_text
+        status_line = None
+        for line in status_text.splitlines():
+            if "| [7]" in line:
+                status_line = line
+                break
+        if status_line:
+            parts = [p.strip() for p in status_line.split("|")]
+            status_field = parts[2] if len(parts) >= 3 else ""
+            checks["status_table_clause_7_field_valid"] = (
+                "done" in status_field or "blocked" in status_field or "pending" in status_field
+            )
+        else:
+            checks["status_table_clause_7_field_valid"] = False
+    else:
+        checks["status_table_clause_7_field_valid"] = False
+
+    # 7. 落实报告八字段完整
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        report_text = report_path.read_text(encoding="utf-8")
+        required_fields = ["[7]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"]
+        all_fields_present = all(f in report_text for f in required_fields)
+        has_done = "已落实" in report_text or "✅" in report_text
+        checks["report_has_eight_fields"] = all_fields_present
+        checks["report_has_done_status"] = has_done
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    # 8. 判定铁律.md 含违反即处置章节
+    paniding_exists = paniding_path.is_file()
+    checks["paniding_md_exists"] = paniding_exists
+    if paniding_exists:
+        paniding_text = paniding_path.read_text(encoding="utf-8")
+        checks["paniding_has_violation_disposition"] = "违反即处置" in paniding_text
+    else:
+        checks["paniding_has_violation_disposition"] = False
+
+    passed = all(checks.values()) and cfg_exists and cfg_parse_ok
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P7-violation-disposition",
+        "name": "[7] 违反即处置",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "cfg_exists": cfg_exists,
+            "cfg_parse_ok": cfg_parse_ok,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)) if manual_exists else "missing",
+            "manual_exists": manual_exists,
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+            "paniding_path": str(paniding_path.relative_to(PROJECT_ROOT)) if paniding_exists else "missing",
+        },
+    }
+
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -15733,7 +15888,12 @@ _ALL = [
     p219_seed_manifest,
     p131_seed_trajectory_explicit,
     p36_git_is_last_resort,
+    p7_violation_disposition,
 ]
+
+
+
+
 def run_all_c_gates() -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for fn in _ALL:
