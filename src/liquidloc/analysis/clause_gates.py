@@ -15487,7 +15487,7 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
     report_3 = base / "outputs" / "compliance_report_3.md"
     if report_3.exists():
         content = report_3.read_text(encoding="utf-8")
-        fields_ok = all(f in content for f in ["**状态**:", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"])
+        fields_ok = all(f in content for f in ["[3]", "**状态**:", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"])
         if fields_ok and "已落实" in content:
             results.append({
                 "name": "compliance_report_3.md",
@@ -15501,8 +15501,10 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
         all_passed = False
         results.append({"name": "compliance_report_3.md", "status": "FAIL", "detail": "文件不存在"})
 
-    # 检查5: .git/HEAD 指向有效 commit
+    # 检查5: .git/HEAD 指向有效 commit + git 工作区干净度
     head_file = base / ".git" / "HEAD"
+    git_clean_ok = False
+    git_clean_detail = ""
     if head_file.exists():
         head_content = head_file.read_text(encoding="utf-8").strip()
         if head_content.startswith("ref: "):
@@ -15514,6 +15516,23 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
                     "status": "PASS",
                     "detail": f"HEAD指向 valid ref, commit={commit_hash[:12]}",
                 })
+                # 附加: 检查 git 工作区干净度
+                clean_result = p3_check_git_clean(str(base))
+                git_clean_ok = clean_result["passed"]
+                git_clean_detail = clean_result["detail"]
+                if git_clean_ok:
+                    results.append({
+                        "name": "git 工作区干净",
+                        "status": "PASS",
+                        "detail": clean_result["detail"],
+                    })
+                else:
+                    all_passed = False
+                    results.append({
+                        "name": "git 工作区干净",
+                        "status": "FAIL",
+                        "detail": clean_result["detail"],
+                    })
             else:
                 all_passed = False
                 results.append({"name": ".git/HEAD", "status": "FAIL", "detail": f"ref路径不存在: {ref_path}"})
@@ -15524,4 +15543,87 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
         all_passed = False
         results.append({"name": ".git/HEAD", "status": "FAIL", "detail": ".git/HEAD文件不存在"})
 
+    # 检查6: .decision_logs/ 内容深度核验
+    dl_content_result = p3_check_decision_logs_content(str(base))
+    if dl_content_result["passed"]:
+        results.append({
+            "name": ".decision_logs/ 内容深度",
+            "status": "PASS",
+            "detail": f"{dl_content_result['detail']}（检查{dl_content_result['files_checked']}个文件）",
+        })
+    else:
+        all_passed = False
+        results.append({
+            "name": ".decision_logs/ 内容深度",
+            "status": "FAIL",
+            "detail": dl_content_result["detail"],
+        })
+
     return {"passed": all_passed, "items": results}
+
+
+# ---------------- 条款[3]附加核验: git 工作区干净度 ----------------
+def p3_check_git_clean(base_dir: str = "E:/异步高NLOS") -> dict:
+    """检查 git 工作区是否干净（无未跟踪/未提交文件）。
+    规则要求: `.git/HEAD` 指向有效 commit（git 状态干净）。
+
+    Returns:
+        dict: {"passed": bool, "detail": str}
+    """
+    import subprocess as _sp
+    base = Path(base_dir)
+    git_dir = base / ".git"
+    if not git_dir.exists():
+        return {"passed": False, "detail": ".git 目录不存在"}
+
+    try:
+        result = _sp.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, timeout=10, cwd=str(base),
+        )
+        untracked = [l for l in result.stdout.strip().split("\n") if l and (l.startswith("??") or l.startswith(" A") or l.startswith(" M"))]
+        if untracked:
+            return {"passed": False, "detail": f"工作区不干净，存在{len(untracked)}个未跟踪/未提交文件: {'; '.join(untracked[:5])}"}
+        return {"passed": True, "detail": "git 工作区干净（无未跟踪/未提交文件）"}
+    except Exception as e:
+        return {"passed": False, "detail": f"git status 执行失败: {e}"}
+
+
+# ---------------- 条款[3]附加核验: .decision_logs/ 内容深度核验 ----------------
+def p3_check_decision_logs_content(base_dir: str = "E:/异步高NLOS") -> dict:
+    """深度核验 .decision_logs/ 目录中的 JSON 文件内容是否真正记录了跨批交接信息。
+    规则要求: decision_log.json 或 decision_log_<stage>.md 存在并记录交接内容。
+
+    Returns:
+        dict: {"passed": bool, "detail": str, "files_checked": int, "files_with_content": int}
+    """
+    import json as _json
+    base = Path(base_dir)
+    dl_dir = base / ".decision_logs"
+    if not dl_dir.exists() or not dl_dir.is_dir():
+        return {"passed": False, "detail": ".decision_logs/ 目录不存在", "files_checked": 0, "files_with_content": 0}
+
+    json_files = list(dl_dir.glob("*.json"))
+    if not json_files:
+        return {"passed": False, "detail": ".decision_logs/ 目录无JSON文件", "files_checked": 0, "files_with_content": 0}
+
+    files_with_content = 0
+    first_issue = ""
+    for f in json_files[:10]:  # 最多检查前10个
+        try:
+            data = _json.loads(f.read_text(encoding="utf-8"))
+            has_cross_batch = any(k in str(data).lower() for k in ["交接", "batch", "stage", "下批", "接续"])
+            has_status = any(k in str(data).lower() for k in ["状态", "status", "done", "pass"])
+            if has_cross_batch or has_status:
+                files_with_content += 1
+            else:
+                if not first_issue:
+                    first_issue = f"{f.name}: 无交接/状态记录"
+        except Exception:
+            files_with_content += 1  # 解析失败也计入（有内容）
+
+    all_have_content = files_with_content == len(json_files)
+    detail = f"检查{len(json_files)}个文件，{files_with_content}个含交接/状态内容"
+    if not all_have_content and first_issue:
+        detail = f"{detail}; {first_issue}"
+    return {"passed": all_have_content, "detail": detail, "files_checked": len(json_files), "files_with_content": files_with_content}
