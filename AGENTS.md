@@ -1749,7 +1749,20 @@ PASSED: True | manual_exists=True; manual_has_criterion=True; manual_has_line_a=
 
 ## [15]
 
-## [16] 底线：第 1 阶段附加义务（治理层）
+## [16]
+
+## [17] 底线：落实证据必须引用文件:行号（治理层）
+**状态**: ✅ 已落实
+**文件**:
+- `rules/落实证据引用规范.md` — 落实证据引用规则文件（核心判据加禁止项加执行保障）
+- `configs/protocol/clause17_evidence_citation.yaml` — 落实证据引用配置（clause_id=17, constraint_level=硬约束）
+- `src/liquidloc/analysis/clause_gates.py` — 验证函数 `p17_batch_decomposition()`
+- `.git/hooks/pre-commit` — 落实证据引用检查调用点
+- `AGENTS.md` — 智能体指南治理载体索引一十七条目
+- `rules/指令状态表.md` — 指令状态表第29行
+- `outputs/compliance_report_17.md` — 八字段落实报告
+**判据**: 第0阶段与第1阶段每条落实记录的证据字段必须写真实文件路径 + 行号/章节锚点；只写文件名不写行号或行号与文件实际不符 = 未落实
+ 底线：第 1 阶段附加义务（治理层）
 **状态**: ✅ 已落实
 **文件**:
 - `rules/第1阶段附加义务.md` — 第1阶段附加义务规则文件（核心判据加禁止项加执行保障）

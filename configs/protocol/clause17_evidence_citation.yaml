@@ -1,0 +1,31 @@
+# 条款[17]：落实证据必须引用文件:行号（治理层）
+# 版本: 2026-05-04 (初始版本)
+# 修订: 2026-05-04 (补全规则文件)
+
+clause_id: 17
+clause_name: 落实证据引用规范
+constraint_level: 硬约束
+governance_phase: 零
+
+# 核心判据
+criterion:
+  - 第0阶段与第1阶段每条落实记录的证据字段必须写真实文件路径 + 行号/章节锚点
+  - 如 AGENTS.md 第 12–30 行、clear_workspace.py 第 8 行、config.py::BATCH_SIZE 第 45 行
+  - 只写文件名不写行号 = 未落实
+  - 行号与文件实际不符 = 未落实
+
+# 禁止项
+forbidden:
+  - 只写文件名不写行号
+  - 行号与文件实际不符
+  - 使用模糊锚点（如"见下方"、"见附录"）
+
+# 执行保障
+execution:
+  rule_file: rules/落实证据引用规范.md
+  config_file: configs/protocol/clause17_evidence_citation.yaml
+  check_function: clause_gates.py:p17_batch_decomposition
+  precommit_hook: .git/hooks/pre-commit
+  agents_md: AGENTS.md
+  status_table: rules/指令状态表.md
+  report: outputs/compliance_report_17.md
