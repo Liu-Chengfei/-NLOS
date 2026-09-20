@@ -15581,7 +15581,7 @@ def p3_check_git_clean(base_dir: str = "E:/异步高NLOS") -> dict:
             ["git", "status", "--porcelain"],
             capture_output=True, text=True, timeout=10, cwd=str(base),
         )
-        untracked = [l for l in result.stdout.strip().split("\n") if l and (l.startswith("??") or l.startswith(" A") or l.startswith(" M"))]
+        untracked = [l for l in result.stdout.split("\n") if l and (l.startswith("??") or l.startswith(" A") or l.startswith(" M"))]
         if untracked:
             return {"passed": False, "detail": f"工作区不干净，存在{len(untracked)}个未跟踪/未提交文件: {'; '.join(untracked[:5])}"}
         return {"passed": True, "detail": "git 工作区干净（无未跟踪/未提交文件）"}
