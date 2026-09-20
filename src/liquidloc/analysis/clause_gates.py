@@ -16279,6 +16279,149 @@ def p10_four_step_closure() -> dict[str, Any]:
         },
     }
 
+
+# ---------------- 条款[11]: 条款归属总则（治理层） ----------------
+def p11_clause_attribution() -> dict[str, Any]:
+    """[11] 条款归属总则（治理层）—— 治理层条款→第0阶段逐条落实并写报告，证据写对应治理载体；
+    Stage1-6落实类→第1阶段代码落实；判据条款判据已并入对应代码条款；
+    Stage7-8执行决策类→第2阶段执行，每条同样单独写执行落实报告。
+
+    验证项（10项）：
+    1. rules/条款归属总则.md 存在且含三阶段归属表
+    2. 规则文件含第0阶段治理层条款范围说明
+    3. 规则文件含Stage1-6落实类说明
+    4. 规则文件含判据条款处理规则
+    5. 规则文件含Stage7-8执行决策类说明
+    6. 规则文件含终检说明
+    7. configs/protocol/clause11_clause_attribution.yaml 存在且解析成功
+    8. clause_name 包含「[11] 条款归属总则」
+    9. AGENTS.md 含 [11] 治理载体条目
+    10. rules/指令状态表.md 含 [11] 条目且状态字段合法
+    """
+    import yaml as _yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause11_clause_attribution.yaml"
+    rules_path = PROJECT_ROOT / "rules" / "条款归属总则.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_11.md"
+    hook_path = PROJECT_ROOT / ".git" / "hooks" / "pre-commit"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception:
+            cfg = {}
+
+    rules_exists = rules_path.is_file()
+    rules_text = rules_path.read_text(encoding="utf-8") if rules_exists else ""
+
+    checks: dict[str, bool] = {}
+
+    # 1. 规则文件存在且含三阶段归属表
+    checks["rules_exists"] = rules_exists
+    checks["rules_has_phase0"] = rules_exists and "第 0 阶段" in rules_text
+    checks["rules_has_phase1_6"] = rules_exists and ("第 1 阶段" in rules_text or "第1阶段" in rules_text)
+    checks["rules_has_criterion_merged"] = rules_exists and ("判据" in rules_text or "并入" in rules_text)
+    checks["rules_has_phase7_8"] = rules_exists and ("第 7 阶段" in rules_text or "第7阶段" in rules_text)
+    checks["rules_has_final_check"] = rules_exists and ("终检" in rules_text or "verify" in rules_text)
+
+    # 2. 配置文件存在且解析成功
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 3. clause_name 包含 [11] 条款归属总则
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_11"] = isinstance(cn, str) and "[11]" in cn and "条款归属总则" in cn
+
+    # 4. AGENTS.md 含 [11] 治理载体条目
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_11"] = "## [11]" in agents_text
+    else:
+        checks["agents_md_has_clause_11"] = False
+
+    # 5. 指令状态表含 [11] 条目
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_11"] = "| [11]" in status_text
+        for line in status_text.splitlines():
+            if "| [11]" in line:
+                parts = [p.strip() for p in line.split("|")]
+                sf = parts[2] if len(parts) >= 3 else ""
+                checks["status_table_clause_11_field_valid"] = "done" in sf or "blocked" in sf or "pending" in sf
+                break
+        else:
+            checks["status_table_clause_11_field_valid"] = False
+    else:
+        checks["status_table_clause_11_field_valid"] = False
+
+    # 6. 手册含 [11] 条款
+    manual_exists = manual_path.is_file()
+    checks["manual_exists"] = manual_exists
+    if manual_exists:
+        manual_text = manual_path.read_text(encoding="utf-8")
+        checks["manual_contains_11"] = "[11]" in manual_text or "**\[11\]**" in manual_text
+        checks["manual_contains_attribution"] = "归属" in manual_text
+    else:
+        checks["manual_contains_11"] = False
+        checks["manual_contains_attribution"] = False
+
+    # 可选：报告八字段检查
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        report_text = report_path.read_text(encoding="utf-8")
+        checks["report_has_eight_fields"] = all(f in report_text for f in ["[11]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"])
+        checks["report_has_done_status"] = "已落实" in report_text or "✅" in report_text
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    # pre-commit钩子检查（可选）
+    hook_exists = hook_path.is_file()
+    checks["hook_exists"] = hook_exists
+    if hook_exists:
+        hook_text = hook_path.read_text(encoding="utf-8")
+        checks["hook_contains_p11_call"] = "p11_clause_attribution" in hook_text or "--check p11" in hook_text
+    else:
+        checks["hook_contains_p11_call"] = False
+
+    # 核心检查必须通过
+    required = [k for k in checks if k not in ("report_has_eight_fields", "report_has_done_status", "hook_contains_p11_call")]
+    passed = all(checks[k] for k in required)
+
+    detail = "; ".join(f"{k}={v}" for k, v in checks.items())
+    return {
+        "code": "P11-clause-attribution",
+        "name": "[11] 条款归属总则",
+        "severity": "hard",
+        "passed": passed,
+        "detail": detail,
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "cfg_exists": cfg_exists,
+            "cfg_parse_ok": cfg_parse_ok,
+            "rules_path": str(rules_path.relative_to(PROJECT_ROOT)) if rules_exists else "missing",
+            "rules_exists": rules_exists,
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+            "hook_path": str(hook_path.relative_to(PROJECT_ROOT)) if hook_exists else "missing",
+            "checks": checks,
+        },
+    }
+
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -16396,6 +16539,7 @@ _ALL = [
     p7_violation_disposition,
     p8_submit_self_check,
     p10_four_step_closure,
+    p11_clause_attribution,
 ]
 
 

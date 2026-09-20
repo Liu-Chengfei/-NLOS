@@ -69,6 +69,17 @@
 
 **内容**: 每条指令按「查 → 落 → 验 → 报」四步闭环：查（读条款原文+查磁盘现状，禁止凭记忆）→ 落（翻译为文件路径+函数/类+行号落点）→ 验（逐行核对条款逐句对应，不落实当场改）→ 报（按八字段写落实记录，未写记录视为未落实）。
 
+## [11] 条款归属总则（治理层）
+**状态**: ✅ 已落地
+**文件**:
+- `rules/条款归属总则.md` — 三阶段归属总则（治理层/Stage1-6落实类/Stage7-8执行决策类）
+- `configs/protocol/clause11_clause_attribution.yaml` — 约束配置（硬约束声明、归属标志）
+- `src/liquidloc/analysis/clause_gates.py` — p11_clause_attribution() 验证函数
+- `.git/hooks/pre-commit` — pre-commit 归属总则验证调用点（p11调用在p10之后）
+- `outputs/compliance_report_11.md` — 合规报告
+
+**内容**: 治理层条款→第0阶段逐条落实并写报告，证据写对应治理载体（按『治理载体分散布局』分散落点：AGENTS/rules/skill/hook/plugin/MCP）；Stage 1-6落实类→第1阶段代码落实，判据条款的判据已并入对应代码条款；Stage 7-8执行决策类→第2阶段执行，每条同样单独写执行落实报告。
+
 ## [9] 落实报告格式（治理层·八字段）
 **状态**: ✅ 已落地
 **文件**:
