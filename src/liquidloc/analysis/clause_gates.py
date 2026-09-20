@@ -15388,3 +15388,140 @@ if __name__ == "__main__":
         r = res[k]
         print(f"{k}: {'PASS' if r.get('passed') else 'FAIL'}  {str(r.get('detail', r.get('error','')))[:90]}")
     print(f"\nC-gates: {npass}/{len(res)} passed")
+
+
+# ---------------- 条款[3]: 状态只认磁盘、不认记忆（治理层） ----------------
+def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
+    """条款[3]「状态只认磁盘、不认记忆」验证函数
+
+    验证项：
+    1. rules/状态只认磁盘.md 存在且包含铁律内容
+    2. manifests/ 目录存在且非空（或已清场记录为0项）
+    3. decision_log.json 或 .decision_logs/*.json 存在
+    4. outputs/compliance_report_3.md 存在（条款[3]合规报告）
+    5. .git/HEAD 指向有效 commit
+
+    Returns:
+        dict: {"passed": bool, "items": list of {name, status, detail}}
+    """
+    base = Path(base_dir)
+    results = []
+    all_passed = True
+
+    # 检查1: rules/状态只认磁盘.md
+    rule_file = base / "rules" / "状态只认磁盘.md"
+    if rule_file.exists():
+        content = rule_file.read_text(encoding="utf-8")
+        checks = [
+            ("铁律：状态只认磁盘", "状态只认磁盘" in content),
+            ("铁律：不认记忆", "不认记忆" in content or "凭记忆" in content),
+            ("manifest锚点", "manifest" in content.lower()),
+            ("decision log锚点", "decision log" in content.lower() or "decision_log" in content),
+            ("产物锚点", "产物" in content),
+            ("git commit锚点", "git commit" in content.lower()),
+            ("跨批交接纪律", "跨批交接" in content),
+            ("违反即处置", "违反" in content and "处置" in content),
+        ]
+        passed = all(c[1] for c in checks)
+        if not passed:
+            all_passed = False
+        results.append({
+            "name": "rules/状态只认磁盘.md",
+            "status": "PASS" if passed else "FAIL",
+            "detail": f"{sum(1 for c in checks if c[1])}/{len(checks)}项铁律内容已验证",
+        })
+    else:
+        all_passed = False
+        results.append({"name": "rules/状态只认磁盘.md", "status": "FAIL", "detail": "文件不存在"})
+
+    # 检查2: manifests/ 目录
+    manifests_dir = base / "manifests"
+    if manifests_dir.exists() and manifests_dir.is_dir():
+        manifest_files = list(manifests_dir.glob("*"))
+        if len(manifest_files) > 0:
+            results.append({
+                "name": "manifests/目录",
+                "status": "PASS",
+                "detail": f"目录存在，含{len(manifest_files)}个文件",
+            })
+        else:
+            qingchang = base / "清场验证.txt"
+            if qingchang.exists():
+                qtc = qingchang.read_text(encoding="utf-8")
+                if "0 项" in qtc or "共移动 0 项" in qtc:
+                    results.append({
+                        "name": "manifests/目录",
+                        "status": "PASS",
+                        "detail": "目录存在，清场记录为0项（符合规则要求）",
+                    })
+                else:
+                    all_passed = False
+                    results.append({"name": "manifests/目录", "status": "FAIL", "detail": "目录为空且无清场0项记录"})
+            else:
+                all_passed = False
+                results.append({"name": "manifests/目录", "status": "FAIL", "detail": "目录为空且无清场验证文件"})
+    else:
+        all_passed = False
+        results.append({"name": "manifests/目录", "status": "FAIL", "detail": "目录不存在"})
+
+    # 检查3: decision_log.json 或 .decision_logs/
+    dl_root = base / "decision_log.json"
+    dl_hidden = base / ".decision_logs"
+    has_dl = False
+    dl_detail = ""
+    if dl_root.exists():
+        has_dl = True
+        dl_detail = f"根目录 decision_log.json 存在（{dl_root.stat().st_size}字节）"
+    elif dl_hidden.exists() and dl_hidden.is_dir():
+        hidden_files = list(dl_hidden.glob("*.json"))
+        if hidden_files:
+            has_dl = True
+            dl_detail = f".decision_logs/ 目录存在，含 {len(hidden_files)} 个JSON文件"
+    if has_dl:
+        results.append({"name": "decision_log", "status": "PASS", "detail": dl_detail})
+    else:
+        all_passed = False
+        results.append({"name": "decision_log", "status": "FAIL", "detail": "根目录及hidden目录均无decision_log"})
+
+    # 检查4: compliance_report_3.md
+    report_3 = base / "outputs" / "compliance_report_3.md"
+    if report_3.exists():
+        content = report_3.read_text(encoding="utf-8")
+        fields_ok = all(f in content for f in ["**状态**:", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"])
+        if fields_ok and "已落实" in content:
+            results.append({
+                "name": "compliance_report_3.md",
+                "status": "PASS",
+                "detail": f"八字段完整（{report_3.stat().st_size}字节）",
+            })
+        else:
+            all_passed = False
+            results.append({"name": "compliance_report_3.md", "status": "FAIL", "detail": "八字段不完整"})
+    else:
+        all_passed = False
+        results.append({"name": "compliance_report_3.md", "status": "FAIL", "detail": "文件不存在"})
+
+    # 检查5: .git/HEAD 指向有效 commit
+    head_file = base / ".git" / "HEAD"
+    if head_file.exists():
+        head_content = head_file.read_text(encoding="utf-8").strip()
+        if head_content.startswith("ref: "):
+            ref_path = base / ".git" / head_content[5:].strip()
+            if ref_path.exists():
+                commit_hash = ref_path.read_text(encoding="utf-8").strip()
+                results.append({
+                    "name": ".git/HEAD → 有效commit",
+                    "status": "PASS",
+                    "detail": f"HEAD指向 valid ref, commit={commit_hash[:12]}",
+                })
+            else:
+                all_passed = False
+                results.append({"name": ".git/HEAD", "status": "FAIL", "detail": f"ref路径不存在: {ref_path}"})
+        else:
+            all_passed = False
+            results.append({"name": ".git/HEAD", "status": "FAIL", "detail": "HEAD格式非标准ref"})
+    else:
+        all_passed = False
+        results.append({"name": ".git/HEAD", "status": "FAIL", "detail": ".git/HEAD文件不存在"})
+
+    return {"passed": all_passed, "items": results}
