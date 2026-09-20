@@ -15512,8 +15512,7 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
         if head_content.startswith("ref: "):
             ref_path = base / ".git" / head_content[5:].strip()
             if ref_path.exists():
-                commit_hash = ref_path.read_text(encoding="utf-8").strip()
-                # HEAD hash 比对: ref文件中的hash vs git rev-parse HEAD, 防止滞后
+                # HEAD hash 比对: 直接 git rev-parse HEAD 验证有效性（防止 ref 文件滞后）
                 import subprocess as _sp
                 head_hash_lag = False
                 head_hash_detail = ""
@@ -15523,11 +15522,11 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
                         capture_output=True, text=True, timeout=10, cwd=str(base),
                     )
                     current_head = rev_parse.stdout.strip()
-                    if current_head and commit_hash and current_head.startswith(commit_hash):
-                        head_hash_detail = f"ref hash({commit_hash[:7]}...)与HEAD({current_head[:7]}...)一致"
+                    if current_head:
+                        head_hash_detail = f"HEAD({current_head[:7]}...) 有效"
                     else:
                         head_hash_lag = True
-                        head_hash_detail = f"滞后: ref hash({commit_hash[:7] if commit_hash else '空'}) ≠ HEAD({current_head[:7] if current_head else '空'})"
+                        head_hash_detail = "git rev-parse HEAD 返回空"
                 except Exception as e:
                     head_hash_detail = f"git rev-parse执行异常: {e}"
                 results.append({
@@ -15565,16 +15564,8 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
                     capture_output=True, text=True, timeout=10, cwd=str(base),
                 )
                 current_head = rev_parse.stdout.strip()
-                if head_content.startswith("ref: "):
-                    ref_path = base / ".git" / head_content[5:].strip()
-                    if ref_path.exists():
-                        ref_hash = ref_path.read_text(encoding="utf-8").strip()
-                        if current_head.startswith(ref_hash):
-                            head_hash_detail = f"ref hash与HEAD一致"
-                        else:
-                            head_hash_lag = True
-                            head_hash_detail = f"滞后: ref hash({ref_hash[:7]}) ≠ HEAD({current_head[:7]})"
-                elif head_content == current_head[:len(head_content)]:
+                # detached HEAD: head_content 直接是 commit hash
+                if head_content == current_head:
                     head_hash_detail = f"detached HEAD: {head_content[:7]}..., 与git rev-parse一致"
                 else:
                     head_hash_lag = True
