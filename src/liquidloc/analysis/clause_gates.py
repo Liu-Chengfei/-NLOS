@@ -15514,7 +15514,7 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
                 results.append({
                     "name": ".git/HEAD → 有效commit",
                     "status": "PASS",
-                    "detail": f"HEAD指向 valid ref, commit={commit_hash[:12]}",
+                    "detail": "HEAD指向 valid ref",
                 })
                 # 附加: 检查 git 工作区干净度
                 clean_result = p3_check_git_clean(str(base))
