@@ -15256,6 +15256,141 @@ def p131_seed_trajectory_explicit() -> dict[str, Any]:
     }
 
 
+# ---------------- 条款[5]: 依赖声明（治理层·指令模式） ----------------
+def p5_dependency_declaration() -> dict[str, Any]:
+    """[5] 依赖声明（治理层·指令模式）—— 每条指令头部标「前置:[N]」；执行前先查前置是否done，
+    未done → 标blocked停下问，不硬跑、不跳序。
+
+    验证项：
+    1. configs/protocol/clause05_dependency_declaration.yaml 存在且能正确解析
+    2. clause_name 包含「[5] 依赖声明」
+    3. 关键约束字段存在：prerequisite_check_before_execution、blocked_on_missing_dependency
+    4. 手册文件中 clauses/protocols/manual 关键字存在
+    5. AGENTS.md 治理载体索引含[5]条目
+    6. rules/指令状态表.md 含[5]条目且状态字段合法
+    7. compliance_report_5.md 存在且八字段完整
+    """
+    import yaml as _yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause05_dependency_declaration.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_5.md"
+
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+    parse_error = ""
+
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception as exc:
+            parse_error = f"yaml parse error: {exc}"
+            cfg = {}
+
+    checks: dict[str, bool] = {}
+
+    # 1. 配置文件存在且解析成功
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 2. clause_name 包含 [5] 依赖声明
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_5"] = isinstance(cn, str) and "[5]" in cn and "依赖声明" in cn
+
+    # 3. 关键约束字段
+    checks["constraint_level_is_hard"] = cfg.get("constraint_level") == "硬约束"
+    checks["prerequisite_check_before_execution"] = cfg.get("prerequisite_check_before_execution") is True
+    checks["blocked_on_missing_dependency"] = cfg.get("blocked_on_missing_dependency") is True
+    checks["no_hard_run_without_done_prerequisite"] = cfg.get("no_hard_run_without_done_prerequisite") is True
+    checks["no_skip_order"] = cfg.get("no_skip_order") is True
+
+    # 4. 手册文件存在且含相关文本
+    manual_exists = manual_path.is_file()
+    checks["manual_exists"] = manual_exists
+    if manual_exists:
+        manual_text = manual_path.read_text(encoding="utf-8")
+        checks["manual_contains_5"] = "**\\[5]**" in manual_text or "**[5]**" in manual_text or "[5]" in manual_text
+        checks["manual_contains_dependency_declaration"] = "依赖声明" in manual_text or "依赖声明" in manual_text
+        checks["manual_contains_prerequisite"] = "前置" in manual_text
+    else:
+        checks["manual_contains_5"] = False
+        checks["manual_contains_dependency_declaration"] = False
+        checks["manual_contains_prerequisite"] = False
+
+    # 5. AGENTS.md 治理载体索引含[5]条目
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_5_section"] = "## [5]" in agents_text or "**\\[5\\]**" in agents_text
+    else:
+        checks["agents_md_has_clause_5_section"] = False
+
+    # 6. 指令状态表含[5]条目
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_5"] = "| [5]" in status_text
+        status_line = None
+        for line in status_text.splitlines():
+            if "| [5]" in line:
+                status_line = line
+                break
+        if status_line:
+            parts = [p.strip() for p in status_line.split("|")]
+            status_field = parts[2] if len(parts) >= 3 else ""
+            checks["status_table_clause_5_field_valid"] = status_field in (
+                "✅ done", "❌ blocked", "⏳ pending",
+                "done", "blocked", "pending",
+                "✅ done|", "❌ blocked|", "⏳ pending|"
+            ) or "done" in status_field or "blocked" in status_field or "pending" in status_field
+        else:
+            checks["status_table_clause_5_field_valid"] = False
+    else:
+        checks["status_table_clause_5_field_valid"] = False
+
+    # 7. 落实报告八字段完整
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        report_text = report_path.read_text(encoding="utf-8")
+        required_fields = ["[5]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"]
+        all_fields_present = all(f in report_text for f in required_fields)
+        has_done = "已落实" in report_text or "✅" in report_text
+        checks["report_has_eight_fields"] = all_fields_present
+        checks["report_has_done_status"] = has_done
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    passed = all(checks.values()) and cfg_exists and cfg_parse_ok
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P5-dependency-declaration",
+        "name": "[5] 依赖声明",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "cfg_exists": cfg_exists,
+            "cfg_parse_ok": cfg_parse_ok,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)) if manual_exists else "missing",
+            "manual_exists": manual_exists,
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+        },
+    }
+
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -15266,6 +15401,7 @@ _ALL = [
     p17_batch_decomposition, p18_agents_md_template, p19_axis_a_sync_verification,
     p20_nlos_axis_verification, p21_visual_axis_verification, p22_anchor_axis_verification,
     p23_missing_data_axis_verification, p24_five_axis_independence_verification,
+    p5_dependency_declaration,
     p15_parallel_scheduling_order_verification, p25_eval_statistical_parallel_verification,
     p26_runtime_assertion_verification,
     p27_no_temp_scripts_verification,
@@ -15629,6 +15765,8 @@ def p3_check_git_clean(base_dir: str = "E:/异步高NLOS") -> dict:
         return {"passed": True, "detail": "git 工作区干净（无未跟踪/未提交文件）"}
     except Exception as e:
         return {"passed": False, "detail": f"git status 执行失败: {e}"}
+
+
 
 
 # ---------------- 条款[3]附加核验: .decision_logs/ 内容深度核验 ----------------

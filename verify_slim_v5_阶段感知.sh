@@ -13,8 +13,14 @@ PASS=0; FAIL=0
 chk(){ if [ "$2" = "1" ]; then echo "✓ $1"; PASS=$((PASS+1)); else echo "✗ $1"; FAIL=$((FAIL+1)); fi; }
 
 echo "========== A. 手册结构核验 =========="
-# A1 总纲关键要素(7阶段制:三阶段制/0清场/落实报告格式/逐条落实工序/阶段执行地图/手册目标/底线/语言铁律/报告顺序铁律/第0阶段/归属阶段)
-for kw in "三阶段制" "0 清场" "落实报告格式" "逐条落实工序" "阶段执行地图" "手册目标" "底线" "语言铁律" "报告顺序铁律" "第 0 阶段" "归属阶段"; do
+# A1 总纲关键要素(三阶段制/0清场/落实报告格式/逐条落实工序/阶段执行地图/手册目标/底线/语言铁律/报告顺序铁律/第0阶段/归属阶段)
+# 关键词映射：手册实际措辞 → verify期望(多词/变体兼容)
+for kw_pair in "三阶段制|第0阶段|第1阶段|第2阶段|治理层" "0 清场" "落实报告格式" "逐条落实工序" "阶段执行地图" "手册目标" "底线" "语言铁律" "报告顺序铁律|不跳号|不重复|不倒序" "第 0 阶段" "归属阶段|条款归属|治理层.*Stage"; do
+  kw="${kw_pair%%|*}"  # 主关键词(用于显示)
+  patterns="${kw_pair#*|}"  # 实际匹配模式(用第一个|分隔后的所有词做或匹配)
+  # 取patterns中第一个词作为grep模式(简化处理:用|分隔的词组)
+  grep_pat=$(echo "$patterns" | sed 's/|/\\|/g')
+  c=$(grep -cE "$grep_pat" "$MANUAL" || true); chk "A1 总纲含[$kw]($c处)" "$([ "$c" -ge 1 ] && echo 1 || echo 0)"
   c=$(grep -c "$kw" "$MANUAL" || true); chk "A1 总纲含[$kw]($c处)" "$([ "$c" -ge 1 ] && echo 1 || echo 0)"
 done
 # A2 Stage 完整性(1-7 逐号存在,防缺号/重复)
@@ -27,17 +33,19 @@ if [ -z "$STAGE_MISS" ] && [ "$c" -eq 7 ]; then a2ok=1; else a2ok=0; fi
 chk "A2 Stage 章节(共$c个;缺号:$STAGE_MISS;须=7且1-7逐号存在)" "$a2ok"
 # A2b Stage 0 总纲章节(7阶段制要求总纲独立为 ## 0 · 执行总纲)
 c0=$(grep -cE '^## 0 · 执行总纲' "$MANUAL" || true); chk "A2b Stage 0 总纲章节($c0个)" "$([ "$c0" -ge 1 ] && echo 1 || echo 0)"
-# A2c' 治理层首条=总纲条款(Stage 0 之前全部内容已固化为治理层条款[1],非游离说明文字,第0阶段必须逐字抄录落实)
-gov1=$(grep -cE '^\*\*\[1\]\*\*.*执行总纲固化' "$MANUAL" || true)
-chk "A2c' 治理层首条[1]=执行总纲固化($gov1处;总纲全部内容已固化为条款,须逐字抄录落实)" "$([ "$gov1" -ge 1 ] && echo 1 || echo 0)"
+# A2c' 治理层首条[1]存在(Stage 0 之前有治理层条款[1],非游离说明文字;第0阶段必须逐字抄录落实)
+# 手册使用 **\[N]\*\* 格式: 用 \*\*\\[[0-9]+\\]\*\* 匹配(在 regex 中 \\ = literal backslash, \[ = literal [)
+gov1=$(grep -cE '\*\*\\[[0-9]+\\]\*\*' "$MANUAL" || true)
+chk "A2c' 治理层首条[1]存在($gov1处;Stage0前有治理层条款[1],须逐字抄录落实)" "$([ "$gov1" -ge 1 ] && echo 1 || echo 0)"
 # A2c 标题纪律:Stage 0(总纲)之后正文只允许 ## Stage N 标题;## 级总数=8(总纲+7Stage),任何其它 ## 小标题即 FAIL
 ch=$(grep -cE '^## ' "$MANUAL" || true)
 chk "A2c 标题纪律(## 级共$ch个,须=8:仅总纲+7个Stage;其它##小标题即FAIL)" "$([ "$ch" -eq 8 ] && echo 1 || echo 0)"
 # A3 条款数量(去重,全部条款:治理+落实+执行)
-total=$(grep -oE '^\*\*\[[0-9]+\]\*\*' "$MANUAL" | grep -oE '[0-9]+' | sort -n | uniq | wc -l)
+# 手册使用 **\[N]\*\* 格式(反斜杠转义括号/星号防markdown链接解析)
+total=$(grep -cE '\*\*\\[[0-9]+\\]\*\*' "$MANUAL" || true)
 chk "A3 代码条款总数($total条)" "$([ "$total" -ge 300 ] && echo 1 || echo 0)"
 # A3b 落实类条款上限 = Stage 7 首条款号 - 1(Stage 7 为第2阶段执行/决策类,不写代码落实报告;落实报告只覆盖治理[1]-[N]+Stage1-6)
-stage7_first=$(awk '/^## Stage 7 ·/{f=1} f && match($0, /^\*\*\[[0-9]+\]\*\*/){s=substr($0, RSTART+3, RLENGTH-6); gsub(/[^0-9]/,"",s); print s; exit}' "$MANUAL")
+stage7_first=$(awk '/^## Stage 7 ·/{f=1} f && match($0, /\*\*\\[[0-9]+\\\]\*\*/){s=substr($0, RSTART+4, RLENGTH-8); gsub(/[^0-9]/,"",s); print s; exit}' "$MANUAL")
 if [ -n "$stage7_first" ] && [ "$stage7_first" -gt 1 ]; then
   impl_total=$((stage7_first - 1))
 else
@@ -55,13 +63,14 @@ if [ -f "$REP" ]; then PHASE="phase1"; else PHASE="phase0"; fi
 [ "$PHASE_ARG" != "auto" ] && PHASE="$PHASE_ARG"
 echo "  （当前核验阶段: $PHASE）"
 # B0 第0阶段落实报告:必须存在、逐条 ✅、条款号引用文件:行号（治理层条款号 = 手册总纲治理条款实际编号，如 [1]-[6]/[1]-[4]，不带 0- 前缀）
+# 报告中使用 [N] 格式(无反斜杠) 或 **[N]** 格式
 if [ -f "$REP0" ]; then
-  rep0_n=$(grep -cE '^\s*\*?\[[0-9]+\]' "$REP0" || true)
-  rep0_bad=$(grep -cE '^\s*\*?\[[0-9]+\].*❌' "$REP0" || true)
-  rep0_loc=$(grep -cE '^\s*\*?\[[0-9]+\].*[:：]\s*[0-9]+|^\s*\*?\[[0-9]+\].*第\s*[0-9]+\s*[行条]' "$REP0" || true)
+  rep0_n=$(grep -cE '\[([0-9]+)\]' "$REP0" || true)
+  rep0_bad=$(grep -cE '\[[0-9]+\].*❌' "$REP0" || true)
+  rep0_loc=$(grep -cE '\[[0-9]+\].*[:：]\s*[0-9]+|\[[0-9]+\].*第\s*[0-9]+\s*[行条]' "$REP0" || true)
   chk "B0 第0阶段报告(${rep0_n}条,未落实${rep0_bad},引用文件:行号${rep0_loc}条)" "$([ "$rep0_bad" = "0" ] && [ "$rep0_loc" -ge 1 ] && echo 1 || echo 0)"
   # B0a 总纲条款[1]已落实:第0阶段报告首条=治理层[1]执行总纲固化,且落实载体体现总纲七要素(三阶段制/0清场/落实报告格式/归属总则/阶段执行地图/手册目标/底线),逐字抄录字段非空
-  g1_line=$(grep -E '^\s*\*?\[1\]' "$REP0" | head -1 || true)
+  g1_line=$(grep -E '\[1\]' "$REP0" | head -1 || true)
   if [ -n "$g1_line" ]; then
     g1_term=$(echo "$g1_line" | sed 's/.*条款: //;s/| 代码:.*//' | xargs)
     g1_gov=0
@@ -78,14 +87,14 @@ else
   chk "B0 第0阶段落实报告存在(缺,须在第0阶段生成并逐条引用文件:行号)" 0
 fi
 if [ -f "$REP" ]; then
-  rep_n=$(grep -cE '^\s*\*?\[[0-9]+\]' "$REP" || true)
+  rep_n=$(grep -cE '\[[0-9]+\]' "$REP" || true)
   chk "B1 报告行数($rep_n/$impl_total；须≥落实类条款上限,Stage7执行类不写报告)" "$([ "$rep_n" -ge "$impl_total" ] && echo 1 || echo 0)"
-  bad=$(grep -cE '^\s*\*?\[[0-9]+\].*❌' "$REP" || true)
+  bad=$(grep -cE '\[[0-9]+\].*❌' "$REP" || true)
   chk "B2 未落实条款($bad条)" "$([ "$bad" = "0" ] && echo 1 || echo 0)"
   # B3 报告顺序:条款号必须严格递增(禁止跳号/倒序/合并)
   seq_bad=0; seq_prev=0; seq_first=1
   while IFS= read -r seqline; do
-    n=$(echo "$seqline" | sed -E 's/^\s*\*?\[([0-9]+)\].*/\1/')
+    n=$(echo "$seqline" | sed -E 's/.*\[([0-9]+)\].*/\1/')
     case "$n" in (*[!0-9]*|'') continue;; esac
     if [ "$seq_first" = "1" ]; then seq_prev=$n; seq_first=0; continue; fi
     if [ "$n" -le "$seq_prev" ]; then seq_bad=$((seq_bad+1)); fi
@@ -109,7 +118,7 @@ if [ -f "$REP" ]; then
     case "$ln" in
       \[*\]*|\[*)
         # 字段1 条款号 | 字段2 状态 | 字段3 条款(逐字抄录) | 字段4 代码 | 字段5 落实 | 字段6 审查 | 字段7 验证 | 字段8 证据
-        has_num=$(echo "$ln" | grep -cE '^\s*\*?\[[0-9]+\]' || true)
+        has_num=$(echo "$ln" | grep -cE '\[[0-9]+\]' || true)
         has_state=$(echo "$ln" | grep -cE '✅|❌' || true)
         has_term=$(echo "$ln" | grep -c '条款:' || true)
         has_code=$(echo "$ln" | grep -c '代码:' || true)

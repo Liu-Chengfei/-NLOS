@@ -19,6 +19,16 @@
 |`.git/hooks/pre-commit`|0 清场、提交前自查、残留审计|
 |`outputs/`|落实报告（compliance_report_*.md）|
 |`archive/`|清场归档 + 决策日志|
+## [5] 依赖声明（治理层·指令模式）
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/clause05_dependency_declaration.yaml` — 约束配置
+- `src/liquidloc/analysis/clause_gates.py:15259-15507` — p5_dependency_declaration() 验证函数
+- `.git/hooks/pre-commit:111,229` — check_dependencies 前置依赖链硬拦截（定义@111、调用@229）
+- `outputs/compliance_report_5.md` — 合规报告
+
+**内容**: 每条指令头部标「前置:[N]」；执行前先查前置是否done，未done → 标blocked停下问，不硬跑、不跳序。pre-commit钩子check_dependencies在[2]-[6]依赖链上实施硬拦截（exit 1阻止提交）。
+
 ## [36] git 是最后防线
 **状态**: ✅ 已落地
 **文件**: 
