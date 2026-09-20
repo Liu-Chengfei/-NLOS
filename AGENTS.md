@@ -34,9 +34,9 @@
 ## [14] 底线：防p-hacking（治理层）
 **状态**: ✅ 已落实
 **文件**:
-- `rules/防p-hacking.md` — 防p-hacking规则文件（核心判据+禁止项+执行保障）
+- `rules/防p-hacking.md` — 防p-hacking规则文件（核心判据加禁止项加执行保障）
 - `configs/protocol/clause14_panti_hacking.yaml` — 防p-hacking配置（clause_id=14, constraint_level=硬约束）
-- `src/liquidloc/analysis/clause_gates.py` — 验证函数 `p14_p_hacking_prevention()`
+- `src/liquidloc/analysis/clause_gates.py` — 验证函数 `p一四防p-hacking检查()`
 - `.git/hooks/pre-commit` — 防p-hacking检查调用点
 - `outputs/compliance_report_14.md` — 八字段落实报告
 **判据**: 禁止选择性补跑/改数据到满意/旧数据复用/诊断轨并入验收轨
