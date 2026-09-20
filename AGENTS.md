@@ -30,6 +30,17 @@
 **内容**: 每条指令头部标「前置:[N]」；执行前先查前置是否done，未done → 标blocked停下问，不硬跑、不跳序。pre-commit钩子check_dependencies在[2]-[6]依赖链上实施硬拦截（exit 1阻止提交）。
 
 
+
+## [14] 底线：防p-hacking（治理层）
+**状态**: ✅ 已落实
+**文件**:
+- `rules/防p-hacking.md` — 防p-hacking规则文件（核心判据+禁止项+执行保障）
+- `configs/protocol/clause14_panti_hacking.yaml` — 防p-hacking配置（clause_id=14, constraint_level=硬约束）
+- `src/liquidloc/analysis/clause_gates.py` — 验证函数 `p14_p_hacking_prevention()`
+- `.git/hooks/pre-commit` — 防p-hacking检查调用点
+- `outputs/compliance_report_14.md` — 八字段落实报告
+**判据**: 禁止选择性补跑/改数据到满意/旧数据复用/诊断轨并入验收轨
+
 ## [13] 底线：语言铁律（GLM 5.3 专属）
 **状态**: ✅ 已落地
 **文件**:

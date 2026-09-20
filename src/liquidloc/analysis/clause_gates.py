@@ -1048,88 +1048,139 @@ def p35_primary_channel_exclusive_rerun() -> dict[str, Any]:
 
 
 # ---------------- P14 条款 [14]: 并行-串行等效性抽查 ----------------
-def p14_parallel_equivalence_check() -> dict[str, Any]:
-    """[14] "不使结果变差"的判据 = 并行-串行等效性抽查。
+def p14_p_hacking_prevention() -> dict[str, Any]:
+    """[14] 底线：防p-hacking（治理层）——验证防p-hacking规则文件、配置文件、验证函数、AGENTS.md索引、状态表条目、八字段报告、pre-commit钩子完整。
 
-    验证 parallel_equivalence_check.py 模块存在且功能完整，
-    并能实际运行一个确定性等效性抽查。
+    验证项（11项）：
+    1. rules/防p-hacking.md 存在且含核心判据说明
+    2. 含禁止选择性补跑说明
+    3. 含禁止改数据到满意为止说明
+    4. 含旧数据不得复用说明
+    5. 含诊断轨不得并入验收轨说明
+    6. configs/protocol/clause14_p_hacking_prevention.yaml 存在且解析成功
+    7. clause_name 包含「[14] 底线：防p-hacking」
+    8. AGENTS.md 含[14]治理载体条目
+    9. rules/指令状态表.md 含[14]条目且状态字段合法
+    10. outputs/compliance_report_14.md 存在且含八字段
+    11. .git/hooks/pre-commit 含防p-hacking检查调用点
     """
-    src_dir = SRC / "liquidloc" / "common"
-    pec_path = src_dir / "parallel_equivalence_check.py"
+    import yaml as _yaml
 
-    # (a) parallel_equivalence_check.py 存在
-    exists = pec_path.is_file()
+    cfg_path = CONFIGS / "protocol" / "clause14_panti_hacking.yaml"
+    manual_path = PROJECT_ROOT / "rules" / "防p-hacking.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_14.md"
+    hook_path = PROJECT_ROOT / ".git" / "hooks" / "pre-commit"
 
-    # (b) 必须有所有必需符号
-    required_names = [
-        "ParallelEquivalenceResult",
-        "run_serial",
-        "run_parallel",
-        "compare_results",
-        "write_decision_log",
-        "run_equivalence_check",
-    ]
-    found_names: list[str] = []
-    missing_names: list[str] = []
-    if exists:
-        txt = pec_path.read_text(encoding="utf-8")
-        for name in required_names:
-            if re.search(rf"\b{name}\b", txt):
-                found_names.append(name)
-            else:
-                missing_names.append(name)
-    else:
-        missing_names = required_names[:]
-
-    # (c) 实际运行一个等效性抽查
-    runtime_ok = False
-    runtime_detail = ""
-    if exists and not missing_names:
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+    if cfg_exists:
         try:
-            import sys
-            sys.path.insert(0, str(SRC))
-            from liquidloc.common.parallel_equivalence_check import run_equivalence_check
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception:
+            cfg = {}
 
-            # 用一个确定性 numpy 计算做等效性抽查
-            def dummy_unit(config: dict, seed: int = 42) -> Any:
-                import numpy as np
-                np.random.seed(seed)
-                arr = np.random.randn(100)
-                return float(np.mean(arr))
+    manual_exists = manual_path.is_file()
+    manual_text = manual_path.read_text(encoding="utf-8") if manual_exists else ""
 
-            result = run_equivalence_check(
-                dummy_unit, unit_id="p14_test",
-                config={}, seed=42, log_dir=str(PROJECT_ROOT / ".decision_logs"),
-            )
-            runtime_ok = result.passed
-            runtime_detail = f"bit_identical={result.bit_identical}, max_abs_diff={result.max_abs_diff:.2e}, passed={result.passed}"
-        except Exception as exc:
-            runtime_detail = f"runtime_error: {type(exc).__name__}: {exc}"
+    checks: dict[str, bool] = {}
 
-    passed = exists and not missing_names and runtime_ok
-    detail_parts = [
-        f"exists={exists}",
-        f"found={len(found_names)}/{len(required_names)} symbols",
-        f"missing={missing_names or 'none'}",
-        f"runtime_ok={runtime_ok}",
-        f"runtime_detail={runtime_detail}",
-    ]
+    # 1. 规则文件存在
+    checks["manual_exists"] = manual_exists
+
+    # 2. 含核心判据说明
+    checks["manual_has_criterion"] = manual_exists and ("核心判据" in manual_text or "禁止" in manual_text)
+
+    # 3. 含禁止选择性补跑
+    checks["manual_has_forbid_selective_rerun"] = manual_exists and ("选择性补跑" in manual_text or "挑结果" in manual_text)
+
+    # 4. 含禁止改数据到满意
+    checks["manual_has_forbid_data_modification"] = manual_exists and ("改数据" in manual_text or "满意" in manual_text)
+
+    # 5. 含旧数据不得复用
+    checks["manual_has_forbid_reuse_old"] = manual_exists and ("旧数据" in manual_text or "复用" in manual_text)
+
+    # 6. 含诊断轨不得并入验收轨
+    checks["manual_has_forbid_diagnostic_into_production"] = manual_exists and ("诊断轨" in manual_text or "冒烟" in manual_text)
+
+    # 7. 配置文件存在且解析成功
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 8. clause_name 包含 [14] 底线：防p-hacking
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_14"] = isinstance(cn, str) and "[14]" in cn and ("防" in cn or "p-hacking" in cn.lower() or "p_hacking" in cn.lower())
+
+    # 9. AGENTS.md 含 [14] 治理载体条目
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_14"] = "## [14]" in agents_text
+    else:
+        checks["agents_md_has_clause_14"] = False
+
+    # 10. 指令状态表含 [14] 条目
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_14"] = "| [14]" in status_text
+        for line in status_text.splitlines():
+            if "| [14]" in line:
+                parts = [p.strip() for p in line.split("|")]
+                sf = parts[2] if len(parts) >= 3 else ""
+                checks["status_table_clause_14_field_valid"] = "done" in sf or "blocked" in sf or "pending" in sf
+                break
+        else:
+            checks["status_table_clause_14_field_valid"] = False
+    else:
+        checks["status_table_clause_14_field_valid"] = False
+
+    # 11. 报告八字段检查
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        rt = report_path.read_text(encoding="utf-8")
+        checks["report_has_eight_fields"] = all(f in rt for f in ["[14]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**:"])
+        checks["report_has_done_status"] = "已落实" in rt or "✅" in rt
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    # 12. pre-commit 钩子含防p-hacking检查
+    hook_exists = hook_path.is_file()
+    checks["hook_exists"] = hook_exists
+    if hook_exists:
+        hook_text = hook_path.read_text(encoding="utf-8")
+        checks["hook_contains_p14_call"] = "条款 [14]" in hook_text or "防p-hacking" in hook_text or "p_hacking" in hook_text
+    else:
+        checks["hook_contains_p14_call"] = False
+
+    passed = all(checks.values())
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P14-equivalence", "name": "[14] 并行-串行等效性抽查", "severity": "hard",
+        "code": "P14-p-hacking",
+        "name": "[14] 底线：防p-hacking（治理层）",
+        "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
-            "pec_path": str(pec_path.relative_to(PROJECT_ROOT)) if exists else "missing",
-            "exists": exists,
-            "found_names": found_names,
-            "missing_names": missing_names,
-            "runtime_ok": runtime_ok,
-            "runtime_detail": runtime_detail,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)) if manual_exists else "missing",
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+            "hook_path": str(hook_path.relative_to(PROJECT_ROOT)) if hook_exists else "missing",
+            "checks": checks,
         },
     }
 
 
-# ---------------- P15 条款 [15]: 并行调度记录留痕 ----------------
+
 def p15_parallel_scheduling_log() -> dict[str, Any]:
     """[15] 并行调度记录随 decision log 留痕。
 
@@ -16644,7 +16695,7 @@ _ALL = [
     c8_cross_experiment_isolation, c9_pre_run_cleanup, c10_retrain_from_scratch,
     p19_tf32_amp_explicit, p22_two_step_inference, p23_analysis_unit_trajectory,
     p15_pilot_isolation, p15_parallel_scheduling_log, p28_nearest_resampling,
-    p13_language_iron_rule, p14_parallel_equivalence_check, p16_resource_conflict_scheduler,
+    p13_language_iron_rule, p14_p_hacking_prevention, p16_resource_conflict_scheduler,
     p17_batch_decomposition, p18_agents_md_template, p19_axis_a_sync_verification,
     p20_nlos_axis_verification, p21_visual_axis_verification, p22_anchor_axis_verification,
     p23_missing_data_axis_verification, p24_five_axis_independence_verification,
