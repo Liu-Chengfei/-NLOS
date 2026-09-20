@@ -16105,6 +16105,180 @@ def p9_compliance_report_format() -> dict[str, Any]:
     }
 
 
+# ---------------- 条款[10]: 逐条落实工序（治理层·四步闭环） ----------------
+# ---------------- 条款[10]: 逐条落实工序（治理层·四步闭环） ----------------
+
+def p10_four_step_closure() -> dict[str, Any]:
+    """[10] 逐条落实工序（治理层·四步闭环）—— 每条指令按「查 → 落 → 验 → 报」四步闭环
+
+    验证项（12项）：
+    1. skills/逐条落实工序/SKILL.md 存在且能读取
+    2. SKILL.md 含第一步「查」（读原文+查磁盘+禁止凭记忆）
+    3. SKILL.md 含第二步「落」（代码类+治理类落点四段格式）
+    4. SKILL.md 含第三步「验」（逐行核对+改完回查+八字段要求）
+    5. SKILL.md 含第四步「报」（八字段格式+自查清单+未写视为未落实）
+    6. SKILL.md 含八字段要求逐字段说明（条款号/状态/条款/代码/落实/审查/验证/证据）
+    7. SKILL.md 含自查清单八项（条款号格式/状态/条款字段/代码字段/落实字段/审查字段/验证字段/证据字段）
+    8. SKILL.md 含「任一为否→作废重做」判定
+    9. configs/protocol/clause10_four_step_closure.yaml 存在且解析成功
+    10. clause_name 包含「[10] 逐条落实工序」
+    11. AGENTS.md 含 [10] 治理载体条目
+    12. rules/指令状态表.md 含 [10] 条目且状态字段合法
+    """
+    import yaml as _yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause10_four_step_closure.yaml"
+    skill_path = PROJECT_ROOT / "skills" / "逐条落实工序" / "SKILL.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_10.md"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    hook_path = PROJECT_ROOT / ".git" / "hooks" / "pre-commit"
+
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception:
+            cfg = {}
+
+    skill_exists = skill_path.is_file()
+    skill_text = skill_path.read_text(encoding="utf-8") if skill_exists else ""
+
+    checks: dict[str, bool] = {}
+
+    # 1. SKILL.md 存在
+    checks["skill_exists"] = skill_exists
+
+    # 2. 含第一步「查」
+    checks["step1_check"] = bool(
+        re.search(r"查", skill_text) and
+        re.search(r"读.*原文|完整原文", skill_text, re.IGNORECASE) and
+        re.search(r"磁盘|现状", skill_text) and
+        re.search(r"禁止.*凭|凭.*判断", skill_text, re.IGNORECASE)
+    )
+
+    # 3. 含第二步「落」
+    checks["step2_implementation"] = bool(
+        re.search(r"落", skill_text) and
+        re.search(r"代码.*路径|文件.*路径|函数.*类", skill_text, re.IGNORECASE) and
+        re.search(r"治理.*类|载体.*文件", skill_text, re.IGNORECASE) and
+        re.search(r"落点|四段", skill_text)
+    )
+
+    # 4. 含第三步「验」
+    checks["step3_verification"] = bool(
+        re.search(r"验", skill_text) and
+        re.search(r"逐行|逐条|核对", skill_text) and
+        re.search(r"改|改完|修复", skill_text) and
+        re.search(r"八字段|八.*字段", skill_text)
+    )
+
+    # 5. 含第四步「报」
+    checks["step4_reporting"] = bool(
+        re.search(r"报", skill_text) and
+        re.search(r"八字段|八.*字段", skill_text) and
+        re.search(r"自查|检查", skill_text) and
+        re.search(r"未写|视为未落实|未落实", skill_text)
+    )
+
+    # 6. 八字段逐字段说明
+    eight_fields = ["条款号", "状态", "条款", "代码", "落实", "审查", "验证", "证据"]
+    checks["eight_fields_spec"] = all(f in skill_text for f in eight_fields)
+
+    # 7. 自查清单八项
+    checks["self_check_list"] = bool(
+        re.search(r"条款号.*格式|条款号.*N", skill_text, re.IGNORECASE) and
+        re.search(r"状态.*✅|状态.*❌|状态.*已落实", skill_text) and
+        re.search(r"条款.*字段|条款.*逐字", skill_text) and
+        re.search(r"代码.*字段|代码.*路径|代码.*行号", skill_text) and
+        re.search(r"落实.*字段|落实.*逐句", skill_text) and
+        re.search(r"审查.*字段|审查.*问题.*修复", skill_text) and
+        re.search(r"验证.*字段|验证.*命令", skill_text) and
+        re.search(r"证据.*字段|证据.*路径", skill_text)
+    )
+
+    # 8. 任一为否作废重做
+    checks["failure_makes_void"] = bool(
+        re.search(r"任一.*否.*作废|作废.*重做|不落实.*重做", skill_text)
+    )
+
+    # 9. 配置文件
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 10. clause_name
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_10"] = isinstance(cn, str) and "[10]" in cn and "逐条落实工序" in cn
+
+    # 11. AGENTS.md
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    checks["agents_md_has_clause_10"] = agents_exists and "## [10]" in agents_path.read_text(encoding="utf-8")
+
+    # 12. 状态表
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_10"] = "| [10]" in status_text
+        for line in status_text.splitlines():
+            if "| [10]" in line:
+                parts = [p.strip() for p in line.split("|")]
+                sf = parts[2] if len(parts) >= 3 else ""
+                checks["status_table_clause_10_field_valid"] = "done" in sf or "blocked" in sf or "pending" in sf
+                break
+        else:
+            checks["status_table_clause_10_field_valid"] = False
+    else:
+        checks["status_table_clause_10_field_valid"] = False
+
+    # 可选检查
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        rt = report_path.read_text(encoding="utf-8")
+        checks["report_has_eight_fields"] = all(f in rt for f in ["[10]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"])
+        checks["report_has_done_status"] = "已落实" in rt or "✅" in rt
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    hook_exists = hook_path.is_file()
+    checks["hook_exists"] = hook_exists
+    if hook_exists:
+        ht = hook_path.read_text(encoding="utf-8")
+        checks["hook_contains_p10_call"] = "p10_four_step_closure" in ht or "--check p10" in ht
+    else:
+        checks["hook_contains_p10_call"] = False
+
+    required = [k for k in checks if k not in ("report_has_eight_fields", "report_has_done_status", "hook_contains_p10_call")]
+    passed = all(checks[k] for k in required)
+
+    detail = "; ".join(f"{k}={v}" for k, v in checks.items())
+    return {
+        "code": "P10-four-step-closure",
+        "name": "[10] 逐条落实工序",
+        "severity": "hard",
+        "passed": passed,
+        "detail": detail,
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "cfg_exists": cfg_exists,
+            "cfg_parse_ok": cfg_parse_ok,
+            "skill_path": str(skill_path.relative_to(PROJECT_ROOT)) if skill_exists else "missing",
+            "skill_exists": skill_exists,
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+            "hook_path": str(hook_path.relative_to(PROJECT_ROOT)) if hook_exists else "missing",
+            "checks": checks,
+        },
+    }
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -16221,6 +16395,7 @@ _ALL = [
     p36_git_is_last_resort,
     p7_violation_disposition,
     p8_submit_self_check,
+    p10_four_step_closure,
 ]
 
 
@@ -16547,3 +16722,5 @@ def p3_check_decision_logs_content(base_dir: str = "E:/异步高NLOS") -> dict:
         detail = f"{detail}; 问题: {'; '.join(issues)}"
     return {"passed": clauses_with_evidence == len(gc) and len(gc) > 0,
             "detail": detail, "clauses_checked": len(gc), "clauses_with_evidence": clauses_with_evidence}
+
+
