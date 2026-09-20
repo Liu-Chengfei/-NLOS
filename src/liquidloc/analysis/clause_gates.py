@@ -15391,6 +15391,234 @@ def p5_dependency_declaration() -> dict[str, Any]:
     }
 
 
+# ---------------- 条款[6]: 代码与文件冗余治理（治理层） ----------------
+def p6_redundancy_governance() -> dict[str, Any]:
+    """[6] 代码与文件冗余治理（治理层）—— 禁止为同一逻辑留多份拷贝、
+    禁止复制旧文件再改的备份文化，历史版本走 git，工作目录只保留当前生效版本；
+    发现 _backup/_old/_copy 类冗余文件 → 移入 archive 或删除；
+    禁止"注释掉一大段代码留作备用"；清理动作只作用于本体系目录，禁止跨体系删改；
+    清理任何进程前必须先判定归属。
+
+    验证项：
+    1. configs/protocol/clause06_redundancy_governance.yaml 存在且能正确解析
+    2. clause_name 包含「[6] 代码与文件冗余治理」
+    3. 关键约束字段存在：no_backup_culture、no_duplicated_code
+    4. 手册文件含[6]条款原文（冗余治理关键词）
+    5. 检测是否有 _backup/_old/_copy 类冗余文件
+    6. 检测是否有「注释掉一大段代码」
+    7. compliance_report_6.md 存在且八字段完整
+    8. AGENTS.md 治理载体索引含[6]条目
+    9. rules/指令状态表.md 含[6]条目且状态字段合法
+    """
+    import yaml as _yaml
+
+    cfg_path = CONFIGS / "protocol" / "clause06_redundancy_governance.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_6.md"
+
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+    parse_error = ""
+
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception as exc:
+            parse_error = f"yaml parse error: {exc}"
+            cfg = {}
+
+    checks: dict[str, bool] = {}
+
+    # 1. 配置文件存在且解析成功
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 2. clause_name 包含 [6] 代码与文件冗余治理
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_6"] = isinstance(cn, str) and "[6]" in cn and "代码与文件冗余治理" in cn
+
+    # 3. 关键约束字段
+    checks["constraint_level_is_hard"] = cfg.get("constraint_level") == "硬约束"
+    checks["no_backup_culture"] = cfg.get("no_backup_culture") is True
+    checks["no_duplicated_code"] = cfg.get("no_duplicated_code") is True
+    checks["no_commented_large_sections"] = cfg.get("no_commented_large_sections") is True
+    checks["cleanup_scope_this_repo"] = cfg.get("cleanup_scope") == "this_repo_only"
+    checks["need_prior_ownership_check"] = cfg.get("need_prior_ownership_check") is True
+
+    # 4. 手册文件存在且含 [6] 条款关键词
+    manual_exists = manual_path.is_file()
+    checks["manual_exists"] = manual_exists
+    if manual_exists:
+        manual_text = manual_path.read_text(encoding="utf-8")
+        checks["manual_contains_6"] = "[6]" in manual_text
+        checks["manual_contains_redundancy"] = "冗余治理" in manual_text or "冗余" in manual_text
+        checks["manual_contains_backup"] = "_backup" in manual_text or "备份" in manual_text
+        checks["manual_contains_no_commented"] = "注释掉" in manual_text and "备用" in manual_text
+        checks["manual_contains_archive"] = "archive" in manual_text
+        checks["manual_contains_ownership"] = "归属" in manual_text
+    else:
+        checks["manual_contains_6"] = False
+        checks["manual_contains_redundancy"] = False
+        checks["manual_contains_backup"] = False
+        checks["manual_contains_no_commented"] = False
+        checks["manual_contains_archive"] = False
+        checks["manual_contains_ownership"] = False
+
+    # 5. 检查冗余文件（_backup/_old/_copy 目录或文件）
+    backup_patterns = ["_backup", "_old", "_copy"]
+    backup_dirs_found: list[str] = []
+    backup_files_found: list[str] = []
+    exclusion_prefixes = (".venv", ".git", "__pycache__", "node_modules")
+    exclusion_substrings = (
+        "/Lib/site-packages/", "\\Lib\\site-packages\\",
+        "/.venv/", "\\.venv\\", "configs/protocol/", "configs\\protocol\\",
+    )
+    for pattern in backup_patterns:
+        for f in PROJECT_ROOT.rglob(f"*{pattern}*"):
+            rel = str(f.relative_to(PROJECT_ROOT))
+            is_dir = f.is_dir()
+            # 排除：隐藏目录、缓存、第三方库、归档、venv
+            if is_dir:
+                if rel.startswith(".") or "/." in rel or "archive/" in rel:
+                    continue
+                if any(rel.startswith(p) or p in rel for p in exclusion_prefixes):
+                    continue
+            else:
+                if "archive/" in rel:
+                    continue
+                if rel.startswith(".") or "/." in rel:
+                    continue
+                if any(p in rel for p in exclusion_substrings + exclusion_prefixes):
+                    continue
+            if is_dir:
+                backup_dirs_found.append(rel)
+            else:
+                backup_files_found.append(rel)
+    checks["no_backup_dirs_in_worktree"] = len(backup_dirs_found) == 0
+    checks["no_backup_files_in_worktree"] = len(backup_files_found) == 0
+    if backup_dirs_found or backup_files_found:
+        checks["backup_dirs_found"] = backup_dirs_found
+        checks["backup_files_found"] = backup_files_found
+
+    # 6. 检查代码中是否有「注释掉一大段代码留作备用」模式
+    #    核心原则：注释掉的代码有缩进（在函数体/代码块内部）；
+    #    模块顶级文档注释（0 缩进 # 行）是说明性文字，不算注释掉的代码。
+    #    阈值 20 行：低于此值的连续注释视为文档/说明，不算注释掉的代码。
+    large_commented_out = False
+    large_commented_detail = ""
+    for py_file in PROJECT_ROOT.rglob("*.py"):
+        rel = str(py_file.relative_to(PROJECT_ROOT))
+        if rel.startswith(".") or "/." in rel:
+            continue
+        if any(p in rel for p in exclusion_substrings + exclusion_prefixes):
+            continue
+        try:
+            content = py_file.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        lines = content.splitlines()
+        consecutive_comments = 0
+        for line in lines:
+            if not line.strip():
+                consecutive_comments = 0
+                continue
+            # 只看有 2+ 空格缩进的 # 注释行（函数体/代码块内部的注释掉的代码）
+            # 模块顶部 0 缩进的 # 注释行是文档说明，跳过
+            stripped = line.strip()
+            leading_ws = len(line) - len(line.lstrip())
+            if stripped.startswith("#") and leading_ws >= 2:
+                consecutive_comments += 1
+                if consecutive_comments >= 20:
+                    large_commented_out = True
+                    large_commented_detail = f"{rel}: 连续 {consecutive_comments} 行含缩进注释代码"
+                    break
+            elif not stripped.startswith("#"):
+                # 非注释行（实际代码行）重置计数器
+                consecutive_comments = 0
+            # 0 缩进的 # 注释行（模块顶级文档）既不清零也不递增
+        if large_commented_out:
+            break
+    checks["no_large_commented_code"] = not large_commented_out
+    if large_commented_out:
+        checks["large_commented_detail"] = large_commented_detail
+
+    # 7. AGENTS.md 治理载体索引含[6]条目
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_6_section"] = "## [6]" in agents_text or "**\\[6\\]**" in agents_text
+    else:
+        checks["agents_md_has_clause_6_section"] = False
+
+    # 8. 指令状态表含[6]条目
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_6"] = "| [6]" in status_text
+        status_line = None
+        for line in status_text.splitlines():
+            if "| [6]" in line:
+                status_line = line
+                break
+        if status_line:
+            parts = [p.strip() for p in status_line.split("|")]
+            status_field = parts[2] if len(parts) >= 3 else ""
+            checks["status_table_clause_6_field_valid"] = status_field in (
+                "✅ done", "❌ blocked", "⏳ pending",
+                "done", "blocked", "pending",
+                "✅ done|", "❌ blocked|", "⏳ pending|"
+            ) or "done" in status_field or "blocked" in status_field or "pending" in status_field
+        else:
+            checks["status_table_clause_6_field_valid"] = False
+    else:
+        checks["status_table_clause_6_field_valid"] = False
+
+    # 9. 落实报告八字段完整
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        report_text = report_path.read_text(encoding="utf-8")
+        required_fields = ["[6]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"]
+        all_fields_present = all(f in report_text for f in required_fields)
+        has_done = "已落实" in report_text or "✅" in report_text
+        checks["report_has_eight_fields"] = all_fields_present
+        checks["report_has_done_status"] = has_done
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    passed = all(checks.values()) and cfg_exists and cfg_parse_ok
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P6-redundancy-governance",
+        "name": "[6] 代码与文件冗余治理",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "cfg_exists": cfg_exists,
+            "cfg_parse_ok": cfg_parse_ok,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)) if manual_exists else "missing",
+            "manual_exists": manual_exists,
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+            "backup_dirs_found": backup_dirs_found,
+            "backup_files_found": backup_files_found,
+            "large_commented_out": large_commented_out,
+        },
+    }
+
+
 _ALL = [
     c1_training_batch_unique, c2_inference_batch_no_mixing, c3_amp_enabled,
     c4_gpu_default, c5_cpu_idle_fallback, c6_ram_limit, c7_parallel_maximize,
@@ -15402,6 +15630,7 @@ _ALL = [
     p20_nlos_axis_verification, p21_visual_axis_verification, p22_anchor_axis_verification,
     p23_missing_data_axis_verification, p24_five_axis_independence_verification,
     p5_dependency_declaration,
+    p6_redundancy_governance,
     p15_parallel_scheduling_order_verification, p25_eval_statistical_parallel_verification,
     p26_runtime_assertion_verification,
     p27_no_temp_scripts_verification,

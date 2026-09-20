@@ -29,6 +29,15 @@
 
 **内容**: 每条指令头部标「前置:[N]」；执行前先查前置是否done，未done → 标blocked停下问，不硬跑、不跳序。pre-commit钩子check_dependencies在[2]-[6]依赖链上实施硬拦截（exit 1阻止提交）。
 
+## [6] 代码与文件冗余治理（治理层）
+**状态**: ✅ 已落地
+**文件**:
+- `configs/protocol/clause06_redundancy_governance.yaml` — 约束配置
+- `src/liquidloc/analysis/clause_gates.py` — p6_redundancy_governance() 验证函数
+- `outputs/compliance_report_6.md` — 合规报告
+
+**内容**: 禁止为同一逻辑留多份拷贝、禁止复制旧文件再改的备份文化，历史版本走 git，工作目录只保留当前生效版本；发现 _backup/_old/_copy 类冗余文件 → 移入 archive 或删除；禁止"注释掉一大段代码留作备用"；清理动作只作用于本体系目录，禁止跨体系删改；清理任何进程前必须先判定归属。
+
 ## [36] git 是最后防线
 **状态**: ✅ 已落地
 **文件**: 
