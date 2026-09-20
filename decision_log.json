@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-09-20T10:20:00",
+  "last_updated": "2026-09-20T18:12:00",
   "stage": "stage0_governance",
   "governance_clauses": {
     "[3]_状态只认磁盘": {
@@ -17,6 +17,25 @@
         "manifests/clause_003_state_only_disk.json:1-13",
         "outputs/compliance_report_3.md:1-5",
         "清场验证.txt:1-4"
+      ]
+    },
+    "[4]_指令状态表与逐条队列": {
+      "status": "done",
+      "anchors_verified": {
+        "rules/指令状态表.md": true,
+        "rules/阶段执行地图.md": true,
+        "verify_slim_v5_阶段感知.sh": true,
+        "skills/逐条落实工序/SKILL.md": true,
+        "decision_log.json": true,
+        ".git/hooks/pre-commit": true
+      },
+      "verification_command": "bash verify_slim_v5_阶段感知.sh docs/最终交付_异步手册_424条_20260917.md phase0",
+      "evidence_files": [
+        "rules/指令状态表.md:1-40",
+        "rules/阶段执行地图.md:1-28",
+        "verify_slim_v5_阶段感知.sh:4-6",
+        "skills/逐条落实工序/SKILL.md:29-41",
+        "AGENTS.md:3-21"
       ]
     }
   }
