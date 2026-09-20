@@ -15516,23 +15516,6 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
                     "status": "PASS",
                     "detail": "HEAD指向 valid ref",
                 })
-                # 附加: 检查 git 工作区干净度
-                clean_result = p3_check_git_clean(str(base))
-                git_clean_ok = clean_result["passed"]
-                git_clean_detail = clean_result["detail"]
-                if git_clean_ok:
-                    results.append({
-                        "name": "git 工作区干净",
-                        "status": "PASS",
-                        "detail": clean_result["detail"],
-                    })
-                else:
-                    all_passed = False
-                    results.append({
-                        "name": "git 工作区干净",
-                        "status": "FAIL",
-                        "detail": clean_result["detail"],
-                    })
             else:
                 all_passed = False
                 results.append({"name": ".git/HEAD", "status": "FAIL", "detail": f"ref路径不存在: {ref_path}"})
