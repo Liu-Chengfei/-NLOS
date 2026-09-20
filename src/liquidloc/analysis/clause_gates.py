@@ -15543,13 +15543,13 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
         all_passed = False
         results.append({"name": ".git/HEAD", "status": "FAIL", "detail": ".git/HEAD文件不存在"})
 
-    # 检查6: .decision_logs/ 内容深度核验
+    # 检查6: decision_log.json 治理内容深度核验
     dl_content_result = p3_check_decision_logs_content(str(base))
     if dl_content_result["passed"]:
         results.append({
-            "name": ".decision_logs/ 内容深度",
+            "name": "decision_log.json 治理内容深度",
             "status": "PASS",
-            "detail": f"{dl_content_result['detail']}（检查{dl_content_result['files_checked']}个文件）",
+            "detail": f"{dl_content_result['detail']}（检查{dl_content_result['clauses_checked']}个治理条款）",
         })
     else:
         all_passed = False
@@ -15591,39 +15591,43 @@ def p3_check_git_clean(base_dir: str = "E:/异步高NLOS") -> dict:
 
 # ---------------- 条款[3]附加核验: .decision_logs/ 内容深度核验 ----------------
 def p3_check_decision_logs_content(base_dir: str = "E:/异步高NLOS") -> dict:
-    """深度核验 .decision_logs/ 目录中的 JSON 文件内容是否真正记录了跨批交接信息。
-    规则要求: decision_log.json 或 decision_log_<stage>.md 存在并记录交接内容。
+    """深度核验 decision_log.json 中的治理内容是否真正记录了条款状态与证据锚点。
+    规则要求: decision_log.json 存在、含 governance_clauses、每个条目有 status 与 evidence_files。
 
     Returns:
-        dict: {"passed": bool, "detail": str, "files_checked": int, "files_with_content": int}
+        dict: {"passed": bool, "detail": str, "clauses_checked": int, "clauses_with_evidence": int}
     """
     import json as _json
     base = Path(base_dir)
-    dl_dir = base / ".decision_logs"
-    if not dl_dir.exists() or not dl_dir.is_dir():
-        return {"passed": False, "detail": ".decision_logs/ 目录不存在", "files_checked": 0, "files_with_content": 0}
+    dl = base / "decision_log.json"
+    if not dl.exists():
+        return {"passed": False, "detail": "decision_log.json 不存在（治理状态未落盘）",
+                "clauses_checked": 0, "clauses_with_evidence": 0}
 
-    json_files = list(dl_dir.glob("*.json"))
-    if not json_files:
-        return {"passed": False, "detail": ".decision_logs/ 目录无JSON文件", "files_checked": 0, "files_with_content": 0}
+    try:
+        data = _json.loads(dl.read_text(encoding="utf-8"))
+    except Exception:
+        return {"passed": False, "detail": "decision_log.json 解析失败（非有效JSON）",
+                "clauses_checked": 0, "clauses_with_evidence": 0}
 
-    files_with_content = 0
-    first_issue = ""
-    for f in json_files[:10]:  # 最多检查前10个
-        try:
-            data = _json.loads(f.read_text(encoding="utf-8"))
-            has_cross_batch = any(k in str(data).lower() for k in ["交接", "batch", "stage", "下批", "接续"])
-            has_status = any(k in str(data).lower() for k in ["状态", "status", "done", "pass"])
-            if has_cross_batch or has_status:
-                files_with_content += 1
-            else:
-                if not first_issue:
-                    first_issue = f"{f.name}: 无交接/状态记录"
-        except Exception:
-            files_with_content += 1  # 解析失败也计入（有内容）
+    if "governance_clauses" not in data:
+        return {"passed": False, "detail": "decision_log.json 无 governance_clauses 键（治理状态未结构化落盘）",
+                "clauses_checked": 0, "clauses_with_evidence": 0}
 
-    all_have_content = files_with_content == len(json_files)
-    detail = f"检查{len(json_files)}个文件，{files_with_content}个含交接/状态内容"
-    if not all_have_content and first_issue:
-        detail = f"{detail}; {first_issue}"
-    return {"passed": all_have_content, "detail": detail, "files_checked": len(json_files), "files_with_content": files_with_content}
+    gc = data["governance_clauses"]
+    clauses_with_evidence = 0
+    issues = []
+    for key, entry in gc.items():
+        has_status = "status" in entry and entry["status"] in ("done", "pass", "PASS", "confirmed", "confirmed_pass")
+        has_evidence = "evidence_files" in entry and len(entry.get("evidence_files", [])) > 0
+        has_ranges = all(":" in ef for ef in entry.get("evidence_files", []))
+        if has_status and has_evidence and has_ranges:
+            clauses_with_evidence += 1
+        else:
+            issues.append(f"{key}: status={entry.get('status')}, evidence_count={len(entry.get('evidence_files',[]))}")
+
+    detail = f"检查{len(gc)}个治理条款，{clauses_with_evidence}个含完整状态+证据锚点"
+    if issues:
+        detail = f"{detail}; 问题: {'; '.join(issues)}"
+    return {"passed": clauses_with_evidence == len(gc) and len(gc) > 0,
+            "detail": detail, "clauses_checked": len(gc), "clauses_with_evidence": clauses_with_evidence}
