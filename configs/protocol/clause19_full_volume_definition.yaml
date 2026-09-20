@@ -1,0 +1,38 @@
+# 条款[19]：全量定义（治理层）
+# 版本: 2026-05-04 (初始版本)
+# 修订: 2026-05-04 (补全规则文件)
+
+clause_id: 19
+clause_name: 全量定义
+constraint_level: 硬约束
+governance_phase: 零
+
+# 核心判据
+criterion:
+  - "全量" ≡ 论文级满额执行
+  - 10 seed × 5 方法 = 50 单元
+  - 120s 基准
+  - 训练 12–15 条/seed
+  - 测试 ≥100 条/seed
+
+# 禁止项
+forbidden:
+  - 创建低于论文级基线的执行档
+  - 将"降级"用于改小执行规模
+  - 偏离 10×5=50 单元基准
+  - 使用非 120s 基准时长
+
+# 允许范围
+allowed:
+  - "降级"仅用于"结论声明强度"分级
+  - "平滑降级"用于紧耦合量测退化
+
+# 执行保障
+execution:
+  rule_file: rules/全量定义.md
+  config_file: configs/protocol/clause19_full_volume_definition.yaml
+  check_function: clause_gates.py:p19_tf32_amp_explicit
+  precommit_hook: .git/hooks/pre-commit
+  agents_md: AGENTS.md
+  status_table: rules/指令状态表.md
+  report: outputs/compliance_report_19.md
