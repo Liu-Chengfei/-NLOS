@@ -16,8 +16,8 @@
 - [2](2)；检查内容：rules/ 目录下 9 个治理载体文件全部存在
 - [2](3)；检查内容：skills/ 目录下 3 个 SKILL.md 全部存在
 - [2](4)；检查内容：.git/hooks/pre-commit 存在且断言逐字一致
-- [2](5)；检查内容：.zcode/hooks/session_start.py 存在且注入治理上下文
-- [2](6)；检查内容：.zcode/hooks/pre_tool_use.py 存在且护栏拦截有效
+- [2](5)；检查内容：.git/hooks/pre-commit 存在且断言逐字一致（0 清场 + 提交前自查 + 残留审计）
+- [2](6)；检查内容：.git/hooks/pre-commit 中 pre-commit 钩子存在且拦截有效
 
 ### [3] 状态只认磁盘
 - [3](1)；检查内容：rules/状态只认磁盘.md 存在且铁律细则完整
@@ -263,7 +263,7 @@
 ### [76] 大修范围界定
 - [76](1)；检查内容：configs/protocol/ 下配置文件全部存在
 - [76](2)；检查内容：src/liquidloc/analysis/clause_gates.py 含 p76_scope_boundary
-- [76](3)；检查内容：rules/ + skills/ + .zcode/hooks/ 配置文件全部存在
+- [76](3)；检查内容：rules/ + skills/ + .git/hooks/ 配置文件全部存在
 - [76](4)；检查内容：outputs/compliance_report_76.md 存在且含八字段
 
 ---
