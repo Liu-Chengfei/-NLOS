@@ -1,0 +1,30 @@
+# 条款[18]：档位引用纪律（治理层）
+# 版本: 2026-05-04 (初始版本)
+# 修订: 2026-05-04 (补全规则文件)
+
+clause_id: 18
+clause_name: 档位引用纪律
+constraint_level: 硬约束
+governance_phase: 零
+
+# 核心判据
+criterion:
+  - 本手册只引用档位名（A2/N1.5/V0/K1/M1）与"是否符合协议"的判定基准
+  - 档位参数数值不重复罗列、一律以 Stage 1 基准条款为准
+  - 任何涉及档位参数的检查一律回查 Stage 1 基准条款
+
+# 禁止项
+forbidden:
+  - 重复罗列档位参数数值
+  - 偏离 Stage 1 基准条款单独定义档位参数
+  - 模糊档位引用（如"参考前面"、"见上文"）
+
+# 执行保障
+execution:
+  rule_file: rules/档位引用纪律.md
+  config_file: configs/protocol/clause18_stage_ref_discipline.yaml
+  check_function: clause_gates.py:p18_agents_md_template
+  precommit_hook: .git/hooks/pre-commit
+  agents_md: AGENTS.md
+  status_table: rules/指令状态表.md
+  report: outputs/compliance_report_18.md

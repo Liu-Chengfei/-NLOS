@@ -3493,7 +3493,20 @@ PASSED: True | manual_exists=True; manual_has_criterion=True; manual_has_line_a=
 
 ## [16]
 
-## [17] 底线：落实证据必须引用文件:行号（治理层）
+## [17]
+
+## [18] 底线：档位引用纪律（治理层）
+**状态**: ✅ 已落实
+**文件**:
+- `rules/档位引用纪律.md` — 档位引用纪律规则文件（核心判据加禁止项加执行保障）
+- `configs/protocol/clause18_stage_ref_discipline.yaml` — 档位引用纪律配置（clause_id=18, constraint_level=硬约束）
+- `src/liquidloc/analysis/clause_gates.py` — 验证函数 `p18_agents_md_template()`
+- `.git/hooks/pre-commit` — 档位引用纪律检查调用点
+- `AGENTS.md` — 智能体指南治理载体索引一十八条目的
+- `rules/指令状态表.md` — 指令状态表第30行
+- `outputs/compliance_report_18.md` — 八字段落实报告
+**判据**: 本手册只引用档位名（A2/N1.5/V0/K1/M1）与"是否符合协议"的判定基准；档位参数数值不重复罗列、一律以 Stage 1 基准条款为准
+ 底线：落实证据必须引用文件:行号（治理层）
 **状态**: ✅ 已落实
 **文件**:
 - `rules/落实证据引用规范.md` — 落实证据引用规则文件（核心判据加禁止项加执行保障）
