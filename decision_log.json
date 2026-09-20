@@ -1,23 +1,23 @@
 {
-    "last_updated": "2026-09-20T10:20:00",
-    "stage": "stage0_governance",
-    "governance_clauses": {
-        "[3]_状态只认磁盘": {
-            "status": "done",
-            "anchors_verified": {
-                "清场验证.txt": true,
-                "manifests/目录": true,
-                ".decision_logs/目录": true,
-                "outputs/compliance_report_*.md": true,
-                ".git/HEAD指向有效commit": true
-            },
-            "verification_command": "python -c \"from liquidloc.analysis.clause_gates import p3_state_only_disk; print(p3_state_only_disk())\"",
-            "evidence_files": [
-                "rules/状态只认磁盘.md:1-32",
-                "manifests/clause_003_state_only_disk.json:1-13",
-                "outputs/compliance_report_3.md:1-5",
-                "清场验证.txt:1-4"
-            ]
-        }
+  "last_updated": "2026-09-20T10:20:00",
+  "stage": "stage0_governance",
+  "governance_clauses": {
+    "[3]_状态只认磁盘": {
+      "status": "done",
+      "anchors_verified": {
+        "清场验证.txt": true,
+        "manifests/目录": true,
+        ".decision_logs/目录": true,
+        "outputs/compliance_report_*.md": true,
+        ".git/HEAD指向有效commit": true
+      },
+      "verification_command": "python -c \"from liquidloc.analysis.clause_gates import p3_state_only_disk; print(p3_state_only_disk())\"",
+      "evidence_files": [
+        "rules/状态只认磁盘.md:1-32",
+        "manifests/clause_003_state_only_disk.json:1-13",
+        "outputs/compliance_report_3.md:1-5",
+        "清场验证.txt:1-4"
+      ]
     }
+  }
 }
