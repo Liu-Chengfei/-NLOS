@@ -15492,7 +15492,7 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
             results.append({
                 "name": "compliance_report_3.md",
                 "status": "PASS",
-                "detail": f"八字段完整（{report_3.stat().st_size}字节）",
+                "detail": "八字段完整",
             })
         else:
             all_passed = False
