@@ -29,6 +29,351 @@
 
 **内容**: 每条指令头部标「前置:[N]」；执行前先查前置是否done，未done → 标blocked停下问，不硬跑、不跳序。pre-commit钩子check_dependencies在[2]-[6]依赖链上实施硬拦截（exit 1阻止提交）。
 
+
+## [13] 底线：语言铁律（GLM 5.3 专属）
+**状态**: ✅ 已落地
+**文件**:
+-  — 语言铁律规则文件（核心判据+禁止项+允许例外+违规处置）
+-  — 语言铁律配置（clause_id=13, constraint_level=硬约束）
+-  — 验证函数 
+- [pre-commit] 前置检查 [2] 依赖 [1]: OK
+[pre-commit] 前置检查 [3] 依赖 [1][2]: OK
+[pre-commit] 前置检查 [4] 依赖 [1][2][3]: OK
+[pre-commit] 前置检查 [5] 依赖 [1][2][3][4]: OK
+[pre-commit] 前置检查 [6] 依赖 [1][2][3][4][5]: OK
+[pre-commit] [8] 提交前自查: [配置] ===== bridge_thresholds.py 常量 =====
+[配置] cov_jitter_eps = 1e-09
+[配置] flow_missing_dyaw_quality_penalty = 0.5
+[配置] imu_missing_inflation = 10.0
+[配置] max_consecutive_skip_count = 1000.0
+[配置] non_current_scaling_ceiling = 2.5
+[配置] risk_hard_skip_threshold = 0.05
+[配置] risk_max = 1.0
+[配置] risk_min = 0.0
+[配置] scaling_max = 50.0
+[配置] scaling_min = 1.0
+[配置] uwb_bias_absolute_max = 5.0
+[配置] uwb_bias_max_ratio = 0.5
+[配置] uwb_hard_skip_quality_floor = 0.1
+[配置] uwb_noise_multiplier_ceiling = 5000.0
+[配置] uwb_risk_hard_skip_threshold = 0.95
+[配置] vio_dyaw_max = 6.283185307179586
+[配置] vio_dyaw_min = -6.283185307179586
+[配置] vio_hard_skip_quality_floor = 0.12
+[配置] vio_noise_multiplier_ceiling = 5000.0
+[配置] vio_risk_hard_skip_threshold = 0.05
+[配置] ===== bridge_thresholds.py 常量 结束 =====
+[配置] ===== load_sensor_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_sensor_contract 入口参数 结束 =====
+[配置] ===== version.py 常量 =====
+[配置] CONFIG_VERSION = 1
+[配置] OUTPUT_CONTRACT_VERSION = 1
+[配置] PROTOCOL_VERSION = 27
+[配置] SNAPSHOT_VERSION = 1
+[配置] ===== version.py 常量 结束 =====
+[配置] ===== load_task_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_task_contract 入口参数 结束 =====
+[配置] ===== metric_schema.py 常量 =====
+[配置] _METRICS_CONFIG_PATH = 'E:\异步高NLOS\configs\base\metrics.yaml'
+[配置] _METRIC_GROUP_FIELD_MAP:
+[配置]   mechanism = 'mechanism_metrics'
+[配置]   primary = 'primary_metrics'
+[配置]   runtime = 'runtime_metrics'
+[配置]   secondary = 'secondary_metrics'
+[配置] _METRIC_META:
+[配置]   ate = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   bias_alignment = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   corr_scaling_error = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   coverage = {'unit': 'ratio', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   failure_rate = {'unit': 'ratio', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   latency_mean = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p50 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p95 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   mae = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   mean_rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p95 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p99 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   params = {'unit': 'count', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   ram_peak = {'unit': 'MB', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   risk_error_corr = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   rpe = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   std_rmse = {'unit': 'm', 'direction': 'neutral', 'group': 'primary'}
+[配置]   yaw_p95 = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   yaw_rmse = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置] _METRIC_ORDER = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'p99', 'mae', 'ate', 'rpe', 'yaw_rmse', 'yaw_p95', 'risk_error_corr', 'coverage', 'bias_alignment', 'corr_scaling_error', 'latency_mean', 'latency_p50', 'latency_p95', 'params', 'ram_peak']
+[配置] _PRIMARY_METRICS = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate']
+[配置] ===== metric_schema.py 常量 结束 =====
+PASSED: True | cfg_exists=True; cfg_parse_ok=True; clause_name_contains_8=True; constraint_level_is_hard=True; self_check_before_submit=True; check_all_reports_pass=True; check_status_table_done=True; check_manual_goals_met=True; check_eight_fields_complete=True; manual_exists=True; manual_contains_8=True; manual_contains_self_check=True; manual_contains_core_criteria=True; manual_contains_acceptance_table=True; hook_exists=True; hook_contains_p8_call=True; agents_md_exists=True; agents_md_has_clause_8_section=True; status_table_exists=True; status_table_has_clause_8=True; status_table_clause_8_field_valid=True; report_exists=True; report_has_eight_fields=True; report_has_done_status=True
+[pre-commit] [9] 落实报告格式: [配置] ===== bridge_thresholds.py 常量 =====
+[配置] cov_jitter_eps = 1e-09
+[配置] flow_missing_dyaw_quality_penalty = 0.5
+[配置] imu_missing_inflation = 10.0
+[配置] max_consecutive_skip_count = 1000.0
+[配置] non_current_scaling_ceiling = 2.5
+[配置] risk_hard_skip_threshold = 0.05
+[配置] risk_max = 1.0
+[配置] risk_min = 0.0
+[配置] scaling_max = 50.0
+[配置] scaling_min = 1.0
+[配置] uwb_bias_absolute_max = 5.0
+[配置] uwb_bias_max_ratio = 0.5
+[配置] uwb_hard_skip_quality_floor = 0.1
+[配置] uwb_noise_multiplier_ceiling = 5000.0
+[配置] uwb_risk_hard_skip_threshold = 0.95
+[配置] vio_dyaw_max = 6.283185307179586
+[配置] vio_dyaw_min = -6.283185307179586
+[配置] vio_hard_skip_quality_floor = 0.12
+[配置] vio_noise_multiplier_ceiling = 5000.0
+[配置] vio_risk_hard_skip_threshold = 0.05
+[配置] ===== bridge_thresholds.py 常量 结束 =====
+[配置] ===== load_sensor_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_sensor_contract 入口参数 结束 =====
+[配置] ===== version.py 常量 =====
+[配置] CONFIG_VERSION = 1
+[配置] OUTPUT_CONTRACT_VERSION = 1
+[配置] PROTOCOL_VERSION = 27
+[配置] SNAPSHOT_VERSION = 1
+[配置] ===== version.py 常量 结束 =====
+[配置] ===== load_task_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_task_contract 入口参数 结束 =====
+[配置] ===== metric_schema.py 常量 =====
+[配置] _METRICS_CONFIG_PATH = 'E:\异步高NLOS\configs\base\metrics.yaml'
+[配置] _METRIC_GROUP_FIELD_MAP:
+[配置]   mechanism = 'mechanism_metrics'
+[配置]   primary = 'primary_metrics'
+[配置]   runtime = 'runtime_metrics'
+[配置]   secondary = 'secondary_metrics'
+[配置] _METRIC_META:
+[配置]   ate = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   bias_alignment = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   corr_scaling_error = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   coverage = {'unit': 'ratio', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   failure_rate = {'unit': 'ratio', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   latency_mean = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p50 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p95 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   mae = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   mean_rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p95 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p99 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   params = {'unit': 'count', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   ram_peak = {'unit': 'MB', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   risk_error_corr = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   rpe = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   std_rmse = {'unit': 'm', 'direction': 'neutral', 'group': 'primary'}
+[配置]   yaw_p95 = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   yaw_rmse = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置] _METRIC_ORDER = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'p99', 'mae', 'ate', 'rpe', 'yaw_rmse', 'yaw_p95', 'risk_error_corr', 'coverage', 'bias_alignment', 'corr_scaling_error', 'latency_mean', 'latency_p50', 'latency_p95', 'params', 'ram_peak']
+[配置] _PRIMARY_METRICS = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate']
+[配置] ===== metric_schema.py 常量 结束 =====
+PASSED: True | rules_exists=True; rules_has_all_eight_fields=True; rules_all_fields_have_three_levels=True; one_sentence_template=True; governance_homology=True; pre_submit_self_check=True; complete_examples_code=True; complete_examples_governance=True; judgment_iron_rule=True; cfg_exists=True; cfg_parse_ok=True; clause_name_contains_9=True; eight_fields_spec=True; one_sentence_template_cfg=True; governance_homology_cfg=True; pre_submit_self_check_cfg=True; complete_examples_cfg=True; judgment_iron_rule_cfg=True; manual_exists=True; manual_contains_9=True; manual_contains_format=True; manual_contains_eight_fields=True; hook_exists=True; hook_contains_p9_call=True; agents_md_exists=True; agents_md_has_clause_9_section=True; status_table_exists=True; status_table_has_clause_9=True; status_table_clause_9_field_valid=True; report_exists=True; report_has_eight_fields=True; report_has_done_status=True
+[pre-commit] [10] 逐条落实工序: [配置] ===== bridge_thresholds.py 常量 =====
+[配置] cov_jitter_eps = 1e-09
+[配置] flow_missing_dyaw_quality_penalty = 0.5
+[配置] imu_missing_inflation = 10.0
+[配置] max_consecutive_skip_count = 1000.0
+[配置] non_current_scaling_ceiling = 2.5
+[配置] risk_hard_skip_threshold = 0.05
+[配置] risk_max = 1.0
+[配置] risk_min = 0.0
+[配置] scaling_max = 50.0
+[配置] scaling_min = 1.0
+[配置] uwb_bias_absolute_max = 5.0
+[配置] uwb_bias_max_ratio = 0.5
+[配置] uwb_hard_skip_quality_floor = 0.1
+[配置] uwb_noise_multiplier_ceiling = 5000.0
+[配置] uwb_risk_hard_skip_threshold = 0.95
+[配置] vio_dyaw_max = 6.283185307179586
+[配置] vio_dyaw_min = -6.283185307179586
+[配置] vio_hard_skip_quality_floor = 0.12
+[配置] vio_noise_multiplier_ceiling = 5000.0
+[配置] vio_risk_hard_skip_threshold = 0.05
+[配置] ===== bridge_thresholds.py 常量 结束 =====
+[配置] ===== load_sensor_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_sensor_contract 入口参数 结束 =====
+[配置] ===== version.py 常量 =====
+[配置] CONFIG_VERSION = 1
+[配置] OUTPUT_CONTRACT_VERSION = 1
+[配置] PROTOCOL_VERSION = 27
+[配置] SNAPSHOT_VERSION = 1
+[配置] ===== version.py 常量 结束 =====
+[配置] ===== load_task_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_task_contract 入口参数 结束 =====
+[配置] ===== metric_schema.py 常量 =====
+[配置] _METRICS_CONFIG_PATH = 'E:\异步高NLOS\configs\base\metrics.yaml'
+[配置] _METRIC_GROUP_FIELD_MAP:
+[配置]   mechanism = 'mechanism_metrics'
+[配置]   primary = 'primary_metrics'
+[配置]   runtime = 'runtime_metrics'
+[配置]   secondary = 'secondary_metrics'
+[配置] _METRIC_META:
+[配置]   ate = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   bias_alignment = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   corr_scaling_error = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   coverage = {'unit': 'ratio', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   failure_rate = {'unit': 'ratio', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   latency_mean = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p50 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p95 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   mae = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   mean_rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p95 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p99 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   params = {'unit': 'count', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   ram_peak = {'unit': 'MB', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   risk_error_corr = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   rpe = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   std_rmse = {'unit': 'm', 'direction': 'neutral', 'group': 'primary'}
+[配置]   yaw_p95 = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   yaw_rmse = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置] _METRIC_ORDER = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'p99', 'mae', 'ate', 'rpe', 'yaw_rmse', 'yaw_p95', 'risk_error_corr', 'coverage', 'bias_alignment', 'corr_scaling_error', 'latency_mean', 'latency_p50', 'latency_p95', 'params', 'ram_peak']
+[配置] _PRIMARY_METRICS = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate']
+[配置] ===== metric_schema.py 常量 结束 =====
+PASSED: True | skill_exists=True; step1_check=True; step2_implementation=True; step3_verification=True; step4_reporting=True; eight_fields_spec=True; self_check_list=True; failure_makes_void=True; cfg_exists=True; cfg_parse_ok=True; clause_name_contains_10=True; agents_md_exists=True; agents_md_has_clause_10=True; status_table_exists=True; status_table_has_clause_10=True; status_table_clause_10_field_valid=True; report_exists=True; report_has_eight_fields=True; report_has_done_status=True; hook_exists=True; hook_contains_p10_call=True
+[pre-commit] [11] 条款归属总则: [配置] ===== bridge_thresholds.py 常量 =====
+[配置] cov_jitter_eps = 1e-09
+[配置] flow_missing_dyaw_quality_penalty = 0.5
+[配置] imu_missing_inflation = 10.0
+[配置] max_consecutive_skip_count = 1000.0
+[配置] non_current_scaling_ceiling = 2.5
+[配置] risk_hard_skip_threshold = 0.05
+[配置] risk_max = 1.0
+[配置] risk_min = 0.0
+[配置] scaling_max = 50.0
+[配置] scaling_min = 1.0
+[配置] uwb_bias_absolute_max = 5.0
+[配置] uwb_bias_max_ratio = 0.5
+[配置] uwb_hard_skip_quality_floor = 0.1
+[配置] uwb_noise_multiplier_ceiling = 5000.0
+[配置] uwb_risk_hard_skip_threshold = 0.95
+[配置] vio_dyaw_max = 6.283185307179586
+[配置] vio_dyaw_min = -6.283185307179586
+[配置] vio_hard_skip_quality_floor = 0.12
+[配置] vio_noise_multiplier_ceiling = 5000.0
+[配置] vio_risk_hard_skip_threshold = 0.05
+[配置] ===== bridge_thresholds.py 常量 结束 =====
+[配置] ===== load_sensor_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_sensor_contract 入口参数 结束 =====
+[配置] ===== version.py 常量 =====
+[配置] CONFIG_VERSION = 1
+[配置] OUTPUT_CONTRACT_VERSION = 1
+[配置] PROTOCOL_VERSION = 27
+[配置] SNAPSHOT_VERSION = 1
+[配置] ===== version.py 常量 结束 =====
+[配置] ===== load_task_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_task_contract 入口参数 结束 =====
+[配置] ===== metric_schema.py 常量 =====
+[配置] _METRICS_CONFIG_PATH = 'E:\异步高NLOS\configs\base\metrics.yaml'
+[配置] _METRIC_GROUP_FIELD_MAP:
+[配置]   mechanism = 'mechanism_metrics'
+[配置]   primary = 'primary_metrics'
+[配置]   runtime = 'runtime_metrics'
+[配置]   secondary = 'secondary_metrics'
+[配置] _METRIC_META:
+[配置]   ate = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   bias_alignment = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   corr_scaling_error = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   coverage = {'unit': 'ratio', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   failure_rate = {'unit': 'ratio', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   latency_mean = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p50 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p95 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   mae = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   mean_rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p95 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p99 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   params = {'unit': 'count', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   ram_peak = {'unit': 'MB', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   risk_error_corr = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   rpe = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   std_rmse = {'unit': 'm', 'direction': 'neutral', 'group': 'primary'}
+[配置]   yaw_p95 = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   yaw_rmse = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置] _METRIC_ORDER = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'p99', 'mae', 'ate', 'rpe', 'yaw_rmse', 'yaw_p95', 'risk_error_corr', 'coverage', 'bias_alignment', 'corr_scaling_error', 'latency_mean', 'latency_p50', 'latency_p95', 'params', 'ram_peak']
+[配置] _PRIMARY_METRICS = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate']
+[配置] ===== metric_schema.py 常量 结束 =====
+PASSED: True | rules_exists=True; rules_has_phase0=True; rules_has_phase1_6=True; rules_has_criterion_merged=True; rules_has_phase7_8=True; rules_has_final_check=True; cfg_exists=True; cfg_parse_ok=True; clause_name_contains_11=True; agents_md_exists=True; agents_md_has_clause_11=True; status_table_exists=True; status_table_has_clause_11=True; status_table_clause_11_field_valid=True; manual_exists=True; manual_contains_11=True; manual_contains_attribution=True; report_exists=True; report_has_eight_fields=True; report_has_done_status=True; hook_exists=True; hook_contains_p11_call=True
+[pre-commit] [12] 手册目标: [配置] ===== bridge_thresholds.py 常量 =====
+[配置] cov_jitter_eps = 1e-09
+[配置] flow_missing_dyaw_quality_penalty = 0.5
+[配置] imu_missing_inflation = 10.0
+[配置] max_consecutive_skip_count = 1000.0
+[配置] non_current_scaling_ceiling = 2.5
+[配置] risk_hard_skip_threshold = 0.05
+[配置] risk_max = 1.0
+[配置] risk_min = 0.0
+[配置] scaling_max = 50.0
+[配置] scaling_min = 1.0
+[配置] uwb_bias_absolute_max = 5.0
+[配置] uwb_bias_max_ratio = 0.5
+[配置] uwb_hard_skip_quality_floor = 0.1
+[配置] uwb_noise_multiplier_ceiling = 5000.0
+[配置] uwb_risk_hard_skip_threshold = 0.95
+[配置] vio_dyaw_max = 6.283185307179586
+[配置] vio_dyaw_min = -6.283185307179586
+[配置] vio_hard_skip_quality_floor = 0.12
+[配置] vio_noise_multiplier_ceiling = 5000.0
+[配置] vio_risk_hard_skip_threshold = 0.05
+[配置] ===== bridge_thresholds.py 常量 结束 =====
+[配置] ===== load_sensor_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_sensor_contract 入口参数 结束 =====
+[配置] ===== version.py 常量 =====
+[配置] CONFIG_VERSION = 1
+[配置] OUTPUT_CONTRACT_VERSION = 1
+[配置] PROTOCOL_VERSION = 27
+[配置] SNAPSHOT_VERSION = 1
+[配置] ===== version.py 常量 结束 =====
+[配置] ===== load_task_contract 入口参数 =====
+[配置] config_path = None
+[配置] ===== load_task_contract 入口参数 结束 =====
+[配置] ===== metric_schema.py 常量 =====
+[配置] _METRICS_CONFIG_PATH = 'E:\异步高NLOS\configs\base\metrics.yaml'
+[配置] _METRIC_GROUP_FIELD_MAP:
+[配置]   mechanism = 'mechanism_metrics'
+[配置]   primary = 'primary_metrics'
+[配置]   runtime = 'runtime_metrics'
+[配置]   secondary = 'secondary_metrics'
+[配置] _METRIC_META:
+[配置]   ate = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   bias_alignment = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   corr_scaling_error = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   coverage = {'unit': 'ratio', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   failure_rate = {'unit': 'ratio', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   latency_mean = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p50 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   latency_p95 = {'unit': 'ms', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   mae = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   mean_rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p95 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   p99 = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   params = {'unit': 'count', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   ram_peak = {'unit': 'MB', 'direction': 'lower_is_better', 'group': 'runtime'}
+[配置]   risk_error_corr = {'unit': 'corr', 'direction': 'higher_is_better', 'group': 'mechanism'}
+[配置]   rmse = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'primary'}
+[配置]   rpe = {'unit': 'm', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   std_rmse = {'unit': 'm', 'direction': 'neutral', 'group': 'primary'}
+[配置]   yaw_p95 = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置]   yaw_rmse = {'unit': 'rad', 'direction': 'lower_is_better', 'group': 'secondary'}
+[配置] _METRIC_ORDER = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'p99', 'mae', 'ate', 'rpe', 'yaw_rmse', 'yaw_p95', 'risk_error_corr', 'coverage', 'bias_alignment', 'corr_scaling_error', 'latency_mean', 'latency_p50', 'latency_p95', 'params', 'ram_peak']
+[配置] _PRIMARY_METRICS = ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate']
+[配置] ===== metric_schema.py 常量 结束 =====
+PASSED: True | manual_exists=True; manual_has_criterion=True; manual_has_line_a=True; manual_has_line_b=True; manual_has_aux=True; manual_has_void=True; cfg_exists=True; cfg_parse_ok=True; clause_name_contains_12=True; agents_md_exists=True; agents_md_has_clause_12=True; status_table_exists=True; status_table_has_clause_12=True; status_table_clause_12_field_valid=True; report_exists=True; report_has_eight_fields=True; report_has_done_status=True; hook_exists=True; hook_contains_p12_call=True — 语言铁律检查调用点（仅检查落实报告文件）
+-  — 八字段落实报告
+**判据**: 全程简体中文；禁止英文回答/禁止中英混杂；3处及以上违规=报告作废重做
+
 ## [6] 代码与文件冗余治理（治理层）
 **状态**: ✅ 已落地
 **文件**:

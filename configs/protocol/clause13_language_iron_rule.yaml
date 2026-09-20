@@ -1,0 +1,25 @@
+# [13] 语言铁律（GLM 5.3 专属·硬约束）
+clause_name: "[13] 底线：语言铁律（GLM 5.3 专属）"
+constraint_level: "硬约束"
+governance_phase0: true
+implementation_phase1_6: true
+criterion_merged: true
+execution_phase7_8: true
+attribution_table_complete: true
+description: "全程简体中文回答/解释/汇报/书写落实报告；禁止英文回答/禁止中英混杂；3处及以上违规=报告作废重做"
+enforcement: "p13_language_iron_rule() 验证规则文件+配置文件+验证函数+AGENTS.md索引+状态表条目+八字段报告+pre-commit钩子"
+manual_ref: "最终交付_异步手册_424条_20260917.md:166"
+verification_gate: "p13_language_iron_rule"
+language_rule:
+  mandatory_chinese: true
+  forbidden_english_answer: true
+  forbidden_mixed_language: true
+  exceptions:
+    - 专有名词
+    - API名
+    - 变量名
+    - 单位符号
+    - 期刊名
+    - 引文原样
+  violation_threshold: 3
+  violation_disposal: "该份落实报告作废重做"

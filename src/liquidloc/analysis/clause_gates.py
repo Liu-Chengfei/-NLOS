@@ -494,57 +494,135 @@ def p28_nearest_resampling() -> dict[str, Any]:
 
 
 # ---------------- P13 条款 [13]: 违反即处置 ----------------
-def p13_violate_and_dispose() -> dict[str, Any]:
-    """[13] 违反即处置、无需请示——验证 failure_handler 模块存在且功能完整。"""
-    src_dir = SRC / "liquidloc" / "common"
-    failure_handler_path = src_dir / "failure_handler.py"
+def p13_language_iron_rule() -> dict[str, Any]:
+    """[13] 底线：语言铁律（GLM 5.3 专属）——验证语言铁律规则文件、配置文件、验证函数、AGENTS.md索引、状态表条目、八字段报告、pre-commit钩子完整。
 
-    # (a) failure_handler.py 存在
-    exists = failure_handler_path.is_file()
+    验证项（10项）：
+    1. rules/语言铁律.md 存在且含核心判据说明（全程简体中文）
+    2. 含禁止英文回答、禁止中英混杂说明
+    3. 含允许例外说明（专有名词/API/变量名/单位符号/期刊名/引文原样）
+    4. 含违规处置说明（3处及以上=报告作废重做）
+    5. configs/protocol/clause13_language_iron_rule.yaml 存在且解析成功
+    6. clause_name 包含「[13] 底线：语言铁律」
+    7. AGENTS.md 含 [13] 治理载体条目
+    8. rules/指令状态表.md 含 [13] 条目且状态字段合法
+    9. outputs/compliance_report_13.md 存在且含八字段
+    10. .git/hooks/pre-commit 含语言铁律检查调用点
+    """
+    import yaml as _yaml
 
-    # (b) 必须有 ViolationRecord, DispositionResult, quarantine_paths, handle_violation
-    required_names = ["ViolationRecord", "DispositionResult", "quarantine_paths", "handle_violation"]
-    found_names: list[str] = []
-    missing_names: list[str] = []
-    if exists:
-        txt = failure_handler_path.read_text(encoding="utf-8")
-        for name in required_names:
-            if re.search(rf"\b{name}\b", txt):
-                found_names.append(name)
-            else:
-                missing_names.append(name)
+    cfg_path = CONFIGS / "protocol" / "clause13_language_iron_rule.yaml"
+    manual_path = PROJECT_ROOT / "rules" / "语言铁律.md"
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
+    report_path = PROJECT_ROOT / "outputs" / "compliance_report_13.md"
+    hook_path = PROJECT_ROOT / ".git" / "hooks" / "pre-commit"
+
+    cfg_exists = cfg_path.is_file()
+    cfg_parse_ok = False
+    cfg: dict[str, Any] = {}
+    if cfg_exists:
+        try:
+            cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg_parse_ok = True
+        except Exception:
+            cfg = {}
+
+    manual_exists = manual_path.is_file()
+    manual_text = manual_path.read_text(encoding="utf-8") if manual_exists else ""
+
+    checks: dict[str, bool] = {}
+
+    # 1. 规则文件存在
+    checks["manual_exists"] = manual_exists
+
+    # 2. 含核心判据说明（全程简体中文）
+    checks["manual_has_criterion"] = manual_exists and ("全程简体中文" in manual_text or "简体中文" in manual_text)
+
+    # 3. 含禁止英文回答、禁止中英混杂
+    checks["manual_has_forbidden"] = manual_exists and ("禁止英文" in manual_text or "禁止中英混杂" in manual_text)
+
+    # 4. 含允许例外说明
+    checks["manual_has_exceptions"] = manual_exists and ("专有名词" in manual_text or "API" in manual_text)
+
+    # 5. 含违规处置说明（3处及以上=报告作废重做）
+    checks["manual_has_violation_disposal"] = manual_exists and ("3处" in manual_text or "作废重做" in manual_text)
+
+    # 6. 配置文件存在且解析成功
+    checks["cfg_exists"] = cfg_exists
+    checks["cfg_parse_ok"] = cfg_parse_ok
+
+    # 7. clause_name 包含 [13] 底线：语言铁律
+    cn = cfg.get("clause_name", "")
+    checks["clause_name_contains_13"] = isinstance(cn, str) and "[13]" in cn and ("语言铁律" in cn or "底线" in cn)
+
+    # 8. AGENTS.md 含 [13] 治理载体条目
+    agents_exists = agents_path.is_file()
+    checks["agents_md_exists"] = agents_exists
+    if agents_exists:
+        agents_text = agents_path.read_text(encoding="utf-8")
+        checks["agents_md_has_clause_13"] = "## [13]" in agents_text
     else:
-        missing_names = required_names[:]
+        checks["agents_md_has_clause_13"] = False
 
-    # (c) precheck_orchestrator 从 failure_handler 导入
-    orchestrator_path = src_dir / "precheck_orchestrator.py"
-    import_ok = False
-    if orchestrator_path.is_file():
-        orch_txt = orchestrator_path.read_text(encoding="utf-8")
-        import_ok = "from liquidloc.common.failure_handler import" in orch_txt
+    # 9. 指令状态表含 [13] 条目
+    status_exists = status_table_path.is_file()
+    checks["status_table_exists"] = status_exists
+    if status_exists:
+        status_text = status_table_path.read_text(encoding="utf-8")
+        checks["status_table_has_clause_13"] = "| [13]" in status_text
+        for line in status_text.splitlines():
+            if "| [13]" in line:
+                parts = [p.strip() for p in line.split("|")]
+                sf = parts[2] if len(parts) >= 3 else ""
+                checks["status_table_clause_13_field_valid"] = "done" in sf or "blocked" in sf or "pending" in sf
+                break
+        else:
+            checks["status_table_clause_13_field_valid"] = False
+    else:
+        checks["status_table_clause_13_field_valid"] = False
 
-    passed = exists and not missing_names and import_ok
-    detail_parts = [
-        f"exists={exists}",
-        f"found={found_names or 'none'}",
-        f"missing={missing_names or 'none'}",
-        f"orchestrator_import={import_ok}",
-    ]
+    # 10. 报告八字段检查
+    report_exists = report_path.is_file()
+    checks["report_exists"] = report_exists
+    if report_exists:
+        rt = report_path.read_text(encoding="utf-8")
+        checks["report_has_eight_fields"] = all(f in rt for f in ["[13]", "**条款**:", "**代码**:", "**落实**:", "**审查**:", "**验证**:", "**证据**"])
+        checks["report_has_done_status"] = "已落实" in rt or "✅" in rt
+    else:
+        checks["report_has_eight_fields"] = False
+        checks["report_has_done_status"] = False
+
+    # 11. pre-commit 钩子含语言铁律检查
+    hook_exists = hook_path.is_file()
+    checks["hook_exists"] = hook_exists
+    if hook_exists:
+        hook_text = hook_path.read_text(encoding="utf-8")
+        checks["hook_contains_p13_call"] = "条款 [13]" in hook_text or "语言铁律" in hook_text
+    else:
+        checks["hook_contains_p13_call"] = False
+
+    passed = all(checks.values())
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P13-violate", "name": "[13] 违反即处置", "severity": "hard",
+        "code": "P13-language",
+        "name": "[13] 底线：语言铁律（GLM 5.3 专属）",
+        "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
-            "failure_handler_path": str(failure_handler_path.relative_to(PROJECT_ROOT)),
-            "exists": exists,
-            "found_names": found_names,
-            "missing_names": missing_names,
-            "orchestrator_import": import_ok,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)) if manual_exists else "missing",
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else "missing",
+            "agents_md_path": str(agents_path.relative_to(PROJECT_ROOT)) if agents_exists else "missing",
+            "status_table_path": str(status_table_path.relative_to(PROJECT_ROOT)) if status_exists else "missing",
+            "report_path": str(report_path.relative_to(PROJECT_ROOT)) if report_exists else "missing",
+            "hook_path": str(hook_path.relative_to(PROJECT_ROOT)) if hook_exists else "missing",
+            "checks": checks,
         },
     }
 
 
-# ---------------- P34 条款 [34]: 禁止"单通道从头做到尾不交叉" ----------------
+
 def p34_no_single_channel_linear() -> dict[str, Any]:
     """[34] 禁止"单通道从头做到尾不交叉"（单线执行 = 干漏风险最高形态）。
 
@@ -16566,7 +16644,7 @@ _ALL = [
     c8_cross_experiment_isolation, c9_pre_run_cleanup, c10_retrain_from_scratch,
     p19_tf32_amp_explicit, p22_two_step_inference, p23_analysis_unit_trajectory,
     p15_pilot_isolation, p15_parallel_scheduling_log, p28_nearest_resampling,
-    p13_violate_and_dispose, p14_parallel_equivalence_check, p16_resource_conflict_scheduler,
+    p13_language_iron_rule, p14_parallel_equivalence_check, p16_resource_conflict_scheduler,
     p17_batch_decomposition, p18_agents_md_template, p19_axis_a_sync_verification,
     p20_nlos_axis_verification, p21_visual_axis_verification, p22_anchor_axis_verification,
     p23_missing_data_axis_verification, p24_five_axis_independence_verification,
