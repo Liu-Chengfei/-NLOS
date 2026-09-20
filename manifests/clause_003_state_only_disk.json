@@ -1,0 +1,13 @@
+{
+  "manifest_version": "1.0",
+  "created_at": "2026-09-20T10:20:00",
+  "clauses": {
+    "[3]_状态只认磁盘": {
+      "anchor_files": [
+        "rules/状态只认磁盘.md"
+      ],
+      "status": "已落实",
+      "notes": "条款[3]治理层铁律：任何'进度/结果/是否已做'的判断一律以磁盘上的 manifest/decision log/产物/时间戳/git commit 为准。本目录为条款[3]的manifest锚点文件。"
+    }
+  }
+}
