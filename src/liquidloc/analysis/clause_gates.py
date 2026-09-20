@@ -15501,20 +15501,39 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
         all_passed = False
         results.append({"name": "compliance_report_3.md", "status": "FAIL", "detail": "文件不存在"})
 
-    # 检查5: .git/HEAD 指向有效 commit + git 工作区干净度
+    # 检查5: .git/HEAD 指向有效 commit + git 工作区干净度 + HEAD hash 比对
     head_file = base / ".git" / "HEAD"
     git_clean_ok = False
     git_clean_detail = ""
+    head_hash_lag = False
+    head_hash_detail = ""
     if head_file.exists():
         head_content = head_file.read_text(encoding="utf-8").strip()
         if head_content.startswith("ref: "):
             ref_path = base / ".git" / head_content[5:].strip()
             if ref_path.exists():
                 commit_hash = ref_path.read_text(encoding="utf-8").strip()
+                # HEAD hash 比对: ref文件中的hash vs git rev-parse HEAD, 防止滞后
+                import subprocess as _sp
+                head_hash_lag = False
+                head_hash_detail = ""
+                try:
+                    rev_parse = _sp.run(
+                        ["git", "rev-parse", "HEAD"],
+                        capture_output=True, text=True, timeout=10, cwd=str(base),
+                    )
+                    current_head = rev_parse.stdout.strip()
+                    if current_head and commit_hash and current_head.startswith(commit_hash):
+                        head_hash_detail = f"ref hash({commit_hash[:7]}...)与HEAD({current_head[:7]}...)一致"
+                    else:
+                        head_hash_lag = True
+                        head_hash_detail = f"滞后: ref hash({commit_hash[:7] if commit_hash else '空'}) ≠ HEAD({current_head[:7] if current_head else '空'})"
+                except Exception as e:
+                    head_hash_detail = f"git rev-parse执行异常: {e}"
                 results.append({
                     "name": ".git/HEAD → 有效commit",
-                    "status": "PASS",
-                    "detail": "HEAD指向 valid ref",
+                    "status": "PASS" if not head_hash_lag else "FAIL",
+                    "detail": head_hash_detail if head_hash_detail else "HEAD指向 valid ref",
                 })
                 # 条款[3]锚点：git工作区干净度（磁盘锚点，确保无未提交变更）
                 clean_result = p3_check_git_clean(str(base))
@@ -15537,8 +15556,36 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
                 all_passed = False
                 results.append({"name": ".git/HEAD", "status": "FAIL", "detail": f"ref路径不存在: {ref_path}"})
         else:
-            all_passed = False
-            results.append({"name": ".git/HEAD", "status": "FAIL", "detail": "HEAD格式非标准ref"})
+            # detached HEAD: HEAD直接包含commit hash（非ref指针）
+            head_hash_lag = False
+            head_hash_detail = ""
+            try:
+                rev_parse = _sp.run(
+                    ["git", "rev-parse", "HEAD"],
+                    capture_output=True, text=True, timeout=10, cwd=str(base),
+                )
+                current_head = rev_parse.stdout.strip()
+                if head_content.startswith("ref: "):
+                    ref_path = base / ".git" / head_content[5:].strip()
+                    if ref_path.exists():
+                        ref_hash = ref_path.read_text(encoding="utf-8").strip()
+                        if current_head.startswith(ref_hash):
+                            head_hash_detail = f"ref hash与HEAD一致"
+                        else:
+                            head_hash_lag = True
+                            head_hash_detail = f"滞后: ref hash({ref_hash[:7]}) ≠ HEAD({current_head[:7]})"
+                elif head_content == current_head[:len(head_content)]:
+                    head_hash_detail = f"detached HEAD: {head_content[:7]}..., 与git rev-parse一致"
+                else:
+                    head_hash_lag = True
+                    head_hash_detail = f"detached HEAD滞后: HEAD内容({head_content[:7]}) ≠ git rev-parse({current_head[:7]})"
+            except Exception as e:
+                head_hash_detail = f"git rev-parse执行异常: {e}"
+            results.append({
+                "name": ".git/HEAD",
+                "status": "PASS" if not head_hash_lag else "FAIL",
+                "detail": head_hash_detail,
+            })
     else:
         all_passed = False
         results.append({"name": ".git/HEAD", "status": "FAIL", "detail": ".git/HEAD文件不存在"})
@@ -15558,6 +15605,10 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
             "status": "FAIL",
             "detail": dl_content_result["detail"],
         })
+
+    # HEAD hash 滞后不通过时标记总结果
+    if head_hash_lag:
+        all_passed = False
 
     return {"passed": all_passed, "items": results}
 
