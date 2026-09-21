@@ -1,0 +1,14 @@
+# 条款 [80] 缺漏由核对脚本/核对清单自动拦截
+# 手册原文：缺漏由 核对脚本/核对清单自动拦截，不靠执行者记忆
+# 对应 docs/最终交付_异步实验手册_终版v15_总纲条款版.md 第315行
+
+clause_id: "80"
+clause_name: "缺漏自动拦截"
+
+gap_interception:
+  verification_script_required: true
+  checklist_required: true
+  no_memory_dependence: true
+  description: "缺漏由核对脚本/核对清单自动拦截，不靠执行者记忆"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第315行"

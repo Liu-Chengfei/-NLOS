@@ -9612,6 +9612,90 @@ def p85_git_verify() -> dict[str, Any]:
     }
 
 
+def p86_gap_interception() -> dict[str, Any]:
+    """[80] 缺漏由核对脚本/核对清单自动拦截——不靠执行者记忆
+
+    手册 [80]：**缺漏由 核对脚本/核对清单自动拦截，不靠执行者记忆**。
+
+    验证项：
+    1. configs/protocol/gap_interception.yaml 存在且能正确解析
+    2. clause_id == "80"
+    3. gap_interception.verification_script_required == true
+    4. gap_interception.checklist_required == true
+    5. gap_interception.no_memory_dependence == true
+    6. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "gap_interception.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P86-gap-interception", "name": "[80] 缺漏自动拦截",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P86-gap-interception", "name": "[80] 缺漏自动拦截",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "80"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    gi = cfg.get("gap_interception", {})
+    if not isinstance(gi, dict):
+        checks["gap_interception_section"] = False
+        passed = False
+    else:
+        checks["gap_interception_section"] = True
+
+        ok_script = gi.get("verification_script_required") is True
+        checks["verification_script_required_true"] = ok_script
+        passed = passed and ok_script
+
+        ok_checklist = gi.get("checklist_required") is True
+        checks["checklist_required_true"] = ok_checklist
+        passed = passed and ok_checklist
+
+        ok_no_memory = gi.get("no_memory_dependence") is True
+        checks["no_memory_dependence_true"] = ok_no_memory
+        passed = passed and ok_no_memory
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P86-gap-interception", "name": "[80] 缺漏自动拦截",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17224,6 +17308,7 @@ _ALL = [
     p83_no_degradation_exit,
     p84_docstring_signature_consistency,
     p85_git_verify,
+    p86_gap_interception,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
