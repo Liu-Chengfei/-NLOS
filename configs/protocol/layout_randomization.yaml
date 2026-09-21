@@ -1,14 +1,17 @@
+# 条款 [63] 布局随机化泛化层配置
+# 手册原文：布局随机化泛化层 N_layout ≥6（入门）/10（推荐）、每布局 5 方法 × 2–3 seed（布局随机化层）
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第298行
+
 clause_id: "63"
-title: "布局随机化泛化层"
-category: generalization
 
+# 布局随机化层配置
 layout_randomization:
-  enabled: true
-  min_layouts_entry: 6
-  min_layouts_recommended: 10
-  methods_per_layout: 5
-  seeds_per_layout_min: 2
-  seeds_per_layout_max: 3
-  description: "布局随机化泛化层：N_layout >= 6（入门）/ 10（推荐）、每布局 5 方法 x 2-3 seed"
+  min_layouts_entry: 6    # 入门要求 ≥6
+  min_layouts_recommended: 10  # 推荐要求 ≥10
+  methods_per_layout: 5   # 每布局 5 方法
+  seeds_per_layout_min: 2 # 每布局最少 2 seed
+  seeds_per_layout_max: 3 # 每布局最多 3 seed
 
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第290行"
+description: "布局随机化泛化层：N_layout ≥6（入门）/10（推荐）、每布局 5 方法 × 2–3 seed（布局随机化层）"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第298行"
