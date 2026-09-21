@@ -4,7 +4,7 @@
 
 **状态**: ✅ 已落实
 
-**代码**: `configs/protocol/no_temp_scripts.yaml:1-25`（硬约束声明+条款名+约束级别+治理阶段零）; `src/liquidloc/analysis/clause_gates.py::p27_no_temp_scripts_verification():2923-3000`（验证函数，含forbidden_patterns列表定义bash_tool_/tmp_/temp_* + constraint_declaration字典定义pass_criteria + 文件系统扫描逻辑 + 三种模式文件计数验证）; `AGENTS.md:185`（治理载体索引条目）
+**代码**: `configs/protocol/no_temp_scripts.yaml:1-17`（硬约束声明+条款名+约束级别+治理阶段零）; `src/liquidloc/analysis/clause_gates.py::p27_no_temp_scripts_verification():2923-3000`（验证函数，含forbidden_patterns列表定义bash_tool_/tmp_/temp_* + constraint_declaration字典定义pass_criteria + 文件系统扫描逻辑 + 三种模式文件计数验证）; `AGENTS.md:185`（治理载体索引条目）
 
 **落实**: 一、发现条款二十七八字段报告缺失——修复：创建八字段报告；问题：无智能体指南二十七条目——修复：新增## [27] 底线：无临时脚本条目
 

@@ -4,7 +4,7 @@
 
 **状态**: ✅ 已落实
 
-**代码**: `configs/protocol/runtime_assertion.yaml:1-33`（硬约束声明+条款名+约束级别+治理阶段零）; `src/liquidloc/analysis/clause_gates.py::p26_runtime_assertion_verification():2818-2920`（验证函数，含assertion_types列表定义batch_shape/gradient_norm/loss_trajectory + constraint_declaration字典定义min_assertion_types/required_assertion_types/assertion_stage/probe_target + 断言类型计数验证+必含字段验证）; `AGENTS.md`（治理载体索引，待补充[26]条目）
+**代码**: `configs/protocol/runtime_assertion.yaml:1-27`（硬约束声明+条款名+约束级别+治理阶段零）; `src/liquidloc/analysis/clause_gates.py::p26_runtime_assertion_verification():2818-2920`（验证函数，含assertion_types列表定义batch_shape/gradient_norm/loss_trajectory + constraint_declaration字典定义min_assertion_types/required_assertion_types/assertion_stage/probe_target + 断言类型计数验证+必含字段验证）; `AGENTS.md`（治理载体索引，待补充[26]条目）
 
 **落实**: 一、发现条款二十六八字段报告缺失——修复：创建八字段报告；问题：无运行断言验证配置文件——修复：创建配置文件目录条款二十六运行断言验证配置文件，含硬约束声明及判据标志；问题：无智能体指南二十六条目——修复：新增## [26] 底线：运行断言条目
 
