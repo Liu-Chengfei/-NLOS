@@ -17,4 +17,4 @@ generalization_layer:
   evaluation_method: "只判排序不做因子推断"
   requirement: "不需要主场景同等功效"
 
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第275行"
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第283行"

@@ -5415,7 +5415,7 @@ def p47_three_layer_evidence() -> dict[str, Any]:
 
 
 def p48_two_sigma_separation() -> dict[str, Any]:
-    """[48] 两个 σ 语义分离：协议 N 轴 σ 仅指 NLOS 段附加抖动，LOS 器件噪声 σ≈0.6m 为器件级非协议参数。
+    """[45] 两个 σ 语义分离：协议 N 轴 σ 仅指 NLOS 段附加抖动，LOS 器件噪声 σ≈0.6m 为器件级非协议参数。
 
     验证项：
     1. configs/protocol/two_sigma_separation.yaml 存在且能正确解析
@@ -5563,7 +5563,7 @@ def p48_scale_gear_spec() -> dict[str, Any]:
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P48-scale-gear", "name": "[48] 规模档位", "severity": "hard",
+            "code": "P48-scale-gear", "name": "[48] 规模档位：入门 N_layout=6、 推荐 N_layout=10（full + 2 个最强基线 LSTM/EKF × 2–3 seed 即可，泛化层只判排序不做因子推断，不需要主场景同等功效）", "severity": "hard",
             "passed": False,
             "detail": "scale_gear_spec.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -5574,7 +5574,7 @@ def p48_scale_gear_spec() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P48-scale-gear", "name": "[48] 规模档位", "severity": "hard",
+            "code": "P48-scale-gear", "name": "[48] 规模档位：入门 N_layout=6、 推荐 N_layout=10（full + 2 个最强基线 LSTM/EKF × 2–3 seed 即可，泛化层只判排序不做因子推断，不需要主场景同等功效）", "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
@@ -5583,7 +5583,7 @@ def p48_scale_gear_spec() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P48-scale-gear", "name": "[48] 规模档位", "severity": "hard",
+            "code": "P48-scale-gear", "name": "[48] 规模档位：入门 N_layout=6、 推荐 N_layout=10（full + 2 个最强基线 LSTM/EKF × 2–3 seed 即可，泛化层只判排序不做因子推断，不需要主场景同等功效）", "severity": "hard",
             "passed": False,
             "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
@@ -5631,18 +5631,18 @@ def p48_scale_gear_spec() -> dict[str, Any]:
     checks["requirement"] = "不需要主场景同等功效" in requirement
     passed = passed and "不需要主场景同等功效" in requirement
 
-    # 8. 手册原文存在且 manual_ref 指向手册第275行
+    # 8. 手册原文存在且 manual_ref 指向手册第283行
     manual_exists = manual_path.is_file()
     checks["manual_exists"] = manual_exists
 
     if manual_exists:
         manual_ref = cfg.get("manual_ref", "")
-        checks["manual_ref_correct"] = "第275行" in manual_ref or "275" in manual_ref
-        passed = passed and ("第275行" in manual_ref or "275" in manual_ref)
+        checks["manual_ref_correct"] = "第283行" in manual_ref or "283" in manual_ref
+        passed = passed and ("第283行" in manual_ref or "283" in manual_ref)
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P48-scale-gear", "name": "[48] 规模档位", "severity": "hard",
+        "code": "P48-scale-gear", "name": "[48] 规模档位：入门 N_layout=6、 推荐 N_layout=10（full + 2 个最强基线 LSTM/EKF × 2–3 seed 即可，泛化层只判排序不做因子推断，不需要主场景同等功效）", "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
