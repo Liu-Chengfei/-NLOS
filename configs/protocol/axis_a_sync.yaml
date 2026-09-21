@@ -1,49 +1,80 @@
-# 档位协议条款 · A轴 —— 同步精度
-# 对应手册第19条 (docs/异步实验_执行手册_终版v15_总纲条款版.md 第197-206行)
-# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
-protocol_version: 27
-clause_reference: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第197-206行"
 axis: A
-axis_name: "异步程度(Asynchrony)"
-axis_description: "传感器时间同步偏差程度"
-
-# A轴四档位定义
-A0:
-  label: "同步"
-  description: "近似同步，传感器时间戳几乎完全对齐"
-  uwb_clock_offset_ms: [0, 0]
-  uwb_round_trip_delay_ms: [0, 0]
-  imu_clock_offset_ms: [0, 0]
-  imu_sampling_jitter_ms: [0, 0]
-  vio_clock_offset_ms: [0, 0]
-  vio_processing_delay_ms: [0, 0]
-
-A1:
-  label: "轻"
-  description: "轻度异步，存在可感知但可控的时间偏差"
-  uwb_clock_offset_ms: [5, 20]
-  uwb_round_trip_delay_ms: [20, 40]
-  imu_clock_offset_ms: [1, 5]
-  imu_sampling_jitter_ms: [1, 1]
-  vio_clock_offset_ms: [5, 20]
-  vio_processing_delay_ms: [10, 30]
-
-A2:
-  label: "主"
-  description: "中度异步，时间偏差明显，需算法主动补偿"
-  uwb_clock_offset_ms: [20, 50]
-  uwb_round_trip_delay_ms: [40, 80]
-  imu_clock_offset_ms: [5, 15]
-  imu_sampling_jitter_ms: [3, 3]
-  vio_clock_offset_ms: [20, 50]
-  vio_processing_delay_ms: [30, 80]
-
-A3:
-  label: "重"
-  description: "重度异步，时间偏差严重，对算法鲁棒性构成重大挑战"
-  uwb_clock_offset_ms: [100, 200]
-  uwb_round_trip_delay_ms: [120, 250]
-  imu_clock_offset_ms: [20, 50]
-  imu_sampling_jitter_ms: [10, 10]
-  vio_clock_offset_ms: [100, 200]
-  vio_processing_delay_ms: [150, 300]
+clause_level: scenario_spec
+clause_name: '[29] 档位协议条款 · A 轴 —— 同步精度'
+description: 同步精度档位协议：UWB时钟偏移、UWB往返延迟、IMU时钟偏移、IMU采样抖动、VIO时钟偏移、VIO处理延迟
+gears:
+  A0:
+    description: 同步
+    imu_clock_offset_ms: 0
+    imu_sampling_jitter_ms: 0
+    uwb_clock_offset_ms: 0
+    uwb_round_trip_delay_ms: 0
+    vio_clock_offset_ms: 0
+    vio_processing_delay_ms: 0
+  A1:
+    description: 轻
+    imu_clock_offset_ms:
+      max: 5
+      min: 1
+    imu_sampling_jitter_ms:
+      max: 1
+      min: -1
+    uwb_clock_offset_ms:
+      max: 20
+      min: 5
+    uwb_round_trip_delay_ms:
+      max: 40
+      min: 20
+    vio_clock_offset_ms:
+      max: 20
+      min: 5
+    vio_processing_delay_ms:
+      max: 30
+      min: 10
+  A2:
+    description: 主
+    imu_clock_offset_ms:
+      max: 15
+      min: 5
+    imu_sampling_jitter_ms:
+      max: 3
+      min: -3
+    uwb_clock_offset_ms:
+      max: 50
+      min: 20
+    uwb_round_trip_delay_ms:
+      max: 80
+      min: 40
+    vio_clock_offset_ms:
+      max: 50
+      min: 20
+    vio_processing_delay_ms:
+      max: 80
+      min: 30
+  A3:
+    description: 重
+    imu_clock_offset_ms:
+      max: 50
+      min: 20
+    imu_sampling_jitter_ms:
+      max: 10
+      min: -10
+    uwb_clock_offset_ms:
+      max: 200
+      min: 100
+    uwb_round_trip_delay_ms:
+      max: 250
+      min: 120
+    vio_clock_offset_ms:
+      max: 200
+      min: 100
+    vio_processing_delay_ms:
+      max: 300
+      min: 150
+governance_phase: '0'
+verification:
+  checkpoints:
+  - A0档所有偏移和延迟为0
+  - A1-A3档参数在手册定义范围内
+  - 配置与手册[29]条款完全一致
+  method: 档位参数验证

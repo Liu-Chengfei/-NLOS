@@ -17294,3 +17294,134 @@ def p28_governance_carrier_index_verification() -> dict[str, Any]:
     }
 
 
+
+
+
+# ---------------- [29] 档位协议条款 · A 轴 —— 同步精度 ----------------
+def p29_axis_a_sync_verification() -> dict[str, Any]:
+    """[29] 档位协议条款 · A 轴 —— 同步精度
+    验证 configs/protocol/axis_a_sync.yaml 文件存在且参数符合手册定义
+    （docs/最终交付_异步手册_424条_20260917.md 第22542行）。
+
+    手册第29条原始定义（A轴同步精度：六个参数×四个档位）：
+    | 档位 | A0（同步） | A1（轻） | A2（主） | A3（重） |
+    |---|---|---|---|---|
+    | UWB 时钟偏移 | 0 | 5–20 ms | 20–50 ms | 100–200 ms |
+    | UWB 往返延迟 | 0 | 20–40 ms | 40–80 ms | 120–250 ms |
+    | IMU 时钟偏移 | 0 | 1–5 ms | 5–15 ms | 20–50 ms |
+    | IMU 采样抖动 | 0 | ±1 ms | ±3 ms | ±10 ms |
+    | VIO 时钟偏移 | 0 | 5–20 ms | 20–50 ms | 100–200 ms |
+    | VIO 处理延迟 | 0 | 10–30 ms | 30–80 ms | 150–300 ms |
+    """
+    import yaml
+
+    cfg_path = CONFIGS / "protocol" / "axis_a_sync.yaml"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    # 手册第29条原始定义（档位 -> 参数范围）
+    expected_gears = {
+        "A0": {
+            "uwb_clock_offset_ms": 0,
+            "uwb_round_trip_delay_ms": 0,
+            "imu_clock_offset_ms": 0,
+            "imu_sampling_jitter_ms": 0,
+            "vio_clock_offset_ms": 0,
+            "vio_processing_delay_ms": 0,
+        },
+        "A1": {
+            "uwb_clock_offset_ms": {"min": 5, "max": 20},
+            "uwb_round_trip_delay_ms": {"min": 20, "max": 40},
+            "imu_clock_offset_ms": {"min": 1, "max": 5},
+            "imu_sampling_jitter_ms": {"min": -1, "max": 1},
+            "vio_clock_offset_ms": {"min": 5, "max": 20},
+            "vio_processing_delay_ms": {"min": 10, "max": 30},
+        },
+        "A2": {
+            "uwb_clock_offset_ms": {"min": 20, "max": 50},
+            "uwb_round_trip_delay_ms": {"min": 40, "max": 80},
+            "imu_clock_offset_ms": {"min": 5, "max": 15},
+            "imu_sampling_jitter_ms": {"min": -3, "max": 3},
+            "vio_clock_offset_ms": {"min": 20, "max": 50},
+            "vio_processing_delay_ms": {"min": 30, "max": 80},
+        },
+        "A3": {
+            "uwb_clock_offset_ms": {"min": 100, "max": 200},
+            "uwb_round_trip_delay_ms": {"min": 120, "max": 250},
+            "imu_clock_offset_ms": {"min": 20, "max": 50},
+            "imu_sampling_jitter_ms": {"min": -10, "max": 10},
+            "vio_clock_offset_ms": {"min": 100, "max": 200},
+            "vio_processing_delay_ms": {"min": 150, "max": 300},
+        },
+    }
+
+    # (a) 配置文件存在性检查
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P29-axis-a-sync", "name": "[29] 档位协议条款 · A 轴 —— 同步精度", "severity": "hard",
+            "passed": False,
+            "detail": "axis_a_sync.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    # (b) 解析配置文件并验证参数
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P29-axis-a-sync", "name": "[29] 档位协议条款 · A 轴 —— 同步精度", "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    # (c) 验证所有档位和参数
+    mismatches: list[str] = []
+    missing_gears: list[str] = []
+    missing_fields: list[str] = []
+    for gear, params in expected_gears.items():
+        if gear not in cfg:
+            missing_gears.append(gear)
+            continue
+        for field, expected_val in params.items():
+            actual_val = cfg[gear].get(field)
+            if actual_val is None:
+                missing_fields.append(f"{gear}.{field}")
+            elif isinstance(expected_val, dict) and "min" in expected_val and "max" in expected_val:
+                # 范围检查
+                if not (expected_val["min"] <= actual_val <= expected_val["max"]):
+                    mismatches.append(f"{gear}.{field}: expected [{expected_val['min']}, {expected_val['max']}], got {actual_val}")
+            elif actual_val != expected_val:
+                mismatches.append(f"{gear}.{field}: expected {expected_val}, got {actual_val}")
+
+    # (d) 手册文件存在性检查
+    handount_exists = handount_path.is_file()
+
+    passed = (
+        cfg_exists and
+        not mismatches and
+        not missing_gears and
+        not missing_fields and
+        handount_exists
+    )
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"mismatches={mismatches or 'none'}",
+        f"missing_gears={missing_gears or 'none'}",
+        f"missing_fields={missing_fields or 'none'}",
+        f"handount_exists={handount_exists}",
+    ]
+    return {
+        "code": "P29-axis-a-sync", "name": "[29] 档位协议条款 · A 轴 —— 同步精度", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "handount_path": str(handount_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "handount_exists": handount_exists,
+            "mismatches": mismatches,
+            "missing_gears": missing_gears,
+            "missing_fields": missing_fields,
+        },
+    }
