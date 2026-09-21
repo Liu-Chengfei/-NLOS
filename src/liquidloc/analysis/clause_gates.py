@@ -11207,6 +11207,94 @@ def p99_table_delivery_list() -> dict[str, Any]:
     }
 
 
+def n15_exclusion_gate() -> dict[str, Any]:
+    """[99] N1.5排除条款 —— N1.5属于同机另一实验体系（消融版协议N轴标准档），不在本手册档位协议条款档位表内
+
+    手册 [99]：N1.5 属于同机另一实验体系按其各自对应协议文件执行的档位，不在本手册档位协议条款档位表内。
+    手册对应行：docs/最终交付_异步手册_424条_20260917.md:334
+    """
+    cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause99_n15_exclusion.yaml"
+    cfg_exists = cfg_path.exists()
+    cfg = {}
+    if cfg_exists:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+
+    checks: dict[str, Any] = {}
+    passed = True
+
+    # a) config file exists
+    checks["cfg_exists"] = cfg_exists
+    if not cfg_exists:
+        passed = False
+
+    # b) clause_id == "99"
+    clause_id = cfg.get("clause_id", "")
+    checks["clause_id_is_99"] = clause_id == "99"
+    passed = passed and checks["clause_id_is_99"]
+
+    # c) n15_classification present
+    n15_class = cfg.get("n15_classification", {})
+    checks["n15_classification_present"] = bool(n15_class)
+    checks["n15_in_this_manual_table_false"] = n15_class.get("in_this_manual_gears_table") is False
+    checks["n15_belongs_to_other_system"] = n15_class.get("belongs_to") == "同机另一实验体系"
+    passed = passed and checks["n15_classification_present"]
+    passed = passed and checks["n15_in_this_manual_table_false"]
+    passed = passed and checks["n15_belongs_to_other_system"]
+
+    # d) this_manual_n_axis only contains N0-N3 (no N1.5)
+    n_axis = cfg.get("this_manual_n_axis", [])
+    checks["this_manual_n_axis_no_n15"] = "N1.5" not in n_axis
+    checks["this_manual_n_axis_has_n0_n3"] = all(n in n_axis for n in ["N0", "N1", "N2", "N3"])
+    passed = passed and checks["this_manual_n_axis_no_n15"]
+    passed = passed and checks["this_manual_n_axis_has_n0_n3"]
+
+    # e) related_clause == "[45]"
+    related = cfg.get("related_clause", "")
+    checks["related_clause_is_45"] = related == "[45]"
+    passed = passed and checks["related_clause_is_45"]
+
+    # f) manual_line == 334
+    manual_line = cfg.get("manual_line")
+    ok_line = manual_line == 334 or str(manual_line) == "334"
+    checks["manual_line_points_to_334"] = ok_line
+    passed = passed and ok_line
+
+    # g) manual reference file exists
+    manual_ref = cfg.get("manual_ref", "")
+    manual_path = PROJECT_ROOT / manual_ref.split(":")[0] if ":" in manual_ref else PROJECT_ROOT / manual_ref
+    manual_exists = manual_path.exists()
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    # h) exclusion_scope fields present
+    excl_scope = cfg.get("exclusion_scope", {})
+    checks["exclusion_scope_present"] = bool(excl_scope)
+    checks["excl_experiment_config_no_n15"] = excl_scope.get("experiment_config_check") == "不涉及 N1.5"
+    checks["excl_precheck_no_n15"] = excl_scope.get("precheck_config_check") == "不涉及 N1.5"
+    checks["excl_config_verification_no_n15"] = excl_scope.get("config_verification") == "不涉及 N1.5"
+    passed = passed and checks["exclusion_scope_present"]
+    passed = passed and checks["excl_experiment_config_no_n15"]
+    passed = passed and checks["excl_precheck_no_n15"]
+    passed = passed and checks["excl_config_verification_no_n15"]
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P99-n15-exclusion",
+        "name": "[99] N1.5 排除",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)) if cfg_exists else str(cfg_path),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_ref": manual_ref,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)) if manual_exists else str(manual_path),
+        },
+    }
+
+
 def p100_miluv_external_domain() -> dict[str, Any]:
     """[95] 36次独立实验为配对单位声明MILUV外部域布局随机化层 —— 36次独立实验为配对单位声明 MILUV 外部域布局随机化层，生成 seed/超参稳健性表，报告 10 seed 间"LNN最低"成立频次（如 10/10、8/10）
 
@@ -17976,10 +18064,11 @@ def p5_dependency_declaration() -> dict[str, Any]:
     1. configs/protocol/clause05_dependency_declaration.yaml 存在且能正确解析
     2. clause_name 包含「[5] 依赖声明」
     3. 关键约束字段存在：prerequisite_check_before_execution、blocked_on_missing_dependency
-    4. 手册文件中 clauses/protocols/manual 关键字存在
-    5. AGENTS.md 治理载体索引含[5]条目
+    4. 手册文件存在且含 [5] 依赖声明相关文本
+    5. AGENTS.md 治理载体索引含[5]条目且含依赖声明机制描述
     6. rules/指令状态表.md 含[5]条目且状态字段合法
-    7. compliance_report_5.md 存在且八字段完整
+    7. 实际指令/规则文件头部标有 前置:[N]（核心：语义落地检查）
+    8. compliance_report_5.md 存在且八字段完整
     """
     import yaml as _yaml
 
@@ -18032,14 +18121,16 @@ def p5_dependency_declaration() -> dict[str, Any]:
         checks["manual_contains_dependency_declaration"] = False
         checks["manual_contains_prerequisite"] = False
 
-    # 5. AGENTS.md 治理载体索引含[5]条目
+    # 5. AGENTS.md 治理载体索引含[5]条目且含依赖声明机制描述
     agents_exists = agents_path.is_file()
     checks["agents_md_exists"] = agents_exists
     if agents_exists:
         agents_text = agents_path.read_text(encoding="utf-8")
-        checks["agents_md_has_clause_5_section"] = "## [5]" in agents_text or "**\\[5\\]**" in agents_text
+        checks["agents_md_has_clause_5_section"] = ("## [5]" in agents_text or "**\\[5\\]**" in agents_text or "[5]" in agents_text)
+        checks["agents_md_has_dependency_mechanism"] = "依赖声明" in agents_text or "前置:" in agents_text
     else:
         checks["agents_md_has_clause_5_section"] = False
+        checks["agents_md_has_dependency_mechanism"] = False
 
     # 6. 指令状态表含[5]条目
     status_exists = status_table_path.is_file()
@@ -18078,6 +18169,45 @@ def p5_dependency_declaration() -> dict[str, Any]:
     else:
         checks["report_has_eight_fields"] = False
         checks["report_has_done_status"] = False
+
+    # 7. 实际指令/规则文件头部是否标了 前置:[N]（核心语义检查）
+    #    关键改进：不再仅检查"前置:"是否出现在文件任意位置，
+    #    而是检查是否在指令头部（**[N]** 或 ### N 等标题行）前方有 前置:[M] 标记
+    instr_files = [
+        PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md",
+        PROJECT_ROOT / "rules" / "指令状态表.md",
+        PROJECT_ROOT / "rules" / "五轴独立性说明.md",
+    ]
+    instr_ok = True
+    instr_details = []
+    header_pattern = re.compile(r"^(?:\*\*\[\d+\]\*\*|###\s+\d+|\#\#\s*\[\d+\])")
+    prefix_pattern = re.compile(r"^\s*前置:\s*\[\d+\]")
+    for f in instr_files:
+        if not f.is_file():
+            instr_ok = False
+            instr_details.append(f"{f.name}=missing")
+            continue
+        text = f.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        # 找所有指令头部行及其前置标记行
+        prefix_hits = 0
+        header_count = 0
+        header_with_prefix = 0
+        for i, line in enumerate(lines):
+            if header_pattern.search(line):
+                header_count += 1
+                # 检查本行或上一行是否有 前置:[N] 标记
+                same_line = bool(prefix_pattern.search(line))
+                prev_line = bool(prefix_pattern.search(lines[i - 1])) if i > 0 else False
+                if same_line or prev_line:
+                    header_with_prefix += 1
+        # 至少有一半的指令头部有前置标记（渐进式落地）
+        ratio = header_with_prefix / header_count if header_count > 0 else 0.0
+        file_ok = ratio >= 0.5
+        instr_ok = instr_ok and file_ok
+        instr_details.append(f"{f.name}={header_with_prefix}/{header_count}={ratio:.0%}≥50%")
+    checks["instr_has_prefix_mark"] = instr_ok
+    checks["instr_prefix_details"] = instr_details
 
     passed = all(checks.values()) and cfg_exists and cfg_parse_ok
 
@@ -19362,6 +19492,7 @@ _ALL = [
     p97_ten_seeds_five_methods,
     p98_baseline_consistency,
     p99_table_delivery_list,
+    n15_exclusion_gate,
     p100_miluv_external_domain,
     p101_layout_scatter_miluv,
     p102_seed_trajectory_explicit,

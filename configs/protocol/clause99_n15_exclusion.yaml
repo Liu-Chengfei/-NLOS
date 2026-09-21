@@ -17,4 +17,6 @@ exclusion_scope:
   config_verification: "不涉及 N1.5"
 reason: "本手册引用协议 N 轴为 N0–N3，不包含 N1.5；N1.5 按同机另一实验体系各自协议文件执行"
 related_clause: "[45]"
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第 326 行"
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md:334"
+manual_line: 334
+verification_gate: "p99_n15_exclusion"
