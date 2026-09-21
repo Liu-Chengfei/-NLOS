@@ -112,9 +112,9 @@ check("评估口径≥1", "≥1", r >= 1, f"{r}")
 
 print("\n条款[16]")
 r = int(safe_run("wc -l AGENTS.md").strip().split()[0]) if safe_run("wc -l AGENTS.md").strip() else 0
-check("AGENTS.md=447行", "447", r == 447, str(r))
+check("AGENTS.md=690行", "690", r == 690, str(r))
 r = int(safe_run("ls rules/ | wc -l") or "0")
-check("rules/=10", "10", r == 10, str(r))
+check("rules/=21", "21", r == 21, str(r))
 r = int(safe_run("ls skills/ | wc -l") or "0")
 check("skills/=3", "3", r == 3, str(r))
 r = int(safe_run("ls .agents/skills/ | wc -l") or "0")
