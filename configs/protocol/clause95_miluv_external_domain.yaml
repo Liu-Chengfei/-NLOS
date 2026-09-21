@@ -1,6 +1,6 @@
 # 条款 [95] MILUV 外部域布局随机化层声明配置
 # 手册原文：36 次独立实验为配对单位声明 MILUV 外部域布局随机化层**seed/超参稳健性表****10seed 间"LNN 最低"成立频次（如 10/10、8/10）
-# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 322 行
+# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 330 行
 
 clause_id: "95"
 clause_name: "MILUV 外部域布局随机化层声明"
@@ -62,6 +62,4 @@ manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第 330 行"
 manual_line: 330
 
 # 验证门限
-verification_gate:
-  min_lnn_frequency: 5  # LNN 至少在 5/10 seed 中表现最优才算有效
-  requires_all_10_seeds: true
+verification_gate: "p100_miluv_external_domain"
