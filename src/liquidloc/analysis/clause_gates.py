@@ -10368,6 +10368,94 @@ def p93_diagnostic_cleanliness_gate() -> dict[str, Any]:
     }
 
 
+def p94_execution_deviation_assumption() -> dict[str, Any]:
+    """[88] 执行偏差默认假设——长流程人工实验的执行偏差是常态，缺省立场：执行存在偏差，直到本条 E 项被证据排除
+
+    手册 [88]：长流程人工实验的执行偏差（漏跑单元、改码未重新冒烟、gate 走过场、日志与结果对不上、记录靠回忆）是常态而非例外——默认立场：执行存在偏差，直到本条 E 项被证据排除。
+
+    验证项：
+    1. configs/protocol/execution_deviation_assumption.yaml 存在且能正确解析
+    2. clause_id == "88"
+    3. governance_assumption.default_stance == "execution_has_deviation"
+    4. deviation_types 包含5项（skip_units, no_retest_after_code_change, gate_bypass, log_result_mismatch, rely_on_memory）
+    5. evidence_requirements 存在criterion "E"
+    6. manual_ref 指向正确行号
+    7. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "execution_deviation_assumption.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P94-execution-deviation", "name": "[88] 执行偏差默认假设",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P94-execution-deviation", "name": "[88] 执行偏差默认假设",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "88"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    governance = cfg.get("governance_assumption", {})
+    ok_stance = governance.get("default_stance") == "execution_has_deviation"
+    checks["governance_assumption_default_stance_eq_execution_has_deviation"] = ok_stance
+    passed = passed and ok_stance
+
+    deviations = cfg.get("deviation_types", [])
+    expected_types = {"skip_units", "no_retest_after_code_change", "gate_bypass", "log_result_mismatch", "rely_on_memory"}
+    actual_types = {d.get("type") for d in deviations if isinstance(d, dict)}
+    ok_deviations = expected_types.issubset(actual_types)
+    checks["deviation_types_covers_5"] = ok_deviations
+    passed = passed and ok_deviations
+
+    evidences = cfg.get("evidence_requirements", [])
+    ok_evidence = any(e.get("criterion") == "E" for e in evidences if isinstance(e, dict))
+    checks["evidence_requirements_has_E_criterion"] = ok_evidence
+    passed = passed and ok_evidence
+
+    manual_ref = cfg.get("manual_ref", "")
+    ok_manual_ref = "第323行" in manual_ref or "323:" in manual_ref or "line 323" in manual_ref.lower()
+    checks["manual_ref_points_to_323"] = ok_manual_ref
+    passed = passed and ok_manual_ref
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P94-execution-deviation", "name": "[88] 执行偏差默认假设",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17988,6 +18076,7 @@ _ALL = [
     p91_systematic_nan_escalation,
     p92_paper_grade_quota,
     p93_diagnostic_cleanliness_gate,
+    p94_execution_deviation_assumption,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
