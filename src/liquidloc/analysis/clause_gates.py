@@ -5806,7 +5806,7 @@ def p51_sequence_split_no_overlap() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P51-sequence-split-no-overlap",
-            "name": "[51] 划分按整条序列、训练与测试无重叠",
+            "name": "[51] 划分按整条序列、训练与测试无重叠（P6）",
             "severity": "hard",
             "passed": False,
             "detail": "clause51_sequence_split_no_overlap.yaml missing",
@@ -5819,7 +5819,7 @@ def p51_sequence_split_no_overlap() -> dict[str, Any]:
     except Exception as exc:
         return {
             "code": "P51-sequence-split-no-overlap",
-            "name": "[51] 划分按整条序列、训练与测试无重叠",
+            "name": "[51] 划分按整条序列、训练与测试无重叠（P6）",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -5830,7 +5830,7 @@ def p51_sequence_split_no_overlap() -> dict[str, Any]:
     if not isinstance(cfg, dict):
         return {
             "code": "P51-sequence-split-no-overlap",
-            "name": "[51] 划分按整条序列、训练与测试无重叠",
+            "name": "[51] 划分按整条序列、训练与测试无重叠（P6）",
             "severity": "hard",
             "passed": False,
             "detail": "cfg is not a dict",
@@ -5881,7 +5881,7 @@ def p51_sequence_split_no_overlap() -> dict[str, Any]:
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
         "code": "P51-sequence-split-no-overlap",
-        "name": "[51] 划分按整条序列、训练与测试无重叠",
+        "name": "[51] 划分按整条序列、训练与测试无重叠（P6）",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
