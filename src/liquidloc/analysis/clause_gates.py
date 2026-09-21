@@ -17709,3 +17709,123 @@ def p31_axis_v_visual_verification() -> dict[str, Any]:
             "missing_fields": missing_fields,
         },
     }
+
+
+# ---------------- [32] 档位协议条款 · K 轴 —— 锚点配置 ----------------
+def p32_axis_k_anchor_verification() -> dict[str, Any]:
+    """[32] 档位协议条款 · K 轴 —— 锚点配置
+    验证 configs/protocol/axis_k_anchor.yaml 文件存在且参数符合手册定义。
+    
+    手册第32条原始定义：
+    |K 档|锚点布局|GDOP|几何特征|
+    |-|-|-|-|
+    |K0|4 锚对称（矩形四角）|1.5–2.5|最优几何，方位均匀覆盖|
+    |K1|4 锚非对称欠定|3–5|锚点分布不均、存在共线倾向|
+    |K3|4 锚近共线退化|8–15+|3 锚近似共线 + 1 锚孤立，精度崩溃边缘|
+    
+    原 G 轴并入 K 轴。锚数全档固定 4。模型输入不含锚点坐标。
+    """
+    import yaml
+
+    cfg_path = CONFIGS / "protocol" / "axis_k_anchor.yaml"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    expected_gears = {
+        "K0": {
+            "anchor_layout": "4 锚对称（矩形四角）",
+            "gdop_range": {"min": 1.5, "max": 2.5},
+            "geometric_feature": "最优几何，方位均匀覆盖",
+        },
+        "K1": {
+            "anchor_layout": "4 锚非对称欠定",
+            "gdop_range": {"min": 3, "max": 5},
+            "geometric_feature": "锚点分布不均、存在共线倾向",
+        },
+        "K3": {
+            "anchor_layout": "4 锚近共线退化",
+            "gdop_range": {"min": 8, "max": 15},
+            "geometric_feature": "3 锚近似共线 + 1 锚孤立，精度崩溃边缘",
+        },
+    }
+
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P32-axis-k-anchor", "name": "[32] 档位协议条款 · K 轴 —— 锚点配置", "severity": "hard",
+            "passed": False,
+            "detail": "axis_k_anchor.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P32-axis-k-anchor", "name": "[32] 档位协议条款 · K 轴 —— 锚点配置", "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    gears = cfg.get("K0", {})
+    # 处理两种可能的结构：直接键或嵌套gears
+    if "gears" in cfg:
+        gears = cfg.get("gears", {})
+    
+    mismatches: list[str] = []
+    missing_gears: list[str] = []
+    missing_fields: list[str] = []
+    
+    for gear, params in expected_gears.items():
+        if gear not in gears:
+            missing_gears.append(gear)
+            continue
+        for field, expected_val in params.items():
+            actual_val = gears[gear].get(field)
+            if actual_val is None:
+                missing_fields.append(f"{gear}.{field}")
+                continue
+            elif isinstance(expected_val, dict) and "min" in expected_val and "max" in expected_val:
+                if isinstance(actual_val, (int, float)):
+                    if not (expected_val["min"] <= actual_val <= expected_val["max"]):
+                        mismatches.append(f"{gear}.{field}: expected [{expected_val['min']}, {expected_val['max']}], got {actual_val}")
+                elif isinstance(actual_val, list) and len(actual_val) == 2:
+                    if not (expected_val["min"] <= actual_val[0] <= expected_val["max"] or 
+                            expected_val["min"] <= actual_val[1] <= expected_val["max"]):
+                        mismatches.append(f"{gear}.{field}: expected range [{expected_val['min']}, {expected_val['max']}], got {actual_val}")
+            elif isinstance(actual_val, str) and isinstance(expected_val, str):
+                if actual_val != expected_val:
+                    mismatches.append(f"{gear}.{field}: expected '{expected_val}', got '{actual_val}'")
+            elif actual_val != expected_val:
+                mismatches.append(f"{gear}.{field}: expected {expected_val}, got {actual_val}")
+
+    handount_exists = handount_path.is_file()
+
+    passed = (
+        cfg_exists and
+        not mismatches and
+        not missing_gears and
+        not missing_fields and
+        handount_exists
+    )
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"mismatches={mismatches or 'none'}",
+        f"missing_gears={missing_gears or 'none'}",
+        f"missing_fields={missing_fields or 'none'}",
+        f"handount_exists={handount_exists}",
+    ]
+    return {
+        "code": "P32-axis-k-anchor", "name": "[32] 档位协议条款 · K 轴 —— 锚点配置", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "handount_path": str(handount_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "handount_exists": handount_exists,
+            "mismatches": mismatches,
+            "missing_gears": missing_gears,
+            "missing_fields": missing_fields,
+        },
+    }
