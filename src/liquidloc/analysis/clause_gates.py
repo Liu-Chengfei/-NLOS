@@ -10068,6 +10068,121 @@ def p90_test_trajectory_regeneration() -> dict[str, Any]:
     }
 
 
+def p91_systematic_nan_escalation() -> dict[str, Any]:
+    """[85] 系统性NaN升级实现层诊断——禁止通过调 lr 反复试探掩盖
+
+    手册 [85]：若 5 方法中某一方法系统性 NaN（≥3 单元同因）→ 升级查实现（第二层 实现层诊断 / ），禁止通过调 lr 反复试探掩盖（调 lr 只允许用于"训练不充分"场景，见 Part 0 学习率三段式协议边界）
+
+    验证项：
+    1. configs/protocol/systematic_nan_escalation.yaml 存在且能正确解析
+    2. clause_id == "85"
+    3. systematic_nan.threshold_units == 3
+    4. escalation.escalate_to_implementation_diagnosis == true
+    5. lr_tuning.lr_tuning_for_masking_forbidden == true
+    6. lr_tuning.lr_tuning_only_for_undertrained == true
+    7. methods_context.n_methods == 5
+    8. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "systematic_nan_escalation.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P91-systematic-nan", "name": "[85] 系统性NaN升级实现层诊断",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P91-systematic-nan", "name": "[85] 系统性NaN升级实现层诊断",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "85"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    sn = cfg.get("systematic_nan", {})
+    if not isinstance(sn, dict):
+        checks["systematic_nan_section"] = False
+        passed = False
+    else:
+        checks["systematic_nan_section"] = True
+
+        ok_threshold = sn.get("threshold_units") == 3
+        checks["threshold_units_eq_3"] = ok_threshold
+        passed = passed and ok_threshold
+
+    esc = cfg.get("escalation", {})
+    if not isinstance(esc, dict):
+        checks["escalation_section"] = False
+        passed = False
+    else:
+        checks["escalation_section"] = True
+
+        ok_escalate = esc.get("escalate_to_implementation_diagnosis") is True
+        checks["escalate_to_implementation_diagnosis_true"] = ok_escalate
+        passed = passed and ok_escalate
+
+    lr = cfg.get("lr_tuning", {})
+    if not isinstance(lr, dict):
+        checks["lr_tuning_section"] = False
+        passed = False
+    else:
+        checks["lr_tuning_section"] = True
+
+        ok_masking = lr.get("lr_tuning_for_masking_forbidden") is True
+        checks["lr_tuning_for_masking_forbidden_true"] = ok_masking
+        passed = passed and ok_masking
+
+        ok_undertrained = lr.get("lr_tuning_only_for_undertrained") is True
+        checks["lr_tuning_only_for_undertrained_true"] = ok_undertrained
+        passed = passed and ok_undertrained
+
+    mc = cfg.get("methods_context", {})
+    if not isinstance(mc, dict):
+        checks["methods_context_section"] = False
+        passed = False
+    else:
+        checks["methods_context_section"] = True
+
+        ok_methods = mc.get("n_methods") == 5
+        checks["n_methods_eq_5"] = ok_methods
+        passed = passed and ok_methods
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P91-systematic-nan", "name": "[85] 系统性NaN升级实现层诊断",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17685,6 +17800,7 @@ _ALL = [
     p88_preliminary_target_verification,
     p89_lstm_transformer_head_verification,
     p90_test_trajectory_regeneration,
+    p91_systematic_nan_escalation,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
