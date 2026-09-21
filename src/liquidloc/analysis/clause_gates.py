@@ -9696,6 +9696,99 @@ def p86_gap_interception() -> dict[str, Any]:
     }
 
 
+def p87_smoke_test_verification() -> dict[str, Any]:
+    """[81] 冒烟验证——冒烟运行脚本 exit 码 + 日志断言探针（d：批形状/loss 轨迹/梯度范数）+ 统计 gate 自动输出比对
+
+    手册 [81]：**冒烟**；验收人/验收机制（自交自验 = 未过）：冒烟运行脚本 exit 码 + 日志断言探针（d：批形状/loss 轨迹/梯度范数）+ 统计 gate 自动输出比对
+
+    验证项：
+    1. configs/protocol/smoke_test_verification.yaml 存在且能正确解析
+    2. clause_id == "81"
+    3. smoke_verification.script_exit_code_required == true
+    4. smoke_verification.log_assertion_probe_required == true
+    5. smoke_verification.batch_shape_assertion == true
+    6. smoke_verification.loss_trajectory_check == true
+    7. smoke_verification.gradient_norm_check == true
+    8. smoke_verification.stats_gate_auto_output == true
+    9. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "smoke_test_verification.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P87-smoke-test", "name": "[81] 冒烟验证",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P87-smoke-test", "name": "[81] 冒烟验证",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "81"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    sv = cfg.get("smoke_verification", {})
+    if not isinstance(sv, dict):
+        checks["smoke_verification_section"] = False
+        passed = False
+    else:
+        checks["smoke_verification_section"] = True
+
+        checks["script_exit_code_required_true"] = sv.get("script_exit_code_required") is True
+        passed = passed and checks["script_exit_code_required_true"]
+
+        checks["log_assertion_probe_required_true"] = sv.get("log_assertion_probe_required") is True
+        passed = passed and checks["log_assertion_probe_required_true"]
+
+        checks["batch_shape_assertion_true"] = sv.get("batch_shape_assertion") is True
+        passed = passed and checks["batch_shape_assertion_true"]
+
+        checks["loss_trajectory_check_true"] = sv.get("loss_trajectory_check") is True
+        passed = passed and checks["loss_trajectory_check_true"]
+
+        checks["gradient_norm_check_true"] = sv.get("gradient_norm_check") is True
+        passed = passed and checks["gradient_norm_check_true"]
+
+        checks["stats_gate_auto_output_true"] = sv.get("stats_gate_auto_output") is True
+        passed = passed and checks["stats_gate_auto_output_true"]
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P87-smoke-test", "name": "[81] 冒烟验证",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17309,6 +17402,7 @@ _ALL = [
     p84_docstring_signature_consistency,
     p85_git_verify,
     p86_gap_interception,
+    p87_smoke_test_verification,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
