@@ -1,6 +1,6 @@
 # 条款 [96] 布局参数 vs 排序散点 & MILUV 分段误差图配置
 # 手册原文：布局参数 vs 排序散点 布局随机化层 MILUV 分段误差图 方法级对比在 MILUV 的 LOS/NLOS 分段误差（整体 + 分段）布局随机化层
-# 对应手册 docs/最终交付_异步手册_424条_20260917.md:323
+# 对应手册 docs/最终交付_异步手册_424条_20260917.md:331
 
 clause_id: "96"
 clause_name: "布局参数 vs 排序散点与 MILUV 分段误差图"
@@ -58,4 +58,4 @@ visualization_spec:
     fill_by: "segment"
     
 # 参考路径
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md:323"
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md:331"

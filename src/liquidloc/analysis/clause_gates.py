@@ -11353,6 +11353,146 @@ def p100_miluv_external_domain() -> dict[str, Any]:
     }
 
 
+def p101_layout_scatter_miluv() -> dict[str, Any]:
+    """[96] 布局参数 vs 排序散点 —布局参数 vs 排序散点 布局随机化层 MILUV 分段误差图 方法级对比在 MILUV 的 LOS/NLOS 分段误差（整体 + 分段）布局随机化层
+
+    手册 [96]：布局参数 vs 排序散点 布局随机化层 MILUV 分段误差图 方法级对比在 MILUV 的 LOS/NLOS 分段误差（整体 + 分段）布局随机化层。
+
+    验证项：
+    1. configs/protocol/clause96_layout_scatter_miluv.yaml 存在且能正确解析
+    2. clause_id == "96"
+    3. layout_parameter_scatter.enabled == true
+    4. layout_parameter_scatter.chart_types 包含 "scatter" 和 "boxplot"
+    5. layout_parameter_scatter.x_axis == "布局参数 (layout_id)"
+    6. layout_parameter_scatter.y_axis == "方法排序 (RMSE)"
+    7. layout_parameter_scatter.method_comparison 包含5个方法
+    8. miluv_segmented_error_plot.enabled == true
+    9. miluv_segmented_error_plot.segments 包含 overall, LOS, NLOS, missing
+    10. miluv_segmented_error_plot.metric == "RMSE"
+    11. manual_ref 指向第331行
+    12. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause96_layout_scatter_miluv.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P101-layout-scatter", "name": "[96] 布局参数 vs 排序散点",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P101-layout-scatter", "name": "[96] 布局参数 vs 排序散点",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "96"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    scatter = cfg.get("layout_parameter_scatter", {})
+    if isinstance(scatter, dict):
+        ok_enabled = scatter.get("enabled") is True
+        checks["scatter_enabled"] = ok_enabled
+        passed = passed and ok_enabled
+
+        ct = scatter.get("chart_types", [])
+        if isinstance(ct, list):
+            ok_ct = "scatter" in ct and "boxplot" in ct
+            checks["chart_types_scatter_boxplot"] = ok_ct
+            passed = passed and ok_ct
+        else:
+            checks["chart_types_scatter_boxplot"] = False
+            passed = False
+
+        ok_x = scatter.get("x_axis") == "布局参数 (layout_id)"
+        checks["x_axis_layout"] = ok_x
+        passed = passed and ok_x
+
+        ok_y = scatter.get("y_axis") == "方法排序 (RMSE)"
+        checks["y_axis_rmse"] = ok_y
+        passed = passed and ok_y
+
+        mc = scatter.get("method_comparison", [])
+        if isinstance(mc, list):
+            ok_mc = len(mc) >= 5
+            checks["method_comparison_5"] = ok_mc
+            passed = passed and ok_mc
+        else:
+            checks["method_comparison_5"] = False
+            passed = False
+    else:
+        for key in ["scatter_enabled", "chart_types_scatter_boxplot", "x_axis_layout",
+                     "y_axis_rmse", "method_comparison_5"]:
+            checks[key] = False
+        passed = False
+
+    miluv = cfg.get("miluv_segmented_error_plot", {})
+    if isinstance(miluv, dict):
+        ok_enabled = miluv.get("enabled") is True
+        checks["miluv_enabled"] = ok_enabled
+        passed = passed and ok_enabled
+
+        segs = miluv.get("segments", [])
+        if isinstance(segs, list):
+            ok_segs = {"overall", "LOS", "NLOS", "missing"}.issubset(segs)
+            checks["segments_4_required"] = ok_segs
+            passed = passed and ok_segs
+        else:
+            checks["segments_4_required"] = False
+            passed = False
+
+        ok_metric = miluv.get("metric") == "RMSE"
+        checks["miluv_metric_rmse"] = ok_metric
+        passed = passed and ok_metric
+    else:
+        for key in ["miluv_enabled", "segments_4_required", "miluv_metric_rmse"]:
+            checks[key] = False
+        passed = False
+
+    ok_layout = cfg.get("layout_randomization_layer") is True
+    checks["layout_randomization_layer"] = ok_layout
+    passed = passed and ok_layout
+
+    manual_ref = cfg.get("manual_ref", "")
+    ok_ref = "331" in manual_ref or "line 331" in manual_ref.lower()
+    checks["manual_ref_points_to_331"] = ok_ref
+    passed = passed and ok_ref
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P101-layout-scatter", "name": "[96] 布局参数 vs 排序散点",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -18980,6 +19120,7 @@ _ALL = [
     p98_baseline_consistency,
     p99_table_delivery_list,
     p100_miluv_external_domain,
+    p101_layout_scatter_miluv,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
     p183_layout_manifest,
