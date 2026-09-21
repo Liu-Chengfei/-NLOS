@@ -17830,3 +17830,135 @@ def p32_axis_k_anchor_verification() -> dict[str, Any]:
             "missing_fields": missing_fields,
         },
     }
+
+
+# ---------------- [33] 档位协议条款 · M 轴 —— 数据缺失 ----------------
+def p33_axis_m_missing_verification() -> dict[str, Any]:
+    """[33] 档位协议条款 · M 轴 —— 数据缺失
+    验证 configs/protocol/axis_m_missing.yaml 文件存在且参数符合手册定义。
+    
+    手册第33条原始定义：
+    |M 档|缺失定义|
+    |-|-|
+    |M0|0%（理想传输）|
+    |M1|UWB 5% 成簇丢包（含 NLOS 引起的不可解帧，统一为缺失注入；成簇产生长间隙 0.3–2 s）|
+    |M2|UWB 15% + VIO 15%（各自独立）|
+    |M3|UWB 30% + VIO 30%（IMU 缺失率 ≤5%）|
+    
+    说明：M2 为各自 15%（非合计）；M3 中 IMU 缺失率上限 5%；
+    M 轴缺失为成簇注入，产生长间隙。
+    """
+    import yaml
+
+    cfg_path = CONFIGS / "protocol" / "axis_m_missing.yaml"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    expected_gears = {
+        "M0": {
+            "uwb_missing_rate": 0.00,
+            "vio_missing_rate": 0.00,
+            "imu_missing_rate": 0.00,
+            "injection_type": "none",
+        },
+        "M1": {
+            "uwb_missing_rate": 0.05,
+            "vio_missing_rate": 0.00,
+            "imu_missing_rate": 0.00,
+            "injection_type": "clustered",
+            "cluster_gap_seconds": [0.3, 2.0],
+        },
+        "M2": {
+            "uwb_missing_rate": 0.15,
+            "vio_missing_rate": 0.15,
+            "imu_missing_rate": 0.00,
+            "injection_type": "clustered",
+            "cluster_gap_seconds": [0.3, 2.0],
+        },
+        "M3": {
+            "uwb_missing_rate": 0.30,
+            "vio_missing_rate": 0.30,
+            "imu_missing_rate": 0.05,
+            "injection_type": "clustered",
+            "cluster_gap_seconds": [0.3, 2.0],
+            "imu_missing_rate_limit": 0.05,
+        },
+    }
+
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P33-axis-m-missing", "name": "[33] 档位协议条款 · M 轴 —— 数据缺失", "severity": "hard",
+            "passed": False,
+            "detail": "axis_m_missing.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P33-axis-m-missing", "name": "[33] 档位协议条款 · M 轴 —— 数据缺失", "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    # M轴配置文件使用扁平结构（M0/M1/M2/M3直接在根节点）
+    gears = {}
+    for gear_key in ["M0", "M1", "M2", "M3"]:
+        if gear_key in cfg:
+            gears[gear_key] = cfg[gear_key]
+    mismatches: list[str] = []
+    missing_gears: list[str] = []
+    missing_fields: list[str] = []
+    
+    for gear, params in expected_gears.items():
+        if gear not in gears:
+            missing_gears.append(gear)
+            continue
+        for field, expected_val in params.items():
+            actual_val = gears[gear].get(field)
+            if actual_val is None:
+                missing_fields.append(f"{gear}.{field}")
+                continue
+            elif isinstance(expected_val, dict) and "min" in expected_val and "max" in expected_val:
+                if isinstance(actual_val, (int, float)):
+                    if not (expected_val["min"] <= actual_val <= expected_val["max"]):
+                        mismatches.append(f"{gear}.{field}: expected [{expected_val['min']}, {expected_val['max']}], got {actual_val}")
+                elif isinstance(actual_val, list) and len(actual_val) == 2:
+                    if not (expected_val["min"] <= actual_val[0] <= expected_val["max"] or
+                            expected_val["min"] <= actual_val[1] <= expected_val["max"]):
+                        mismatches.append(f"{gear}.{field}: expected range [{expected_val['min']}, {expected_val['max']}], got {actual_val}")
+            elif actual_val != expected_val:
+                mismatches.append(f"{gear}.{field}: expected {expected_val}, got {actual_val}")
+
+    handount_exists = handount_path.is_file()
+
+    passed = (
+        cfg_exists and
+        not mismatches and
+        not missing_gears and
+        not missing_fields and
+        handount_exists
+    )
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"mismatches={mismatches or 'none'}",
+        f"missing_gears={missing_gears or 'none'}",
+        f"missing_fields={missing_fields or 'none'}",
+        f"handount_exists={handount_exists}",
+    ]
+    return {
+        "code": "P33-axis-m-missing", "name": "[33] 档位协议条款 · M 轴 —— 数据缺失", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "handount_path": str(handount_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "handount_exists": handount_exists,
+            "mismatches": mismatches,
+            "missing_gears": missing_gears,
+            "missing_fields": missing_fields,
+        },
+    }
