@@ -4880,7 +4880,7 @@ def p42b_four_output_heads() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P42b-four-output-heads",
-            "name": "[42] 四个输出头的机制链配置（自适应加权/偏差补偿/门控）",
+            "name": "[42] 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控， 正是"NLOS 识别 → 协方差调制/降权 → 鲁棒门控"机制链的落地（与 架构说明 鲁棒融合组合拳一致：NLOS 识别 + 协方差膨胀/调制 + 鲁棒核/残差拒斥 + 自适应噪声）",
             "severity": "hard",
             "passed": False,
             "detail": "four_output_heads.yaml missing",
@@ -4968,7 +4968,7 @@ def p42b_four_output_heads() -> dict[str, Any]:
 
     return {
         "code": "P42b-four-output-heads",
-        "name": "[42] 四个输出头的机制链配置（自适应加权/偏差补偿/门控）",
+        "name": "[42] 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控， 正是"NLOS 识别 → 协方差调制/降权 → 鲁棒门控"机制链的落地（与 架构说明 鲁棒融合组合拳一致：NLOS 识别 + 协方差膨胀/调制 + 鲁棒核/残差拒斥 + 自适应噪声）",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
