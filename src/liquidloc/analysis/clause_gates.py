@@ -17576,3 +17576,136 @@ def p30_axis_n_nlos_verification() -> dict[str, Any]:
             "missing_fields": missing_fields,
         },
     }
+
+
+# ---------------- [31] 档位协议条款 · V 轴 —— 视觉退化 ----------------
+def p31_axis_v_visual_verification() -> dict[str, Any]:
+    """[31] 档位协议条款 · V 轴 —— 视觉退化
+    验证 configs/protocol/axis_v_visual.yaml 文件存在且参数符合手册定义。
+    
+    手册第31条原始定义：
+    |V 档|名称|具体数值|
+    |-|---|---|
+    |V0|健康|特征 >50/frame；增量噪声 σ=0.01–0.03 m/步；帧有效 100%；无间隙|
+    |V1|黑屏|视觉完全失效：增量在但置零（=0），scaling→0；每序列 1–2 次，单次 0.5–2 s，占轨迹 5–10%|
+    |V2|特征丢失|特征 10–20/frame；增量噪声放大 5×（σ→0.05–0.15 m/步）；占轨迹 20–40%，连续段 1–3 s；scaling→0.3–0.7|
+    |V3|关键帧中断|增量缺失（质量触发，非时间戳缺失）；每序列 2–4 次，间隙 0.5–3 s，占轨迹 10–20%；恢复后重定位跳变 0.3–1 m|
+    
+    说明：A轴丢帧 = 数据不在（时间戳级缺失）；
+    V1 = 数据在但置零； V2 = 数据在但变糙（σ×5）；
+    V3 = 数据不在（质量触发）+ 恢复跳变。
+    """
+    import yaml
+
+    cfg_path = CONFIGS / "protocol" / "axis_v_visual.yaml"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    expected_gears = {
+        "V0": {
+            "features_per_frame_min": 50,
+            "increment_noise_sigma_m": {"min": 0.01, "max": 0.03},
+            "frame_validity_pct": 100,
+            "gap": None,
+        },
+        "V1": {
+            "increment_mode": "zeroed",
+            "scaling": 0.0,
+            "episodes_per_sequence": {"min": 1, "max": 2},
+            "episode_duration_s": {"min": 0.5, "max": 2.0},
+            "trajectory_ratio_pct": {"min": 5, "max": 10},
+        },
+        "V2": {
+            "features_per_frame": {"min": 10, "max": 20},
+            "increment_noise_amplification": 5,
+            "increment_noise_sigma_m": {"min": 0.05, "max": 0.15},
+            "trajectory_ratio_pct": {"min": 20, "max": 40},
+            "continuous_segment_s": {"min": 1, "max": 3},
+            "scaling": {"min": 0.3, "max": 0.7},
+        },
+        "V3": {
+            "increment_mode": "missing",
+            "trigger": "quality",
+            "episodes_per_sequence": {"min": 2, "max": 4},
+            "gap_s": {"min": 0.5, "max": 3.0},
+            "trajectory_ratio_pct": {"min": 10, "max": 20},
+            "relocalization_jump_m": {"min": 0.3, "max": 1.0},
+        },
+    }
+
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P31-axis-v-visual", "name": "[31] 档位协议条款 · V 轴 —— 视觉退化", "severity": "hard",
+            "passed": False,
+            "detail": "axis_v_visual.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P31-axis-v-visual", "name": "[31] 档位协议条款 · V 轴 —— 视觉退化", "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    gears = cfg.get("gears", {})
+    
+    mismatches: list[str] = []
+    missing_gears: list[str] = []
+    missing_fields: list[str] = []
+    
+    for gear, params in expected_gears.items():
+        if gear not in gears:
+            missing_gears.append(gear)
+            continue
+        for field, expected_val in params.items():
+            actual_val = gears[gear].get(field)
+            # 跳过expected_val为None的字段（表示该字段不验证）
+            if expected_val is None:
+                continue
+            if actual_val is None:
+                missing_fields.append(f"{gear}.{field}")
+                continue
+            elif isinstance(expected_val, dict) and "min" in expected_val and "max" in expected_val:
+                if isinstance(actual_val, dict) and "min" in actual_val and "max" in actual_val:
+                    if actual_val["max"] < expected_val["min"] or actual_val["min"] > expected_val["max"]:
+                        mismatches.append(f"{gear}.{field}: expected range [{expected_val['min']}, {expected_val['max']}], got [{actual_val['min']}, {actual_val['max']}]")
+                elif isinstance(actual_val, (int, float)):
+                    if not (expected_val["min"] <= actual_val <= expected_val["max"]):
+                        mismatches.append(f"{gear}.{field}: expected range [{expected_val['min']}, {expected_val['max']}], got {actual_val}")
+            elif actual_val != expected_val:
+                mismatches.append(f"{gear}.{field}: expected {expected_val}, got {actual_val}")
+
+    handount_exists = handount_path.is_file()
+
+    passed = (
+        cfg_exists and
+        not mismatches and
+        not missing_gears and
+        not missing_fields and
+        handount_exists
+    )
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"mismatches={mismatches or 'none'}",
+        f"missing_gears={missing_gears or 'none'}",
+        f"missing_fields={missing_fields or 'none'}",
+        f"handount_exists={handount_exists}",
+    ]
+    return {
+        "code": "P31-axis-v-visual", "name": "[31] 档位协议条款 · V 轴 —— 视觉退化", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "handount_path": str(handount_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "handount_exists": handount_exists,
+            "mismatches": mismatches,
+            "missing_gears": missing_gears,
+            "missing_fields": missing_fields,
+        },
+    }
