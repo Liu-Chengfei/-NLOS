@@ -18079,3 +18079,62 @@ def p34_axis_independence_verification() -> dict[str, Any]:
             "missing_fields": missing_fields,
         },
     }
+
+
+# ---------------- [35] 无临时脚本 ----------------
+def p35_no_temp_scripts_verification() -> dict[str, Any]:
+    """[35] 无临时脚本；通过标准：bash_tool_*/tmp_*/temp_* = 0
+
+    验证工作区中不存在临时脚本文件（bash_tool_*、tmp_*、temp_* 前缀）。
+    通过标准：所有三类临时脚本数量均为 0。
+    """
+    import glob
+    import re
+
+    workspace = str(PROJECT_ROOT)
+    
+    # 搜索三类临时脚本模式
+    patterns = [
+        "bash_tool_*",
+        "tmp_*",
+        "temp_*",
+    ]
+    
+    temp_files: dict[str, list[str]] = {}
+    total_count = 0
+    
+    for pattern in patterns:
+        full_pattern = f"{workspace}/**/{pattern}"
+        matches = glob.glob(full_pattern, recursive=True)
+        # 过滤掉 .git 目录和 __pycache__
+        matches = [
+            m for m in matches
+            if ".git" not in m and "__pycache__" not in m and ".zcode" not in m
+        ]
+        temp_files[pattern] = [
+            os.path.relpath(m, workspace) for m in matches
+        ]
+        total_count += len(temp_files[pattern])
+    
+    # 通过标准：所有临时脚本数量均为 0
+    passed = total_count == 0
+    
+    detail_parts = [
+        f"total_temp_files={total_count}",
+        f"bash_tool_count={len(temp_files.get('bash_tool_*', []))}",
+        f"tmp_count={len(temp_files.get('tmp_*', []))}",
+        f"temp_count={len(temp_files.get('temp_*', []))}",
+    ]
+    
+    return {
+        "code": "P35-no-temp-scripts",
+        "name": "[35] 无临时脚本",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "total_count": total_count,
+            "temp_files": temp_files,
+            "passed": passed,
+        },
+    }
