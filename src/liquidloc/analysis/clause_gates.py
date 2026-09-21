@@ -6087,7 +6087,7 @@ def p54_layout_parameter_scatter() -> dict[str, Any]:
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P49-layout-scatter-plot", "name": "[49] 布局参数vs方法排序散点/箱线图",
+            "code": "P49-layout-scatter-plot", "name": "[49] 布局参数 vs 方法排序的散点/箱线（论文稳健性图）",
             "severity": "hard", "passed": False,
             "detail": "layout_scatter_plot_spec.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -6097,7 +6097,7 @@ def p54_layout_parameter_scatter() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P49-layout-scatter-plot", "name": "[49] 布局参数vs方法排序散点/箱线图",
+            "code": "P49-layout-scatter-plot", "name": "[49] 布局参数 vs 方法排序的散点/箱线（论文稳健性图）",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
@@ -6106,7 +6106,7 @@ def p54_layout_parameter_scatter() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P49-layout-scatter-plot", "name": "[49] 布局参数vs方法排序散点/箱线图",
+            "code": "P49-layout-scatter-plot", "name": "[49] 布局参数 vs 方法排序的散点/箱线（论文稳健性图）",
             "severity": "hard", "passed": False,
             "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
@@ -6142,7 +6142,7 @@ def p54_layout_parameter_scatter() -> dict[str, Any]:
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P49-layout-scatter-plot", "name": "[49] 布局参数vs方法排序散点/箱线图",
+        "code": "P49-layout-scatter-plot", "name": "[49] 布局参数 vs 方法排序的散点/箱线（论文稳健性图）",
         "severity": "hard", "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {

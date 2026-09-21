@@ -1,8 +1,8 @@
-# 条款 [54] 布局参数 vs 方法排序散点/箱线图配置
+# 条款 [49] 布局参数 vs 方法排序散点/箱线图配置
 # 手册原文：布局参数 vs 方法排序的散点/箱线（论文稳健性图）。
 
-clause_id: "54"
-clause_name: "布局参数vs方法排序散点/箱线图"
+clause_id: "49"
+clause_name: "布局参数 vs 方法排序的散点/箱线（论文稳健性图）"
 
 chart_types:
   - "scatter"
@@ -27,4 +27,4 @@ plot_spec:
     notch: false
     show_outliers: true
 
-manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第318行"
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第284行"
