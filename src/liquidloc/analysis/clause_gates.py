@@ -10865,6 +10865,123 @@ def p91_anchor_fixed_4_m1_clustered() -> dict[str, Any]:
     }
 
 
+def p97_ten_seeds_five_methods() -> dict[str, Any]:
+    """[92] 10 repeats（seed）× 5 方法 ——10 repeats（seed）× 5 方法
+
+    手册 [92]：10 repeats（seed）× 5 方法。
+
+    验证项：
+    1. configs/protocol/clause92_10seeds_5methods.yaml 存在且能正确解析
+    2. clause_id == "92"
+    3. seed_config.n_seeds == 10
+    4. method_config.n_methods == 5
+    5. experiment_units.total_units == 50
+    6. compliance.same_seed_init == true
+    7. compliance.baseline_consistent == true
+    8. reference.manual_line == 327
+    9. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause92_10seeds_5methods.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P97-ten-seeds-five-methods", "name": "[92] 10 repeats（seed）× 5 方法",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P97-ten-seeds-five-methods", "name": "[92] 10 repeats（seed）× 5 方法",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "92"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    seed_cfg = cfg.get("seed_config", {})
+    if isinstance(seed_cfg, dict):
+        ok_n_seeds = seed_cfg.get("n_seeds") == 10
+        checks["n_seeds_eq_10"] = ok_n_seeds
+        passed = passed and ok_n_seeds
+    else:
+        checks["n_seeds_eq_10"] = False
+        passed = False
+
+    method_cfg = cfg.get("method_config", {})
+    if isinstance(method_cfg, dict):
+        ok_n_methods = method_cfg.get("n_methods") == 5
+        checks["n_methods_eq_5"] = ok_n_methods
+        passed = passed and ok_n_methods
+    else:
+        checks["n_methods_eq_5"] = False
+        passed = False
+
+    exp_units = cfg.get("experiment_units", {})
+    if isinstance(exp_units, dict):
+        ok_total = exp_units.get("total_units") == 50
+        checks["total_units_eq_50"] = ok_total
+        passed = passed and ok_total
+    else:
+        checks["total_units_eq_50"] = False
+        passed = False
+
+    compliance = cfg.get("compliance", {})
+    if isinstance(compliance, dict):
+        ok_same_seed = compliance.get("same_seed_init") is True
+        ok_baseline = compliance.get("baseline_consistent") is True
+        checks["same_seed_init_true"] = ok_same_seed
+        checks["baseline_consistent_true"] = ok_baseline
+        passed = passed and ok_same_seed and ok_baseline
+    else:
+        checks["same_seed_init_true"] = False
+        checks["baseline_consistent_true"] = False
+        passed = False
+
+    ref = cfg.get("reference", {})
+    if isinstance(ref, dict):
+        manual_line = ref.get("manual_line")
+        ok_line = manual_line == 327 or str(manual_line) == "327"
+        checks["manual_line_points_to_327"] = ok_line
+        passed = passed and ok_line
+    else:
+        checks["manual_line_points_to_327"] = False
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P97-ten-seeds-five-methods", "name": "[92] 10 repeats（seed）× 5 方法",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -18488,6 +18605,7 @@ _ALL = [
     p94_execution_deviation_assumption,
     p95_add_seed_or_trajectory,
     p96_learning_rate_three_phase,
+    p97_ten_seeds_five_methods,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
     p183_layout_manifest,
