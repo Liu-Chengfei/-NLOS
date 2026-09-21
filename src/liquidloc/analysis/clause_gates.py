@@ -5920,7 +5920,7 @@ def p52_baseline_not_bare_model() -> dict[str, Any]:
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型",
+            "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型：确认 LSTM/Transformer 确实带头运行——否则 LNN 赢它们=\"4 个头 + 液态骨干\"双重优势，对比不公平。",
             "severity": "hard", "passed": False,
             "detail": "baseline_not_bare_model.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -5930,7 +5930,7 @@ def p52_baseline_not_bare_model() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型",
+            "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型：确认 LSTM/Transformer 确实带头运行——否则 LNN 赢它们=\"4 个头 + 液态骨干\"双重优势，对比不公平。",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
@@ -5939,7 +5939,7 @@ def p52_baseline_not_bare_model() -> dict[str, Any]:
 
     if not isinstance(cfg, dict):
         return {
-            "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型",
+            "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型：确认 LSTM/Transformer 确实带头运行——否则 LNN 赢它们=\"4 个头 + 液态骨干\"双重优势，对比不公平。",
             "severity": "hard", "passed": False,
             "detail": "cfg is not a dict",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
@@ -5978,7 +5978,7 @@ def p52_baseline_not_bare_model() -> dict[str, Any]:
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型", "severity": "hard",
+        "code": "P52-baseline-not-bare-model", "name": "[52] 基线不是裸模型：确认 LSTM/Transformer 确实带头运行——否则 LNN 赢它们=\"4 个头 + 液态骨干\"双重优势，对比不公平。", "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
