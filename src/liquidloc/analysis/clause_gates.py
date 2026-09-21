@@ -235,8 +235,8 @@ def c6_ram_limit() -> dict[str, Any]:
     
     真实实现位置：
       - src/liquidloc/common/resource_budget.py:RAM_LIMIT_GB=12.0（唯一常数源）
-      - scripts/_run_25unit.py:_pre5_resource_budget() → ram_limit_gb=12.0 + parallel_decision
-      - scripts/_run_25unit.py 阶段1/2 → ThreadPoolExecutor(max_workers=final_parallel)
+      - scripts/_run_25unit.py:_pre5_resource_budget() -> ram_limit_gb=12.0 + parallel_decision
+      - scripts/_run_25unit.py 阶段1/2 -> ThreadPoolExecutor(max_workers=final_parallel)
     """
     const_sites: list[str] = []
     bad_08: list[str] = []
@@ -271,8 +271,8 @@ def c7_parallel_maximize() -> dict[str, Any]:
     
     真实实现位置：
       - src/liquidloc/common/resource_budget.py:compute_parallel_limits()
-        → final_parallel = min(gpu_parallel, ram_parallel, pending)
-      - scripts/_run_25unit.py 阶段1/2 → ThreadPoolExecutor(max_workers=final_parallel)
+        -> final_parallel = min(gpu_parallel, ram_parallel, pending)
+      - scripts/_run_25unit.py 阶段1/2 -> ThreadPoolExecutor(max_workers=final_parallel)
     """
     min_sites: list[str] = []
     tpe_sites: list[str] = []
@@ -300,7 +300,7 @@ def c7_parallel_maximize() -> dict[str, Any]:
 
 # ---------------- C-8: 跨体系互斥 + 工作区隔离 ----------------
 def c8_cross_experiment_isolation() -> dict[str, Any]:
-    """C-8: 论文级硬互斥（对方 RZ-1→RZ-3 时不得启动论文级）+ 工作区隔离。"""
+    """C-8: 论文级硬互斥（对方 RZ-1->RZ-3 时不得启动论文级）+ 工作区隔离。"""
     mutex: list[str] = []
     isolation: list[str] = []
     arbiter = (PROJECT_ROOT.parent / "exp_arbiter" / "status.json")
@@ -414,7 +414,7 @@ def p22_two_step_inference() -> dict[str, Any]:
     """[718]-[720] 整体-局部分层推断：全局不显著则两两 Wilcoxon 降级为探索性 +CI 未校正声明。"""
     # P22 两步推断逻辑已在 significance_tests.py run_significance_tests() 中实现：
     # 1. Friedman 全局检验先行
-    # 2. 若 global p >= 0.05 → 所有局部分析标为 exploratory=True
+    # 2. 若 global p >= 0.05 -> 所有局部分析标为 exploratory=True
     # 3. 输出字段: exploratory / exploratory_reason / global_test_p_value / global_test_significant
     # 静态检查：找到 significance_tests.py 中的两步逻辑实现
     two_step_sites = []
@@ -478,9 +478,9 @@ def p15_p_hacking_prevention() -> dict[str, Any]:
     """[15] 底线：解冻纪律与数据纯净性（治理层）——验证解冻纪律规则文件、配置文件、验证函数、AGENTS.md索引、状态表条目、八字段报告、pre-commit钩子完整。
     
     核心判据：
-    - 生成器有改动 → 解冻 → 修改 → 重新冒烟 → 再冻结 → 清场重做
+    - 生成器有改动 -> 解冻 -> 修改 -> 重新冒烟 -> 再冻结 -> 清场重做
     - 禁止"补跑只挑结果好的单元"（选择性补跑 = 变相p-hacking）
-    - 禁止"把数据改到结果满意为止"（若属档位/注入语义错误 → 走协议变更流程或缩小声明范围，不得改数据到满意）
+    - 禁止"把数据改到结果满意为止"（若属档位/注入语义错误 -> 走协议变更流程或缩小声明范围，不得改数据到满意）
     - 修复后结果不得与旧结果混用（纪律）
     - 任何旧数据集一律不得复用（哪怕旧数据本身合格），论文级结论必须来自这批复现可查的全新数据
     - 诊断轨/冒烟数据的任何结果不得以任何形式并入、替代或"补充"验收轨数据（用后即弃或隔离归档，禁止并入任何正式数据）
@@ -1025,7 +1025,7 @@ def p36_no_single_thread_linear() -> dict[str, Any]:
 
 
 def p35_primary_channel_exclusive_rerun() -> dict[str, Any]:
-    """[35] 需重跑 → 主执行通道独占重跑，不派给其他通道。
+    """[35] 需重跑 -> 主执行通道独占重跑，不派给其他通道。
 
     验证 configs/protocol/primary_channel_exclusive_rerun.yaml 存在且能解析，
     关键字段（rerun_policy / channel_assignment / prohibition / constraint_declaration）完整，
@@ -1415,7 +1415,7 @@ def p16_resource_conflict_scheduler() -> dict[str, Any]:
                     default_stagger_seconds=5.0,
                 )
 
-                # 场景1: 有冲突 → 错峰调度
+                # 场景1: 有冲突 -> 错峰调度
                 tasks_conflict = [
                     {"unit_id": f"unit_{i}", "gpu_required": 1, "ram_gb": 4.0}
                     for i in range(5)
@@ -1430,7 +1430,7 @@ def p16_resource_conflict_scheduler() -> dict[str, Any]:
                 mode_staggered = result_conflict.get("mode") == "staggered"
                 log_path = scheduler.write_scheduling_log()
 
-                # 场景2: 无冲突 → 并行调度
+                # 场景2: 无冲突 -> 并行调度
                 tasks_no_conflict = [
                     {"unit_id": f"unit_{i}", "gpu_required": 1, "ram_gb": 2.0}
                     for i in range(2)
@@ -2000,8 +2000,8 @@ def p21_visual_axis_verification() -> dict[str, Any]:
     | V 档 | 名称 | 具体数值 |
     |---|---|---|
     | V0 | 健康 | 特征 >50/frame；增量噪声 σ=0.01–0.03 m/步；帧有效 100%；无间隙 |
-    | V1 | 黑屏 | 视觉完全失效：增量在但置零（=0），scaling→0；每序列 1–2 次，单次 0.5–2 s，占轨迹 5–10% |
-    | V2 | 特征丢失 | 特征 10–20/frame；增量噪声放大 5×（σ→0.05–0.15 m/步）；占轨迹 20–40%，连续段 1–3 s；scaling→0.3–0.7 |
+    | V1 | 黑屏 | 视觉完全失效：增量在但置零（=0），scaling->0；每序列 1–2 次，单次 0.5–2 s，占轨迹 5–10% |
+    | V2 | 特征丢失 | 特征 10–20/frame；增量噪声放大 5×（σ->0.05–0.15 m/步）；占轨迹 20–40%，连续段 1–3 s；scaling->0.3–0.7 |
     | V3 | 关键帧中断 | 增量缺失（质量触发，非时间戳缺失）；每序列 2–4 次，间隙 0.5–3 s，占轨迹 10–20%；恢复后重定位跳变 0.3–1 m |
     A 轴丢帧 = 数据不在（时间戳级缺失）
     V1 = 数据在但置零
@@ -3735,7 +3735,7 @@ def p37_gear_definition_declaration() -> dict[str, Any]:
 def p38_scale_no_downgrade() -> dict[str, Any]:
     """[38] 规模不可降级（硬约束）。
 
-    全文档任何环节出现资源不足 → 降为串行排队执行（同一 GPU 上逐单元依次跑完，预算固定，不换卡/不加机/不扩资源），
+    全文档任何环节出现资源不足 -> 降为串行排队执行（同一 GPU 上逐单元依次跑完，预算固定，不换卡/不加机/不扩资源），
     禁止以降 seed/降轨迹数换取跑完。
     验证：
     1. configs/protocol/no_scale_downgrade.yaml 存在且能正确解析
@@ -4857,7 +4857,7 @@ def p42_imu_no_head_reasoning() -> dict[str, Any]:
 
 def p42b_four_output_heads() -> dict[str, Any]:
     """[42] 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控，
-    正是"NLOS 识别 → 协方差调制/降权 → 鲁棒门控"机制链的落地（与 S4.2 鲁棒融合组合拳一致：
+    正是\"NLOS 识别 -> 协方差调制/降权 -> 鲁棒门控\"机制链的落地（与 S4.2 鲁棒融合组合拳一致：
     NLOS 识别 + 协方差膨胀/调制 + 鲁棒核/残差拒斥 + 自适应噪声）。
 
     验证：
@@ -4880,7 +4880,7 @@ def p42b_four_output_heads() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P42b-four-output-heads",
-            "name": "[42] 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控， 正是"NLOS 识别 → 协方差调制/降权 → 鲁棒门控"机制链的落地（与 架构说明 鲁棒融合组合拳一致：NLOS 识别 + 协方差膨胀/调制 + 鲁棒核/残差拒斥 + 自适应噪声）",
+            "name": "[42] 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控， 正是\"NLOS 识别 -> 协方差调制/降权 -> 鲁棒门控\"机制链的落地（与 架构说明 鲁棒融合组合拳一致：NLOS 识别 + 协方差膨胀/调制 + 鲁棒核/残差拒斥 + 自适应噪声）",
             "severity": "hard",
             "passed": False,
             "detail": "four_output_heads.yaml missing",
@@ -4910,7 +4910,7 @@ def p42b_four_output_heads() -> dict[str, Any]:
     detail_parts.append(f"output_heads={output_heads}, 期望包含 {expected_heads}, 匹配={heads_ok}")
 
     # 校验 mechanism_chain
-    expected_chain = "NLOS 识别 → 协方差调制/降权 → 鲁棒门控"
+    expected_chain = "NLOS 识别 -> 协方差调制/降权 -> 鲁棒门控"
     actual_chain = cfg.get("mechanism_chain", "")
     chain_ok = actual_chain == expected_chain
     detail_parts.append(f"mechanism_chain='{actual_chain}', 期望='{expected_chain}', 匹配={chain_ok}")
@@ -4968,7 +4968,7 @@ def p42b_four_output_heads() -> dict[str, Any]:
 
     return {
         "code": "P42b-four-output-heads",
-        "name": "[42] 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控， 正是"NLOS 识别 → 协方差调制/降权 → 鲁棒门控"机制链的落地（与 架构说明 鲁棒融合组合拳一致：NLOS 识别 + 协方差膨胀/调制 + 鲁棒核/残差拒斥 + 自适应噪声）",
+        "name": "[42] 四个输出头（uwb_scaling / bias / vio_scaling / risk）对三源量测做自适应加权、偏差补偿与门控， 正是\"NLOS 识别 -> 协方差调制/降权 -> 鲁棒门控\"机制链的落地（与 架构说明 鲁棒融合组合拳一致：NLOS 识别 + 协方差膨胀/调制 + 鲁棒核/残差拒斥 + 自适应噪声）",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -5026,7 +5026,7 @@ def p44_gear_injection_discipline() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P44-gear-injection-discipline",
-            "name": "[44] 档位注入纪律（参数怎么注入） ——A 轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表）， 严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 → 协议裁决项 + 敏感性分析）",
+            "name": "[44] 档位注入纪律（参数怎么注入） ——A 轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表）， 严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 -> 协议裁决项 + 敏感性分析）",
             "severity": "hard",
             "passed": False,
             "detail": "clause44_injection_discipline.yaml missing",
@@ -5038,7 +5038,7 @@ def p44_gear_injection_discipline() -> dict[str, Any]:
     except Exception as exc:
         return {
             "code": "P44-gear-injection-discipline",
-            "name": "[44] 档位注入纪律（参数怎么注入） ——A 轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表）， 严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 → 协议裁决项 + 敏感性分析）",
+            "name": "[44] 档位注入纪律（参数怎么注入） ——A 轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表）， 严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 -> 协议裁决项 + 敏感性分析）",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -5073,7 +5073,7 @@ def p44_gear_injection_discipline() -> dict[str, Any]:
     ]
     return {
         "code": "P44-gear-injection-discipline",
-        "name": "[44] 档位注入纪律（参数怎么注入） ——A 轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表）， 严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 → 协议裁决项 + 敏感性分析）",
+        "name": "[44] 档位注入纪律（参数怎么注入） ——A 轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表）， 严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 -> 协议裁决项 + 敏感性分析）",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -7440,7 +7440,7 @@ def p67_a2_a3_offset_protocol_verification() -> dict[str, Any]:
 def p68_execution_deviation() -> dict[str, Any]:
     """[68] 执行偏差（deviation）验证。
 
-    手册 [68]：执行层面与方案的偏差（漏跑/换机/中断恢复）→ 记 execution deviation 表（E 系列审计覆盖），
+    手册 [68]：执行层面与方案的偏差（漏跑/换机/中断恢复）-> 记 execution deviation 表（E 系列审计覆盖），
     不影响协议与分析定义。实验目录结构 run 目录命名规范：`run-<日期>-<seed>-<method>-<config_hash>`
     """
     import yaml
@@ -7723,11 +7723,11 @@ def p69_resampling_method() -> dict[str, Any]:
     nearest_sites: list[str] = []
     for p, txt in _iter_files([SRC], (".py",)):
         for i, line in enumerate(txt.splitlines(), 1):
-            # 对 UWB/VIO range 使用 linear/spline 插值 → 禁止
+            # 对 UWB/VIO range 使用 linear/spline 插值 -> 禁止
             if re.search(r"(?:uwb.*interp|interp.*uwb|range.*interp|vio.*interp|interpolate.*range)", line, re.I):
                 if re.search(r"(?:linear|spline|np\.interp|interp1d)", line, re.I):
                     illegal_interp.append(f"{p.name}:{i}")
-            # 最近邻实现 → 允许/要求
+            # 最近邻实现 -> 允许/要求
             if re.search(r"(?:nearest|nearest_neighbor|nearest.*align|align.*nearest)", line, re.I):
                 nearest_sites.append(f"{p.name}:{i}")
 
@@ -8843,9 +8843,9 @@ def p78_transformer_sliding_window() -> dict[str, Any]:
 
 
 def p79_no_gpu_error_stop() -> dict[str, Any]:
-    """[73] 在无 GPU 环境实测 → 确认报错停而非静默 CPU 训练。CPU 空闲协助（执行模式/执行模式·CPU 空闲协助）CPU 承接仅限 GPU 排满后启用的剩余训练单元。
+    """[73] 在无 GPU 环境实测 -> 确认报错停而非静默 CPU 训练。CPU 空闲协助（执行模式/执行模式·CPU 空闲协助）CPU 承接仅限 GPU 排满后启用的剩余训练单元。
 
-    手册 [73]：在无 GPU 环境实测 → 确认报错停而非静默 CPU 训练 **CPU 空闲协助**（执行模式/执行模式·CPU 空闲协助） CPU 承接仅限 GPU 排满后启用的剩余训练单元。
+    手册 [73]：在无 GPU 环境实测 -> 确认报错停而非静默 CPU 训练 **CPU 空闲协助**（执行模式/执行模式·CPU 空闲协助） CPU 承接仅限 GPU 排满后启用的剩余训练单元。
 
     验证项：
     1. configs/protocol/gpu_error_handling.yaml 存在且能正确解析
@@ -10327,10 +10327,10 @@ def p189_generation_sequence() -> dict[str, Any]:
 
     手册原文：
     [189] 生成顺序（每条序列）：
-    (1) 场景/轨迹生成 → (2) 传感器量测仿真（UWB/IMU/VIO 原始） →
-    (3) A 轴异步偏移注入（重采样前） → (4) N 轴 NLOS 偏差注入（按遮挡区） →
-    (5) M 轴缺失注入（人为丢包） → (6) 统一重采样到公共时间轴
-    （UWB/VIO/gt → 10Hz；IMU 保留 150Hz 原生，不降采样，写 `imu_t`） →
+    (1) 场景/轨迹生成 -> (2) 传感器量测仿真（UWB/IMU/VIO 原始） ->
+    (3) A 轴异步偏移注入（重采样前） -> (4) N 轴 NLOS 偏差注入（按遮挡区） ->
+    (5) M 轴缺失注入（人为丢包） -> (6) 统一重采样到公共时间轴
+    （UWB/VIO/gt -> 10Hz；IMU 保留 150Hz 原生，不降采样，写 `imu_t`） ->
     (7) 写 npz + manifest
     """
     cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause189_generation_sequence.yaml"
@@ -10978,7 +10978,7 @@ def p192_s9_correctness_gate() -> dict[str, Any]:
 
     # 检查 dq_prerequisite 配置
     dq_cfg = cfg.get("dq_prerequisite", {}) or {}
-    dq_order_ok = str(dq_cfg.get("order", "")) in ("S9 → DQ，不可逆序", "S9→DQ", "S9 → DQ")
+    dq_order_ok = str(dq_cfg.get("order", "")) in ("S9 -> DQ，不可逆序", "S9->DQ", "S9 -> DQ")
     dq_condition_ok = "S9" in str(dq_cfg.get("condition", ""))
     checks["dq_prerequisite_correct"] = dq_order_ok and dq_condition_ok
     detail_parts.append(f"DQ前置条件(S9在前)={dq_order_ok and dq_condition_ok}, order={str(dq_cfg.get('order',''))!r}")
@@ -11442,7 +11442,7 @@ def p195_dq_timing() -> dict[str, Any]:
         dq_before_step1 = "DQ" in dq_step and "Step 1" in step1_step
     checks["s9_before_dq_order"] = s9_before_dq
     checks["dq_before_step1_order"] = dq_before_step1
-    detail_parts.append(f"时序配置(S9→DQ→Step1)={s9_before_dq and dq_before_step1}, steps={step_names}")
+    detail_parts.append(f"时序配置(S9->DQ->Step1)={s9_before_dq and dq_before_step1}, steps={step_names}")
 
     # 检查 forbidden 违规项
     boundaries = cfg.get("boundaries", {}) or {}
@@ -11528,7 +11528,7 @@ def p196_dq_fail_disposal() -> dict[str, Any]:
     """[196] DQ 不合格处置顺序：先修数据，修不通才允许缩小声明范围
 
     手册原文：
-    [196] 不合格 → 先修数据（重生成/调轨迹设计/走协议变更），修不通才允许"缩小声明范围"（见 R-1 、R-5）。
+    [196] 不合格 -> 先修数据（重生成/调轨迹设计/走协议变更），修不通才允许"缩小声明范围"（见 R-1 、R-5）。
     """
     cfg_path = PROJECT_ROOT / "configs" / "protocol" / "clause196_dq_fail_disposal.yaml"
     manual_path = PROJECT_ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
@@ -14793,13 +14793,13 @@ def p215_rz0_paper_grade_clearing() -> dict[str, Any]:
 
 
 def p216_never_enter_old_products() -> dict[str, Any]:
-    """[216] 任一未过 → 继续清场，不得带旧产物进入任何论文级流程
+    """[216] 任一未过 -> 继续清场，不得带旧产物进入任何论文级流程
 
     验证论文级实验的 RZ-0/RZ-1/RZ-2/RZ-3 四个执行环节中，
     绝不会引用旧的仿真数据集、权重文件或结果文件。
 
     手册原文：
-    [216] 任一未过 → 继续清场，**不得带旧产物进入任何论文级流程**。
+    [216] 任一未过 -> 继续清场，**不得带旧产物进入任何论文级流程**。
 
     验证项：
     1. configs/protocol/clause216_never_enter_old_products.yaml 存在且可解析
@@ -15482,7 +15482,7 @@ def p131_seed_trajectory_explicit() -> dict[str, Any]:
 # ---------------- 条款[5]: 依赖声明（治理层·指令模式） ----------------
 def p5_dependency_declaration() -> dict[str, Any]:
     """[5] 依赖声明（治理层·指令模式）—— 每条指令头部标「前置:[N]」；执行前先查前置是否done，
-    未done → 标blocked停下问，不硬跑、不跳序。
+    未done -> 标blocked停下问，不硬跑、不跳序。
 
     验证项：
     1. configs/protocol/clause05_dependency_declaration.yaml 存在且能正确解析
@@ -15618,7 +15618,7 @@ def p5_dependency_declaration() -> dict[str, Any]:
 def p6_redundancy_governance() -> dict[str, Any]:
     """[6] 代码与文件冗余治理（治理层）—— 禁止为同一逻辑留多份拷贝、
     禁止复制旧文件再改的备份文化，历史版本走 git，工作目录只保留当前生效版本；
-    发现 _backup/_old/_copy 类冗余文件 → 移入 archive 或删除；
+    发现 _backup/_old/_copy 类冗余文件 -> 移入 archive 或删除；
     禁止"注释掉一大段代码留作备用"；清理动作只作用于本体系目录，禁止跨体系删改；
     清理任何进程前必须先判定归属。
 
@@ -15845,8 +15845,8 @@ def p6_redundancy_governance() -> dict[str, Any]:
 # ---------------- 条款[7]: 违反即处置（治理层） ----------------
 def p7_violation_disposition() -> dict[str, Any]:
     """[7] 违反即处置（治理层）—— 执行中任何环节发现违反本文档
-    （未清场/审计失败/口径不符/数据或权重污染）→ 隔离作废相关产物
-    （archive 留痕）→ 修复根因 → 回到对应回归点重跑，处置证据随结果一并提交；
+    （未清场/审计失败/口径不符/数据或权重污染）-> 隔离作废相关产物
+    （archive 留痕）-> 修复根因 -> 回到对应回归点重跑，处置证据随结果一并提交；
     任何'未达预期'的第一解释永远是执行偏差，不是方法不行、不是数据集不行；
     窗口外先修根因再谈结论。
 
@@ -16146,7 +16146,7 @@ def p8_submit_self_check() -> dict[str, Any]:
 
 # ---------------- 条款[9]: 落实报告格式（治理层·八字段） ----------------
 def p9_compliance_report_format() -> dict[str, Any]:
-    """[9] 落实报告格式（治理层·八字段）—— 每条指令输出 = 落实报告格式一行，八字段逐字段规范（条款号/状态/条款逐字抄录/代码绝对定位/落实极尽具体+全量映射/审查问题→修复+循环轨迹/验证命令→预期/证据真实路径+stdout落盘），含一句话模板、治理类同构、提交前自检、完整示例、判定铁律；缺任一字段或字段不合格 = 该条未落实。完整规范见 rules/落实报告格式规范.md。
+    """[9] 落实报告格式（治理层·八字段）—— 每条指令输出 = 落实报告格式一行，八字段逐字段规范（条款号/状态/条款逐字抄录/代码绝对定位/落实极尽具体+全量映射/审查问题->修复+循环轨迹/验证命令->预期/证据真实路径+stdout落盘），含一句话模板、治理类同构、提交前自检、完整示例、判定铁律；缺任一字段或字段不合格 = 该条未落实。完整规范见 rules/落实报告格式规范.md。
 
     验证项：
     1. rules/落实报告格式规范.md 存在且含八字段规范逐字段说明（含合格标准/不合格典型/合格示例三级）
@@ -16332,7 +16332,7 @@ def p9_compliance_report_format() -> dict[str, Any]:
 # ---------------- 条款[10]: 逐条落实工序（治理层·四步闭环） ----------------
 
 def p10_four_step_closure() -> dict[str, Any]:
-    """[10] 逐条落实工序（治理层·四步闭环）—— 每条指令按「查 → 落 → 验 → 报」四步闭环
+    """[10] 逐条落实工序（治理层·四步闭环）—— 每条指令按「查 -> 落 -> 验 -> 报」四步闭环
 
     验证项（12项）：
     1. skills/逐条落实工序/SKILL.md 存在且能读取
@@ -16342,7 +16342,7 @@ def p10_four_step_closure() -> dict[str, Any]:
     5. SKILL.md 含第四步「报」（八字段格式+自查清单+未写视为未落实）
     6. SKILL.md 含八字段要求逐字段说明（条款号/状态/条款/代码/落实/审查/验证/证据）
     7. SKILL.md 含自查清单八项（条款号格式/状态/条款字段/代码字段/落实字段/审查字段/验证字段/证据字段）
-    8. SKILL.md 含「任一为否→作废重做」判定
+    8. SKILL.md 含「任一为否->作废重做」判定
     9. configs/protocol/clause10_four_step_closure.yaml 存在且解析成功
     10. clause_name 包含「[10] 逐条落实工序」
     11. AGENTS.md 含 [10] 治理载体条目
@@ -16505,9 +16505,9 @@ def p10_four_step_closure() -> dict[str, Any]:
 
 # ---------------- 条款[11]: 条款归属总则（治理层） ----------------
 def p11_clause_attribution() -> dict[str, Any]:
-    """[11] 条款归属总则（治理层）—— 治理层条款→第0阶段逐条落实并写报告，证据写对应治理载体；
-    Stage1-6落实类→第1阶段代码落实；判据条款判据已并入对应代码条款；
-    Stage7-8执行决策类→第2阶段执行，每条同样单独写执行落实报告。
+    """[11] 条款归属总则（治理层）—— 治理层条款->第0阶段逐条落实并写报告，证据写对应治理载体；
+    Stage1-6落实类->第1阶段代码落实；判据条款判据已并入对应代码条款；
+    Stage7-8执行决策类->第2阶段执行，每条同样单独写执行落实报告。
 
     验证项（10项）：
     1. rules/条款归属总则.md 存在且含三阶段归属表
@@ -17085,7 +17085,7 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
                 except Exception as e:
                     head_hash_detail = f"git rev-parse执行异常: {e}"
                 results.append({
-                    "name": ".git/HEAD → 有效commit",
+                    "name": ".git/HEAD -> 有效commit",
                     "status": "PASS" if not head_hash_lag else "FAIL",
                     "detail": head_hash_detail if head_hash_detail else "HEAD指向 valid ref",
                 })
@@ -17590,8 +17590,8 @@ def p31_axis_v_visual_verification() -> dict[str, Any]:
     |V 档|名称|具体数值|
     |-|---|---|
     |V0|健康|特征 >50/frame；增量噪声 σ=0.01–0.03 m/步；帧有效 100%；无间隙|
-    |V1|黑屏|视觉完全失效：增量在但置零（=0），scaling→0；每序列 1–2 次，单次 0.5–2 s，占轨迹 5–10%|
-    |V2|特征丢失|特征 10–20/frame；增量噪声放大 5×（σ→0.05–0.15 m/步）；占轨迹 20–40%，连续段 1–3 s；scaling→0.3–0.7|
+    |V1|黑屏|视觉完全失效：增量在但置零（=0），scaling->0；每序列 1–2 次，单次 0.5–2 s，占轨迹 5–10%|
+    |V2|特征丢失|特征 10–20/frame；增量噪声放大 5×（σ->0.05–0.15 m/步）；占轨迹 20–40%，连续段 1–3 s；scaling->0.3–0.7|
     |V3|关键帧中断|增量缺失（质量触发，非时间戳缺失）；每序列 2–4 次，间隙 0.5–3 s，占轨迹 10–20%；恢复后重定位跳变 0.3–1 m|
     
     说明：A轴丢帧 = 数据不在（时间戳级缺失）；
