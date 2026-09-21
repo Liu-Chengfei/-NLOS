@@ -9492,6 +9492,126 @@ def p84_docstring_signature_consistency() -> dict[str, Any]:
     }
 
 
+def p85_git_verify() -> dict[str, Any]:
+    """[79] git 核验——**git 核验**（status 干净 + commit 已记录）→ 全过才进实验准备
+
+    手册 [79]：**git 核验**（status 干净 + commit 已记录）→ 全过才进实验准备
+
+    验证项：
+    1. configs/protocol/git_verification.yaml 存在且能正确解析
+    2. clause_id == "79"
+    3. git_verification.status_clean == true
+    4. git_verification.commit_recorded == true
+    5. git status 干净（无未staging更改）
+    6. .git/HEAD 指向有效 commit
+    7. 手册真源存在
+    """
+    import subprocess as _sp
+    cfg_path = CONFIGS / "protocol" / "git_verification.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P85-git-verify", "name": "[79] git 核验",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P85-git-verify", "name": "[79] git 核验",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "79"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    gv = cfg.get("git_verification", {})
+    if not isinstance(gv, dict):
+        checks["git_verification_section"] = False
+        passed = False
+    else:
+        checks["git_verification_section"] = True
+
+        ok_status_clean = gv.get("status_clean") is True
+        checks["status_clean_true"] = ok_status_clean
+        passed = passed and ok_status_clean
+
+        ok_commit_recorded = gv.get("commit_recorded") is True
+        checks["commit_recorded_true"] = ok_commit_recorded
+        passed = passed and ok_commit_recorded
+
+    # Check git status is clean
+    try:
+        result = _sp.run(["git", "status", "--porcelain"], capture_output=True, text=True, cwd=PROJECT_ROOT, timeout=30)
+        git_output = result.stdout.strip()
+        status_clean = len(git_output) == 0
+        checks["git_status_clean"] = status_clean
+        passed = passed and status_clean
+    except Exception as exc:
+        checks["git_status_clean"] = False
+        passed = False
+        checks["git_error"] = str(exc)
+
+    # Check .git/HEAD points to valid commit
+    try:
+        head_path = PROJECT_ROOT / ".git" / "HEAD"
+        if head_path.is_file():
+            head_content = head_path.read_text(encoding="utf-8").strip()
+            # HEAD can be "ref: refs/heads/main" or a commit hash
+            if head_content.startswith("ref:"):
+                # Follow the ref to get the commit hash
+                ref_path = PROJECT_ROOT / ".git" / head_content[4:].strip()
+                if ref_path.is_file():
+                    ref_content = ref_path.read_text(encoding="utf-8").strip()[:40]
+                    valid_commit = len(ref_content) >= 7
+                else:
+                    valid_commit = False
+            else:
+                # Direct commit hash
+                valid_commit = len(head_content) >= 7 and all(c in "0123456789abcdef" for c in head_content.lower())
+            checks["valid_commit_in_head"] = valid_commit
+            passed = passed and valid_commit
+        else:
+            checks["valid_commit_in_head"] = False
+            passed = False
+    except Exception as exc:
+        checks["valid_commit_in_head"] = False
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P85-git-verify", "name": "[79] git 核验",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17103,6 +17223,7 @@ _ALL = [
     p82_refactor_scope_definition,
     p83_no_degradation_exit,
     p84_docstring_signature_consistency,
+    p85_git_verify,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,

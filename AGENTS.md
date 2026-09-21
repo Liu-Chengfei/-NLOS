@@ -299,7 +299,7 @@
 [76] **大修范围界定** ——明确本次大修的范围（哪个模块/哪个脚本/哪些接口），写入 decision log（时间/原因/影响范围/git commit）
 [77] **大修不是降级出口**——大修目标是让代码与手册严格一致（回到正轨），**不得借大修缩小实验声明/降 seed/降轨迹/降精度**（降级边界不变）
 [78] **docstring 与函数签名一致性** — 条款: **[78]**; 状态: ✅ 已落实; 代码: `configs/protocol/docstring_consistency.yaml` + `src/liquidloc/analysis/clause_gates.py::p84_docstring_signature_consistency()`; 验证: passed=True
-**[79]** **git 核验**（status 干净 + commit 已记录）→ 全过才进实验准备
+[79] **git 核验** — 条款: **[79]**; 状态: ✅ 已落实; 代码: `configs/protocol/git_verification.yaml` + `src/liquidloc/analysis/clause_gates.py::p85_git_verify()`; 验证: passed=True
 \*\*\[80]\*\*\*\* 缺漏由 核对脚本/核对清单自动拦截，不靠执行者记忆\*\*。
 \*\*\[81]\*\*\*\* 冒烟；验收人/验收机制（自交自验 = 未过）：冒烟运行脚本 exit 码 + 日志断言探针（d：批形状/loss 轨迹/梯度范数）+ 统计 gate 自动输出比对
 \*\*\[82]\*\*\*\* 预达标判定；验收人/验收机制（自交自验 = 未过）：\*\*独立复核者\*\*对照 Part 0 合格基准逐项勾选（落窗量级/无爆炸行 + LNN 排序最低/提升方向/A3N3 切片，不许执行者自判自过）+ 统计断言复核
