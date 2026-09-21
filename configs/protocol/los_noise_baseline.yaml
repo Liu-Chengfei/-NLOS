@@ -1,5 +1,5 @@
 # 文件职责：声明 LOS 段测距噪声基准 σ≈0.6m，作为器件事例级均值误差的 LOS 基准。
-# 本文件是手册第39条的配置落点，声明 LOS 段高斯噪声参数。
+# 本文件是手册第38条的配置落点，声明 LOS 段高斯噪声参数。
 # 注意：本文件声明的是 LOS 基准，**非协议档位参数**。
 # 商用 UWB 模块室内实测测距误差标准差在亚米级，LOS 与 NLOS 统计分布差异显著。
 
@@ -26,7 +26,7 @@ context:
 constraint_declaration:
   discipline_level: "hard"
   source_is_clause_39: true
-  clause_id: "39"
+  clause_id: "38"
   clause_name: "LOS 段测距噪声 σ≈0.6m"
   baseline_for: "S4 LOS 段测距噪声基准"
   not_protocol_parameter: true
