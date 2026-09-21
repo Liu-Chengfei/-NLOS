@@ -21,6 +21,9 @@ SRC = PROJECT_ROOT / "src"
 SCRIPTS = PROJECT_ROOT / "scripts"
 
 
+# 手册总条款数
+TOTAL_CLAUSES = 424
+
 def _iter_files(roots: list[Path], suffixes: tuple[str, ...] = (".py", ".yaml")):
     for r in roots:
         if not r.is_dir():
