@@ -11082,6 +11082,131 @@ def p98_baseline_consistency() -> dict[str, Any]:
     }
 
 
+def p99_table_delivery_list() -> dict[str, Any]:
+    """[94] 表（Table）交付清单 ——每个表必须注明：数据层来源（主场景/布局随机化/MILUV）、分析单位（轨迹级/帧级）、是否 10 seed 聚合、是否校正后 p 值
+
+    手册 [94]：每个表必须注明：数据层来源（主场景/布局随机化/MILUV）、分析单位（轨迹级/帧级）、是否 10 seed 聚合、是否校正后 p 值。
+
+    验证项：
+    1. configs/protocol/clause94_table_delivery_list.yaml 存在且能正确解析
+    2. clause_id == "94"
+    3. table_delivery_requirements.data_layer_source 包含"主场景"、"布局随机化"、"MILUV"
+    4. table_delivery_requirements.analysis_unit 包含"轨迹级"、"帧级"
+    5. table_delivery_requirements.seed_aggregation 包含"10 seed 聚合"、"非聚合"
+    6. table_delivery_requirements.corrected_p_value 包含"是"、"否"
+    7. tables_expected 包含3张表：布局参数 vs 排序散点、MILUV外部域布局随机化层 seed/超参稳健性表、10seed间LNN最低成立频次
+    8. checks 列表包含5项（table_metadata_specified, data_layer_declared, analysis_unit_specified, seed_aggregation_declared, p_value_correction_declared）
+    9. manual_line == 329
+    10. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause94_table_delivery_list.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P99-table-delivery", "name": "[94] 表交付清单",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P99-table-delivery", "name": "[94] 表交付清单",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "94"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    req = cfg.get("table_delivery_requirements", {})
+    if isinstance(req, dict):
+        dla = req.get("data_layer_source", [])
+        ok_dla = isinstance(dla, list) and "主场景" in dla and "布局随机化" in dla and "MILUV" in dla
+        checks["data_layer_source_3_required"] = ok_dla
+        passed = passed and ok_dla
+
+        au = req.get("analysis_unit", [])
+        ok_au = isinstance(au, list) and "轨迹级" in au and "帧级" in au
+        checks["analysis_unit_2_required"] = ok_au
+        passed = passed and ok_au
+
+        sa = req.get("seed_aggregation", [])
+        ok_sa = isinstance(sa, list) and "10 seed 聚合" in sa and "非聚合" in sa
+        checks["seed_aggregation_2_required"] = ok_sa
+        passed = passed and ok_sa
+
+        pv = req.get("corrected_p_value", [])
+        ok_pv = isinstance(pv, list) and "是" in pv and "否" in pv
+        checks["corrected_p_value_2_required"] = ok_pv
+        passed = passed and ok_pv
+    else:
+        for key in ["data_layer_source_3_required", "analysis_unit_2_required",
+                     "seed_aggregation_2_required", "corrected_p_value_2_required"]:
+            checks[key] = False
+        passed = False
+
+    tables = cfg.get("tables_expected", [])
+    if isinstance(tables, list):
+        table_names = {t.get("table_name") for t in tables if isinstance(t, dict)}
+        expected_names = {"布局参数 vs 排序散点", "MILUV外部域布局随机化层 seed/超参稳健性表", "10seed间LNN最低成立频次"}
+        ok_tables = expected_names.issubset(table_names)
+        checks["tables_expected_3"] = ok_tables
+        passed = passed and ok_tables
+    else:
+        checks["tables_expected_3"] = False
+        passed = False
+
+    checks_list = cfg.get("checks", [])
+    if isinstance(checks_list, list):
+        expected_checks = {"table_metadata_specified", "data_layer_declared",
+                           "analysis_unit_specified", "seed_aggregation_declared",
+                           "p_value_correction_declared"}
+        actual_checks = {c for c in checks_list if isinstance(c, str)}
+        ok_checks = expected_checks.issubset(actual_checks)
+        checks["checks_5_required"] = ok_checks
+        passed = passed and ok_checks
+    else:
+        checks["checks_5_required"] = False
+        passed = False
+
+    manual_line = cfg.get("manual_line")
+    ok_line = manual_line == 329 or str(manual_line) == "329"
+    checks["manual_line_points_to_329"] = ok_line
+    passed = passed and ok_line
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P99-table-delivery", "name": "[94] 表交付清单",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -18707,6 +18832,7 @@ _ALL = [
     p96_learning_rate_three_phase,
     p97_ten_seeds_five_methods,
     p98_baseline_consistency,
+    p99_table_delivery_list,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
     p183_layout_manifest,

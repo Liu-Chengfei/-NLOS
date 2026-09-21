@@ -7,7 +7,7 @@ clause_name: "[94] 表交付清单"
 constraint_level: "硬约束"
 description: "每个交付表必须注明表的源数据层、分析单位、是否进行10 seed聚合、是否使用校正后p值。"
 manual_ref: "最终交付_异步手册_424条_20260917.md"
-manual_line: 321
+manual_line: 329
 verification_gate: "p94_table_delivery_list"
 
 # 表格交付清单要求
