@@ -59,3 +59,5 @@ visualization_spec:
     
 # 参考路径
 manual_ref: "docs/最终交付_异步手册_424条_20260917.md:331"
+manual_line: 331
+verification_gate: "p101_layout_scatter_miluv"
