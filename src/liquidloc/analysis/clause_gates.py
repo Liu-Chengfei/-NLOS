@@ -11207,6 +11207,152 @@ def p99_table_delivery_list() -> dict[str, Any]:
     }
 
 
+def p100_miluv_external_domain() -> dict[str, Any]:
+    """[95] 36次独立实验为配对单位声明MILUV外部域布局随机化层 —— 36次独立实验为配对单位声明 MILUV 外部域布局随机化层，生成 seed/超参稳健性表，报告 10 seed 间"LNN最低"成立频次（如 10/10、8/10）
+
+    手册 [95]：36次独立实验为配对单位声明 MILUV 外部域布局随机化层 seed/超参稳健性表，10 seed 间"LNN最低"成立频次（如 10/10、8/10）。
+
+    验证项：
+    1. configs/protocol/clause95_miluv_external_domain.yaml 存在且能正确解析
+    2. clause_id == "95"
+    3. core_requirements.paired_unit == "36 次独立实验"
+    4. core_requirements.miluv_declaration == true
+    5. core_requirements.layout_randomization_layer == true
+    6. core_requirements.robustness_table == "seed/超参稳健性表"
+    7. core_requirements.lnn_lowest_frequency == "10 seed 间'LNN 最低'成立频次"
+    8. paired_experiment_unit.definition == "36 次独立实验"
+    9. miluv_layout_randomization.layer_type == "MILUV 外部域布局随机化层"
+    10. seed_robustness_table.n_seeds == 10
+    11. seed_robustness_table.lnn_lowest_frequency_calculation == true
+    12. frequency_reporting.metric == "LNN 最低成立频次"
+    13. manual_line == 330
+    14. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause95_miluv_external_domain.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P100-miluv-external-domain", "name": "[95] MILUV 外部域布局随机化层",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P100-miluv-external-domain", "name": "[95] MILUV 外部域布局随机化层",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "95"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    core = cfg.get("core_requirements", {})
+    if isinstance(core, dict):
+        ok_paired = core.get("paired_unit") == "36 次独立实验"
+        checks["paired_unit_36"] = ok_paired
+        passed = passed and ok_paired
+
+        ok_miluv = core.get("miluv_declaration") is True
+        checks["miluv_declaration_true"] = ok_miluv
+        passed = passed and ok_miluv
+
+        ok_layout = core.get("layout_randomization_layer") is True
+        checks["layout_randomization_layer_true"] = ok_layout
+        passed = passed and ok_layout
+
+        ok_robust = core.get("robustness_table") == "seed/超参稳健性表"
+        checks["robustness_table_correct"] = ok_robust
+        passed = passed and ok_robust
+
+        ok_lnn = core.get("lnn_lowest_frequency") == "10 seed 间'LNN 最低'成立频次"
+        checks["lnn_lowest_frequency_correct"] = ok_lnn
+        passed = passed and ok_lnn
+    else:
+        for key in ["paired_unit_36", "miluv_declaration_true", "layout_randomization_layer_true",
+                     "robustness_table_correct", "lnn_lowest_frequency_correct"]:
+            checks[key] = False
+        passed = False
+
+    paired = cfg.get("paired_experiment_unit", {})
+    if isinstance(paired, dict):
+        ok_def = paired.get("definition") == "36 次独立实验"
+        checks["paired_unit_definition"] = ok_def
+        passed = passed and ok_def
+    else:
+        checks["paired_unit_definition"] = False
+        passed = False
+
+    miluv = cfg.get("miluv_layout_randomization", {})
+    if isinstance(miluv, dict):
+        ok_layer = miluv.get("layer_type") == "MILUV 外部域布局随机化层"
+        checks["miluv_layer_type"] = ok_layer
+        passed = passed and ok_layer
+    else:
+        checks["miluv_layer_type"] = False
+        passed = False
+
+    seed_table = cfg.get("seed_robustness_table", {})
+    if isinstance(seed_table, dict):
+        ok_seeds = seed_table.get("n_seeds") == 10
+        checks["n_seeds_eq_10"] = ok_seeds
+        passed = passed and ok_seeds
+
+        ok_lnn_calc = seed_table.get("lnn_lowest_frequency_calculation") is True
+        checks["lnn_lowest_frequency_calc"] = ok_lnn_calc
+        passed = passed and ok_lnn_calc
+    else:
+        checks["n_seeds_eq_10"] = False
+        checks["lnn_lowest_frequency_calc"] = False
+        passed = False
+
+    freq = cfg.get("frequency_reporting", {})
+    if isinstance(freq, dict):
+        ok_metric = freq.get("metric") == "LNN 最低成立频次"
+        checks["frequency_metric"] = ok_metric
+        passed = passed and ok_metric
+    else:
+        checks["frequency_metric"] = False
+        passed = False
+
+    manual_line = cfg.get("manual_line")
+    ok_line = manual_line == 330 or str(manual_line) == "330"
+    checks["manual_line_points_to_330"] = ok_line
+    passed = passed and ok_line
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P100-miluv-external-domain", "name": "[95] MILUV 外部域布局随机化层",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -18833,6 +18979,7 @@ _ALL = [
     p97_ten_seeds_five_methods,
     p98_baseline_consistency,
     p99_table_delivery_list,
+    p100_miluv_external_domain,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
     p183_layout_manifest,

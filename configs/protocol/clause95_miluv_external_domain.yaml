@@ -58,8 +58,8 @@ checks:
   - "manual_ref_correct"
 
 # 手动引用
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第 322 行"
-manual_line: 322
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第 330 行"
+manual_line: 330
 
 # 验证门限
 verification_gate:
