@@ -8,7 +8,7 @@ constraint_level: "硬约束"
 description: "消融各变体与主实验必须使用同数据、同 seed、同超参、同评估口径，确保消融实验的差异仅来自被消融的组件，而非其他变量。"
 manual_ref: "最终交付_异步手册_424条_20260917.md"
 manual_line: 328
-verification_gate: "p93_baseline_consistency"
+verification_gate: "p98_baseline_consistency"
 
 # 消融变体与主实验一致性要求
 baseline_consistency_requirements:
