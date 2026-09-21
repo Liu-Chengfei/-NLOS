@@ -4469,7 +4469,7 @@ def p41_vio_output_spec() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P41-vio-output-spec",
-            "name": "[41] VIO输出规范(单目+IMU前端,20Hz)",
+            "name": "[41] VIO（单目+IMU 前端，20 Hz）；输出数据：vio_pos（N×2/3）+ vio_yaw（N×1）+ vio_valid（N×1）+ 协方差（V0 健康档有效帧率 100%）",
             "severity": "hard",
             "passed": False,
             "detail": "vio_output_spec.yaml missing",
@@ -4482,7 +4482,7 @@ def p41_vio_output_spec() -> dict[str, Any]:
     except Exception as exc:
         return {
             "code": "P41-vio-output-spec",
-            "name": "[41] VIO输出规范(单目+IMU前端,20Hz)",
+            "name": "[41] VIO（单目+IMU 前端，20 Hz）；输出数据：vio_pos（N×2/3）+ vio_yaw（N×1）+ vio_valid（N×1）+ 协方差（V0 健康档有效帧率 100%）",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -4625,7 +4625,7 @@ def p41_vio_output_spec() -> dict[str, Any]:
 
     return {
         "code": "P41-vio-output-spec",
-        "name": "[41] VIO输出规范(单目+IMU前端,20Hz)",
+        "name": "[41] VIO（单目+IMU 前端，20 Hz）；输出数据：vio_pos（N×2/3）+ vio_yaw（N×1）+ vio_valid（N×1）+ 协方差（V0 健康档有效帧率 100%）",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -4683,7 +4683,7 @@ def p42_imu_no_head_reasoning() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P42-imu-no-head",
-            "name": "[42] IMU无输出头逻辑闭环说明",
+            "name": "[42] 为什么 IMU 没有输出头（逻辑闭环）：IMU 是高频运动先验，直接进入骨干作为状态传播/预积分的底料，不需要像 UWB/VIO 那样的自适应降权——因为 IMU 不单独解算绝对位置，其误差是积分漂移而非单帧离群。",
             "severity": "hard",
             "passed": False,
             "detail": "imu_no_head_reasoning.yaml missing",
@@ -4696,7 +4696,7 @@ def p42_imu_no_head_reasoning() -> dict[str, Any]:
     except Exception as exc:
         return {
             "code": "P42-imu-no-head",
-            "name": "[42] IMU 无输出头逻辑闭环说明",
+            "name": "[42] 为什么 IMU 没有输出头（逻辑闭环）：IMU 是高频运动先验，直接进入骨干作为状态传播/预积分的底料，不需要像 UWB/VIO 那样的自适应降权——因为 IMU 不单独解算绝对位置，其误差是积分漂移而非单帧离群。",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -4827,7 +4827,7 @@ def p42_imu_no_head_reasoning() -> dict[str, Any]:
 
     return {
         "code": "P42-imu-no-head",
-        "name": "[42] IMU无输出头逻辑闭环说明",
+        "name": "[42] 为什么 IMU 没有输出头（逻辑闭环）：IMU 是高频运动先验，直接进入骨干作为状态传播/预积分的底料，不需要像 UWB/VIO 那样的自适应降权——因为 IMU 不单独解算绝对位置，其误差是积分漂移而非单帧离群。",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -5026,7 +5026,7 @@ def p44_gear_injection_discipline() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P44-gear-injection-discipline",
-            "name": "[44] 档位注入纪律",
+            "name": "[44] 档位注入纪律（参数怎么注入） ——A 轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表）， 严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 → 协议裁决项 + 敏感性分析）",
             "severity": "hard",
             "passed": False,
             "detail": "clause44_injection_discipline.yaml missing",
@@ -5038,7 +5038,7 @@ def p44_gear_injection_discipline() -> dict[str, Any]:
     except Exception as exc:
         return {
             "code": "P44-gear-injection-discipline",
-            "name": "[44] 档位注入纪律",
+            "name": "[44] 档位注入纪律（参数怎么注入） ——A 轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表）， 严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 → 协议裁决项 + 敏感性分析）",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -5073,7 +5073,7 @@ def p44_gear_injection_discipline() -> dict[str, Any]:
     ]
     return {
         "code": "P44-gear-injection-discipline",
-        "name": "[44] 档位注入纪律",
+        "name": "[44] 档位注入纪律（参数怎么注入） ——A 轴为静态时钟偏移/延迟统计口径（数值见 Stage 1 档位协议条款 A 轴表）， 严格按静态口径注入，不引入随时间线性增长的时钟漂移作为额外档位（如需评估 → 协议裁决项 + 敏感性分析）",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -5213,7 +5213,7 @@ def p43_no_extra_levels() -> dict[str, Any]:
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P43-no-extra-levels", "name": "[43] 禁止使用档位空间外参数/新档",
+            "code": "P43-no-extra-levels", "name": "[43] 禁止使用档位空间外的参数、禁止自行定义插值档/新档",
             "severity": "hard",
             "passed": False,
             "detail": "no_extra_levels.yaml missing",
@@ -5225,7 +5225,7 @@ def p43_no_extra_levels() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P43-no-extra-levels", "name": "[43] 禁止使用档位空间外参数/新档",
+            "code": "P43-no-extra-levels", "name": "[43] 禁止使用档位空间外的参数、禁止自行定义插值档/新档",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -5292,7 +5292,7 @@ def p43_no_extra_levels() -> dict[str, Any]:
         f"handount_exists={handount_exists}",
     ]
     return {
-        "code": "P43-no-extra-levels", "name": "[43] 禁止使用档位空间外参数/新档",
+        "code": "P43-no-extra-levels", "name": "[43] 禁止使用档位空间外的参数、禁止自行定义插值档/新档",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -5678,7 +5678,7 @@ def p49_protocol_reference_boundary() -> dict[str, Any]:
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P49-pa5-boundary", "name": "[49] PA-5 协议引用边界", "severity": "hard",
+            "code": "P49-pa5-boundary", "name": "[46] 协议引用边界 ——本手册档位参数数值唯一权威 = Stage 1 档位协议条款", "severity": "hard",
             "passed": False, "detail": "protocol_reference_boundary.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
         }
@@ -5688,7 +5688,7 @@ def p49_protocol_reference_boundary() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P49-pa5-boundary", "name": "[49] PA-5 协议引用边界", "severity": "hard",
+            "code": "P49-pa5-boundary", "name": "[46] 协议引用边界 ——本手册档位参数数值唯一权威 = Stage 1 档位协议条款", "severity": "hard",
             "passed": False, "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
         }
@@ -5707,7 +5707,7 @@ def p49_protocol_reference_boundary() -> dict[str, Any]:
     passed = all(checks.values()) and cfg_exists
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P49-pa5-boundary", "name": "[49] PA-5 协议引用边界", "severity": "hard",
+        "code": "P49-pa5-boundary", "name": "[46] 协议引用边界 ——本手册档位参数数值唯一权威 = Stage 1 档位协议条款", "severity": "hard",
         "passed": passed,
         "detail": f"cfg_exists={cfg_exists}; checks={'; '.join(detail_parts)}",
         "evidence": {

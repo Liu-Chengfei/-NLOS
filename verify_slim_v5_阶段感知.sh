@@ -75,7 +75,7 @@ if [ -f "$REP0" ]; then
   rep0_loc=$(grep -cE '\[[0-9]+\].*[:：]\s*[0-9]+|\[[0-9]+\].*第\s*[0-9]+\s*[行条]' "$REP0" || true)
   chk "B0 第0阶段报告(${rep0_n}条,未落实${rep0_bad},引用文件:行号${rep0_loc}条)" "$([ "$rep0_bad" = "0" ] && [ "$rep0_loc" -ge 1 ] && echo 1 || echo 0)"
   # B0a 总纲条款[1]已落实:第0阶段报告首条=治理层[1]执行总纲固化,且落实载体体现总纲七要素(三阶段制/0清场/落实报告格式/归属总则/阶段执行地图/手册目标/底线),逐字抄录字段非空
-  g1_line=$(grep -E '\[1\]' "$REP0" | head -1 || true)
+  g1_line=$(grep -E '^\[1\]' "$REP0" | head -1 || true)
   if [ -n "$g1_line" ]; then
     g1_term=$(echo "$g1_line" | sed 's/.*条款: //;s/| 代码:.*//' | xargs)
     g1_gov=0
