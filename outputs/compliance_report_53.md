@@ -25,21 +25,34 @@
 1. 条款[53]的核心要求是确保各方法评估时采用配对样本对齐，即同一测试轨迹和同一随机种子。这样可以消除因轨迹差异和随机性差异导致的评估偏差，确保方法间对比的公平性。
 
 2. 配置文件通过7个字段完整实现了这一要求：
-   - clause_id: 标识条款编号
-   - clause_name: 明确条款名称
-   - paired_eval: 启用配对评估模式
-   - same_test_trajectory: 强制所有方法使用相同测试轨迹
-   - same_seed: 强制所有方法使用相同随机种子
-   - pairing_key: 定义配对键，用于关联不同方法的评估结果
-   - manual_ref: 指向手册真源
+   - clause_id: 标识条款编号，确保与手册中的条款对应
+   - clause_name: 明确条款名称，便于识别和管理
+   - paired_eval: 启用配对评估模式，所有方法在同一条件下运行
+   - same_test_trajectory: 强制所有方法使用相同的测试轨迹集合，确保轨迹一致性
+   - same_seed: 强制所有方法使用相同的随机种子，确保可复现性
+   - pairing_key: 定义配对键格式，如"轨迹ID_seed"，用于关联不同方法的评估结果
+   - manual_ref: 指向手册真源，确保条款来源可追溯
 
-3. 验证函数通过九项检查确保配置文件的正确性，包括配置文件存在性、YAML解析、字段完整性、语义正确性等。所有检查项均通过，证明条款[53]已严格完美落实。
+3. 验证函数通过九项检查确保配置文件的正确性：
+   - (a) cfg_exists: 检查配置文件是否存在
+   - (b) yaml.safe_load: 检查YAML能否正确解析
+   - (c) missing_fields: 检查所有必需字段是否存在
+   - (d) clause_id_ok: 检查clause_id是否为"53"
+   - (e) name_ok: 检查clause_name是否包含"配对样本对齐"
+   - (f) paired_eval_ok: 检查paired_eval是否为True
+   - (g) same_trajectory_ok: 检查same_test_trajectory是否为True
+   - (h) same_seed_ok: 检查same_seed是否为True
+   - (i) pairing_key_ok: 检查pairing_key是否包含"同一测试轨迹 × 同 seed"
+   - (j) manual_exists: 检查手册文件是否存在
+   
+   所有检查项均通过，证明条款[53]已严格完美落实。
 
 **技术细节**:
-- paired_eval: 启用配对评估模式，所有方法在同一条件下运行
-- same_test_trajectory: 强制所有方法使用相同的测试轨迹集合，确保轨迹一致性
-- same_seed: 强制所有方法使用相同的随机种子，确保可复现性
-- pairing_key: 定义配对键格式，如"轨迹ID_seed"，用于关联不同方法的评估结果
+- paired_eval: 布尔标志，启用后所有方法必须在相同条件下运行
+- same_test_trajectory: 布尔标志，强制所有方法使用相同测试轨迹集合
+- same_seed: 布尔标志，强制所有方法使用相同随机种子
+- pairing_key: 字符串，定义配对键的格式，用于后续数据分析
+- manual_ref: 字符串，指向手册中条款原文的具体位置
 
 **实现意义**:
 本条款的落实确保了实验对比的科学性和公平性。通过强制配对样本对齐，消除了外部因素对评估结果的干扰，使得方法间的性能差异真正反映算法本身的优劣，而非实验条件的差异。这对于科学研究和工程实践都具有重要意义。
