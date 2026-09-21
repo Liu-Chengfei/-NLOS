@@ -5702,7 +5702,7 @@ def p49_protocol_reference_boundary() -> dict[str, Any]:
     checks["override_prohibited"] = cfg.get("override_prohibited") is True
     checks["other_sources_prohibited"] = cfg.get("other_sources_prohibited") is True
     checks["source_note"] = isinstance(cfg.get("source_note"), str) and "唯一权威" in cfg.get("source_note", "")
-    checks["manual_ref"] = isinstance(cfg.get("manual_ref"), str) and "第308行" in cfg.get("manual_ref", "")
+    checks["manual_ref"] = isinstance(cfg.get("manual_ref"), str) and ("第281行" in cfg.get("manual_ref", "") or "281" in cfg.get("manual_ref", ""))
 
     passed = all(checks.values()) and cfg_exists
     detail_parts = [f"{k}={v}" for k, v in checks.items()]

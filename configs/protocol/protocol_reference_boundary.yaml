@@ -1,8 +1,8 @@
 # 文件职责：PA-5 协议引用边界声明
-# 对应手册条款 [49]：PA-5 协议引用边界
+# 对应手册条款 [46]：PA-5 协议引用边界
 # 本文件声明本手册档位参数数值唯一权威 = Stage 1 档位协议条款
 
-# 条款 [49] 原文
+# 条款 [46] 原文
 boundary_name: "PA-5 协议引用边界"
 
 # 唯一权威声明
@@ -20,7 +20,7 @@ other_sources_prohibited: true
 source_note: "本手册档位参数数值唯一权威 = Stage 1 档位协议条款"
 
 # 手册引用
-manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第308行"
+manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第281行"
 
 # 边界声明
 boundary_declaration:
