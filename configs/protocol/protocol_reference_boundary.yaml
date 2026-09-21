@@ -28,3 +28,9 @@ boundary_declaration:
   clause_name: "PA-5 协议引用边界"
   rationale: "档位参数数值需统一来源，防止不同协议文件内部数值冲突或冗余定义"
   effective: true
+# 边界声明
+constraint_declaration:
+  clause_id: "PA-5"
+  clause_name: "PA-5 协议引用边界"
+  rationale: "档位参数数值需统一来源，防止不同协议文件内部数值冲突或冗余定义"
+  effective: true
