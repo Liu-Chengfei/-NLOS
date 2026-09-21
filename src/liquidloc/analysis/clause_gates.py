@@ -9890,6 +9890,90 @@ def p88_preliminary_target_verification() -> dict[str, Any]:
     }
 
 
+def p89_lstm_transformer_head_verification() -> dict[str, Any]:
+    """[83] LSTM/Transformer带头运行；无 >10m 爆炸行
+
+    手册 [83]：**[83]** LSTM/Transformer 带头运行； 无 >10m 爆炸行
+
+    验证项：
+    1. configs/protocol/lstm_transformer_head_verification.yaml 存在且能正确解析
+    2. clause_id == "83"
+    3. lstm_transformer_verification.enable_heads_required == true
+    4. lstm_transformer_verification.explosion_threshold_m == 10
+    5. lstm_transformer_verification.explosion_check_required == true
+    6. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "lstm_transformer_head_verification.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P89-lstm-transformer-head", "name": "[83] LSTM/Transformer带头运行",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P89-lstm-transformer-head", "name": "[83] LSTM/Transformer带头运行",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "83"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    ltv = cfg.get("lstm_transformer_verification", {})
+    if not isinstance(ltv, dict):
+        checks["lstm_transformer_verification_section"] = False
+        passed = False
+    else:
+        checks["lstm_transformer_verification_section"] = True
+
+        ok_heads = ltv.get("enable_heads_required") is True
+        checks["enable_heads_required_true"] = ok_heads
+        passed = passed and ok_heads
+
+        ok_threshold = ltv.get("explosion_threshold_m") == 10
+        checks["explosion_threshold_m_eq_10"] = ok_threshold
+        passed = passed and ok_threshold
+
+        ok_explosion = ltv.get("explosion_check_required") is True
+        checks["explosion_check_required_true"] = ok_explosion
+        passed = passed and ok_explosion
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P89-lstm-transformer-head", "name": "[83] LSTM/Transformer带头运行",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17505,6 +17589,7 @@ _ALL = [
     p86_gap_interception,
     p87_smoke_test_verification,
     p88_preliminary_target_verification,
+    p89_lstm_transformer_head_verification,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
