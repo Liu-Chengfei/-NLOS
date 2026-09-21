@@ -1,0 +1,13 @@
+# 条款 [78] docstring 与函数签名一致性
+# 手册原文：docstring 与函数签名不一致 = 未过
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第313行
+
+clause_id: "78"
+clause_name: "docstring 与函数签名一致性"
+
+docstring_signature_consistency:
+  enabled: true
+  description: "docstring 与函数签名不一致 = 未过"
+  check_all_functions: true
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第313行"

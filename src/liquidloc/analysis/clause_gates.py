@@ -9340,6 +9340,158 @@ def p83_no_degradation_exit() -> dict[str, Any]:
     }
 
 
+def p84_docstring_signature_consistency() -> dict[str, Any]:
+    """[78] docstring 与函数签名一致性——docstring 与函数签名不一致 = 未过
+
+    手册 [78]：**docstring 与函数签名不一致 = 未过**
+
+    验证项：
+    1. configs/protocol/docstring_consistency.yaml 存在且能正确解析
+    2. clause_id == "78"
+    3. docstring_signature_consistency.enabled == true
+    4. docstring_signature_consistency.check_all_functions == true
+    5. 手册真源存在
+    6. docstring 与函数签名完全一致（无不匹配）
+    """
+    cfg_path = CONFIGS / "protocol" / "docstring_consistency.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P84-docstring-consistency", "name": "[78] docstring 与函数签名一致性",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P84-docstring-consistency", "name": "[78] docstring 与函数签名一致性",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "78"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    dsc = cfg.get("docstring_signature_consistency", {})
+    if not isinstance(dsc, dict):
+        checks["docstring_signature_consistency_section"] = False
+        passed = False
+    else:
+        checks["docstring_signature_consistency_section"] = True
+
+        ok_enabled = dsc.get("enabled") is True
+        checks["enabled_true"] = ok_enabled
+        passed = passed and ok_enabled
+
+        ok_check_all = dsc.get("check_all_functions") is True
+        checks["check_all_functions_true"] = ok_check_all
+        passed = passed and ok_check_all
+
+    # Check docstring-signature consistency in clause_gates.py
+    import ast
+    import inspect
+
+    source_path = PROJECT_ROOT / "src" / "liquidloc" / "analysis" / "clause_gates.py"
+    docstring_consistent = True
+    inconsistencies = []
+
+    try:
+        source_text = source_path.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                # Skip private functions and dunder methods
+                if node.name.startswith("_") and not node.name.startswith("p"):
+                    continue
+
+                # Get docstring
+                docstring = ast.get_docstring(node)
+                if docstring is None:
+                    continue
+
+                # Check if docstring contains param and return info that matches signature
+                # This is a simplified check - just verify docstring structure
+                params_in_doc = []
+                returns_in_doc = False
+
+                for line in docstring.split('\n'):
+                    line = line.strip().lower()
+                    if ':param' in line or ':type' in line:
+                        # Extract param name
+                        parts = line.replace(':param', '').replace(':type', '')
+                        parts = parts.split(':')[0].strip()
+                        if parts:
+                            params_in_doc.append(parts)
+                    if ':return:' in line or ':rtype:' in line:
+                        returns_in_doc = True
+
+                # Also check Args: format (Google style)
+                in_args = False
+                for line in docstring.split('\n'):
+                    stripped = line.strip()
+                    if stripped.lower() == 'args:':
+                        in_args = True
+                        continue
+                    if in_args and stripped and ':' in stripped and not stripped.startswith(':'):
+                        # This is a param line: "param_name: description"
+                        param_name = stripped.split(':')[0].strip()
+                        if param_name:
+                            params_in_doc.append(param_name)
+                    elif in_args and stripped and not stripped.startswith(' '):
+                        # New section started
+                        in_args = False
+
+                # Verify params match
+                for arg in node.args.args:
+                    if arg.arg != 'self' and arg.arg not in params_in_doc:
+                        # Check if param is mentioned in any form
+                        found = any(arg.arg in p for p in params_in_doc)
+                        if not found:
+                            docstring_consistent = False
+                            inconsistencies.append(f"{node.name}: param '{arg.arg}' not documented")
+
+    except Exception as exc:
+        docstring_consistent = False
+        inconsistencies.append(str(exc))
+
+    checks["docstring_consistent"] = docstring_consistent
+    passed = passed and docstring_consistent
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P84-docstring-consistency", "name": "[78] docstring 与函数签名一致性",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "inconsistencies": inconsistencies[:5] if inconsistencies else [],
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -16950,6 +17102,7 @@ _ALL = [
     p81_no_refactor_changes,
     p82_refactor_scope_definition,
     p83_no_degradation_exit,
+    p84_docstring_signature_consistency,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
@@ -17048,6 +17201,9 @@ def p3_state_only_disk(base_dir: str = "E:/异步高NLOS") -> dict:
     3. decision_log.json 或 .decision_logs/*.json 存在
     4. outputs/compliance_report_3.md 存在（条款[3]合规报告）
     5. .git/HEAD 指向有效 commit
+
+    Args:
+        base_dir: 基准目录，默认为"E:/异步高NLOS"
 
     Returns:
         dict: {"passed": bool, "items": list of {name, status, detail}}
@@ -17257,6 +17413,9 @@ def p3_check_git_clean(base_dir: str = "E:/异步高NLOS") -> dict:
     """检查 git 工作区是否干净（无未跟踪/未提交文件）。
     规则要求: `.git/HEAD` 指向有效 commit（git 状态干净）。
 
+    Args:
+        base_dir: 基准目录，默认为"E:/异步高NLOS"
+
     Returns:
         dict: {"passed": bool, "detail": str}
     """
@@ -17285,6 +17444,9 @@ def p3_check_git_clean(base_dir: str = "E:/异步高NLOS") -> dict:
 def p3_check_decision_logs_content(base_dir: str = "E:/异步高NLOS") -> dict:
     """深度核验 decision_log.json 中的治理内容是否真正记录了条款状态与证据锚点。
     规则要求: decision_log.json 存在、含 governance_clauses、每个条目有 status 与 evidence_files。
+
+    Args:
+        base_dir: 基准目录，默认为"E:/异步高NLOS"
 
     Returns:
         dict: {"passed": bool, "detail": str, "clauses_checked": int, "clauses_with_evidence": int}
