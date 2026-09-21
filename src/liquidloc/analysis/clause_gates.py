@@ -11613,6 +11613,129 @@ def p102_seed_trajectory_explicit() -> dict[str, Any]:
     }
 
 
+def p103_gear_param_reference() -> dict[str, Any]:
+    """[98] 档位参数回查 Stage 1 档位协议条款 ——任何涉及档位参数的检查（档位检查项等）一律回查 Stage 1 档位协议条款。
+
+    手册 [98]：任何涉及档位参数的检查（档位检查项等）一律回查 Stage 1 档位协议条款。
+
+    验证项：
+    1. configs/protocol/clause98_gear_param_reference.yaml 存在且能正确解析
+    2. clause_id == "98"
+    3. sole_authority.reference == "Stage 1 档位协议条款"
+    4. gear_param_checks 包含 A 轴、N 轴、V 轴、K 轴、M 轴 五个参数检查
+    5. 每个 gear_param_checks 项包含 name, reference, rule 字段
+    6. requirements 数组包含 4 条要求
+    7. prohibitions 数组包含 3 条禁用行为
+    8. manual_line == 333
+    9. 手册真源文件存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause98_gear_param_reference.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P103-gear-param-reference", "name": "[98] 档位参数回查 Stage 1",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P103-gear-param-reference", "name": "[98] 档位参数回查 Stage 1",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "98"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    sole = cfg.get("sole_authority", {})
+    if isinstance(sole, dict):
+        ok_ref = sole.get("reference") == "Stage 1 档位协议条款"
+        checks["sole_authority_reference"] = ok_ref
+        passed = passed and ok_ref
+    else:
+        checks["sole_authority_reference"] = False
+        passed = False
+
+    checks["sole_authority_reason"] = bool(sole.get("reason"))
+    passed = passed and checks["sole_authority_reason"]
+
+    params = cfg.get("gear_param_checks", [])
+    if isinstance(params, list):
+        expected_names = {"A 轴同步精度", "N 轴 NLOS 偏差", "V 轴视觉退化", "K 轴锚分布", "M 轴数据缺失"}
+        actual_names = {p.get("name") for p in params if isinstance(p, dict)}
+        ok_5_params = expected_names.issubset(actual_names)
+        checks["gear_param_5_axes"] = ok_5_params
+        passed = passed and ok_5_params
+
+        ok_each = all(
+            isinstance(p, dict) and 
+            all(k in p for k in ("name", "reference", "rule"))
+            for p in params
+        )
+        checks["param_items_complete"] = ok_each
+        passed = passed and ok_each
+    else:
+        checks["gear_param_5_axes"] = False
+        checks["param_items_complete"] = False
+        passed = False
+
+    reqs = cfg.get("requirements", [])
+    if isinstance(reqs, list):
+        ok_reqs = len(reqs) >= 4
+        checks["requirements_4"] = ok_reqs
+        passed = passed and ok_reqs
+    else:
+        checks["requirements_4"] = False
+        passed = False
+
+    props = cfg.get("prohibitions", [])
+    if isinstance(props, list):
+        ok_props = len(props) >= 3
+        checks["prohibitions_3"] = ok_props
+        passed = passed and ok_props
+    else:
+        checks["prohibitions_3"] = False
+        passed = False
+
+    manual_line = cfg.get("manual_line")
+    ok_line = manual_line == 333 or str(manual_line) == "333"
+    checks["manual_line_points_to_333"] = ok_line
+    passed = passed and ok_line
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P103-gear-param-reference", "name": "[98] 档位参数回查 Stage 1",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -19242,6 +19365,7 @@ _ALL = [
     p100_miluv_external_domain,
     p101_layout_scatter_miluv,
     p102_seed_trajectory_explicit,
+    p103_gear_param_reference,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
     p183_layout_manifest,

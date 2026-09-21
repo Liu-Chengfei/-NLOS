@@ -1,6 +1,6 @@
 # 条款 [98] 档位参数回查 Stage 1 档位协议条款
 # 手册原文：任何涉及档位参数的检查（档位检查项等）一律回查 Stage 1 档位协议条款。
-# 对应手册 docs/最终交付_异步手册_424条_20260917.md:325
+# 对应手册 docs/最终交付_异步手册_424条_20260917.md:333
 
 clause_id: "98"
 clause_name: "档位参数回查 Stage 1 档位协议条款"
@@ -43,7 +43,9 @@ prohibitions:
   - "禁止通过复制粘贴创建与协议不一致的参数副本"
 
 # 参考路径
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md:325"
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md:333"
+manual_line: 333
+verification_gate: "p103_gear_param_reference"
 related_clauses:
   - "37"
   - "43"
