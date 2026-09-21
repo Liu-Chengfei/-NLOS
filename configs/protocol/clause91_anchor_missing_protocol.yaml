@@ -1,5 +1,5 @@
 # 条款 [91] · 锚固定 4 且缺失 M1 成簇协议
-# 来源：docs/最终交付_异步手册_424条_20260917.md 第 318 行
+# 来源：docs/最终交付_异步手册_424条_20260917.md 第 326 行
 # 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
 #
 # 内容：
@@ -9,7 +9,7 @@
 protocol_version: 27
 clause_id: "91"
 clause_title: "锚固定 4 且缺失 M1 成簇"
-clause_source: "docs/最终交付_异步手册_424条_20260917.md 第 318 行"
+clause_source: "docs/最终交付_异步手册_424条_20260917.md 第326行"
 
 axis_k_anchor_protocol:
   description: "协议 K 轴全档固定 4 锚"

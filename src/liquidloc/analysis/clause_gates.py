@@ -10738,6 +10738,133 @@ def p96_learning_rate_three_phase() -> dict[str, Any]:
     }
 
 
+def p91_anchor_fixed_4_m1_clustered() -> dict[str, Any]:
+    """[91] 锚固定 4 且缺失 M1 成簇协议 ——协议 K 轴全档固定 4 锚，异步高NLOS实验按协议 K1=4 锚执行（锚点坐标 A1–A4 即 4 锚），与协议一致 M 轴 主表 M1（UWB 5% 成簇丢包，含 NLOS 不可解帧统一归缺失），与协议 M1 一致
+
+    手册 [91]：协议 K 轴全档固定 4 锚，异步高NLOS实验按协议 K1=4 锚执行（锚点坐标 A1–A4 即 4 锚），与协议一致 M 轴 主表 M1（UWB 5% 成簇丢包，含 NLOS 不可解帧统一归缺失），与协议 M1 一致。
+
+    验证项：
+    1. configs/protocol/clause91_anchor_missing_protocol.yaml 存在且能正确解析
+    2. clause_id == "91"
+    3. axis_k_anchor_protocol.anchor_count_fixed == 4
+    4. axis_k_anchor_protocol.execution_gear == "K1"
+    5. axis_k_anchor_protocol.k1_spec 存在且label为"4 锚非对称欠定"
+    6. axis_m_missing_protocol.m1_spec.uwb_missing_rate == 0.05
+    7. axis_m_missing_protocol.m1_spec.injection_type == "clustered"
+    8. joint_constraints.k_anchor_fixed_at_4 == true
+    9. joint_constraints.m_missing_at_m1_clustered == true
+    10. manual_ref 指向第326行
+    11. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause91_anchor_missing_protocol.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P91-anchor-fixed-m1", "name": "[91] 锚固定 4 且缺失 M1 成簇",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P91-anchor-fixed-m1", "name": "[91] 锚固定 4 且缺失 M1 成簇",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "91"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    k_axis = cfg.get("axis_k_anchor_protocol", {})
+    if isinstance(k_axis, dict):
+        ok_anchor_4 = k_axis.get("anchor_count_fixed") == 4
+        checks["k_axis_anchor_count_fixed_4"] = ok_anchor_4
+        passed = passed and ok_anchor_4
+
+        ok_gear = k_axis.get("execution_gear") == "K1"
+        checks["k_axis_execution_gear_K1"] = ok_gear
+        passed = passed and ok_gear
+
+        k1_spec = k_axis.get("k1_spec", {})
+        if isinstance(k1_spec, dict):
+            ok_k1_label = k1_spec.get("label") == "4 锚非对称欠定"
+            checks["k1_spec_label_correct"] = ok_k1_label
+            passed = passed and ok_k1_label
+        else:
+            checks["k1_spec_label_correct"] = False
+            passed = False
+    else:
+        for key in ["k_axis_anchor_count_fixed_4", "k_axis_execution_gear_K1", "k1_spec_label_correct"]:
+            checks[key] = False
+        passed = False
+
+    m_axis = cfg.get("axis_m_missing_protocol", {})
+    if isinstance(m_axis, dict):
+        m1_spec = m_axis.get("m1_spec", {})
+        if isinstance(m1_spec, dict):
+            ok_uwb = m1_spec.get("uwb_missing_rate") == 0.05
+            checks["m1_uwb_missing_rate_0.05"] = ok_uwb
+            passed = passed and ok_uwb
+
+            ok_injection = m1_spec.get("injection_type") == "clustered"
+            checks["m1_injection_type_clustered"] = ok_injection
+            passed = passed and ok_injection
+        else:
+            checks["m1_uwb_missing_rate_0.05"] = False
+            checks["m1_injection_type_clustered"] = False
+            passed = False
+    else:
+        checks["m1_uwb_missing_rate_0.05"] = False
+        checks["m1_injection_type_clustered"] = False
+        passed = False
+
+    jc = cfg.get("joint_constraints", {})
+    ok_k_fixed = jc.get("k_anchor_fixed_at_4") is True
+    checks["joint_k_anchor_fixed_at_4"] = ok_k_fixed
+    passed = passed and ok_k_fixed
+
+    ok_m_clustered = jc.get("m_missing_at_m1_clustered") is True
+    checks["joint_m_missing_at_m1_clustered"] = ok_m_clustered
+    passed = passed and ok_m_clustered
+
+    manual_ref = cfg.get("clause_source", "")
+    ok_manual_ref = "第326行" in manual_ref or "326:" in manual_ref or "line 326" in manual_ref.lower()
+    checks["manual_ref_points_to_326"] = ok_manual_ref
+    passed = passed and ok_manual_ref
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P91-anchor-fixed-m1", "name": "[91] 锚固定 4 且缺失 M1 成簇",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -18361,6 +18488,7 @@ _ALL = [
     p94_execution_deviation_assumption,
     p95_add_seed_or_trajectory,
     p96_learning_rate_three_phase,
+    p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
