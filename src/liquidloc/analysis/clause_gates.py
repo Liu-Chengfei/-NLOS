@@ -9974,6 +9974,100 @@ def p89_lstm_transformer_head_verification() -> dict[str, Any]:
     }
 
 
+def p90_test_trajectory_regeneration() -> dict[str, Any]:
+    """[84] 测试轨迹重新生成——全量 10 seed 的测试轨迹必须全部重新生成
+
+    手册 [84]：测试轨迹重新生成（全量 10 seed 的测试轨迹必须全部重新生成，不能用冒烟那 ≥12 条凑数）
+
+    验证项：
+    1. configs/protocol/test_trajectory_regeneration.yaml 存在且能正确解析
+    2. clause_id == "84"
+    3. test_trajectory_regeneration.must_regenerate_all_seeds == true
+    4. test_trajectory_regeneration.full_seed_count == 10
+    5. test_trajectory_regeneration.reuse_smoke_trajectories_forbidden == true
+    6. test_trajectory_regeneration.smoke_test_trajectory_count_min == 12
+    7. test_trajectory_regeneration.full_test_trajectory_count_min >= 100
+    8. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "test_trajectory_regeneration.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P90-test-trajectory", "name": "[84] 测试轨迹重新生成",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P90-test-trajectory", "name": "[84] 测试轨迹重新生成",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "84"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    tr = cfg.get("test_trajectory_regeneration", {})
+    if not isinstance(tr, dict):
+        checks["test_trajectory_regeneration_section"] = False
+        passed = False
+    else:
+        checks["test_trajectory_regeneration_section"] = True
+
+        ok_regen = tr.get("must_regenerate_all_seeds") is True
+        checks["must_regenerate_all_seeds_true"] = ok_regen
+        passed = passed and ok_regen
+
+        ok_seed = tr.get("full_seed_count") == 10
+        checks["full_seed_count_eq_10"] = ok_seed
+        passed = passed and ok_seed
+
+        ok_reuse = tr.get("reuse_smoke_trajectories_forbidden") is True
+        checks["reuse_smoke_trajectories_forbidden_true"] = ok_reuse
+        passed = passed and ok_reuse
+
+        ok_smoke = tr.get("smoke_test_trajectory_count_min") == 12
+        checks["smoke_test_trajectory_count_min_eq_12"] = ok_smoke
+        passed = passed and ok_smoke
+
+        ok_full = tr.get("full_test_trajectory_count_min", 0) >= 100
+        checks["full_test_trajectory_count_min_ge_100"] = ok_full
+        passed = passed and ok_full
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P90-test-trajectory", "name": "[84] 测试轨迹重新生成",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17590,6 +17684,7 @@ _ALL = [
     p87_smoke_test_verification,
     p88_preliminary_target_verification,
     p89_lstm_transformer_head_verification,
+    p90_test_trajectory_regeneration,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
