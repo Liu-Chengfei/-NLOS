@@ -10183,6 +10183,88 @@ def p91_systematic_nan_escalation() -> dict[str, Any]:
     }
 
 
+def p92_paper_grade_quota() -> dict[str, Any]:
+    """[86] 论文级完成满额判据——全量必须满额 10 seed × 5 方法 × ≥100 测试轨迹
+
+    手册 [86]：全量必须满额 10 seed × 5 方法 × ≥100 测试轨迹才算论文级完成。缺任何一个维度即为未完成，不可用统计推断或敏感性分析替代满额要求。
+
+    验证项：
+    1. configs/protocol/full_scale_paper_grade_quota.yaml 存在且能正确解析
+    2. clause_id == "86"
+    3. full_seed_count == 10
+    4. full_method_count == 5
+    5. full_test_trajectory_count_min >= 100
+    6. paper_grade_completion_requires_full_quota == true
+    7. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "full_scale_paper_grade_quota.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P92-paper-grade-quota", "name": "[86] 论文级完成满额判据",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P92-paper-grade-quota", "name": "[86] 论文级完成满额判据",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "86"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    ok_seed = cfg.get("full_seed_count") == 10
+    checks["full_seed_count_eq_10"] = ok_seed
+    passed = passed and ok_seed
+
+    ok_method = cfg.get("full_method_count") == 5
+    checks["full_method_count_eq_5"] = ok_method
+    passed = passed and ok_method
+
+    ok_traj = cfg.get("full_test_trajectory_count_min", 0) >= 100
+    checks["full_test_trajectory_count_min_ge_100"] = ok_traj
+    passed = passed and ok_traj
+
+    ok_quota = cfg.get("paper_grade_completion_requires_full_quota") is True
+    checks["paper_grade_completion_requires_full_quota_true"] = ok_quota
+    passed = passed and ok_quota
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P92-paper-grade-quota", "name": "[86] 论文级完成满额判据",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17801,6 +17883,7 @@ _ALL = [
     p89_lstm_transformer_head_verification,
     p90_test_trajectory_regeneration,
     p91_systematic_nan_escalation,
+    p92_paper_grade_quota,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
