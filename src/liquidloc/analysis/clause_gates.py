@@ -9248,6 +9248,98 @@ def p82_refactor_scope_definition() -> dict[str, Any]:
     }
 
 
+def p83_no_degradation_exit() -> dict[str, Any]:
+    """[77] 大修不是降级出口——大修目标是让代码与手册严格一致（回到正轨），不得借大修缩小实验声明/降 seed/降轨迹/降精度（降级边界不变）。
+
+    手册 [77]：**大修不是降级出口**——大修目标是让代码与手册严格一致（回到正轨），**不得借大修缩小实验声明/降 seed/降轨迹/降精度**（降级边界不变）。
+
+    验证项：
+    1. configs/protocol/no_degradation.yaml 存在且能正确解析
+    2. clause_id == "77"
+    3. no_degradation.no_shrink_declaration == true
+    4. no_degradation.no_reduce_seed == true
+    5. no_degradation.no_reduce_trajectory == true
+    6. no_degradation.no_reduce_precision == true
+    7. 手册真源存在
+    """
+    import yaml
+    cfg_path = CONFIGS / "protocol" / "no_degradation.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if cfg_exists:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "code": "P83-no-degradation-exit", "name": "[77] 大修不是降级出口",
+                "severity": "hard", "passed": False,
+                "detail": f"yaml parse error: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                             "parse_error": str(exc)},
+            }
+
+        if not isinstance(cfg, dict):
+            return {
+                "code": "P83-no-degradation-exit", "name": "[77] 大修不是降级出口",
+                "severity": "hard", "passed": False,
+                "detail": "cfg is not a dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+            }
+
+        ok_id = cfg.get("clause_id") == "77"
+        checks["clause_id"] = ok_id
+        passed = passed and ok_id
+
+        nd = cfg.get("no_degradation", {})
+        if not isinstance(nd, dict):
+            checks["no_degradation_section"] = False
+            passed = False
+        else:
+            checks["no_degradation_section"] = True
+
+            ok_shrink = nd.get("no_shrink_declaration") is True
+            checks["no_shrink_declaration_true"] = ok_shrink
+            passed = passed and ok_shrink
+
+            ok_seed = nd.get("no_reduce_seed") is True
+            checks["no_reduce_seed_true"] = ok_seed
+            passed = passed and ok_seed
+
+            ok_traj = nd.get("no_reduce_trajectory") is True
+            checks["no_reduce_trajectory_true"] = ok_traj
+            passed = passed and ok_traj
+
+            ok_prec = nd.get("no_reduce_precision") is True
+            checks["no_reduce_precision_true"] = ok_prec
+            passed = passed and ok_prec
+    else:
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P83-no-degradation-exit", "name": "[77] 大修不是降级出口",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -16857,6 +16949,7 @@ _ALL = [
     p80_ram_limit_12g,
     p81_no_refactor_changes,
     p82_refactor_scope_definition,
+    p83_no_degradation_exit,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
