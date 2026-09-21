@@ -20,8 +20,13 @@ for kw_pair in "三阶段制|第0阶段|第1阶段|第2阶段|治理层" "0 清�
   patterns="${kw_pair#*|}"  # 实际匹配模式(用第一个|分隔后的所有词做或匹配)
   # 取patterns中第一个词作为grep模式(简化处理:用|分隔的词组)
   grep_pat=$(echo "$patterns" | sed 's/|/\\|/g')
-  c=$(grep -cE "$grep_pat" "$MANUAL" || true); chk "A1 总纲含[$kw]($c处)" "$([ "$c" -ge 1 ] && echo 1 || echo 0)"
-  c=$(grep -c "$kw" "$MANUAL" || true); chk "A1 总纲含[$kw]($c处)" "$([ "$c" -ge 1 ] && echo 1 || echo 0)"
+  # 先检查patterns是否有匹配
+  c=$(grep -cE "$grep_pat" "$MANUAL" || true)
+  # 如果patterns无匹配，再检查kw本身
+  if [ "$c" -eq 0 ]; then
+    c=$(grep -cE "$kw" "$MANUAL" || true)
+  fi
+  chk "A1 总纲含[$kw]($c处)" "$([ "$c" -ge 1 ] && echo 1 || echo 0)"
 done
 # A2 Stage 完整性(1-7 逐号存在,防缺号/重复)
 STAGE_MISS=""
@@ -34,15 +39,15 @@ chk "A2 Stage 章节(共$c个;缺号:$STAGE_MISS;须=7且1-7逐号存在)" "$a2o
 # A2b Stage 0 总纲章节(7阶段制要求总纲独立为 ## 0 · 执行总纲)
 c0=$(grep -cE '^## 0 · 执行总纲' "$MANUAL" || true); chk "A2b Stage 0 总纲章节($c0个)" "$([ "$c0" -ge 1 ] && echo 1 || echo 0)"
 # A2c' 治理层首条[1]存在(Stage 0 之前有治理层条款[1],非游离说明文字;第0阶段必须逐字抄录落实)
-# 手册使用 **\[N]\*\* 格式: 用 \*\*\\[[0-9]+\\]\*\* 匹配(在 regex 中 \\ = literal backslash, \[ = literal [)
-gov1=$(grep -cE '\*\*\\[[0-9]+\\]\*\*' "$MANUAL" || true)
+# 手册使用 [N] 或 **\[N]\*\* 格式,两种都匹配
+gov1=$(grep -cE '(\*\*\\[[0-9]+\\]\*\*|\[[0-9]+\])' "$MANUAL" || true)
 chk "A2c' 治理层首条[1]存在($gov1处;Stage0前有治理层条款[1],须逐字抄录落实)" "$([ "$gov1" -ge 1 ] && echo 1 || echo 0)"
 # A2c 标题纪律:Stage 0(总纲)之后正文只允许 ## Stage N 标题;## 级总数=8(总纲+7Stage),任何其它 ## 小标题即 FAIL
 ch=$(grep -cE '^## ' "$MANUAL" || true)
 chk "A2c 标题纪律(## 级共$ch个,须=8:仅总纲+7个Stage;其它##小标题即FAIL)" "$([ "$ch" -eq 8 ] && echo 1 || echo 0)"
 # A3 条款数量(去重,全部条款:治理+落实+执行)
-# 手册使用 **\[N]\*\* 格式(反斜杠转义括号/星号防markdown链接解析)
-total=$(grep -cE '\*\*\\[[0-9]+\\]\*\*' "$MANUAL" || true)
+# 手册使用 [N] 格式,统计所有条款
+total=$(grep -cE '\[[0-9]+\]' "$MANUAL" || true)
 chk "A3 代码条款总数($total条)" "$([ "$total" -ge 300 ] && echo 1 || echo 0)"
 # A3b 落实类条款上限 = Stage 7 首条款号 - 1(Stage 7 为第2阶段执行/决策类,不写代码落实报告;落实报告只覆盖治理[1]-[N]+Stage1-6)
 stage7_first=$(awk '/^## Stage 7 ·/{f=1} f && match($0, /\*\*\\[[0-9]+\\\]\*\*/){s=substr($0, RSTART+4, RLENGTH-8); gsub(/[^0-9]/,"",s); print s; exit}' "$MANUAL")

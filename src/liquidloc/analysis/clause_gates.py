@@ -4286,7 +4286,7 @@ def p40_imu_output_spec() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P40-imu-output-spec",
-            "name": "[40] IMU输出规范(消费级,150Hz)",
+            "name": "[40] IMU（消费级，150 Hz）；输出数据：imu（N_imu×6：ax/ay/az/gx/gy/gz，150Hz 原生，不降采样）+ imu_t（N_imu×1 自身时间戳）",
             "severity": "hard",
             "passed": False,
             "detail": "imu_output_spec.yaml missing",
@@ -4299,7 +4299,7 @@ def p40_imu_output_spec() -> dict[str, Any]:
     except Exception as exc:
         return {
             "code": "P40-imu-output-spec",
-            "name": "[40] IMU输出规范(消费级,150Hz)",
+            "name": "[40] IMU（消费级，150 Hz）；输出数据：imu（N_imu×6：ax/ay/az/gx/gy/gz，150Hz 原生，不降采样）+ imu_t（N_imu×1 自身时间戳）",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -4418,7 +4418,7 @@ def p40_imu_output_spec() -> dict[str, Any]:
 
     return {
         "code": "P40-imu-output-spec",
-        "name": "[40] IMU输出规范(消费级,150Hz)",
+        "name": "[40] IMU（消费级，150 Hz）；输出数据：imu（N_imu×6：ax/ay/az/gx/gy/gz，150Hz 原生，不降采样）+ imu_t（N_imu×1 自身时间戳）",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
