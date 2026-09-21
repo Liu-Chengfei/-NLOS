@@ -1,6 +1,6 @@
 # 条款 [89] · 加 seed/轨迹预算约束
-# 手册原文：加 seed/轨迹：仅在预算内且预设判据内进行（如补 seed/轨迹到设计值）。
-# 对应 docs/最终交付_异步手册_424条_20260917.md 第316行
+# 手册原文：docs/最终交付_异步手册_424条_20260917.md 第324行
+# 加 seed/轨迹：仅在预算内且预设判据内进行（如补 seed/轨迹到设计值）
 
 clause_id: "89"
 clause_name: "加 seed/轨迹预算约束"
@@ -46,5 +46,4 @@ add_seed_or_trajectory:
     no_downgrade: true
     scale_never_less_than_design_value: true
 
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第316行"
-source_line: 316
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第324行"

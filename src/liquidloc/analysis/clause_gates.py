@@ -10456,6 +10456,137 @@ def p94_execution_deviation_assumption() -> dict[str, Any]:
     }
 
 
+def p95_add_seed_or_trajectory() -> dict[str, Any]:
+    """[89] 加 seed/轨迹预算约束——加 seed/轨迹：仅在预算内且预设判据内进行（如补 seed/轨迹到设计值）
+
+    手册 [89]：加 seed/轨迹：仅在预算内且预设判据内进行（如补 seed/轨迹到设计值）。
+
+    验证项：
+    1. configs/protocol/add_data_budget_constraint.yaml 存在且能正确解析
+    2. clause_id == "89"
+    3. add_seed_or_trajectory.allowed_conditions 包含 budget_within_limit 和 preset_criteria_followed
+    4. add_seed_or_trajectory.uncontrolled_expansion_forbidden == true
+    5. add_seed_or_trajectory.design_values.target_seed_count == 10
+    6. add_seed_or_trajectory.design_values.target_trajectories_per_seed == 100
+    7. add_seed_or_trajectory.budget_constraints.approval_required_for_excess == true
+    8. add_seed_or_trajectory.preset_criteria 包含 below_design_value 和 within_budget
+    9. add_seed_or_trajectory.expansion_rules.direction == "only_increase"
+    10. manual_ref 指向第324行
+    11. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "add_data_budget_constraint.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P95-add-seed-trajectory", "name": "[89] 加 seed/轨迹预算约束",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P95-add-seed-trajectory", "name": "[89] 加 seed/轨迹预算约束",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "89"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    asct = cfg.get("add_seed_or_trajectory", {})
+    if isinstance(asct, dict):
+        allowed = asct.get("allowed_conditions", [])
+        ok_allowed = "budget_within_limit" in allowed and "preset_criteria_followed" in allowed
+        checks["allowed_conditions_2_required"] = ok_allowed
+        passed = passed and ok_allowed
+
+        ok_uncontrolled = asct.get("uncontrolled_expansion_forbidden") is True
+        checks["uncontrolled_expansion_forbidden_true"] = ok_uncontrolled
+        passed = passed and ok_uncontrolled
+
+        dv = asct.get("design_values", {})
+        if isinstance(dv, dict):
+            ok_seed = dv.get("target_seed_count") == 10
+            checks["design_values_target_seed_count_eq_10"] = ok_seed
+            passed = passed and ok_seed
+
+            ok_traj = dv.get("target_trajectories_per_seed") == 100
+            checks["design_values_target_trajectories_per_seed_eq_100"] = ok_traj
+            passed = passed and ok_traj
+        else:
+            checks["design_values_target_seed_count_eq_10"] = False
+            checks["design_values_target_trajectories_per_seed_eq_100"] = False
+            passed = False
+
+        bc = asct.get("budget_constraints", {})
+        ok_bc = isinstance(bc, dict) and bc.get("approval_required_for_excess") is True
+        checks["budget_constraints_approval_required_for_excess_true"] = ok_bc
+        passed = passed and ok_bc
+
+        preset = asct.get("preset_criteria", [])
+        if isinstance(preset, list):
+            preset_names = {p.get("name") for p in preset if isinstance(p, dict)}
+            ok_preset = "below_design_value" in preset_names and "within_budget" in preset_names
+            checks["preset_criteria_2_required"] = ok_preset
+            passed = passed and ok_preset
+        else:
+            checks["preset_criteria_2_required"] = False
+            passed = False
+
+        er = asct.get("expansion_rules", {})
+        ok_direction = er.get("direction") == "only_increase"
+        checks["expansion_rules_direction_only_increase"] = ok_direction
+        passed = passed and ok_direction
+
+        ok_purpose = asct.get("purpose") == "补至设计值"
+        checks["purpose_eq_补至设计值"] = ok_purpose
+        passed = passed and ok_purpose
+    else:
+        for key in ["allowed_conditions_2_required", "uncontrolled_expansion_forbidden_true",
+                     "design_values_target_seed_count_eq_10", "design_values_target_trajectories_per_seed_eq_100",
+                     "budget_constraints_approval_required_for_excess_true", "preset_criteria_2_required",
+                     "expansion_rules_direction_only_increase", "purpose_eq_补至设计值"]:
+            checks[key] = False
+        passed = False
+
+    manual_ref = cfg.get("manual_ref", "")
+    ok_manual_ref = "第324行" in manual_ref or "324:" in manual_ref or "line 324" in manual_ref.lower()
+    checks["manual_ref_points_to_324"] = ok_manual_ref
+    passed = passed and ok_manual_ref
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P95-add-seed-trajectory", "name": "[89] 加 seed/轨迹预算约束",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -18077,6 +18208,7 @@ _ALL = [
     p92_paper_grade_quota,
     p93_diagnostic_cleanliness_gate,
     p94_execution_deviation_assumption,
+    p95_add_seed_or_trajectory,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
