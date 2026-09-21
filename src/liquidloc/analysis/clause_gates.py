@@ -4910,7 +4910,7 @@ def p42b_four_output_heads() -> dict[str, Any]:
     detail_parts.append(f"output_heads={output_heads}, 期望包含 {expected_heads}, 匹配={heads_ok}")
 
     # 校验 mechanism_chain
-    expected_chain = "NLOS 识别 -> 协方差调制/降权 -> 鲁棒门控"
+    expected_chain = "NLOS 识别 → 协方差调制/降权 → 鲁棒门控"
     actual_chain = cfg.get("mechanism_chain", "")
     chain_ok = actual_chain == expected_chain
     detail_parts.append(f"mechanism_chain='{actual_chain}', 期望='{expected_chain}', 匹配={chain_ok}")
