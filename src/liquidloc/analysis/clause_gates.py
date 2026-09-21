@@ -5741,7 +5741,7 @@ def p50_test_train_no_overlap() -> dict[str, Any]:
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P50-test-train-no-overlap", "name": "[50] 测试轨迹与训练无重叠", "severity": "hard",
+            "code": "P50-test-train-no-overlap", "name": "[50] 测试轨迹与训练无重叠（P6）", "severity": "hard",
             "passed": False, "detail": "clause50_test_train_no_overlap.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
         }
@@ -5751,7 +5751,7 @@ def p50_test_train_no_overlap() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P50-test-train-no-overlap", "name": "[50] 测试轨迹与训练无重叠", "severity": "hard",
+            "code": "P50-test-train-no-overlap", "name": "[50] 测试轨迹与训练无重叠（P6）", "severity": "hard",
             "passed": False, "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
         }
@@ -5770,7 +5770,7 @@ def p50_test_train_no_overlap() -> dict[str, Any]:
     passed = all(checks.values()) and cfg_exists
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P50-test-train-no-overlap", "name": "[50] 测试轨迹与训练无重叠", "severity": "hard",
+        "code": "P50-test-train-no-overlap", "name": "[50] 测试轨迹与训练无重叠（P6）", "severity": "hard",
         "passed": passed,
         "detail": f"cfg_exists={cfg_exists}; checks={'; '.join(detail_parts)}",
         "evidence": {

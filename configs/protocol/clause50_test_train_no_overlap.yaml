@@ -5,5 +5,5 @@ test_train_no_overlap: true
 paper_reference: "P6"
 description: "测试轨迹与训练数据在序列级别严格分离，不存在任何重叠。所有评估指标均在独立于训练集的数据上计算，确保结果的可信度和泛化能力验证。"
 enforcement: "sequence_split_no_overlap 验证函数强制执行"
-manual_ref: "最终交付_异步手册_424 条_20260917.md"
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第285行"
 verification_gate: "p50_test_train_no_overlap"
