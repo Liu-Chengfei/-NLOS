@@ -12,7 +12,7 @@
 
 **验证**: 命令: `python -c "import sys; sys.path.insert(0, 'src'); from liquidloc.analysis.clause_gates import p44_gear_injection_discipline; r = p44_gear_injection_discipline(); print(f'passed={r[\"passed\"]}, name={r[\"name\"][:60]}...'); exit(0 if r['passed'] else 1)"` → 预期: passed=True；name含完整条款原文（60字以上）；退出码0
 
-**证据**: configs/protocol/clause44_injection_discipline.yaml（档位注入纪律配置文件，25行，含discipline_name/inject_what/a_axis_nature/a_axis_source/strict_static_injection/forbidden_drift_as_level/drifty_evaluation_path/forbidden_drift_description八键）; src/liquidloc/analysis/clause_gates.py::p44_gear_injection_discipline():5005（验证函数，八项检查）; docs/最终交付_异步手册_424条_20260917.md:279（手册真源，条款[44]原文所在行）; AGENTS.md:273（治理载体索引条目）; rules/指令状态表.md:64（指令状态表[44]条目）; outputs/compliance_report_44_gear_injection.md（本八字段报告）
+**证据**: configs/protocol/clause44_injection_discipline.yaml（档位注入纪律配置文件，25行，含discipline_name/inject_what/a_axis_nature/a_axis_source/strict_static_injection/forbidden_drift_as_level/drift_evaluation_path/forbidden_drift_description八键）; src/liquidloc/analysis/clause_gates.py::p44_gear_injection_discipline():5005（验证函数，八项检查）; docs/最终交付_异步手册_424条_20260917.md:279（手册真源，条款[44]原文所在行）; AGENTS.md:273（治理载体索引条目）; rules/指令状态表.md:64（指令状态表[44]条目）; outputs/compliance_report_44_gear_injection.md（本八字段报告）
 
 ---
 
