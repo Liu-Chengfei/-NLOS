@@ -1,9 +1,9 @@
 # 文件职责：声明两个 σ 语义分离——协议 N 轴 σ 仅指 NLOS 段附加抖动，LOS 器件噪声 σ≈0.6m 为器件级非协议参数。
-# 本文件是手册第48条的配置落点。
+# 本文件是手册第45条的配置落点。
 # 关键约束：N 轴噪声 σ 是协议档位参数（描述 NLOS 附加抖动），LOS 器件噪声 σ 是非协议参数（描述器件级噪声）。
 # 两者语义不同，不得混淆计入同一参数体系。
 
-# 条款 [48] 原文
+# 条款 [45] 原文
 separation_name: "两个 σ 语义分离"
 
 # 协议 N 轴 σ 语义：仅指 NLOS 段附加抖动
@@ -29,7 +29,7 @@ non_protocol_note: "器件级噪声不应计入协议 σ 参数"
 
 # 约束声明
 constraint_declaration:
-  separation_id: "clause_48"
+  separation_id: "clause_45"
   clause_name: "两个 σ 语义分离"
   two_sigma_meaning_separated: true
   protocol_sigma_is_nlos_only: true

@@ -5435,7 +5435,7 @@ def p48_two_sigma_separation() -> dict[str, Any]:
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P48-two-sigma", "name": "[48] 两个 σ 语义分离", "severity": "hard",
+            "code": "P48-two-sigma", "name": "[45] 两个 σ 语义分离", "severity": "hard",
             "passed": False,
             "detail": "two_sigma_separation.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -5446,7 +5446,7 @@ def p48_two_sigma_separation() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P48-two-sigma", "name": "[48] 两个 σ 语义分离", "severity": "hard",
+            "code": "P48-two-sigma", "name": "[45] 两个 σ 语义分离", "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
@@ -5522,7 +5522,7 @@ def p48_two_sigma_separation() -> dict[str, Any]:
         f"axis_n={axis_n_detail}",
     ]
     return {
-        "code": "P48-two-sigma", "name": "[48] 两个 σ 语义分离", "severity": "hard",
+        "code": "P48-two-sigma", "name": "[45] 两个 σ 语义分离", "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
