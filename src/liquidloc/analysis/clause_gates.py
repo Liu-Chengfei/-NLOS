@@ -17767,10 +17767,11 @@ def p32_axis_k_anchor_verification() -> dict[str, Any]:
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
         }
 
-    gears = cfg.get("K0", {})
-    # 处理两种可能的结构：直接键或嵌套gears
-    if "gears" in cfg:
-        gears = cfg.get("gears", {})
+    # K轴配置文件使用扁平结构（K0/K1/K3直接在根节点）
+    gears = {}
+    for gear_key in ["K0", "K1", "K3"]:
+        if gear_key in cfg:
+            gears[gear_key] = cfg[gear_key]
     
     mismatches: list[str] = []
     missing_gears: list[str] = []
