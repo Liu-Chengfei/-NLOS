@@ -1,6 +1,6 @@
 # 条款 [97] seed/轨迹数/独立实验数是否明示？
 # 手册原文：seed/轨迹数/独立实验数是否明示？；高兼容默认：表注或实验设置（含 seed 数、轨迹级样本数、独立实验数）；不满足时：补明示
-# 对应手册 docs/最终交付_异步手册_424条_20260917.md:324
+# 对应手册 docs/最终交付_异步手册_424条_20260917.md:332
 
 clause_id: "97"
 clause_name: "seed/轨迹数/独立实验数明示"
@@ -75,4 +75,6 @@ validation_rules:
   - "手册真源文件必须存在"
 
 # 参考路径
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md:324"
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md:332"
+manual_line: 332
+verification_gate: "p102_seed_trajectory_explicit"

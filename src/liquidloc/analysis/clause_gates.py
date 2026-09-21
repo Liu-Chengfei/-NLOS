@@ -11493,6 +11493,126 @@ def p101_layout_scatter_miluv() -> dict[str, Any]:
     }
 
 
+def p102_seed_trajectory_explicit() -> dict[str, Any]:
+    """[97] seed/轨迹数/独立实验数明示 ——seed/轨迹数/独立实验数是否明示；高兼容默认：表注或实验设置（含 seed 数、轨迹级样本数、独立实验数）；不满足时：补明示
+
+    手册 [97]：seed/轨迹数/独立实验数是否明示；高兼容默认：表注或实验设置（含 seed 数、轨迹级样本数、独立实验数）；不满足时：补明示。
+
+    验证项：
+    1. configs/protocol/clause97_seed_trajectory_explicit.yaml 存在且能正确解析
+    2. clause_id == "97"
+    3. explicit_declaration.seed_count.required == true
+    4. explicit_declaration.trajectory_per_seed.required == true
+    5. explicit_declaration.independent_experiments.required == true
+    6. four_combinations.required == true
+    7. four_combinations.combinations 包含全部四个组合（A2N2, A2N3, A3N2, A3N3）
+    8. four_combinations.per_combination_min_trajectory == 25
+    9. four_combinations.total_min_trajectory == 100
+    10. manual_line == 332
+    11. 手册真源文件存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause97_seed_trajectory_explicit.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P102-seed-trajectory-explicit", "name": "[97] seed/轨迹数/独立实验数明示",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P102-seed-trajectory-explicit", "name": "[97] seed/轨迹数/独立实验数明示",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "97"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    explicit = cfg.get("explicit_declaration", {})
+    if isinstance(explicit, dict):
+        ok_seed = explicit.get("seed_count", {}).get("required") is True if isinstance(explicit.get("seed_count"), dict) else explicit.get("seed_count") is True
+        checks["seed_count_required"] = ok_seed
+        passed = passed and ok_seed
+
+        ok_traj = explicit.get("trajectory_per_seed", {}).get("required") is True if isinstance(explicit.get("trajectory_per_seed"), dict) else explicit.get("trajectory_per_seed") is True
+        checks["trajectory_per_seed_required"] = ok_traj
+        passed = passed and ok_traj
+
+        ok_indep = explicit.get("independent_experiments", {}).get("required") is True if isinstance(explicit.get("independent_experiments"), dict) else explicit.get("independent_experiments") is True
+        checks["independent_experiments_required"] = ok_indep
+        passed = passed and ok_indep
+    else:
+        for key in ["seed_count_required", "trajectory_per_seed_required", "independent_experiments_required"]:
+            checks[key] = False
+        passed = False
+
+    four = cfg.get("four_combinations", {})
+    if isinstance(four, dict):
+        ok_required = four.get("required") is True
+        checks["four_combinations_required"] = ok_required
+        passed = passed and ok_required
+
+        combos = four.get("combinations", [])
+        if isinstance(combos, list):
+            ok_combos = {"A2N2", "A2N3", "A3N2", "A3N3"}.issubset(combos)
+            checks["combinations_4"] = ok_combos
+            passed = passed and ok_combos
+        else:
+            checks["combinations_4"] = False
+            passed = False
+
+        ok_per = four.get("per_combination_min_trajectory") == 25
+        checks["per_combination_25"] = ok_per
+        passed = passed and ok_per
+
+        ok_total = four.get("total_min_trajectory") == 100
+        checks["total_min_100"] = ok_total
+        passed = passed and ok_total
+    else:
+        for key in ["four_combinations_required", "combinations_4", "per_combination_25", "total_min_100"]:
+            checks[key] = False
+        passed = False
+
+    manual_line = cfg.get("manual_line")
+    ok_line = manual_line == 332 or str(manual_line) == "332"
+    checks["manual_line_points_to_332"] = ok_line
+    passed = passed and ok_line
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P102-seed-trajectory-explicit", "name": "[97] seed/轨迹数/独立实验数明示",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -19121,6 +19241,7 @@ _ALL = [
     p99_table_delivery_list,
     p100_miluv_external_domain,
     p101_layout_scatter_miluv,
+    p102_seed_trajectory_explicit,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
     p183_layout_manifest,
