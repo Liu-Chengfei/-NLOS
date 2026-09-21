@@ -14,4 +14,4 @@ weight_init_consistent: true
 
 description: "LNN/LSTM/Transformer 三方法使用同一 seed 进行权重初始化，确保可比性。"
 
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第288行"
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第296行"
