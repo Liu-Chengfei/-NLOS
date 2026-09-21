@@ -9,6 +9,7 @@ ten_seed_insufficient_honest_declaration: true
 expansion_path_only_increase: true
 scale_floor_ge_10seed_100perseed: true
 s3_hard_constraint: true
+paper_level_constraint: true
 no_narrowing_exit: true
 
 description: "10 seed不足支撑功效时如实声明并给出扩样路径（只增不减：加seed/轨迹至功效达标，规模恒≥论文级10 seed × ≥100/seed，S3硬约束——不存在'收窄/降档'方向的出口）"
