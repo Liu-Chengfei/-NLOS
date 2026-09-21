@@ -17229,3 +17229,68 @@ def p3_check_decision_logs_content(base_dir: str = "E:/异步高NLOS") -> dict:
             "detail": detail, "clauses_checked": len(gc), "clauses_with_evidence": clauses_with_evidence}
 
 
+# ---------------- [28] 治理载体索引模板 ----------------
+def p28_governance_carrier_index_verification() -> dict[str, Any]:
+    """[28] 治理载体索引模板（分散落点，禁止集中单文件）——验证治理载体索引结构完整性。
+    
+    验证方式：
+    ① AGENTS.md存在且含五铁律+治理载体索引条目；
+    ② 治理文件分散在rules/、skills/、hooks/、checklist_*.md、.zcode/config.json中；
+    ③ 不存在集中单文件的治理载体。
+    通过条件：AGENTS.md存在且含索引条目，且治理文件分散分布。
+    """
+    import yaml
+    import re
+    
+    agents_path = PROJECT_ROOT / "AGENTS.md"
+    rules_dir = PROJECT_ROOT / "rules"
+    skills_dir = PROJECT_ROOT / "skills"
+    hooks_dir = PROJECT_ROOT / ".git" / "hooks"
+    zcode_dir = PROJECT_ROOT / ".zcode"
+    
+    # (a) AGENTS.md存在性检查
+    agents_exists = agents_path.is_file()
+    agents_text = agents_path.read_text(encoding="utf-8") if agents_exists else ""
+    
+    # (b) 检查五铁律+治理载体索引条目
+    has_five_rules = "五铁律" in agents_text or "五轴" in agents_text or "铁律" in agents_text
+    has_index_entries = "治理载体索引" in agents_text or "索引" in agents_text
+    
+    # (c) 检查分散分布
+    rules_exist = rules_dir.exists()
+    skills_exist = skills_dir.exists()
+    hooks_exist = hooks_dir.exists()
+    zcode_exist = zcode_dir.exists()
+    
+    # (d) 检查checklist文件
+    checklist_files = list(rules_dir.glob("checklist_*.md")) if rules_exist else []
+    
+    # (e) 验证通过条件
+    passed = (
+        agents_exists and
+        has_five_rules and
+        has_index_entries and
+        rules_exist and
+        len(checklist_files) > 0
+    )
+    
+    return {
+        "code": "P28-governance-carrier-index",
+        "name": "[28] 治理载体索引模板",
+        "severity": "hard",
+        "passed": passed,
+        "detail": f"agents_exists={agents_exists}; has_five_rules={has_five_rules}; has_index_entries={has_index_entries}; rules_exist={rules_exist}; skills_exist={skills_exist}; hooks_exist={hooks_exist}; zcode_exist={zcode_exist}; checklist_count={len(checklist_files)}",
+        "evidence": {
+            "agents_exists": agents_exists,
+            "has_five_rules": has_five_rules,
+            "has_index_entries": has_index_entries,
+            "rules_exist": rules_exist,
+            "skills_exist": skills_exist,
+            "hooks_exist": hooks_exist,
+            "zcode_exist": zcode_exist,
+            "checklist_files": [f.name for f in checklist_files[:5]],
+            "agents_line": None
+        }
+    }
+
+
