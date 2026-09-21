@@ -10265,6 +10265,109 @@ def p92_paper_grade_quota() -> dict[str, Any]:
     }
 
 
+def p93_diagnostic_cleanliness_gate() -> dict[str, Any]:
+    """[87] 诊断前洁净性 gate——若少单元/坏文件/指标不可读/告警未清零，直接进诊断会让诊断结论失真
+
+    手册 [87]：若少单元/坏文件/指标不可读/告警未清零，直接进诊断会让诊断结论失真（例如少 1 个 seed 的 LNN 恰好是拖后腿的单元，诊断会误判"LNN 非最低"）。
+
+    验证项：
+    1. configs/protocol/diagnostic_cleanliness_gate.yaml 存在且能正确解析
+    2. clause_id == "87"
+    3. diagnostic_cleanliness_gate.required == True
+    4. issues_pre_diagnosis 第1项（少单元检查）存在
+    5. issues_pre_diagnosis 第2项（坏文件检查）存在
+    6. issues_pre_diagnosis 第3项（指标不可读性检查）存在
+    7. issues_pre_diagnosis 第4项（告警未清零检查）存在
+    8. disclaimer_distortion_risk.enabled == True
+    9. diagnostic_prohibition.when_issues_present == True
+    10. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "diagnostic_cleanliness_gate.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P93-diagnostic-cleanliness", "name": "[87] 诊断前洁净性gate",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P93-diagnostic-cleanliness", "name": "[87] 诊断前洁净性gate",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "87"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    dcg = cfg.get("diagnostic_cleanliness_gate", {})
+    if isinstance(dcg, dict):
+        ok_req = dcg.get("required") is True
+        checks["diagnostic_cleanliness_gate_required_true"] = ok_req
+        passed = passed and ok_req
+    else:
+        checks["diagnostic_cleanliness_gate_section"] = False
+        passed = False
+
+    issues = cfg.get("issues_pre_diagnosis", [])
+    if isinstance(issues, list) and len(issues) >= 4:
+        checks["issues_pre_diagnosis_4_items"] = True
+
+        check_names = ["少单元检查", "坏文件检查", "指标不可读性检查", "告警未清零检查"]
+        for i, expected_name in enumerate(check_names):
+            if i < len(issues) and expected_name in issues[i].get("name", ""):
+                checks[f"issue_{i+1}_{expected_name}"] = True
+            else:
+                checks[f"issue_{i+1}_{expected_name}"] = False
+                passed = False
+    else:
+        checks["issues_pre_diagnosis_4_items"] = False
+        passed = False
+
+    disclaimer = cfg.get("disclaimer_distortion_risk", {})
+    ok_disclaimer = disclaimer.get("enabled") is True
+    checks["disclaimer_distortion_risk_enabled_true"] = ok_disclaimer
+    passed = passed and ok_disclaimer
+
+    prohibition = cfg.get("diagnostic_prohibition", {})
+    ok_prohibition = prohibition.get("when_issues_present") is True
+    checks["diagnostic_prohibition_when_issues_present_true"] = ok_prohibition
+    passed = passed and ok_prohibition
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P93-diagnostic-cleanliness", "name": "[87] 诊断前洁净性gate",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17884,6 +17987,7 @@ _ALL = [
     p90_test_trajectory_regeneration,
     p91_systematic_nan_escalation,
     p92_paper_grade_quota,
+    p93_diagnostic_cleanliness_gate,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
