@@ -1,0 +1,19 @@
+# 条款 [82] 预达标判定
+# 手册原文：**[82]** 预达标判定；验收人/验收机制（自交自验 = 未过）：独立复核者对照 Part 0 合格基准逐项勾选（落窗量级/无爆炸行 + LNN 排序最低/提升方向/A3N3 切片，不许执行者自判自过）+ 统计断言复核
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第317行
+
+clause_id: "82"
+clause_name: "预达标判定"
+
+preliminary_target_verification:
+  independent_reviewer_required: true
+  manual_self_check_forbidden: true
+  baseline_mapping_required: true
+  checklist_items:
+    - "落窗量级/无爆炸行"
+    - "LNN 排序最低/提升方向"
+    - "A3N3 切片"
+  statistical_assertion_review_required: true
+  description: "独立复核者对照 Part 0 合格基准逐项勾选（落窗量级/无爆炸行 + LNN 排序最低/提升方向/A3N3 切片，不许执行者自判自过）+ 统计断言复核"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第317行"

@@ -9789,6 +9789,107 @@ def p87_smoke_test_verification() -> dict[str, Any]:
     }
 
 
+def p88_preliminary_target_verification() -> dict[str, Any]:
+    """[82] 预达标判定——独立复核者对照 Part 0 合格基准逐项勾选，不许执行者自判自过
+
+    手册 [82]：**[82]** 预达标判定；验收人/验收机制（自交自验 = 未过）：独立复核者对照 Part 0 合格基准逐项勾选（落窗量级/无爆炸行 + LNN 排序最低/提升方向/A3N3 切片，不许执行者自判自过）+ 统计断言复核
+
+    验证项：
+    1. configs/protocol/preliminary_target_verification.yaml 存在且能正确解析
+    2. clause_id == "82"
+    3. preliminary_target_verification.independent_reviewer_required == true
+    4. preliminary_target_verification.manual_self_check_forbidden == true
+    5. preliminary_target_verification.statistical_assertion_review_required == true
+    6. checklist items 含"落窗量级/无爆炸行"
+    7. checklist items 含"LNN 排序最低/提升方向"
+    8. checklist items 含"A3N3 切片"
+    9. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "preliminary_target_verification.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P88-preliminary-target", "name": "[82] 预达标判定",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P88-preliminary-target", "name": "[82] 预达标判定",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "82"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    ptv = cfg.get("preliminary_target_verification", {})
+    if not isinstance(ptv, dict):
+        checks["preliminary_target_verification_section"] = False
+        passed = False
+    else:
+        checks["preliminary_target_verification_section"] = True
+
+        ok_reviewer = ptv.get("independent_reviewer_required") is True
+        checks["independent_reviewer_required_true"] = ok_reviewer
+        passed = passed and ok_reviewer
+
+        ok_no_self = ptv.get("manual_self_check_forbidden") is True
+        checks["manual_self_check_forbidden_true"] = ok_no_self
+        passed = passed and ok_no_self
+
+        ok_stats = ptv.get("statistical_assertion_review_required") is True
+        checks["statistical_assertion_review_required_true"] = ok_stats
+        passed = passed and ok_stats
+
+        # Check checklist items
+        checklist = ptv.get("checklist_items", [])
+        has_window = any("落窗量级" in item or "无爆炸行" in item for item in checklist)
+        checks["checklist_has_window_explosion"] = has_window
+        passed = passed and has_window
+
+        has_lnn = any("LNN" in item and ("排序最低" in item or "提升方向" in item) for item in checklist)
+        checks["checklist_has_lnn"] = has_lnn
+        passed = passed and has_lnn
+
+        has_a3n3 = any("A3N3" in item and "切片" in item for item in checklist)
+        checks["checklist_has_a3n3"] = has_a3n3
+        passed = passed and has_a3n3
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P88-preliminary-target", "name": "[82] 预达标判定",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -17403,6 +17504,7 @@ _ALL = [
     p85_git_verify,
     p86_gap_interception,
     p87_smoke_test_verification,
+    p88_preliminary_target_verification,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
