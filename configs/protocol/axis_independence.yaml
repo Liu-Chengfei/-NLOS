@@ -1,0 +1,46 @@
+# 档位协议条款 · 五轴独立性说明
+# 对应手册第34条 (docs/最终交付_异步手册_424条_20260917.md 第1行)
+# 五铁律：唯一真源=手册原文，状态只认磁盘，逐字执行
+#
+# 五轴独立性：A/N/V/K/M 各轴可独立变化，可与任意其他轴组合。
+# 完整实验覆盖需在覆盖率中体现各轴所有档位的组合采样。
+protocol_version: 27
+clause_reference: "docs/最终交付_异步手册_424条_20260917.md 第34条"
+axis_type: "independence"
+axis_name: "五轴独立性说明"
+axis_description: "A/N/V/K/M 各轴可独立变化，可与任意其他轴组合。完整实验覆盖需在覆盖率中体现各轴所有档位的组合采样。"
+
+# A 轴：同步时钟偏移
+A:
+  label: "同步时钟偏移"
+  core_description: "同步时钟偏移"
+  can_combine_with: "任意其他轴"
+
+# N 轴：NLOS 偏差
+N:
+  label: "NLOS 偏差"
+  core_description: "NLOS 偏差（值不对）"
+  can_combine_with: "任意其他轴"
+
+# V 轴：视觉里程计退化
+V:
+  label: "视觉里程计退化"
+  core_description: "视觉里程计退化"
+  can_combine_with: "任意其他轴"
+
+# K 轴：锚点几何
+K:
+  label: "锚点几何"
+  core_description: "锚点几何（GDOP）"
+  can_combine_with: "任意其他轴"
+
+# M 轴：数据包缺失
+M:
+  label: "数据包缺失"
+  core_description: "数据包缺失（到没到）"
+  can_combine_with: "任意其他轴"
+
+constraint_declaration:
+  independence: true
+  all_axes_combinable: true
+  coverage_requirement: "完整实验覆盖需在覆盖率中体现各轴所有档位的组合采样"

@@ -17962,3 +17962,120 @@ def p33_axis_m_missing_verification() -> dict[str, Any]:
             "missing_fields": missing_fields,
         },
     }
+
+
+# ---------------- [34] 档位协议条款 · 五轴独立性说明 ----------------
+def p34_axis_independence_verification() -> dict[str, Any]:
+    """[34] 档位协议条款 · 五轴独立性说明
+    验证 configs/protocol/axis_independence.yaml 文件存在且参数符合手册定义。
+    
+    手册第34条原始定义：
+    |轴|核心描述|独立变化|
+    |-|-|-|
+    |A|同步时钟偏移|可与任意其他轴组合|
+    |N|NLOS 偏差（值不对）|可与任意其他轴组合|
+    |V|视觉里程计退化|可与任意其他轴组合|
+    |K|锚点几何（GDOP）|可与任意其他轴组合|
+    |M|数据包缺失（到没到）|可与任意其他轴组合|
+    
+    说明：完整实验覆盖需在覆盖率中体现各轴所有档位的组合采样。
+    """
+    import yaml
+
+    cfg_path = CONFIGS / "protocol" / "axis_independence.yaml"
+    handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    expected_axes = {
+        "A": {
+            "core_description": "同步时钟偏移",
+            "can_combine_with": "任意其他轴",
+        },
+        "N": {
+            "core_description": "NLOS 偏差（值不对）",
+            "can_combine_with": "任意其他轴",
+        },
+        "V": {
+            "core_description": "视觉里程计退化",
+            "can_combine_with": "任意其他轴",
+        },
+        "K": {
+            "core_description": "锚点几何（GDOP）",
+            "can_combine_with": "任意其他轴",
+        },
+        "M": {
+            "core_description": "数据包缺失（到没到）",
+            "can_combine_with": "任意其他轴",
+        },
+    }
+
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {
+            "code": "P34-axis-independence", "name": "[34] 档位协议条款 · 五轴独立性说明", "severity": "hard",
+            "passed": False,
+            "detail": "axis_independence.yaml missing",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P34-axis-independence", "name": "[34] 档位协议条款 · 五轴独立性说明", "severity": "hard",
+            "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
+        }
+
+    # 五轴配置文件使用扁平结构（A/N/V/K/M直接在根节点）
+    axes = {}
+    for axis_key in ["A", "N", "V", "K", "M"]:
+        if axis_key in cfg:
+            axes[axis_key] = cfg[axis_key]
+    
+    mismatches: list[str] = []
+    missing_axes: list[str] = []
+    missing_fields: list[str] = []
+    
+    for axis, params in expected_axes.items():
+        if axis not in axes:
+            missing_axes.append(axis)
+            continue
+        for field, expected_val in params.items():
+            actual_val = axes[axis].get(field)
+            if actual_val is None:
+                missing_fields.append(f"{axis}.{field}")
+                continue
+            elif actual_val != expected_val:
+                mismatches.append(f"{axis}.{field}: expected '{expected_val}', got '{actual_val}'")
+
+    handount_exists = handount_path.is_file()
+
+    passed = (
+        cfg_exists and
+        not mismatches and
+        not missing_axes and
+        not missing_fields and
+        handount_exists
+    )
+    detail_parts = [
+        f"cfg_exists={cfg_exists}",
+        f"mismatches={mismatches or 'none'}",
+        f"missing_axes={missing_axes or 'none'}",
+        f"missing_fields={missing_fields or 'none'}",
+        f"handount_exists={handount_exists}",
+    ]
+    return {
+        "code": "P34-axis-independence", "name": "[34] 档位协议条款 · 五轴独立性说明", "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "handount_path": str(handount_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "handount_exists": handount_exists,
+            "mismatches": mismatches,
+            "missing_axes": missing_axes,
+            "missing_fields": missing_fields,
+        },
+    }
