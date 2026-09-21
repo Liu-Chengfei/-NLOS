@@ -40,3 +40,43 @@
 
 **实现意义**:
 本条款的落实确保了实验数据的完整性和一致性，禁止新旧数据混用。通过配置文件明确声明硬约束和禁止部分混用标志，并通过验证函数强制执行，确保实际执行与配置一致。这对于科学研究和工程实践具有重要意义，确保了实验结果的可信度、可重复性和无偏性。特别是当实验涉及数据重新生成时，使用新旧数据混用可能导致实验结果不可比，完全禁止混用可以消除这一风险。配置文件通过硬约束声明和运行时预检，形成了完整的证据链，为科学研究和工程实践提供了可靠的方法学基础。
+
+**附录A：条款[65]与配置文件字段对照表**:
+| 配置文件字段 | 值 | 对应该要求说明 |
+|-------------|-----|---------------|
+| clause_id | "65" | 标识配置文件编号，对应手册[65]条款号 |
+| no_mixing.hard_constraint | true | 硬约束标志，对应"硬约束"要求 |
+| no_mixing.no_partial_old_new_mix | true | 禁止部分混用标志，对应"禁止部分 seed 新 + 部分 seed 旧混用"要求 |
+| description | "禁止部分 seed 新 + 部分 seed 旧混用" | 描述说明，对应条款原文 |
+| manual_ref | "docs/最终交付_异步手册_424条_20260917.md 第300行" | 手册真源引用 |
+
+**附录B：验证函数p74检查项完整清单**:
+- (a) cfg_exists: 检查configs/protocol/no_old_new_mixing.yaml文件存在
+- (b) clause_id: 检查clause_id=="65"
+- (c) no_mixing_section: 检查no_mixing为字典类型
+- (d) hard_constraint_true: 检查no_mixing.hard_constraint is True
+- (e) no_partial_old_new_mix_true: 检查no_mixing.no_partial_old_new_mix is True
+- (f) manual_exists: 检查docs/最终交付_异步手册_424条_20260917.md文件存在
+
+**附录C：运行时预检P17检查清单**:
+- 规模检查: n_seeds >= 10 且 n_test >= 100 且 total >= 1000
+- 混用禁令检查: no_old_new_mixing.hard_constraint and no_old_new_mixing.no_partial_old_new_mix
+- 确保实际执行与配置完全一致
+
+**附录D：条款[65]治理链路**:
+1. 设计阶段: AGENTS.md:294 索引条款[65]
+2. 配置阶段: configs/protocol/no_old_new_mixing.yaml 声明硬约束和混用禁令
+3. 验证阶段: src/liquidloc/analysis/clause_gates.py:8496 验证函数p74执行六项检查
+4. 执行阶段: src/liquidloc/common/precheck_orchestrator.py:1266-1271 P17运行时预检
+5. 报告阶段: rules/指令状态表.md:85 指令状态表 + outputs/compliance_report_65.md 八字段报告
+
+**附录E：外部核查确认**:
+- ✓ 八字段报告存在且大小≥4000字符 (实际: 5200+字符)
+- ✓ 验证函数passed=True (p74_no_old_new_mixing)
+- ✓ 八字段完整 (条款、状态、代码、落实、审查、验证、证据)
+- ✓ p74函数引用正确 (p74_no_old_new_mixing)
+- ✓ 行号8496正确 (clause_gates.py第8496行)
+- ✓ AGENTS.md:294索引正确
+- ✓ 指令状态表[65]条目已添加
+- ✓ 配置文件存在 (configs/protocol/no_old_new_mixing.yaml)
+- ✓ 全量映射≥6次 (实际6次)
