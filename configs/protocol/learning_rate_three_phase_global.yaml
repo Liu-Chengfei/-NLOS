@@ -1,6 +1,6 @@
 # 条款 [90] · 学习率三段式协议全局唯一
 
-# 手册位置：docs/最终交付_异步手册_424条_20260917.md 第317行
+# 手册位置：docs/最终交付_异步手册_424条_20260917.md 第325行
 # 对应 Part 0 三段式学习率协议全局约束
 
 clause_id: "90"
@@ -67,5 +67,4 @@ learning_rate_three_phase_protocol:
     - "schedule_type"
     - "decay_target_ratio"
 
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第317行"
-source_line: 317
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第325行"

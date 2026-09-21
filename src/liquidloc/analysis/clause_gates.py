@@ -10587,6 +10587,157 @@ def p95_add_seed_or_trajectory() -> dict[str, Any]:
     }
 
 
+def p96_learning_rate_three_phase() -> dict[str, Any]:
+    """[90] 学习率三段式协议全局唯一 ——学习率三段式协议全局唯一（Part 0：warm-up 线性升 → 平台恒定 → 后 1/3 段衰减到 lr_max×0.1，只允许调 W_up/lr_max/衰减比例，三网络同形态同预算训练不充分允许调 lr 但最多 2 轮、禁掩盖 bug）
+
+    手册 [90]：学习率三段式协议全局唯一（Part 0：warm-up 线性升 → 平台恒定 → 后 1/3 段衰减到 lr_max×0.1，只允许调 W_up/lr_max/衰减比例，三网络同形态同预算训练不充分允许调 lr 但最多 2 轮、禁掩盖 bug）。
+
+    验证项：
+    1. configs/protocol/learning_rate_three_phase_global.yaml 存在且能正确解析
+    2. clause_id == "90"
+    3. learning_rate_three_phase_protocol.unique_global == true
+    4. phases 包含3个阶段：warmup_linear_up、plateau_constant、last_third_decay_to_lr_max_x_0.1
+    5. warmup_linear_up.type == "linear_ramp"、max_fraction_of_total_steps == 0.05
+    6. plateau_constant.type == "constant"、value == "lr_max"
+    7. last_third_decay_to_lr_max_x_0.1.type == "decay"、target_value == "lr_max * 0.1"
+    8. adjustable_parameters 包含 W_up、lr_max、decay_ratio
+    9. training_inadequate_lr_tuning_allowed == true、max_lr_tuning_rounds == 2
+    10. bug_masking_forbidden == true
+    11. three_networks_same_schedule == true、three_networks_same_budget == true
+    12. manifest_required == true、manifest_fields 包含必要字段
+    13. manual_ref 指向第325行
+    14. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "learning_rate_three_phase_global.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P96-lr-three-phase", "name": "[90] 学习率三段式协议全局唯一",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P96-lr-three-phase", "name": "[90] 学习率三段式协议全局唯一",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "90"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    lr_protocol = cfg.get("learning_rate_three_phase_protocol", {})
+    if isinstance(lr_protocol, dict):
+        ok_unique = lr_protocol.get("unique_global") is True
+        checks["unique_global_true"] = ok_unique
+        passed = passed and ok_unique
+
+        phases = lr_protocol.get("phases", [])
+        phase_names = {p.get("name") for p in phases if isinstance(p, dict)}
+        ok_phases = "warmup_linear_up" in phase_names and "plateau_constant" in phase_names and "last_third_decay_to_lr_max_x_0.1" in phase_names
+        checks["phases_3_exist"] = ok_phases
+        passed = passed and ok_phases
+
+        phases_dict = {p.get("name"): p for p in phases if isinstance(p, dict)}
+        if "warmup_linear_up" in phases_dict:
+            warmup = phases_dict["warmup_linear_up"]
+            ok_warmup_type = warmup.get("type") == "linear_ramp"
+            ok_warmup_frac = warmup.get("max_fraction_of_total_steps") == 0.05
+            checks["warmup_linear_up_correct"] = ok_warmup_type and ok_warmup_frac
+            passed = passed and ok_warmup_type and ok_warmup_frac
+        else:
+            checks["warmup_linear_up_correct"] = False
+            passed = False
+
+        if "plateau_constant" in phases_dict:
+            plateau = phases_dict["plateau_constant"]
+            ok_plateau_type = plateau.get("type") == "constant"
+            ok_plateau_val = plateau.get("value") == "lr_max"
+            checks["plateau_constant_correct"] = ok_plateau_type and ok_plateau_val
+            passed = passed and ok_plateau_type and ok_plateau_val
+        else:
+            checks["plateau_constant_correct"] = False
+            passed = False
+
+        if "last_third_decay_to_lr_max_x_0.1" in phases_dict:
+            decay = phases_dict["last_third_decay_to_lr_max_x_0.1"]
+            ok_decay_type = decay.get("type") == "decay"
+            ok_decay_val = decay.get("target_value") == "lr_max * 0.1"
+            checks["decay_phase_correct"] = ok_decay_type and ok_decay_val
+            passed = passed and ok_decay_type and ok_decay_val
+        else:
+            checks["decay_phase_correct"] = False
+            passed = False
+
+        adj_params = lr_protocol.get("adjustable_parameters", [])
+        adj_names = {p.get("name") for p in adj_params if isinstance(p, dict)}
+        ok_adj = "W_up" in adj_names and "lr_max" in adj_names and "decay_ratio" in adj_names
+        checks["adjustable_params_3_correct"] = ok_adj
+        passed = passed and ok_adj
+
+        ok_tuning = lr_protocol.get("training_inadequate_lr_tuning_allowed") is True
+        ok_max_rounds = lr_protocol.get("max_lr_tuning_rounds") == 2
+        checks["lr_tuning_allowed_2_rounds"] = ok_tuning and ok_max_rounds
+        passed = passed and ok_tuning and ok_max_rounds
+
+        ok_bug_forbidden = lr_protocol.get("bug_masking_forbidden") is True
+        checks["bug_masking_forbidden_true"] = ok_bug_forbidden
+        passed = passed and ok_bug_forbidden
+
+        ok_same_schedule = lr_protocol.get("three_networks_same_schedule") is True
+        ok_same_budget = lr_protocol.get("three_networks_same_budget") is True
+        checks["three_networks_same_lr"] = ok_same_schedule and ok_same_budget
+        passed = passed and ok_same_schedule and ok_same_budget
+
+        manifest_req = lr_protocol.get("manifest_required") is True
+        checks["manifest_required_true"] = manifest_req
+        passed = passed and manifest_req
+    else:
+        for key in ["unique_global_true", "phases_3_exist", "warmup_linear_up_correct",
+                     "plateau_constant_correct", "decay_phase_correct", "adjustable_params_3_correct",
+                     "lr_tuning_allowed_2_rounds", "bug_masking_forbidden_true", "three_networks_same_lr"]:
+            checks[key] = False
+        passed = False
+
+    manual_ref = cfg.get("manual_ref", "")
+    ok_manual_ref = "第325行" in manual_ref or "325:" in manual_ref or "line 325" in manual_ref.lower()
+    checks["manual_ref_points_to_325"] = ok_manual_ref
+    passed = passed and ok_manual_ref
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P96-lr-three-phase", "name": "[90] 学习率三段式协议全局唯一",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -18209,6 +18360,7 @@ _ALL = [
     p93_diagnostic_cleanliness_gate,
     p94_execution_deviation_assumption,
     p95_add_seed_or_trajectory,
+    p96_learning_rate_three_phase,
     p182_manifest,
     p183_layout_manifest,
     p184_data_independence,
