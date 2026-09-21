@@ -1,19 +1,26 @@
-# 条款 [62] 功效与样本量声明配置
-# 手册原文：功效与样本量声明（论文必报）：论文须报告目标效应量（最小可检测相对提升，按 A-2 的 40% 下限折算）、显著性水平 α=0.05、功效 power≥0.8、以及 10 seed × ≥100 测试轨迹对应的统计把握说明（含预估方差来源：冒烟/先导实验）
-# 对应 docs/异步实验_执行手册_终版v15_总纲条款版.md 第336行
+# 条款 [62] 论文级规模参数配置
+# 手册原文：论文级规模参数：训练 12-15 条/seed、测试 >=100 条/seed（A2/A3 x N2/N3 四组合各 >=25）、120s 基准、10 seed（论文级基线）
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第297行
 
 clause_id: "62"
-clause_name: "功效与样本量声明"
+clause_name: "论文级规模参数"
 
-target_effect_size: true
-alpha: 0.05
-power: 0.8
-sample_size_10seed_100traj: true
-statistical_power_justification: true
-variance_source:
-  - "smoke_test"
-  - "pilot_experiment"
+# 训练规模参数
+train_per_seed_min: 12
+train_per_seed_max: 15
 
-description: "论文须报告目标效应量、α=0.05、功效power≥0.8、以及10 seed × ≥100测试轨迹对应的统计把握说明（含预估方差来源：冒烟/先导实验）"
+# 测试规模参数
+test_per_seed_min: 100
 
-manual_ref: "docs/异步实验_执行手册_终版v15_总纲条款版.md 第336行"
+# A2/A3 x N2/N3 四组合最小条目数
+A2A3_N2N3_combo_min: 25
+
+# 基准时长（秒）
+baseline_120s: true
+
+# 论文级seed数量
+paper_seed: 10
+
+description: "论文级规模参数：训练12-15条/seed、测试>=100条/seed（A2/A3 x N2/N3 四组合各>=25）、120s基准、10 seed（论文级基线）"
+
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第297行"
