@@ -10982,6 +10982,106 @@ def p97_ten_seeds_five_methods() -> dict[str, Any]:
     }
 
 
+def p98_baseline_consistency() -> dict[str, Any]:
+    """[93] 基线一致 ——消融各变体与主实验同数据/同 seed/同超参/同评估口径
+
+    手册 [93]：消融各变体与主实验同数据/同 seed/同超参/同评估口径。
+
+    验证项：
+    1. configs/protocol/clause93_baseline_consistency.yaml 存在且能正确解析
+    2. clause_id == "93"
+    3. baseline_consistency_requirements.same_data == true
+    4. baseline_consistency_requirements.same_seed == true
+    5. baseline_consistency_requirements.same_hyperparams == true
+    6. baseline_consistency_requirements.same_eval_standard == true
+    7. baseline_consistency_requirements.ablation_variable_only == true
+    8. checks 列表包含4项（data_manifest_consistency, seed_initialization_match, hyperparam_table_identical, eval_metric_definition_same）
+    9. manual_line == 328
+    10. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause93_baseline_consistency.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P98-baseline-consistency", "name": "[93] 基线一致",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P98-baseline-consistency", "name": "[93] 基线一致",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "93"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    req = cfg.get("baseline_consistency_requirements", {})
+    if isinstance(req, dict):
+        for key, expected in [("same_data", True), ("same_seed", True),
+                               ("same_hyperparams", True), ("same_eval_standard", True),
+                               ("ablation_variable_only", True)]:
+            ok = req.get(key) is True
+            checks[f"{key}_true"] = ok
+            passed = passed and ok
+    else:
+        for key in ["same_data_true", "same_seed_true", "same_hyperparams_true",
+                     "same_eval_standard_true", "ablation_variable_only_true"]:
+            checks[key] = False
+        passed = False
+
+    checks_list = cfg.get("checks", [])
+    if isinstance(checks_list, list):
+        expected_checks = {"data_manifest_consistency", "seed_initialization_match",
+                           "hyperparam_table_identical", "eval_metric_definition_same"}
+        actual_checks = {c for c in checks_list if isinstance(c, str)}
+        ok_checks = expected_checks.issubset(actual_checks)
+        checks["checks_4_required"] = ok_checks
+        passed = passed and ok_checks
+    else:
+        checks["checks_4_required"] = False
+        passed = False
+
+    manual_line = cfg.get("manual_line")
+    ok_line = manual_line == 328 or str(manual_line) == "328"
+    checks["manual_line_points_to_328"] = ok_line
+    passed = passed and ok_line
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P98-baseline-consistency", "name": "[93] 基线一致",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "cfg_exists": cfg_exists,
+            "checks": checks,
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
 def p182_manifest() -> dict[str, Any]:
     """[182] manifest：每个 seed 一个 JSON ——含场景图、锚点坐标、档位四组合、注入统计、外参/杆臂。
 
@@ -18606,6 +18706,7 @@ _ALL = [
     p95_add_seed_or_trajectory,
     p96_learning_rate_three_phase,
     p97_ten_seeds_five_methods,
+    p98_baseline_consistency,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
     p183_layout_manifest,
