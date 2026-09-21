@@ -7017,7 +7017,7 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     if not cfg_exists:
         return {
             "code": "P64-analysis-unit-sample-independence",
-            "name": "[56] 分析单位与样本独立性声明",
+            "name": "[56] 分析单位与样本独立性声明（P6）",
             "severity": "hard",
             "passed": False,
             "detail": "analysis_unit_sample_independence.yaml missing",
@@ -7029,7 +7029,7 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     except Exception as exc:
         return {
             "code": "P64-analysis-unit-sample-independence",
-            "name": "[56] 分析单位与样本独立性声明",
+            "name": "[56] 分析单位与样本独立性声明（P6）",
             "severity": "hard",
             "passed": False,
             "detail": f"yaml parse error: {exc}",
@@ -7040,7 +7040,7 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     if not isinstance(cfg, dict):
         return {
             "code": "P64-analysis-unit-sample-independence",
-            "name": "[56] 分析单位与样本独立性声明",
+            "name": "[56] 分析单位与样本独立性声明（P6）",
             "severity": "hard",
             "passed": False,
             "detail": "cfg is not a dict",
@@ -7119,7 +7119,7 @@ def p64_analysis_unit_sample_independence() -> dict[str, Any]:
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
         "code": "P64-analysis-unit-sample-independence",
-        "name": "[56] 分析单位与样本独立性声明",
+        "name": "[56] 分析单位与样本独立性声明（P6）",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
