@@ -5334,7 +5334,7 @@ def p47_three_layer_evidence() -> dict[str, Any]:
     cfg_exists = cfg_path.is_file()
     if not cfg_exists:
         return {
-            "code": "P47-three-layer-evidence", "name": "[47] 三层证据结构总表",
+            "code": "P47-three-layer-evidence", "name": "[47] 三层证据结构总表（论文级数据架构，与 S3 轨迹规格衔接）：层场景/数据规模职责统计推断与主场景共享 主场景（受控）主场景固定布局（20m×20m、4锚、4遮挡区）10seed×5方法=50单元",
             "severity": "hard", "passed": False,
             "detail": "three_layer_evidence_structure.yaml missing",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -5344,7 +5344,7 @@ def p47_three_layer_evidence() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P47-three-layer-evidence", "name": "[47] 三层证据结构总表",
+            "code": "P47-three-layer-evidence", "name": "[47] 三层证据结构总表（论文级数据架构，与 S3 轨迹规格衔接）：层场景/数据规模职责统计推断与主场景共享 主场景（受控）主场景固定布局（20m×20m、4锚、4遮挡区）10seed×5方法=50单元",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
@@ -5399,7 +5399,7 @@ def p47_three_layer_evidence() -> dict[str, Any]:
         f"stat_ok={stat_ok}", f"handount_exists={handount_exists}",
     ]
     return {
-        "code": "P47-three-layer-evidence", "name": "[47] 三层证据结构总表",
+        "code": "P47-three-layer-evidence", "name": "[47] 三层证据结构总表（论文级数据架构，与 S3 轨迹规格衔接）：层场景/数据规模职责统计推断与主场景共享 主场景（受控）主场景固定布局（20m×20m、4锚、4遮挡区）10seed×5方法=50单元",
         "severity": "hard", "passed": passed,
         "detail": "; ".join(detail_parts),
         "evidence": {
