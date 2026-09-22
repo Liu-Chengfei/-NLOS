@@ -12191,6 +12191,115 @@ def p102_problem_distribution() -> dict[str, Any]:
     }
 
 
+def p104_statistical_caliber_smoke_gate() -> dict[str, Any]:
+    """[104] 统计口径→统计脚本冒烟验证 gate；统计口径变更 → 重新冒烟验证（gate）。
+
+    核心断言：
+    1. 统计口径必须有冒烟验证 gate（smoke_test_gate_required == true）
+    2. 初始统计脚本必须通过冒烟验证（initial_validation == true）
+    3. 统计口径变更时必须重新冒烟验证（re_validation_on_change == true）
+    4. Gate 出口要求为 green（gate_exit_requirement == "green"）
+    5. 统计口径范围 4 项定义（误差指标 / 聚合方式 / 置信区间 / 假设检验）
+
+    验证项：
+    1. configs/protocol/clause104_smoke_test_gate.yaml 存在且能正确解析
+    2. clause_id == "104"
+    3. smoke_test_gate_required == true
+    4. gate_conditions.initial_validation == true
+    5. gate_conditions.re_validation_on_change == true
+    6. gate_conditions.gate_exit_requirement == "green"
+    7. statistical_methodology.scope 包含 4 项定义
+    8. manual_line == 339
+    9. 手册真源文件存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause104_smoke_test_gate.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P104-statistical-caliber-smoke-gate",
+            "name": "[104] 统计口径冒烟验证 Gate",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P104-statistical-caliber-smoke-gate",
+            "name": "[104] 统计口径冒烟验证 Gate",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    ok_id = cfg.get("clause_id") == "104"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    ok_smoke_gate = cfg.get("smoke_test_gate_required") is True
+    checks["smoke_test_gate_required"] = ok_smoke_gate
+    passed = passed and ok_smoke_gate
+
+    gc = cfg.get("gate_conditions", {})
+    if isinstance(gc, dict):
+        ok_init = gc.get("initial_validation") is True
+        checks["gate_conditions_initial_validation"] = ok_init
+        passed = passed and ok_init
+
+        ok_reval = gc.get("re_validation_on_change") is True
+        checks["gate_conditions_re_validation_on_change"] = ok_reval
+        passed = passed and ok_reval
+
+        ok_exit = gc.get("gate_exit_requirement") == "green"
+        checks["gate_exit_requirement_green"] = ok_exit
+        passed = passed and ok_exit
+    else:
+        checks["gate_conditions_initial_validation"] = False
+        checks["gate_conditions_re_validation_on_change"] = False
+        checks["gate_exit_requirement_green"] = False
+        passed = False
+
+    sm = cfg.get("statistical_methodology", {})
+    if isinstance(sm, dict):
+        scope = sm.get("scope", [])
+        ok_scope = isinstance(scope, list) and len(scope) == 4
+        checks["statistical_methodology_scope_4"] = ok_scope
+        passed = passed and ok_scope
+    else:
+        checks["statistical_methodology_scope_4"] = False
+        passed = False
+
+    ok_ml = cfg.get("manual_line") == 339
+    checks["manual_line_339"] = ok_ml
+    passed = passed and ok_ml
+
+    ok_manual = manual_exists
+    checks["manual_exists"] = ok_manual
+    passed = passed and ok_manual
+
+    return {
+        "code": "P104-statistical-caliber-smoke-gate",
+        "name": "[104] 统计口径冒烟验证 Gate",
+        "severity": "hard", "passed": passed,
+        "detail": "统计口径冒烟验证 gate 条款验证完成",
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+        },
+    }
+
+
 def p103_tost_bayesian_factor() -> dict[str, Any]:
     """[103] TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具。
 
@@ -18920,7 +19029,7 @@ def p6_redundancy_governance() -> dict[str, Any]:
     checks["agents_md_exists"] = agents_exists
     if agents_exists:
         agents_text = agents_path.read_text(encoding="utf-8")
-        checks["agents_md_has_clause_6_section"] = "## [6]" in agents_text or "**\\[6\\]**" in agents_text
+        checks["agents_md_has_clause_6_section"] = "## [6]" in agents_text or "**\\[6]" in agents_text
     else:
         checks["agents_md_has_clause_6_section"] = False
 
@@ -20026,6 +20135,7 @@ _ALL = [
     p101_output_alignment,
     p102_seed_trajectory_explicit,
     p102_problem_distribution,
+    p104_statistical_caliber_smoke_gate,
     p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,

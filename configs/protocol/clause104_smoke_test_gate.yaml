@@ -1,6 +1,6 @@
 # 条款 [104] 统计口径冒烟验证 Gate 配置
 # 手册原文：统计口径→统计脚本冒烟验证 gate；统计口径变更 → 重新冒烟验证（gate）
-# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 331 行
+# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 339 行
 
 clause_id: "104"
 clause_name: "统计口径冒烟验证 Gate"
@@ -54,9 +54,33 @@ verification_flow:
       action: "重新冒烟验证"
       description: "口径变更后必须重新验证"
 
+# 验证项
+verification_items:
+  # 1. 冒烟验证 gate 启用
+  smoke_test_gate_required: true
+
+  # 2. 初始验证必须通过
+  gate_conditions_initial_validation: true
+
+  # 3. 口径变更时重新验证
+  gate_conditions_re_validation_on_change: true
+
+  # 4. Gate 出口要求为 green
+  gate_exit_requirement_green: true
+
+  # 5. 统计口径范围 4 项定义
+  statistical_methodology_scope_4: true
+
+# 手册引用
+manual_ref: "docs/最终交付_异步手册_424 条_20260917.md 第 339 行"
+manual_line: 339
+
 # 约束声明（包含 related_clauses）
 constraint_declaration:
   clause_id: "104"
+  clause_name: "统计口径冒烟验证 Gate"
+  source_file: "docs/最终交付_异步手册_424 条_20260917.md"
+  source_line: 339
   binding_level: "hard"
   violation_consequence: "统计口径变更未重验 → 数据作废，重新跑"
   related_clauses:
@@ -65,7 +89,7 @@ constraint_declaration:
     - "[62] 论文级规模参数"
 
 # 手册引用
-manual_ref: "docs/最终交付_异步手册_424 条_20260917.md 第 331 行"
+manual_ref: "docs/最终交付_异步手册_424 条_20260917.md 第 339 行"
 
 # 实施说明
 implementation_note: >
