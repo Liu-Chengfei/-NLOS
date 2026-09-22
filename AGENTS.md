@@ -322,7 +322,7 @@
 [99] **N1.5 排除** — 条款: **[99]**; 状态: ✅ 已落实; 验证: passed=True
 **[100]** **头实现一致性** — 条款: **[100]**; 状态: 🔄 核实中; 验证: passed=False
 \*\*\[101]\*\*\*\* 输出对齐 — 条款: \*\*\[101]\*\*; 状态: ✅ 已落实; 验证: passed=True; Config: configs/protocol/clause101_output_alignment.yaml; Function: p101_output_alignment in src/liquidloc/analysis/clause_gates.py; Severity: hard; Description: 五个方法在同一批测试轨迹上评估，RMSE口径一致（Sim对齐/2D/世界系/warm-up剔除）
-\*\*\[102]\*\*\*\* 七成情况是"假象"（评估口径/单 seed 偶然）或"任务压力不足"，两成是"实现/机制未生效"，一成才是真问题。
+\*\*\[102]\*\*\*\* 问题分布 — 条款: \*\*\[102]\*\*; 状态: 🔄 核实中; Config: configs/protocol/clause102_problem_distribution.yaml; Function: p102_problem_distribution in src/liquidloc/analysis/clause_gates.py; Severity: hard; Description: 七成情况是"假象"（评估口径/单 seed 偶然）或"任务压力不足"，两成是"实现/机制未生效"，一成才是真问题。
 \*\*\[103]\*\*\*\* TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具—— \*\*判定链（按顺序执行，任一环节进入正式出口即停止）\*\*： \*\*预设等效边界（SESOI，实验方案冻结时定， 预注册口径）\*\*：在方案冻结时预设\*\*最小有意义效应（SESOI）\*\* ——本实验为 LNN vs EKF 相对提升的\*\*实际判定下限 33%（窗口内数学可达下限，见 Part 0）\*\*， 等效边界取该值的 ±50%（即相对提升 ±16.5% 内视为"等效/无实际差异"）
 \*\*\[104]\*\*\*\* 统计口径→统计脚本冒烟验证 gate；统计口径变更 → 重新冒烟验证（gate）
 

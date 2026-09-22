@@ -12043,6 +12043,154 @@ def p102_seed_trajectory_explicit() -> dict[str, Any]:
     }
 
 
+def p102_problem_distribution() -> dict[str, Any]:
+    """[102] 问题分布 ——七成假象（评估口径/单 seed 偶然），两成任务压力不足，一成实现未生效，零成真问题。
+
+    手册 [102]：七成情况是"假象"（评估口径/单 seed 偶然）或"任务压力不足"，两成是"实现/机制未生效"，一成才是真问题。
+
+    验证项：
+    1. configs/protocol/clause102_problem_distribution.yaml 存在且能正确解析
+    2. clause_id == "102"
+    3. problem_distribution.description 包含"假象"关键词
+    4. problem_distribution.distribution 包含四个类别
+    5. 假象类百分比 == 70
+    6. 任务压力不足百分比 == 20
+    7. 实现/机制未生效百分比 == 10
+    8. 真问题百分比 == 0
+    9. qualifying_criteria 全部 enforce == true
+    10. verification_items 全部为 true
+    11. manual_line == 337
+    12. 手册真源文件存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause102_problem_distribution.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P102-problem-distribution", "name": "[102] 问题分布",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P102-problem-distribution", "name": "[102] 问题分布",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    # clause_id
+    ok_id = cfg.get("clause_id") == "102"
+    checks["clause_id_eq_102"] = ok_id
+    passed = passed and ok_id
+
+    # problem_distribution.description contains "假象"
+    pd = cfg.get("problem_distribution", {})
+    if isinstance(pd, dict):
+        desc = pd.get("description", "")
+        ok_phantom = "假象" in desc
+        checks["description_contains_phantom"] = ok_phantom
+        passed = passed and ok_phantom
+
+        # distribution categories
+        dist = pd.get("distribution", [])
+        if isinstance(dist, list):
+            categories = {item.get("category") for item in dist if isinstance(item, dict)}
+            ok_4_categories = {"假象", "任务压力不足", "实现/机制未生效", "真问题"}.issubset(categories)
+            checks["distribution_4_categories"] = ok_4_categories
+            passed = passed and ok_4_categories
+
+            # percentage checks
+            pct_map = {item.get("category"): item.get("percentage") for item in dist if isinstance(item, dict)}
+            ok_phantom_70 = pct_map.get("假象") == 70
+            checks["phantom_70_percent"] = ok_phantom_70
+            passed = passed and ok_phantom_70
+
+            ok_pressure_20 = pct_map.get("任务压力不足") == 20
+            checks["pressure_insufficient_20_percent"] = ok_pressure_20
+            passed = passed and ok_pressure_20
+
+            ok_impl_10 = pct_map.get("实现/机制未生效") == 10
+            checks["implementation_10_percent"] = ok_impl_10
+            passed = passed and ok_impl_10
+
+            ok_real_0 = pct_map.get("真问题") == 0
+            checks["real_problem_0_percent"] = ok_real_0
+            passed = passed and ok_real_0
+        else:
+            checks["distribution_4_categories"] = False
+            checks["phantom_70_percent"] = False
+            checks["pressure_insufficient_20_percent"] = False
+            checks["implementation_10_percent"] = False
+            checks["real_problem_0_percent"] = False
+            passed = False
+    else:
+        checks["description_contains_phantom"] = False
+        checks["distribution_4_categories"] = False
+        checks["phantom_70_percent"] = False
+        checks["pressure_insufficient_20_percent"] = False
+        checks["implementation_10_percent"] = False
+        checks["real_problem_0_percent"] = False
+        passed = False
+
+    # qualifying_criteria: all enforce must be true
+    qc = cfg.get("qualifying_criteria", {})
+    if isinstance(qc, list):
+        qc_enforces = [item.get("enforce") is True for item in qc if isinstance(item, dict)]
+        ok_qc = all(qc_enforces) and len(qc_enforces) >= 4
+        checks["qualifying_criteria_enforce_true"] = ok_qc
+        passed = passed and ok_qc
+    else:
+        checks["qualifying_criteria_enforce_true"] = False
+        passed = False
+
+    # verification_items: all expected must be true
+    vi = cfg.get("verification_items", {})
+    if isinstance(vi, list):
+        vi_values = [item.get("expected") is True for item in vi if isinstance(item, dict)]
+        ok_vi = all(vi_values) and len(vi_values) >= 5
+        checks["verification_items_all_true"] = ok_vi
+        passed = passed and ok_vi
+    else:
+        checks["verification_items_all_true"] = False
+        passed = False
+
+    # manual_line
+    manual_line = cfg.get("manual_line")
+    ok_line = manual_line == 337 or str(manual_line) == "337"
+    checks["manual_line_points_to_337"] = ok_line
+    passed = passed and ok_line
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P102-problem-distribution", "name": "[102] 问题分布",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+        },
+    }
+
+
 def p103_gear_param_reference() -> dict[str, Any]:
     """[98] 档位参数回查 Stage 1 档位协议条款 ——任何涉及档位参数的检查（档位检查项等）一律回查 Stage 1 档位协议条款。
 
@@ -19862,6 +20010,7 @@ _ALL = [
     p100_miluv_external_domain,
     p101_output_alignment,
     p102_seed_trajectory_explicit,
+    p102_problem_distribution,
     p103_gear_param_reference,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
