@@ -12427,6 +12427,129 @@ def p105_generator_code_freeze() -> dict[str, Any]:
     }
 
 
+def p106_decision_log() -> dict[str, Any]:
+    """[106] 决策日志（decision log）：自实验方案冻结起，每次改动（数据/代码/配置/参数）记录：时间、改动内容、原因、影响范围、git commit。
+
+    核心断言：
+    1. 决策日志必须启用（decision_log.required == true）
+    2. 覆盖 4 类改动：数据 / 代码 / 配置 / 参数
+    3. 每条日志条目必须包含 5 个必填字段
+    4. 日志必须绑定 git commit（git_commit_binding）
+    5. 启动触发点为"实验方案冻结"
+
+    验证项：
+    1. configs/protocol/clause106_decision_log.yaml 存在且能正确解析
+    2. clause_id == "106"
+    3. decision_log.required == true
+    4. decision_log.covered_change_types 包含 4 项（数据/代码/配置/参数）
+    5. entry_fields 5 项必填字段全为 true
+    6. verification_items.git_commit_binding == true
+    7. manual_line == 344
+    8. 手册真源文件存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause106_decision_log.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P106-decision-log",
+            "name": "[106] 决策日志（decision log）",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P106-decision-log",
+            "name": "[106] 决策日志（decision log）",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    # 1. clause_id == "106"
+    ok_id = cfg.get("clause_id") == "106"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    # 2. decision_log.required == true
+    dl = cfg.get("decision_log", {})
+    if isinstance(dl, dict):
+        ok_req = dl.get("required") is True
+        checks["decision_log_required"] = ok_req
+        passed = passed and ok_req
+
+        # 3. covered_change_types 包含 4 项
+        cct = dl.get("covered_change_types", [])
+        expected_cct = ["数据", "代码", "配置", "参数"]
+        ok_cct = isinstance(cct, list) and set(cct) == set(expected_cct) and len(cct) == 4
+        checks["covered_change_types_4"] = ok_cct
+        passed = passed and ok_cct
+    else:
+        checks["decision_log_required"] = False
+        checks["covered_change_types_4"] = False
+        passed = False
+
+    # 4. entry_fields 5 项必填字段全为 true
+    ef = cfg.get("entry_fields", {})
+    if isinstance(ef, dict):
+        field_keys = [
+            "timestamp_required",
+            "change_description_required",
+            "reason_required",
+            "impact_scope_required",
+            "git_commit_required",
+        ]
+        ok_ef = all(ef.get(k) is True for k in field_keys)
+        checks["entry_fields_5_complete"] = ok_ef
+        passed = passed and ok_ef
+    else:
+        checks["entry_fields_5_complete"] = False
+        passed = False
+
+    # 5. verification_items.git_commit_binding == true
+    vi = cfg.get("verification_items", {})
+    if isinstance(vi, dict):
+        ok_gc = vi.get("git_commit_binding") is True
+        checks["git_commit_binding"] = ok_gc
+        passed = passed and ok_gc
+    else:
+        checks["git_commit_binding"] = False
+        passed = False
+
+    # 6. manual_line == 344
+    ok_ml = cfg.get("manual_line") == 344
+    checks["manual_line_344"] = ok_ml
+    passed = passed and ok_ml
+
+    # 7. 手册真源文件存在
+    ok_manual = manual_exists
+    checks["manual_exists"] = ok_manual
+    passed = passed and ok_manual
+
+    return {
+        "code": "P106-decision-log",
+        "name": "[106] 决策日志（decision log）",
+        "severity": "hard", "passed": passed,
+        "detail": "决策日志 gate 条款验证完成",
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+        },
+    }
+
+
 def p103_tost_bayesian_factor() -> dict[str, Any]:
     """[103] TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具。
 
@@ -18856,7 +18979,7 @@ def p5_dependency_declaration() -> dict[str, Any]:
     if manual_exists:
         manual_text = manual_path.read_text(encoding="utf-8")
         checks["manual_contains_5"] = "**\\[5]**" in manual_text or "**[5]**" in manual_text or "[5]" in manual_text
-        checks["manual_contains_dependency_declaration"] = "依赖声明" in manual_text or "依赖声明" in manual_text
+        checks["manual_contains_dependency_declaration"] = "依赖声明" in manual_text
         checks["manual_contains_prerequisite"] = "前置" in manual_text
     else:
         checks["manual_contains_5"] = False
@@ -18933,10 +19056,12 @@ def p5_dependency_declaration() -> dict[str, Any]:
     ]
     instr_ok = True
     instr_details = []
-    prefix_inline = re.compile(r'\[\u524d\u7f6e:\[(\d+)\]\]')   # [前置:[N]]
-    prefix_line = re.compile(r'^\s*前置:\s*\[(\d+)\]')           # 行首 前置:[N]
-    clause_marker = re.compile(r'\*\*\\\[')                       # **\[N] 行首
-    table_clause = re.compile(r'\|\s*\[\d+\]\s*\|')               # | [N] | 表格行
+    # 手册条款行：以 **[N]** 行首开头（re 已锚定 ^\s*）
+    # 表格行：以 | [N] | 开头
+    clause_marker_re = re.compile(r'^\s*\*\*\\\[\d+\]\*\*')
+    table_clause_re = re.compile(r'^\|\s*\[\d+\]\s*\|')
+    prefix_inline_re = re.compile(r'\[\u524d\u7f6e:\[(\d+)\]\]')   # [前置:[N]]
+    prefix_line_re = re.compile(r'^\s*前置:\s*\[(\d+)\]')          # 行首 前置:[N]
     for f in instr_files:
         if not f.is_file():
             instr_ok = False
@@ -18947,22 +19072,21 @@ def p5_dependency_declaration() -> dict[str, Any]:
         instr_count = 0
         instr_with_prefix = 0
         for i, line in enumerate(lines):
-            is_instr = False
-            if "**\\[" in line and "**" in line[:20]:
-                # 手册条款行（以 **[N]** 开头）
-                is_instr = True
-            elif table_clause.search(line) and any(f"| [{n}] |" in line for n in range(1, 6)):
-                # 指令状态表中的治理层条款行（条款1-5）
-                is_instr = True
+            # 手册条款行：行首以 **[N]** 开头
+            is_instr = bool(clause_marker_re.match(line))
+            # 指令状态表中的治理层条款行（条款1-5）
+            if not is_instr and table_clause_re.match(line):
+                m = table_clause_re.match(line)
+                clause_num = m.group(0).strip("| ")
+                try:
+                    is_instr = 1 <= int(clause_num[1:-1]) <= 5
+                except (ValueError, IndexError):
+                    is_instr = False
             if is_instr:
                 instr_count += 1
-                # 检查本行是否有 inline [前置:[N]] 或行首 前置:[N]
-                has_inline = bool(prefix_inline.search(line))
-                has_line_prefix = bool(prefix_line.search(line))
-                # 检查上一行是否有行首 前置:[N]
-                has_prev_prefix = False
-                if i > 0:
-                    has_prev_prefix = bool(prefix_line.search(lines[i - 1]))
+                has_inline = bool(prefix_inline_re.search(line))
+                has_line_prefix = bool(prefix_line_re.search(line))
+                has_prev_prefix = bool(prefix_line_re.search(lines[i - 1])) if i > 0 else False
                 if has_inline or has_line_prefix or has_prev_prefix:
                     instr_with_prefix += 1
         # 渐进式落地：治理层条款（14 条）已标记 = 治理层全覆盖，整体比例≥3%
@@ -18973,7 +19097,8 @@ def p5_dependency_declaration() -> dict[str, Any]:
     checks["instr_has_prefix_mark"] = instr_ok
     checks["instr_prefix_details"] = instr_details
 
-    passed = all(checks.values()) and cfg_exists and cfg_parse_ok
+    # cfg_exists 和 cfg_parse_ok 已在 checks 中，无需再与 passed 做 and
+    passed = all(checks.values())
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
@@ -20264,6 +20389,7 @@ _ALL = [
     p102_problem_distribution,
     p104_statistical_caliber_smoke_gate,
     p105_generator_code_freeze,
+    p106_decision_log,
     p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,

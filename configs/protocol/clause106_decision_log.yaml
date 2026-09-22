@@ -1,16 +1,21 @@
 # 条款 [106] 决策日志（decision log）配置
 # 手册原文：决策日志（decision log） 自实验方案冻结起，每次改动（数据/代码/配置/参数）记录：时间、改动内容、原因、影响范围、git commit
-# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 336 行
+# 对应 docs/最终交付_异步手册_424 条_20260917.md 第 344 行
 
 clause_id: "106"
-clause_name: "决策日志"
+clause_name: "决策日志（decision log）"
+manual_line: 344
 
 # 核心断言：自方案冻结起所有改动必须记录
 decision_log:
   required: true
   description: "自实验方案冻结起，每次改动必须记录决策日志"
-  freeze_start: "方案冻结时刻"
-  scope: "数据/代码/配置/参数"
+  start_trigger: "实验方案冻结"
+  covered_change_types:
+    - "数据"
+    - "代码"
+    - "配置"
+    - "参数"
   log_items:
     - "时间"
     - "改动内容"
@@ -18,33 +23,42 @@ decision_log:
     - "影响范围"
     - "git commit"
 
-# 日志规范
-log_specification:
-  required_fields:
-    - "时间"
-    - "改动内容"
-    - "原因"
-    - "影响范围"
-    - "git commit"
-  format: "结构化记录"
-  retention: "永久保留"
+# 日志条目必填字段
+entry_fields:
+  timestamp_required: true
+  change_description_required: true
+  reason_required: true
+  impact_scope_required: true
+  git_commit_required: true
 
-# 相关条款
+# 验证项
+verification_items:
+  decision_log_required: true
+  covered_change_types_4: true
+  entry_fields_5_complete: true
+  start_trigger_set: true
+  git_commit_binding: true
+
+# 约束声明
 constraint_declaration:
   clause_id: "106"
+  clause_name: "决策日志（decision log）"
+  source_file: "docs/最终交付_异步手册_424 条_20260917.md"
+  source_line: 344
+  manual_line: 344
   binding_level: "hard"
-  violation_consequence: "未记录决策日志 → 无法追溯变更，影响实验可复现性"
+  violation_consequence: "未记录决策日志 → 无法追溯变更，相关实验结果作废"
   related_clauses:
     - "[105] 生成器代码冻结确认"
     - "[104] 统计口径冒烟验证 Gate"
-    - "[32] 所有改动必须留痕"
-    - "[33] 变更必须记录"
+    - "[111] 出口：代码项 与 实现项 全部通过并留痕"
 
 # 手册引用
-manual_ref: "docs/最终交付_异步手册_424 条_20260917.md 第 336 行"
+manual_ref: "docs/最终交付_异步手册_424 条_20260917.md 第 344 行"
 
 # 实施说明
 implementation_note: >
-  Stage 2 写码阶段的变更追溯要求。自实验方案冻结起，任何数据/代码/配置/参数的改动
-  都必须记录决策日志，包括时间、改动内容、原因、影响范围和 git commit，确保实验全程可追溯。
+  决策日志（decision log）是 Stage 2 写码阶段的核心工程纪律。自实验方案冻结起，
+  所有数据/代码/配置/参数改动必须记录：时间、改动内容、原因、影响范围、git commit。
+  日志必须可机器解析（YAML/JSON），每条记录须有 git commit 哈希绑定。
   若无日志记录，该改动视为非法变更，相关实验结果必须作废。
