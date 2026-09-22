@@ -11593,7 +11593,7 @@ def p100_miluv_external_domain() -> dict[str, Any]:
     }
 
 
-def p101_layout_scatter_miluv() -> dict[str, Any]:
+def p96_layout_scatter_miluv() -> dict[str, Any]:
     """[96] 布局参数 vs 排序散点 —布局参数 vs 排序散点 布局随机化层 MILUV 分段误差图 方法级对比在 MILUV 的 LOS/NLOS 分段误差（整体 + 分段）布局随机化层
 
     手册 [96]：布局参数 vs 排序散点 布局随机化层 MILUV 分段误差图 方法级对比在 MILUV 的 LOS/NLOS 分段误差（整体 + 分段）布局随机化层。
@@ -11623,7 +11623,7 @@ def p101_layout_scatter_miluv() -> dict[str, Any]:
 
     if not cfg_exists:
         return {
-            "code": "P101-layout-scatter", "name": "[96] 布局参数 vs 排序散点",
+            "code": "P96-layout-scatter", "name": "[96] 布局参数 vs 排序散点",
             "severity": "hard", "passed": False,
             "detail": "config file not found",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -11634,7 +11634,7 @@ def p101_layout_scatter_miluv() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P101-layout-scatter", "name": "[96] 布局参数 vs 排序散点",
+            "code": "P96-layout-scatter", "name": "[96] 布局参数 vs 排序散点",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
@@ -11720,7 +11720,7 @@ def p101_layout_scatter_miluv() -> dict[str, Any]:
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P101-layout-scatter", "name": "[96] 布局参数 vs 排序散点",
+        "code": "P96-layout-scatter", "name": "[96] 布局参数 vs 排序散点",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -11729,6 +11729,196 @@ def p101_layout_scatter_miluv() -> dict[str, Any]:
             "cfg_exists": cfg_exists,
             "checks": checks,
             "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+        },
+    }
+
+
+def p101_output_alignment() -> dict[str, Any]:
+    """[101] 输出对齐 ——五个方法在同一批测试轨迹上评估，RMSE口径一致（Sim对齐/2D/世界系/warm-up剔除）
+
+    手册 [101]：输出对齐；合格标准：五个方法的评估输入为同一批测试轨迹（配对），RMSE口径一致（Sim对齐/2D/世界系/warm-up剔除）。
+
+    验证项：
+    1. configs/protocol/clause101_output_alignment.yaml 存在且能正确解析
+    2. clause_id == "101"
+    3. output_alignment.paired_trajectories.same_test_set == true
+    4. output_alignment.paired_trajectories.methods 包含全部五个方法
+    5. output_alignment.paired_trajectories.pairing_unit == "trajectory_seed"
+    6. output_alignment.rmse_consistency.alignment_method == "Sim"
+    7. output_alignment.rmse_consistency.dimension == "2D"
+    8. output_alignment.rmse_consistency.dimensions_used 包含 x 和 y
+    9. output_alignment.rmse_consistency.coordinate_system == "world"
+    10. output_alignment.rmse_consistency.warmup_removal.enabled == true
+    11. output_alignment.rmse_consistency.warmup_removal.duration_seconds == 10
+    12. output_alignment.rmse_consistency.aggregation_unit == "trajectory"
+    13. qualifying_criteria 全部 enforce == true
+    14. verification_items 全部为 true
+    15. constraint_declaration.enforce_level == "hard"
+    16. constraint_declaration.source_line == 328
+    17. 手册真源存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause101_output_alignment.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P101-output-alignment", "name": "[101] 输出对齐",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P101-output-alignment", "name": "[101] 输出对齐",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    # clause_id
+    ok_id = cfg.get("clause_id") == "101"
+    checks["clause_id_eq_101"] = ok_id
+    passed = passed and ok_id
+
+    # output_alignment.paired_trajectories
+    oa = cfg.get("output_alignment", {})
+    if isinstance(oa, dict):
+        pt = oa.get("paired_trajectories", {})
+        if isinstance(pt, dict):
+            ok_same = pt.get("same_test_set") is True
+            checks["paired_same_test_set"] = ok_same
+            passed = passed and ok_same
+
+            methods = pt.get("methods", [])
+            expected_methods = ["LNN", "LSTM", "Transformer", "EKF", "Robust-EKF"]
+            ok_methods = isinstance(methods, list) and set(expected_methods) == set(methods)
+            checks["five_methods_present"] = ok_methods
+            passed = passed and ok_methods
+
+            ok_pairing = pt.get("pairing_unit") == "trajectory_seed"
+            checks["pairing_unit_trajectory_seed"] = ok_pairing
+            passed = passed and ok_pairing
+        else:
+            checks["paired_same_test_set"] = False
+            checks["five_methods_present"] = False
+            checks["pairing_unit_trajectory_seed"] = False
+            passed = False
+
+        # output_alignment.rmse_consistency
+        rmse = oa.get("rmse_consistency", {})
+        if isinstance(rmse, dict):
+            ok_alignment = rmse.get("alignment_method") == "Sim"
+            checks["rmse_alignment_sim"] = ok_alignment
+            passed = passed and ok_alignment
+
+            ok_dim = rmse.get("dimension") == "2D"
+            checks["rmse_dimension_2d"] = ok_dim
+            passed = passed and ok_dim
+
+            dim_used = rmse.get("dimensions_used", [])
+            ok_dims = isinstance(dim_used, list) and set(dim_used) == {"x", "y"}
+            checks["dimensions_x_y"] = ok_dims
+            passed = passed and ok_dims
+
+            ok_coord = rmse.get("coordinate_system") == "world"
+            checks["coordinate_system_world"] = ok_coord
+            passed = passed and ok_coord
+
+            warmup = rmse.get("warmup_removal", {})
+            if isinstance(warmup, dict):
+                ok_warmup_enabled = warmup.get("enabled") is True
+                ok_warmup_duration = warmup.get("duration_seconds") == 10
+                checks["warmup_enabled_10s"] = ok_warmup_enabled and ok_warmup_duration
+                passed = passed and ok_warmup_enabled and ok_warmup_duration
+            else:
+                checks["warmup_enabled_10s"] = False
+                passed = False
+
+            ok_agg = rmse.get("aggregation_unit") == "trajectory"
+            checks["aggregation_unit_trajectory"] = ok_agg
+            passed = passed and ok_agg
+        else:
+            checks["rmse_alignment_sim"] = False
+            checks["rmse_dimension_2d"] = False
+            checks["dimensions_x_y"] = False
+            checks["coordinate_system_world"] = False
+            checks["warmup_enabled_10s"] = False
+            checks["aggregation_unit_trajectory"] = False
+            passed = False
+    else:
+        checks["paired_same_test_set"] = False
+        checks["five_methods_present"] = False
+        checks["pairing_unit_trajectory_seed"] = False
+        checks["rmse_alignment_sim"] = False
+        checks["rmse_dimension_2d"] = False
+        checks["dimensions_x_y"] = False
+        checks["coordinate_system_world"] = False
+        checks["warmup_enabled_10s"] = False
+        checks["aggregation_unit_trajectory"] = False
+        passed = False
+
+    # qualifying_criteria: all enforce must be true
+    qc = cfg.get("qualifying_criteria", {})
+    if isinstance(qc, dict):
+        qc_enforces = []
+        for key, val in qc.items():
+            if isinstance(val, dict) and "enforce" in val:
+                qc_enforces.append(val.get("enforce") is True)
+        ok_qc = all(qc_enforces) and len(qc_enforces) >= 2
+        checks["qualifying_criteria_enforce_true"] = ok_qc
+        passed = passed and ok_qc
+    else:
+        checks["qualifying_criteria_enforce_true"] = False
+        passed = False
+
+    # verification_items: all must be true
+    vi = cfg.get("verification_items", {})
+    if isinstance(vi, dict):
+        vi_values = [v for v in vi.values() if isinstance(v, bool)]
+        ok_vi = len(vi_values) >= 4 and all(vi_values)
+        checks["verification_items_all_true"] = ok_vi
+        passed = passed and ok_vi
+    else:
+        checks["verification_items_all_true"] = False
+        passed = False
+
+    # constraint_declaration
+    cd = cfg.get("constraint_declaration", {})
+    if isinstance(cd, dict):
+        ok_cd_id = cd.get("clause_id") == "101"
+        ok_cd_level = cd.get("enforce_level") == "hard"
+        ok_cd_line = cd.get("source_line") == 328
+        checks["constraint_declaration_101"] = ok_cd_id and ok_cd_level and ok_cd_line
+        passed = passed and ok_cd_id and ok_cd_level and ok_cd_line
+    else:
+        checks["constraint_declaration_101"] = False
+        passed = False
+
+    checks["cfg_exists"] = cfg_exists
+    checks["manual_exists"] = manual_exists
+    passed = passed and manual_exists
+
+    detail_parts = [f"{k}={v}" for k, v in checks.items()]
+    return {
+        "code": "P101-output-alignment", "name": "[101] 输出对齐",
+        "severity": "hard",
+        "passed": passed,
+        "detail": "; ".join(detail_parts),
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
         },
     }
 
@@ -18229,6 +18419,7 @@ def p5_dependency_declaration() -> dict[str, Any]:
     agents_path = PROJECT_ROOT / "AGENTS.md"
     status_table_path = PROJECT_ROOT / "rules" / "指令状态表.md"
     report_path = PROJECT_ROOT / "outputs" / "compliance_report_5.md"
+    dep_rule_path = PROJECT_ROOT / "rules" / "依赖声明.md"
 
     cfg_exists = cfg_path.is_file()
     cfg_parse_ok = False
@@ -18307,6 +18498,15 @@ def p5_dependency_declaration() -> dict[str, Any]:
             checks["status_table_clause_5_field_valid"] = False
     else:
         checks["status_table_clause_5_field_valid"] = False
+
+    # 6.5 治理文件 rules/依赖声明.md 存在且含机制定义
+    dep_rule_path = PROJECT_ROOT / "rules" / "依赖声明.md"
+    checks["dep_rule_exists"] = dep_rule_path.is_file()
+    if checks["dep_rule_exists"]:
+        dep_rule_text = dep_rule_path.read_text(encoding="utf-8")
+        checks["dep_rule_has_mechanism"] = "前置:[N]" in dep_rule_text and ("blocked" in dep_rule_text or "执行前" in dep_rule_text)
+    else:
+        checks["dep_rule_has_mechanism"] = False
 
     # 7. 落实报告八字段完整
     report_exists = report_path.is_file()
@@ -19660,7 +19860,7 @@ _ALL = [
     p100_head_implementation_consistency,
     n15_exclusion_gate,
     p100_miluv_external_domain,
-    p101_layout_scatter_miluv,
+    p101_output_alignment,
     p102_seed_trajectory_explicit,
     p103_gear_param_reference,
     p91_anchor_fixed_4_m1_clustered,
