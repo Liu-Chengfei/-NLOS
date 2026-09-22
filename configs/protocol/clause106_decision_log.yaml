@@ -31,13 +31,21 @@ entry_fields:
   impact_scope_required: true
   git_commit_required: true
 
+# 手册原文（逐字抄录）
+manual_text: "决策日志（decision log）自实验方案冻结起，每次改动（数据/代码/配置/参数）记录：时间、改动内容、原因、影响范围、git commit"
+
 # 验证项
 verification_items:
   decision_log_required: true
-  covered_change_types_4: true
-  entry_fields_5_complete: true
   start_trigger_set: true
+  covered_change_types_4: true
+  log_items_5_complete: true
+  entry_fields_5_complete: true
   git_commit_binding: true
+  violation_consequence_set: true
+  related_clauses_3: true
+  manual_line_344: true
+  manual_text_present: true
 
 # 约束声明
 constraint_declaration:

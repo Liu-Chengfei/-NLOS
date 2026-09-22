@@ -12442,10 +12442,15 @@ def p106_decision_log() -> dict[str, Any]:
     2. clause_id == "106"
     3. decision_log.required == true
     4. decision_log.covered_change_types 包含 4 项（数据/代码/配置/参数）
-    5. entry_fields 5 项必填字段全为 true
-    6. verification_items.git_commit_binding == true
-    7. manual_line == 344
-    8. 手册真源文件存在
+    5. decision_log.log_items 包含 5 项（时间/改动内容/原因/影响范围/git commit）
+    6. entry_fields 5 项必填字段全为 true
+    7. decision_log.start_trigger == "实验方案冻结"
+    8. verification_items.git_commit_binding == true
+    9. verification_items.violation_consequence_set == true
+    10. constraint_declaration.related_clauses >= 3
+    11. manual_text 存在于配置中
+    12. manual_line == 344
+    13. 手册真源文件存在
     """
     cfg_path = CONFIGS / "protocol" / "clause106_decision_log.yaml"
     manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
@@ -12496,6 +12501,18 @@ def p106_decision_log() -> dict[str, Any]:
         ok_cct = isinstance(cct, list) and set(cct) == set(expected_cct) and len(cct) == 4
         checks["covered_change_types_4"] = ok_cct
         passed = passed and ok_cct
+
+        # 3b. log_items 包含 5 项
+        log_items = dl.get("log_items", [])
+        expected_log_items = ["时间", "改动内容", "原因", "影响范围", "git commit"]
+        ok_log = isinstance(log_items, list) and set(log_items) == set(expected_log_items) and len(log_items) == 5
+        checks["log_items_5_complete"] = ok_log
+        passed = passed and ok_log
+
+        # 3c. start_trigger == "实验方案冻结"
+        ok_st = dl.get("start_trigger") == "实验方案冻结"
+        checks["start_trigger_set"] = ok_st
+        passed = passed and ok_st
     else:
         checks["decision_log_required"] = False
         checks["covered_change_types_4"] = False
@@ -12524,11 +12541,39 @@ def p106_decision_log() -> dict[str, Any]:
         ok_gc = vi.get("git_commit_binding") is True
         checks["git_commit_binding"] = ok_gc
         passed = passed and ok_gc
+
+        # 5b. verification_items.violation_consequence_set == true
+        ok_vc = vi.get("violation_consequence_set") is True
+        checks["violation_consequence_set"] = ok_vc
+        passed = passed and ok_vc
     else:
         checks["git_commit_binding"] = False
+        checks["violation_consequence_set"] = False
         passed = False
 
-    # 6. manual_line == 344
+    # 6. constraint_declaration.related_clauses >= 3
+    cd = cfg.get("constraint_declaration", {})
+    if isinstance(cd, dict):
+        rc = cd.get("related_clauses", [])
+        ok_rc = isinstance(rc, list) and len(rc) >= 3
+        checks["related_clauses_3"] = ok_rc
+        passed = passed and ok_rc
+
+        # 6b. constraint_declaration.violation_consequence 非空
+        ok_vc2 = bool(cd.get("violation_consequence"))
+        checks["violation_consequence_nonempty"] = ok_vc2
+        passed = passed and ok_vc2
+    else:
+        checks["related_clauses_3"] = False
+        checks["violation_consequence_nonempty"] = False
+        passed = False
+
+    # 7. manual_text 存在于配置中
+    ok_mt = bool(cfg.get("manual_text"))
+    checks["manual_text_present"] = ok_mt
+    passed = passed and ok_mt
+
+    # 8. manual_line == 344
     ok_ml = cfg.get("manual_line") == 344
     checks["manual_line_344"] = ok_ml
     passed = passed and ok_ml
