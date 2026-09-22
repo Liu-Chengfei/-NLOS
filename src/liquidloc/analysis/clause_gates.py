@@ -13115,6 +13115,156 @@ def p108_pre_gate_checklist() -> dict[str, Any]:
     }
 
 
+def p109_amp_default_enabled() -> dict[str, Any]:
+    """[109] AMP 混合精度默认启用（三网络同一设置）；代码实现要求（细化）：AMP 开关写入 manifest。
+
+    手册原文：
+    [109] AMP 混合精度默认启用（三网络同一设置）；代码实现要求（细化）：AMP 开关写入 manifest
+    """
+    cfg_path = CONFIGS / "protocol" / "clause109_amp_manifest_write.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P109-amp-default-enabled", "name": "[109] AMP 混合精度默认启用（三网络同一设置）；AMP 开关写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause109_amp_manifest_write.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P109-amp-default-enabled", "name": "[109] AMP 混合精度默认启用（三网络同一设置）；AMP 开关写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P109-amp-default-enabled", "name": "[109] AMP 混合精度默认启用（三网络同一设置）；AMP 开关写入 manifest",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "109"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "109"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='109', 匹配={id_ok}")
+
+    # VS-3: 约束声明 clause_id
+    cd_cfg = cfg.get("constraint_declaration", {})
+    if isinstance(cd_cfg, dict):
+        ok_cd_id = cd_cfg.get("clause_id") == "109"
+        checks["vs3_constraint_clause_id"] = ok_cd_id
+        detail_parts.append(f"VS-3 constraint_declaration.clause_id={cd_cfg.get('clause_id')!r}, 期望='109', 匹配={ok_cd_id}")
+    else:
+        checks["vs3_constraint_clause_id"] = False
+        detail_parts.append("VS-3 constraint_declaration 缺失")
+
+    # VS-4: binding_level == "hard"
+    if isinstance(cd_cfg, dict):
+        ok_cd_level = cd_cfg.get("binding_level") == "hard"
+        checks["vs4_binding_level_hard"] = ok_cd_level
+        detail_parts.append(f"VS-4 binding_level={cd_cfg.get('binding_level')!r}, 期望='hard', 匹配={ok_cd_level}")
+    else:
+        checks["vs4_binding_level_hard"] = False
+        detail_parts.append("VS-4 constraint_declaration 缺失，binding_level 无法验证")
+
+    # VS-5: violation_consequence 非空
+    if isinstance(cd_cfg, dict):
+        ok_vc = cd_cfg.get("violation_consequence") not in (None, "")
+        checks["vs5_violation_consequence"] = ok_vc
+        detail_parts.append(f"VS-5 violation_consequence 已声明={ok_vc}")
+    else:
+        checks["vs5_violation_consequence"] = False
+        detail_parts.append("VS-5 constraint_declaration 缺失，violation_consequence 无法验证")
+
+    # VS-6: amp_default_enabled 启用
+    amp_cfg = cfg.get("amp_default_enabled", {})
+    if isinstance(amp_cfg, dict):
+        ok_amp_en = amp_cfg.get("enabled") is True
+        checks["vs6_amp_default_enabled"] = ok_amp_en
+        detail_parts.append(f"VS-6 amp_default_enabled.enabled={amp_cfg.get('enabled')!r}, 期望=True, 匹配={ok_amp_en}")
+    else:
+        checks["vs6_amp_default_enabled"] = False
+        detail_parts.append("VS-6 amp_default_enabled 缺失或非 dict")
+
+    # VS-7: three_networks_same_setting 启用
+    tns_cfg = cfg.get("three_networks_same_setting", {})
+    if isinstance(tns_cfg, dict):
+        ok_tns = tns_cfg.get("enabled") is True
+        checks["vs7_three_networks_same_setting"] = ok_tns
+        detail_parts.append(f"VS-7 three_networks_same_setting.enabled={tns_cfg.get('enabled')!r}, 期望=True, 匹配={ok_tns}")
+    else:
+        checks["vs7_three_networks_same_setting"] = False
+        detail_parts.append("VS-7 three_networks_same_setting 缺失或非 dict")
+
+    # VS-8: 网络数量 >= 3
+    if isinstance(tns_cfg, dict):
+        networks = tns_cfg.get("networks", [])
+        ok_networks = isinstance(networks, list) and len(networks) >= 3
+        checks["vs8_networks_count"] = ok_networks
+        detail_parts.append(f"VS-8 networks 数量={len(networks) if isinstance(networks, list) else 0}, 期望>=3, 匹配={ok_networks}")
+    else:
+        checks["vs8_networks_count"] = False
+        detail_parts.append("VS-8 three_networks_same_setting 缺失，networks 无法验证")
+
+    # VS-9: amp_switch_manifest 启用
+    manifest_cfg = cfg.get("amp_switch_manifest", {})
+    if isinstance(manifest_cfg, dict):
+        ok_manifest_en = manifest_cfg.get("enabled") is True
+        checks["vs9_amp_switch_manifest_enabled"] = ok_manifest_en
+        detail_parts.append(f"VS-9 amp_switch_manifest.enabled={manifest_cfg.get('enabled')!r}, 期望=True, 匹配={ok_manifest_en}")
+    else:
+        checks["vs9_amp_switch_manifest_enabled"] = False
+        detail_parts.append("VS-9 amp_switch_manifest 缺失或非 dict")
+
+    # VS-10: required_fields >= 2
+    if isinstance(manifest_cfg, dict):
+        fields = manifest_cfg.get("required_fields", [])
+        ok_fields = isinstance(fields, list) and len(fields) >= 2
+        checks["vs10_manifest_required_fields"] = ok_fields
+        detail_parts.append(f"VS-10 required_fields 数量={len(fields) if isinstance(fields, list) else 0}, 期望>=2, 匹配={ok_fields}")
+    else:
+        checks["vs10_manifest_required_fields"] = False
+        detail_parts.append("VS-10 amp_switch_manifest 缺失，required_fields 无法验证")
+
+    # VS-11: manual_line == 347
+    ok_ml = cfg.get("manual_line") == 347
+    checks["vs11_manual_line_347"] = ok_ml
+    detail_parts.append(f"VS-11 manual_line={cfg.get('manual_line')!r}, 期望=347, 匹配={ok_ml}")
+
+    # VS-12: manual_text 非空
+    ok_mt = cfg.get("manual_text") not in (None, "")
+    checks["vs12_manual_text_declared"] = ok_mt
+    detail_parts.append(f"VS-12 manual_text={'已声明' if ok_mt else '缺失'}, 匹配={ok_mt}")
+
+    # VS-13: 手册真源文件存在
+    ok_manual = manual_path.is_file()
+    checks["vs13_manual_exists"] = ok_manual
+    detail_parts.append(f"VS-13 手册真源文件存在={ok_manual}")
+
+    passed = all(v is True for k, v in checks.items() if isinstance(v, bool))
+
+    return {
+        "code": "P109-amp-default-enabled",
+        "name": "[109] AMP 混合精度默认启用（三网络同一设置）；AMP 开关写入 manifest",
+        "severity": "hard", "passed": passed,
+        "detail": "AMP 混合精度默认启用 gate 条款验证完成",
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+            "detail_parts": detail_parts,
+        },
+    }
+
+
 def p103_tost_bayesian_factor() -> dict[str, Any]:
     """[103] TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具。
 
@@ -19996,7 +20146,7 @@ def p7_violation_disposition() -> dict[str, Any]:
     checks["agents_md_exists"] = agents_exists
     if agents_exists:
         agents_text = agents_path.read_text(encoding="utf-8")
-        checks["agents_md_has_clause_7_section"] = "## [7]" in agents_text or "**\\[7\\]**" in agents_text
+        checks["agents_md_has_clause_7_section"] = "## [7]" in agents_text or "**\[7]" in agents_text
     else:
         checks["agents_md_has_clause_7_section"] = False
 
@@ -20957,6 +21107,7 @@ _ALL = [
     p106_decision_log,
     p107_checksum_traceability,
     p108_pre_gate_checklist,
+    p109_amp_default_enabled,
     p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,

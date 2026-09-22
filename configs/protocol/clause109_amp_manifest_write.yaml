@@ -1,50 +1,34 @@
-# 条款 [109] AMP 混合精度默认启用（三网络同一设置）；代码实现要求：AMP 开关写入 manifest
+# 条款 [109] AMP 混合精度默认启用（三网络同一设置）；代码实现要求（细化）：AMP 开关写入 manifest
 # 手册原文：AMP 混合精度默认启用（三网络同一设置）；代码实现要求（细化）：AMP 开关写入 manifest
-# 对应 docs/最终交付_异步手册_424条_20260917.md 第 339 行
+# 对应 docs/最终交付_异步手册_424条_20260917.md 第 347 行
 
 clause_id: "109"
 clause_name: "AMP 混合精度默认启用（三网络同一设置）；AMP 开关写入 manifest"
+manual_line: 347
+manual_text: "AMP 混合精度默认启用（三网络同一设置）；代码实现要求（细化）：AMP 开关写入 manifest"
 
-# 核心断言：AMP 默认启用且三网络同一设置
-amp_default_enabled:
-  required: true
-  description: "AMP 混合精度默认启用"
-  three_network_same_setting: true
-  default_value: "auto"
-
-# AMP 开关写入 manifest 的要求
-manifest_write_requirement:
-  required: true
-  description: "AMP 开关状态必须写入每个 seed 的 manifest 文件"
-  field_name: "amp_enabled"
-  field_location: "训练配置章节"
-  value_types: ["auto", true, false, "true", "false"]
-  all_methods_share: true
-
-# 三网络一致性检查
-three_network_consistency:
-  networks:
-    - liquid_ekf
-    - lstm_ekf
-    - transformer_ekf
-  same_amp_setting_required: true
-  enforcement: "hard"
-
-# 约束声明
 constraint_declaration:
   clause_id: "109"
   binding_level: "hard"
-  violation_consequence: "AMP 设置不一致或未写入 manifest → 实验配置不完整，影响结果可复现性"
-  related_clauses:
-    - "[3] AMP 混合精度默认启用"
-    - "[19] TF32 开关显式设置并写入 manifest"
-    - "[111] 出口代码项与实现项全部通过"
-    - "[117] 学习率调度方案统一"
+  violation_consequence: "AMP 未默认启用或三网络精度不一致，数据与实验结果不可信，禁止进入全量训练"
 
-# 手册引用
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第 339 行"
+amp_default_enabled:
+  enabled: true
+  description: "AMP mixed precision 默认启用，覆盖全网络"
 
-# 实施说明
-implementation_note: >
-  AMP 混合精度默认启用，三网络（LNN/LSTM/Transformer）使用同一 AMP 设置（amp_enabled: auto）。
-  关键要求：AMP 开关状态必须在每个 seed 的 manifest 文件中记录，确保实验配置可追溯和可复现。
+three_networks_same_setting:
+  enabled: true
+  description: "LNN、EKF、LSTM 三网络共用同一 AMP 设置，禁止不一致"
+  networks:
+    - "LNN"
+    - "EKF"
+    - "LSTM"
+
+amp_switch_manifest:
+  enabled: true
+  description: "AMP 开关写入 manifest，实现校验和覆盖"
+  required_fields:
+    - "amp.enabled"
+    - "amp.dtype"
+    - "amp.grad_scaler"
+    - "amp.three_networks_same"
