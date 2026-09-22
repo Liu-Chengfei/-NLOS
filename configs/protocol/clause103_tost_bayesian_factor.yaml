@@ -63,6 +63,8 @@ sesoi:
     interpretation: "相对提升 ±16.5% 内视为'等效/无实际差异'"
     calculation: "±50% of 33% = ±16.5%"
 
+manual_line: 338
+
 # 验证项
 verification_items:
   # 1. TOST 等效性检验启用
@@ -88,7 +90,7 @@ constraint_declaration:
   clause_id: "103"
   clause_name: "TOST 等效性检验与贝叶斯因子"
   source_file: "docs/最终交付_异步手册_424 条_20260917.md"
-  source_line: 330
+  source_line: 338
   enforce_level: "hard"
   rationale: "TOST 和 BF 是主张'无差异'的正规统计工具，必须按判定链顺序执行以确保结论严谨"
   related_clauses:

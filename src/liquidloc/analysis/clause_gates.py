@@ -12191,23 +12191,27 @@ def p102_problem_distribution() -> dict[str, Any]:
     }
 
 
-def p103_gear_param_reference() -> dict[str, Any]:
-    """[98] 档位参数回查 Stage 1 档位协议条款 ——任何涉及档位参数的检查（档位检查项等）一律回查 Stage 1 档位协议条款。
+def p103_tost_bayesian_factor() -> dict[str, Any]:
+    """[103] TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具。
 
-    手册 [98]：任何涉及档位参数的检查（档位检查项等）一律回查 Stage 1 档位协议条款。
+    判定链（按顺序执行，任一环节进入正式出口即停止）：
+    1. 预设等效边界（SESOI）
+    2. TOST 等效性检验
+    3. 贝叶斯因子检验
+    4. 得出结论
 
     验证项：
-    1. configs/protocol/clause98_gear_param_reference.yaml 存在且能正确解析
-    2. clause_id == "98"
-    3. sole_authority.reference == "Stage 1 档位协议条款"
-    4. gear_param_checks 包含 A 轴、N 轴、V 轴、K 轴、M 轴 五个参数检查
-    5. 每个 gear_param_checks 项包含 name, reference, rule 字段
-    6. requirements 数组包含 4 条要求
-    7. prohibitions 数组包含 3 条禁用行为
-    8. manual_line == 333
+    1. configs/protocol/clause103_tost_bayesian_factor.yaml 存在且能正确解析
+    2. clause_id == "103"
+    3. equivalence_testing.tost.enabled == true
+    4. equivalence_testing.bayes_factor.enabled == true
+    5. decision_chain 包含 4 个步骤（prespecified_equivalence_boundary → tost_test → bayes_factor_test → conclusion）
+    6. sesoi.minimum_effect_size.value == 0.33 (33%)
+    7. sesoi.equivalence_boundary 包含 lower_bound == -0.165 和 upper_bound == 0.165
+    8. manual_line == 338
     9. 手册真源文件存在
     """
-    cfg_path = CONFIGS / "protocol" / "clause98_gear_param_reference.yaml"
+    cfg_path = CONFIGS / "protocol" / "clause103_tost_bayesian_factor.yaml"
     manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
     cfg_exists = cfg_path.is_file()
@@ -12218,7 +12222,7 @@ def p103_gear_param_reference() -> dict[str, Any]:
 
     if not cfg_exists:
         return {
-            "code": "P103-gear-param-reference", "name": "[98] 档位参数回查 Stage 1",
+            "code": "P103-tost-bayesian-factor", "name": "[103] TOST 等效性检验与贝叶斯因子",
             "severity": "hard", "passed": False,
             "detail": "config file not found",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
@@ -12229,70 +12233,80 @@ def p103_gear_param_reference() -> dict[str, Any]:
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return {
-            "code": "P103-gear-param-reference", "name": "[98] 档位参数回查 Stage 1",
+            "code": "P103-tost-bayesian-factor", "name": "[103] TOST 等效性检验与贝叶斯因子",
             "severity": "hard", "passed": False,
             "detail": f"yaml parse error: {exc}",
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
                          "parse_error": str(exc)},
         }
 
-    ok_id = cfg.get("clause_id") == "98"
+    ok_id = cfg.get("clause_id") == "103"
     checks["clause_id"] = ok_id
     passed = passed and ok_id
 
-    sole = cfg.get("sole_authority", {})
-    if isinstance(sole, dict):
-        ok_ref = sole.get("reference") == "Stage 1 档位协议条款"
-        checks["sole_authority_reference"] = ok_ref
-        passed = passed and ok_ref
+    eq = cfg.get("equivalence_testing", {})
+    if isinstance(eq, dict):
+        ok_tost = eq.get("tost", {}).get("enabled") is True
+        checks["tost_enabled"] = ok_tost
+        passed = passed and ok_tost
+
+        ok_bf = eq.get("bayes_factor", {}).get("enabled") is True
+        checks["bayes_factor_enabled"] = ok_bf
+        passed = passed and ok_bf
     else:
-        checks["sole_authority_reference"] = False
+        checks["tost_enabled"] = False
+        checks["bayes_factor_enabled"] = False
         passed = False
 
-    checks["sole_authority_reason"] = bool(sole.get("reason"))
-    passed = passed and checks["sole_authority_reason"]
-
-    params = cfg.get("gear_param_checks", [])
-    if isinstance(params, list):
-        expected_names = {"A 轴同步精度", "N 轴 NLOS 偏差", "V 轴视觉退化", "K 轴锚分布", "M 轴数据缺失"}
-        actual_names = {p.get("name") for p in params if isinstance(p, dict)}
-        ok_5_params = expected_names.issubset(actual_names)
-        checks["gear_param_5_axes"] = ok_5_params
-        passed = passed and ok_5_params
-
-        ok_each = all(
-            isinstance(p, dict) and 
-            all(k in p for k in ("name", "reference", "rule"))
-            for p in params
-        )
-        checks["param_items_complete"] = ok_each
-        passed = passed and ok_each
+    dc = cfg.get("decision_chain", {})
+    if isinstance(dc, dict):
+        steps = dc.get("steps", [])
+        if isinstance(steps, list) and len(steps) >= 4:
+            expected_step_names = ["prespecified_equivalence_boundary", "tost_test",
+                                   "bayes_factor_test", "conclusion"]
+            actual_step_names = [s.get("step") for s in steps if isinstance(s, dict)]
+            ok_dc = actual_step_names == expected_step_names
+            checks["decision_chain_4_steps"] = ok_dc
+            passed = passed and ok_dc
+        else:
+            checks["decision_chain_4_steps"] = False
+            passed = False
     else:
-        checks["gear_param_5_axes"] = False
-        checks["param_items_complete"] = False
+        checks["decision_chain_4_steps"] = False
         passed = False
 
-    reqs = cfg.get("requirements", [])
-    if isinstance(reqs, list):
-        ok_reqs = len(reqs) >= 4
-        checks["requirements_4"] = ok_reqs
-        passed = passed and ok_reqs
-    else:
-        checks["requirements_4"] = False
-        passed = False
+    sesoi = cfg.get("sesoi", {})
+    if isinstance(sesoi, dict):
+        mes = sesoi.get("minimum_effect_size", {})
+        if isinstance(mes, dict):
+            ok_mes_value = mes.get("value") == 0.33
+            checks["sesoi_value_033"] = ok_mes_value
+            passed = passed and ok_mes_value
+        else:
+            checks["sesoi_value_033"] = False
+            passed = False
 
-    props = cfg.get("prohibitions", [])
-    if isinstance(props, list):
-        ok_props = len(props) >= 3
-        checks["prohibitions_3"] = ok_props
-        passed = passed and ok_props
+        eb = sesoi.get("equivalence_boundary", {})
+        if isinstance(eb, dict):
+            ok_lb = eb.get("lower_bound") == -0.165
+            checks["equivalence_boundary_lower_0165"] = ok_lb
+            passed = passed and ok_lb
+            ok_ub = eb.get("upper_bound") == 0.165
+            checks["equivalence_boundary_upper_0165"] = ok_ub
+            passed = passed and ok_ub
+        else:
+            checks["equivalence_boundary_lower_0165"] = False
+            checks["equivalence_boundary_upper_0165"] = False
+            passed = False
     else:
-        checks["prohibitions_3"] = False
+        checks["sesoi_value_033"] = False
+        checks["equivalence_boundary_lower_0165"] = False
+        checks["equivalence_boundary_upper_0165"] = False
         passed = False
 
     manual_line = cfg.get("manual_line")
-    ok_line = manual_line == 333 or str(manual_line) == "333"
-    checks["manual_line_points_to_333"] = ok_line
+    ok_line = manual_line == 338 or str(manual_line) == "338"
+    checks["manual_line_points_to_338"] = ok_line
     passed = passed and ok_line
 
     checks["cfg_exists"] = cfg_exists
@@ -12301,7 +12315,7 @@ def p103_gear_param_reference() -> dict[str, Any]:
 
     detail_parts = [f"{k}={v}" for k, v in checks.items()]
     return {
-        "code": "P103-gear-param-reference", "name": "[98] 档位参数回查 Stage 1",
+        "code": "P103-tost-bayesian-factor", "name": "[103] TOST 等效性检验与贝叶斯因子",
         "severity": "hard",
         "passed": passed,
         "detail": "; ".join(detail_parts),
@@ -12312,6 +12326,7 @@ def p103_gear_param_reference() -> dict[str, Any]:
             "manual_path": str(manual_path.relative_to(PROJECT_ROOT)),
         },
     }
+
 
 
 def p182_manifest() -> dict[str, Any]:
@@ -20011,7 +20026,7 @@ _ALL = [
     p101_output_alignment,
     p102_seed_trajectory_explicit,
     p102_problem_distribution,
-    p103_gear_param_reference,
+    p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
     p183_layout_manifest,
