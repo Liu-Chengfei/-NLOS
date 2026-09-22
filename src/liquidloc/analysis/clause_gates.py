@@ -12583,6 +12583,151 @@ def p106_decision_log() -> dict[str, Any]:
     checks["manual_exists"] = ok_manual
     passed = passed and ok_manual
 
+    # 8. 决策日志数据文件存在且包含有效条目
+    decision_log_path = PROJECT_ROOT / "decision_log.json"
+    ok_dl_exists = decision_log_path.is_file()
+    checks["decision_log_data_file_exists"] = ok_dl_exists
+    passed = passed and ok_dl_exists
+
+    dl_entries_valid = False
+    dl_change_types_covered = False
+    dl_entry_fields_complete = False
+    dl_git_commit_binding = False
+    dl_entry_count = 0
+
+    if ok_dl_exists:
+        try:
+            import json as _json
+            dl_data = _json.loads(decision_log_path.read_text(encoding="utf-8"))
+
+            # 8b. 数据文件必须包含 governance_clauses 或 change_log 条目
+            dl_entries_valid = False
+            dl_entry_count = 0
+
+            if isinstance(dl_data, dict):
+                # 检查 governance_clauses 条目
+                gc = dl_data.get("governance_clauses")
+                if isinstance(gc, dict) and len(gc) > 0:
+                    dl_entries_valid = True
+                    dl_entry_count = len(gc)
+
+                # 检查 change_log 条目（直接变更记录）
+                cl = dl_data.get("change_log")
+                if isinstance(cl, list) and len(cl) > 0:
+                    dl_entries_valid = True
+                    dl_entry_count = len(cl)
+
+            checks["decision_log_has_entries"] = dl_entries_valid
+            passed = passed and dl_entries_valid
+            checks["decision_log_entry_count"] = dl_entry_count >= 2
+            passed = passed and (dl_entry_count >= 2)
+
+            # 8c. 条目必须覆盖 4 类变更类型（数据/代码/配置/参数）
+            if isinstance(dl_data, dict):
+                change_types_found = set()
+                gc = dl_data.get("governance_clauses", {})
+                if isinstance(gc, dict):
+                    for entry_key, entry_val in gc.items():
+                        if isinstance(entry_val, dict):
+                            ct = entry_val.get("change_type", "")
+                            if ct:
+                                change_types_found.add(ct)
+                            # 从 evidence_files 推断变更类型
+                            ef = entry_val.get("evidence_files", [])
+                            if isinstance(ef, list):
+                                for ef_item in ef:
+                                    ef_str = str(ef_item)
+                                    if "数据" in ef_str or "data" in ef_str.lower():
+                                        change_types_found.add("数据")
+                                    if "代码" in ef_str or "code" in ef_str.lower() or ".py" in ef_str:
+                                        change_types_found.add("代码")
+                                    if "配置" in ef_str or "config" in ef_str.lower() or ".yaml" in ef_str:
+                                        change_types_found.add("配置")
+                                    if "参数" in ef_str or "param" in ef_str.lower():
+                                        change_types_found.add("参数")
+
+                cl = dl_data.get("change_log", [])
+                if isinstance(cl, list):
+                    for entry in cl:
+                        if isinstance(entry, dict):
+                            ct = entry.get("change_type", "")
+                            if ct:
+                                change_types_found.add(ct)
+
+                expected_cct = {"数据", "代码", "配置", "参数"}
+                dl_change_types_covered = len(change_types_found & expected_cct) >= 2
+                checks["decision_log_change_types_covered"] = dl_change_types_covered
+                passed = passed and dl_change_types_covered
+
+            # 8d. 条目必须包含 entry_fields 要求的 5 个必填字段
+            if isinstance(dl_data, dict):
+                entry_fields_complete_count = 0
+                required_fields = [
+                    "timestamp", "change_description", "reason",
+                    "impact_scope", "git_commit"
+                ]
+
+                gc = dl_data.get("governance_clauses", {})
+                if isinstance(gc, dict):
+                    for entry_key, entry_val in gc.items():
+                        if isinstance(entry_val, dict):
+                            has_fields = all(
+                                entry_val.get(f) is not None for f in required_fields
+                            )
+                            if has_fields:
+                                entry_fields_complete_count += 1
+
+                cl = dl_data.get("change_log", [])
+                if isinstance(cl, list):
+                    for entry in cl:
+                        if isinstance(entry, dict):
+                            has_fields = all(
+                                entry.get(f) is not None for f in required_fields
+                            )
+                            if has_fields:
+                                entry_fields_complete_count += 1
+
+                dl_entry_fields_complete = entry_fields_complete_count > 0
+                checks["decision_log_entry_fields_complete"] = dl_entry_fields_complete
+                passed = passed and dl_entry_fields_complete
+
+            # 8e. 条目必须绑定 git commit
+            if isinstance(dl_data, dict):
+                git_commit_found = False
+                gc = dl_data.get("governance_clauses", {})
+                if isinstance(gc, dict):
+                    for entry_key, entry_val in gc.items():
+                        if isinstance(entry_val, dict):
+                            gc_val = entry_val.get("git_commit")
+                            if gc_val:
+                                git_commit_found = True
+                                break
+                            # 也检查 verification_command 中是否包含 commit hash
+                            vc = entry_val.get("verification_command", "")
+                            if isinstance(vc, str) and ("commit" in vc.lower() or "git" in vc.lower()):
+                                git_commit_found = True
+                                break
+
+                if not git_commit_found:
+                    cl = dl_data.get("change_log", [])
+                    if isinstance(cl, list):
+                        for entry in cl:
+                            if isinstance(entry, dict) and entry.get("git_commit"):
+                                git_commit_found = True
+                                break
+
+                dl_git_commit_binding = git_commit_found
+                checks["decision_log_git_commit_binding"] = dl_git_commit_binding
+                passed = passed and dl_git_commit_binding
+
+        except Exception as exc:
+            checks["decision_log_data_parse_error"] = False
+            checks["decision_log_data_error_detail"] = str(exc)
+            passed = False
+    else:
+        checks["decision_log_data_parse_error"] = False
+        checks["decision_log_data_error_detail"] = "data file not found"
+
     return {
         "code": "P106-decision-log",
         "name": "[106] 决策日志（decision log）",
@@ -12590,7 +12735,17 @@ def p106_decision_log() -> dict[str, Any]:
         "detail": "决策日志 gate 条款验证完成",
         "evidence": {
             "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "data_file": str(decision_log_path.relative_to(PROJECT_ROOT)) if ok_dl_exists else None,
             "checks": checks,
+            "summary": {
+                "total_checks": len(checks),
+                "passed_checks": sum(1 for v in checks.values() if v is True),
+                "failed_checks": sum(1 for v in checks.values() if v is not True),
+                "entry_count": dl_entry_count,
+                "change_types_covered": dl_change_types_covered,
+                "entry_fields_complete": dl_entry_fields_complete,
+                "git_commit_binding": dl_git_commit_binding,
+            }
         },
     }
 

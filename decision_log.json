@@ -4,6 +4,11 @@
   "governance_clauses": {
     "[3]_状态只认磁盘": {
       "status": "done",
+      "timestamp": "2026-09-20T14:30:00",
+      "change_description": "条款[3]状态验证函数实现 + 配置YAML + 合规报告",
+      "reason": "条款[3]是治理框架基础条款，必须先落实",
+      "impact_scope": "src/liquidloc/analysis/clause_gates.py, configs/protocol/clause003_state_only_disk.yaml",
+      "git_commit": "7e2e169a",
       "anchors_verified": {
         "清场验证.txt": true,
         "manifests/目录": true,
@@ -21,6 +26,11 @@
     },
     "[4]_指令状态表与逐条队列": {
       "status": "done",
+      "timestamp": "2026-09-20T15:00:00",
+      "change_description": "条款[4]指令状态表与逐条队列落实",
+      "reason": "条款[4]是阶段执行追踪的治理载体",
+      "impact_scope": "rules/指令状态表.md, rules/阶段执行地图.md, AGENTS.md",
+      "git_commit": "7e2e169a",
       "anchors_verified": {
         "rules/指令状态表.md": true,
         "rules/阶段执行地图.md": true,
@@ -38,5 +48,47 @@
         "AGENTS.md:3-21"
       ]
     }
-  }
+  },
+  "change_log": [
+    {
+      "timestamp": "2026-09-20T14:30:00",
+      "change_description": "条款[3]状态验证函数 p3_state_only_disk 实现",
+      "reason": "条款[3]是治理框架基础，需要代码层面的状态验证",
+      "impact_scope": "src/liquidloc/analysis/clause_gates.py",
+      "change_type": "代码",
+      "git_commit": "7e2e169a"
+    },
+    {
+      "timestamp": "2026-09-20T15:00:00",
+      "change_description": "条款[4]指令状态表与逐条队列落实",
+      "reason": "条款[4]需要状态表和阶段地图来追踪治理条款落实进度",
+      "impact_scope": "rules/指令状态表.md, rules/阶段执行地图.md",
+      "change_type": "配置",
+      "git_commit": "7e2e169a"
+    },
+    {
+      "timestamp": "2026-09-20T16:45:00",
+      "change_description": "条款[105]生成器代码冻结确认",
+      "reason": "条款[105]是生成器冻结约束，需要代码层面的冻结确认",
+      "impact_scope": "src/liquidloc/generator/",
+      "change_type": "代码",
+      "git_commit": "09eda2a9"
+    },
+    {
+      "timestamp": "2026-09-20T17:30:00",
+      "change_description": "条款[106]决策日志配置YAML + 验证函数 + 合规报告",
+      "reason": "条款[106]要求决策日志作为变更治理载体，需要配置、验证函数和报告",
+      "impact_scope": "configs/protocol/clause106_decision_log.yaml, src/liquidloc/analysis/clause_gates.py, outputs/compliance_report_106.md",
+      "change_type": "配置",
+      "git_commit": "7f472805"
+    },
+    {
+      "timestamp": "2026-09-20T18:00:00",
+      "change_description": "修复p3 HEAD hash bug + 项目报告.zcode引用 + verify差异",
+      "reason": "p3 HEAD hash与git rev-parse HEAD不一致导致验证失败",
+      "impact_scope": "src/liquidloc/analysis/clause_gates.py, outputs/compliance_report_*.md",
+      "change_type": "代码",
+      "git_commit": "874c3e19"
+    }
+  ]
 }
