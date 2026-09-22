@@ -478,21 +478,26 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
             batch_first=True,  # 输入张量采用 batch-first 布局。
             bidirectional=False,  # §10.1/§10.2 强制单向因果：禁止双向注意力看未来。
         )
-        self.output_layer = nn.Linear(self.hidden_dim + self.context_dim, len(self.output_heads))  # 把隐藏态和上下文拼接后映射到四个头。
-        self._reset_output_layer_contract_biases()  # 初始化输出层偏置，保证默认先验稳定。
+        # §100 头实现一致性：四个独立线性头，与 LNN/Transformer 逐头参数结构对齐；
+        # 只骨干不同，防止实现偏差污染对比。
+        self.output_heads = nn.ModuleDict({  # 用 ModuleDict 管理四个独立头。
+            key: nn.Linear(self.hidden_dim + self.context_dim, 1, bias=True)  # 每头独立权重和偏置。
+            for key in self.output_heads  # 按协议顺序创建 bias/risk/uwb_scaling/vio_scaling。
+        })
+        self._reset_output_heads_contract_biases()  # 初始化输出头偏置，保证默认先验稳定。
 
-    # 这个内部方法负责把输出层偏置初始化成符合协议先验的状态。
-    def _reset_output_layer_contract_biases(self) -> None:
-        """初始化输出层权重和偏置，让输出契约从一开始就稳定。"""
-        nn.init.xavier_uniform_(self.output_layer.weight)  # 权重用 Xavier 初始化，保持数值尺度合理。
-        if self.output_layer.bias is None:  # 如果这个层没有 bias，就不用再做任何事。
-            return  # 直接结束。
-        with torch.no_grad():  # 初始化阶段不需要梯度记录。
-            self.output_layer.bias.zero_()  # 先把所有偏置清零。
-            # 从冻结协议取 risk 头位置，避免硬编码索引漂移；显式校验该位置确实是 risk 头。
-            if "risk" in self.output_heads:
-                risk_head_index = self.output_heads.index("risk")
-                self.output_layer.bias[risk_head_index] = RISK_PRIOR_LOGIT  # 给风险头一个先验偏置。
+    # §100 头实现一致性：四个独立头的偏置初始化，与 LNN/Transformer 逐头对齐。
+    def _reset_output_heads_contract_biases(self) -> None:
+        """初始化每个输出头的权重和偏置，保证默认先验稳定。"""
+        for key, head in self.output_heads.items():
+            nn.init.xavier_uniform_(head.weight)  # 权重用 Xavier 初始化，保持数值尺度合理。
+            if head.bias is None:  # 如果这个头没有 bias，就不用再做任何事。
+                continue
+            with torch.no_grad():  # 初始化阶段不需要梯度记录。
+                head.bias.zero_()  # 先把所有偏置清零。
+                # 从冻结协议取 risk 头位置，避免硬编码索引漂移；显式校验该位置确实是 risk 头。
+                if key == "risk":
+                    head.bias.fill_(RISK_PRIOR_LOGIT)  # 给风险头一个先验偏置。
 
     # 重置所有可学习参数到初始状态，与 LiquidNetwork.reset_parameters 同名同口径（D7 公平性）。
     def reset_parameters(self) -> None:
@@ -501,7 +506,7 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
         重置范围：
         - input_projection（若存在）：委托给 nn.Linear.reset_parameters。
         - lstm：委托给 nn.LSTM.reset_parameters。
-        - output_layer：通过 _reset_output_layer_contract_biases 重置，保留协议偏置契约。
+        - output_heads：通过 _reset_output_heads_contract_biases 逐头重置，保留协议偏置契约。
 
         与 LiquidNetwork.reset_parameters 保持同名同口径（D7 公平性）。
 
@@ -514,7 +519,7 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
         if self.input_projection is not None:  # 输入投影层存在时重置为默认初始化。
             self.input_projection.reset_parameters()
         self.lstm.reset_parameters()  # LSTM 重置为默认初始化。
-        self._reset_output_layer_contract_biases()  # 输出层重置，保留协议偏置契约。
+        self._reset_output_heads_contract_biases()  # 逐头输出层重置，保留协议偏置契约。
 
     # 这个内部方法负责把任意输入统一成三维序列批次。
     def _coerce_sequence_batch(self, window_tensor: Any) -> torch.Tensor:
@@ -598,8 +603,11 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
         encoded_sequence, _ = self.lstm(sequence_batch)  # LSTM 编码整个序列。
         # 只取最后一个时间步，代表整段序列的主摘要。
         last_hidden = encoded_sequence[:, -1, :]  # 只取最后一个时间步的隐藏态。
-        # 把隐藏态和上下文拼起来，再送进最终输出层。
-        network_output = self.output_layer(torch.cat([last_hidden, context_batch], dim=-1))  # 拼接上下文后输出四头。
+        # 把隐藏态和上下文拼起来，再逐头送入四个独立线性输出。
+        fused = torch.cat([last_hidden, context_batch], dim=-1)  # 拼接隐藏态和上下文。
+        network_output = torch.stack([  # 逐头计算四路输出并堆叠为 batch×4×1。
+            self.output_heads[key](fused) for key in self.output_heads  # 按协议顺序拼接 bias/risk/uwb_scaling/vio_scaling。
+        ], dim=1).squeeze(-1)  # 去掉最后一维，输出形状 batch×4。
         if network_output.shape[0] == 1:  # 单样本时压掉 batch 维，方便外部消费。
             return network_output.squeeze(0)  # 返回一维四头向量。
         return network_output  # 多样本时保留 batch 维。
@@ -629,6 +637,9 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
         # LSTM 主干先编码序列，再取最后时刻的隐藏态。
         encoded_sequence, _ = self.lstm(sequence_tensor)  # LSTM 正式编码。
         last_hidden = encoded_sequence[:, -1, :]  # 取最后时刻的隐藏态。
-        # 把隐藏态和上下文拼起来，得到最终四头输出。
-        network_output = self.output_layer(torch.cat([last_hidden, context_batch], dim=-1))  # 拼接上下文后映射为四头输出。
+        # 把隐藏态和上下文拼起来，逐头送入四个独立线性输出。
+        fused = torch.cat([last_hidden, context_batch], dim=-1)  # 拼接隐藏态和上下文。
+        network_output = torch.stack([  # 逐头计算四路输出并堆叠为 1×4×1。
+            self.output_heads[key](fused) for key in self.output_heads  # 按协议顺序拼接 bias/risk/uwb_scaling/vio_scaling。
+        ], dim=1).squeeze(-1)  # 去掉最后一维，输出形状 1×4。
         return network_output.squeeze(0)  # 单样本窗口始终为 batch=1，去掉 batch 维返回一维四头向量。

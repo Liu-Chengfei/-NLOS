@@ -1,6 +1,7 @@
 # 条款 [100] · 头实现一致性配置
-# 手册位置：docs/最终交付_异步手册_424条_20260917.md 第 327 行
+# 手册位置：docs/最终交付_异步手册_424条_20260917.md 第 335 行
 # 条款原文：头实现一致性：三个网络的 4 个头参数结构逐层一致，只骨干不同（防止实现偏差污染对比）。
+# 对应手册 docs/最终交付_异步手册_424条_20260917.md:335
 
 # 条款标识（顶层）
 clause_id: "100"
@@ -10,55 +11,58 @@ clause_name: "头实现一致性"
 head_consistency:
   # 三个网络：LNN / LSTM / Transformer
   networks:
-    - LNN
-    - LSTM
-    - Transformer
+    - LiquidNeuralNetwork
+    - LSTMNetwork
+    - TransformerNetwork
 
-  # 四个头：uwb_scaling / bias / vio_scaling / risk（见条款 [42]）
+  # 四个头：bias / risk / uwb_scaling / vio_scaling（见条款 [42]）
   heads:
-    - uwb_scaling
     - bias
-    - vio_scaling
     - risk
+    - uwb_scaling
+    - vio_scaling
 
-  # 约束 1: 参数结构逐层一致
-  layer_structure_consistent: true
-  structure_note: "三个网络的 4 个头在各对应层的参数形状、初始化方式、激活函数必须完全一致"
-
-  # 约束 2: 只骨干不同
-  backbone_only_different: true
-  backbone_note: "LNN/LSTM/Transformer的唯一差异是骨干网络结构，头参数结构必须保持一致"
-
-  # 约束 3: 防止实现偏差污染对比
-  prevent_bias_contamination: true
-  bias_prevention_note: "头参数不一致会导致 LNN vs LSTM/Transformer 的对比被头实现差异污染，而非真正反映骨干效果"
-
-# 验证项
+# 验证项（5 项逐层一致检查）
 verification_items:
-  # 1. 三个网络的头配置文件存在
-  head_config_files_exist: true
-
-  # 2. 头的参数形状逐层一致
-  head_shapes_match_across_networks: true
-
-  # 3. 头的初始化方式一致
-  head_initialization_consistent: true
-
-  # 4. 头的激活函数一致
-  head_activation_consistent: true
-
-  # 5. 骨干网络结构确实不同（否则无需对比）
-  backbones_are_actually_different: true
+  - head_architecture_equal
+  - projection_linear_shape_equal
+  - activation_function_equal
+  - parameter_count_equal
+  - initialization_method_equal
 
 # 约束声明
 constraint_declaration:
   clause_id: "100"
   clause_name: "头实现一致性"
   source_file: "docs/最终交付_异步手册_424条_20260917.md"
-  source_line: 327
+  source_line: 335
   enforce_level: "hard"
   rationale: "防止实现偏差污染对比，确保 LNN vs LSTM/Transformer 的差异仅来自骨干网络"
+
+  # 3 个网络必须统一
+  3_networks: true
+
+  # 4 个头必须统一
+  4_heads: true
+
+  # 约束 1: 参数结构逐层一致
+  layer_structure_consistent:
+    enforce_level: hard
+    expected: lnn_lstm_transformer
+    note: "三个网络的 4 个头在各对应层的参数形状、初始化方式、激活函数必须完全一致"
+
+  # 约束 2: 只骨干不同
+  backbone_only_different:
+    enforce_level: hard
+    note: "LNN/LSTM/Transformer 的唯一差异是骨干网络结构，头参数结构必须保持一致"
+
+  # 约束 3: 防止实现偏差污染对比
+  prevent_bias_contamination:
+    enforce_level: hard
+    note: "头参数不一致会导致 LNN vs LSTM/Transformer 的对比被头实现差异污染"
+
+  # 相关条款
   related_clauses:
-    - "[42] 四个输出头"  # 头机制链定义
-    - "[52] 基线不是裸模型"  # 基线也带头
-    - "[61] 同 seed 初始化"  # 同种子初始化权重
+    - "[42] 四个输出头"
+    - "[52] 基线不是裸模型"
+    - "[61] 同 seed 初始化"
