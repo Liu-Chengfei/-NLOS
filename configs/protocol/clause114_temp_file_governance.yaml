@@ -55,4 +55,8 @@ verification_requirements:
 # 配置文件路径
 config_version: "1.0"
 last_updated: "2026-09-18"
-manual_reference: "docs/最终交付_异步手册_424条_20260917.md 第 344 行"
+manual_reference: "docs/最终交付_异步手册_424条_20260917.md 第 352 行"
+
+# 手册真源行号与文本
+manual_line: 352
+manual_text: "[114] 临时文件治理——临时调试脚本（bash_tool_*.py、一次性探针）跑完立即删除或移入 sandbox/ 并标注用途，不留在实验代码目录"
