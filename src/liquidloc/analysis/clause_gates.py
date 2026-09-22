@@ -1822,18 +1822,18 @@ def p19_axis_a_sync_verification() -> dict[str, Any]:
     # 手册定义期望值（范围用 [min, max] 表示）
     expected = {
         "A0": {
-            "uwb_clock_offset_ms": [0, 0],
-            "uwb_round_trip_delay_ms": [0, 0],
-            "imu_clock_offset_ms": [0, 0],
-            "imu_sampling_jitter_ms": [0, 0],
-            "vio_clock_offset_ms": [0, 0],
-            "vio_processing_delay_ms": [0, 0],
+            "uwb_clock_offset_ms": 0,
+            "uwb_round_trip_delay_ms": 0,
+            "imu_clock_offset_ms": 0,
+            "imu_sampling_jitter_ms": 0,
+            "vio_clock_offset_ms": 0,
+            "vio_processing_delay_ms": 0,
         },
         "A1": {
             "uwb_clock_offset_ms": [5, 20],
             "uwb_round_trip_delay_ms": [20, 40],
             "imu_clock_offset_ms": [1, 5],
-            "imu_sampling_jitter_ms": [1, 1],
+            "imu_sampling_jitter_ms": [-1, 1],
             "vio_clock_offset_ms": [5, 20],
             "vio_processing_delay_ms": [10, 30],
         },
@@ -1841,7 +1841,7 @@ def p19_axis_a_sync_verification() -> dict[str, Any]:
             "uwb_clock_offset_ms": [20, 50],
             "uwb_round_trip_delay_ms": [40, 80],
             "imu_clock_offset_ms": [5, 15],
-            "imu_sampling_jitter_ms": [3, 3],
+            "imu_sampling_jitter_ms": [-3, 3],
             "vio_clock_offset_ms": [20, 50],
             "vio_processing_delay_ms": [30, 80],
         },
@@ -1849,25 +1849,28 @@ def p19_axis_a_sync_verification() -> dict[str, Any]:
             "uwb_clock_offset_ms": [100, 200],
             "uwb_round_trip_delay_ms": [120, 250],
             "imu_clock_offset_ms": [20, 50],
-            "imu_sampling_jitter_ms": [10, 10],
+            "imu_sampling_jitter_ms": [-10, 10],
             "vio_clock_offset_ms": [100, 200],
             "vio_processing_delay_ms": [150, 300],
         },
     }
+
+    # 档位参数在 gears 子字典中
+    gears_cfg = cfg.get("gears", cfg)
 
     # 验证所有档位和字段
     mismatches: list[str] = []
     missing_levels: list[str] = []
     missing_fields: list[str] = []
     for level, fields in expected.items():
-        if level not in cfg:
+        if level not in gears_cfg:
             missing_levels.append(level)
             continue
         for field, expected_val in fields.items():
-            actual_val = cfg[level].get(field)
+            actual_val = gears_cfg[level].get(field)
             if actual_val is None:
                 missing_fields.append(f"{level}.{field}")
-            elif actual_val != expected_val:
+            elif not _values_match(actual_val, expected_val):
                 mismatches.append(f"{level}.{field}: expected {expected_val}, got {actual_val}")
 
     # (c) 手册文件存在性检查
@@ -1913,31 +1916,31 @@ def p20_nlos_axis_verification() -> dict[str, Any]:
     cfg_path = CONFIGS / "protocol" / "axis_n_nlos.yaml"
     handount_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
 
-    # 手册第20条原始定义（字段顺序：nlos_ratio / bias_mu / noise_sigma / physical）
+    # 手册第20条原始定义（字段名与 axis_n_nlos.yaml 保持一致：nlos_ratio_pct / bias_m / noise_m / physical_description）
     expected = {
         "N0": {
-            "nlos_ratio": [0.00, 0.05],
-            "bias_mu": [0.0, 0.0],
-            "noise_sigma": [0.0, 0.0],
-            "physical_correspondence": "理想 LOS",
+            "nlos_ratio_pct": [0, 5],
+            "bias_m": 0.0,
+            "noise_m": None,
+            "physical_description": "理想 LOS",
         },
         "N1": {
-            "nlos_ratio": [0.10, 0.15],
-            "bias_mu": [0.5, 1.0],
-            "noise_sigma": [0.3, 0.3],
-            "physical_correspondence": "门/人体遮挡",
+            "nlos_ratio_pct": [10, 15],
+            "bias_m": [0.5, 1.0],
+            "noise_m": 0.3,
+            "physical_description": "门/人体遮挡",
         },
         "N2": {
-            "nlos_ratio": [0.25, 0.30],
-            "bias_mu": [2.0, 3.0],
-            "noise_sigma": [0.8, 0.8],
-            "physical_correspondence": "墙体级遮挡",
+            "nlos_ratio_pct": [25, 30],
+            "bias_m": [2.0, 3.0],
+            "noise_m": 0.8,
+            "physical_description": "墙体级遮挡",
         },
         "N3": {
-            "nlos_ratio": [0.35, 0.40],
-            "bias_mu": [4.0, 6.0],
-            "noise_sigma": [1.5, 1.5],
-            "physical_correspondence": "完全遮挡极端",
+            "nlos_ratio_pct": [35, 40],
+            "bias_m": [4.0, 6.0],
+            "noise_m": 1.5,
+            "physical_description": "完全遮挡极端",
         },
     }
     # 期望的约束声明（纯偏差/4锚/可解率100%/不可解归M轴）
@@ -1969,19 +1972,23 @@ def p20_nlos_axis_verification() -> dict[str, Any]:
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
         }
 
+    # 档位参数在 gears 子字典中
+    gears_cfg = cfg.get("gears", cfg)
+
     # 验证所有档位和字段
     mismatches: list[str] = []
     missing_levels: list[str] = []
     missing_fields: list[str] = []
     for level, fields in expected.items():
-        if level not in cfg:
+        if level not in gears_cfg:
             missing_levels.append(level)
             continue
         for field, expected_val in fields.items():
-            actual_val = cfg[level].get(field)
-            if actual_val is None:
+            if field not in gears_cfg[level]:
                 missing_fields.append(f"{level}.{field}")
-            elif actual_val != expected_val:
+                continue
+            actual_val = gears_cfg[level][field]
+            if not _values_match(actual_val, expected_val):
                 mismatches.append(f"{level}.{field}: expected {expected_val}, got {actual_val}")
 
     # (c) 验证约束声明
@@ -2051,39 +2058,37 @@ def p21_visual_axis_verification() -> dict[str, Any]:
 
     expected = {
         "V0": {
-            "name": "健康",
-            "feature_count": [50, 100],
-            "incremental_noise_sigma": [0.01, 0.03],
-            "frame_valid_ratio": 1.0,
-            "scaling_factor": 1.0,
+            "label": "健康",
+            "features_per_frame_min": 50,
+            "increment_noise_sigma_m": {"min": 0.01, "max": 0.03},
+            "frame_validity_pct": 100,
+            "gap": None,
         },
         "V1": {
-            "name": "黑屏",
-            "feature_count": [0, 0],
-            "incremental_noise_sigma": [0.0, 0.0],
-            "incremental_zeroed": True,
-            "frame_valid_ratio": [0.05, 0.10],
-            "gap_duration": [0.5, 2.0],
-            "gap_count_per_sequence": [1, 2],
-            "scaling_factor": 0.0,
+            "label": "黑屏",
+            "increment_mode": "zeroed",
+            "scaling": 0.0,
+            "episodes_per_sequence": {"min": 1, "max": 2},
+            "episode_duration_s": {"min": 0.5, "max": 2.0},
+            "trajectory_ratio_pct": {"min": 5, "max": 10},
         },
         "V2": {
-            "name": "特征丢失",
-            "feature_count": [10, 20],
-            "incremental_noise_sigma": [0.05, 0.15],
-            "noise_amplification_factor": 5,
-            "frame_valid_ratio": [0.20, 0.40],
-            "gap_duration": [1.0, 3.0],
-            "scaling_factor": [0.3, 0.7],
+            "label": "特征丢失",
+            "features_per_frame": {"min": 10, "max": 20},
+            "increment_noise_amplification": 5,
+            "increment_noise_sigma_m": {"min": 0.05, "max": 0.15},
+            "trajectory_ratio_pct": {"min": 20, "max": 40},
+            "continuous_segment_s": {"min": 1, "max": 3},
+            "scaling": {"min": 0.3, "max": 0.7},
         },
         "V3": {
-            "name": "关键帧中断",
-            "feature_count": [0, 0],
-            "incremental_missing": True,
-            "frame_valid_ratio": [0.10, 0.20],
-            "gap_duration": [0.5, 3.0],
-            "gap_count_per_sequence": [2, 4],
-            "relocalization_jump": [0.3, 1.0],
+            "label": "关键帧中断",
+            "increment_mode": "missing",
+            "trigger": "quality",
+            "episodes_per_sequence": {"min": 2, "max": 4},
+            "gap_s": {"min": 0.5, "max": 3.0},
+            "trajectory_ratio_pct": {"min": 10, "max": 20},
+            "relocalization_jump_m": {"min": 0.3, "max": 1.0},
         },
     }
     expected_constraint = {
@@ -2113,18 +2118,22 @@ def p21_visual_axis_verification() -> dict[str, Any]:
             "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True},
         }
 
+    # 档位参数在 gears 子字典中
+    gears_cfg = cfg.get("gears", cfg)
+
     mismatches: list[str] = []
     missing_levels: list[str] = []
     missing_fields: list[str] = []
     for level, fields in expected.items():
-        if level not in cfg:
+        if level not in gears_cfg:
             missing_levels.append(level)
             continue
         for field, expected_val in fields.items():
-            actual_val = cfg[level].get(field)
-            if actual_val is None:
+            if field not in gears_cfg[level]:
                 missing_fields.append(f"{level}.{field}")
-            elif not _values_match(actual_val, expected_val):
+                continue
+            actual_val = gears_cfg[level][field]
+            if not _values_match(actual_val, expected_val):
                 mismatches.append(f"{level}.{field}: expected {expected_val}, got {actual_val}")
 
     constraint = cfg.get("constraint_declaration", {})
@@ -7406,7 +7415,7 @@ def p67_a2_a3_offset_protocol_verification() -> dict[str, Any]:
             "uwb_clock_offset_ms": [20, 50],
             "uwb_round_trip_delay_ms": [40, 80],
             "imu_clock_offset_ms": [5, 15],
-            "imu_sampling_jitter_ms": [3, 3],
+            "imu_sampling_jitter_ms": [-3, 3],
             "vio_clock_offset_ms": [20, 50],
             "vio_processing_delay_ms": [30, 80],
         },
@@ -7414,7 +7423,7 @@ def p67_a2_a3_offset_protocol_verification() -> dict[str, Any]:
             "uwb_clock_offset_ms": [100, 200],
             "uwb_round_trip_delay_ms": [120, 250],
             "imu_clock_offset_ms": [20, 50],
-            "imu_sampling_jitter_ms": [10, 10],
+            "imu_sampling_jitter_ms": [-10, 10],
             "vio_clock_offset_ms": [100, 200],
             "vio_processing_delay_ms": [150, 300],
         },
@@ -7427,11 +7436,14 @@ def p67_a2_a3_offset_protocol_verification() -> dict[str, Any]:
     validated_levels: list[str] = []
 
     for level, expected_fields in expected.items():
-        if level not in cfg:
+        gears = cfg.get("gears", {})
+        if not isinstance(gears, dict):
+            gears = {}
+        if level not in gears:
             missing_levels.append(level)
             continue
         for field, expected_val in expected_fields.items():
-            actual_val = cfg[level].get(field)
+            actual_val = gears[level].get(field) if isinstance(gears[level], dict) else None
             if actual_val is None:
                 missing_fields.append(f"{level}.{field}")
             elif not _values_match(actual_val, expected_val):
@@ -7612,7 +7624,7 @@ def p68_a2a3_shift_jitter() -> dict[str, Any]:
             "uwb_clock_offset_ms": [20, 50],
             "uwb_round_trip_delay_ms": [40, 80],
             "imu_clock_offset_ms": [5, 15],
-            "imu_sampling_jitter_ms": [3, 3],
+            "imu_sampling_jitter_ms": [-3, 3],
             "vio_clock_offset_ms": [20, 50],
             "vio_processing_delay_ms": [30, 80],
         },
@@ -7620,7 +7632,7 @@ def p68_a2a3_shift_jitter() -> dict[str, Any]:
             "uwb_clock_offset_ms": [100, 200],
             "uwb_round_trip_delay_ms": [120, 250],
             "imu_clock_offset_ms": [20, 50],
-            "imu_sampling_jitter_ms": [10, 10],
+            "imu_sampling_jitter_ms": [-10, 10],
             "vio_clock_offset_ms": [100, 200],
             "vio_processing_delay_ms": [150, 300],
         },
@@ -13891,6 +13903,133 @@ def p114_temp_file_governance() -> dict[str, Any]:
             "temp_patterns_count": len(patterns),
             "temp_types_count": len(types),
             "forbidden_locations_count": len(forbidden),
+        },
+    }
+
+
+def p115_checkpoint_format() -> dict[str, Any]:
+    """[115] checkpoint 落盘格式细则（硬约束，结果持久化的落盘实现细则）。
+
+    手册原文：
+    [115] checkpoint 落盘格式细则（硬约束，结果持久化的落盘实现细则）——检查点文件必须包含 model_state、optimizer_state、config_hash，
+    落盘必须是原子操作（temp + rename），config_hash 必须与当前配置匹配
+
+    验证项：
+    1. configs/protocol/clause115_checkpoint_format.yaml 存在且能正确解析
+    2. clause_id == "115"
+    3. severity == "hard"
+    4. required_payload_fields 至少包含 3 项（model_state, optimizer_state, config_hash）
+    5. atomic_save.required == true
+    6. atomic_save.method 匹配 "temp_then_rename" 或 "atomic_write"
+    7. config_hash_validation.required == true
+    8. config_hash_validation.mismatch_action 匹配 "reject" 或 "abort"
+    9. forbidden_patterns 至少包含 1 项
+    10. verification_requirements.code_audit == true
+    11. manual_line == 353
+    12. manual_text 非空且包含关键描述
+    """
+    cfg_path = CONFIGS / "protocol" / "clause115_checkpoint_format.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P115-checkpoint-format", "name": "[115] checkpoint 落盘格式细则",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause115_checkpoint_format.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P115-checkpoint-format", "name": "[115] checkpoint 落盘格式细则",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    # VS-2: clause_id == "115"
+    ok_cid = cfg.get("clause_id") == "115"
+    checks["vs2_clause_id_115"] = ok_cid
+    detail_parts.append(f"VS-2 clause_id={cfg.get('clause_id')!r}, 期望='115', 匹配={ok_cid}")
+
+    # VS-3: severity == "hard"
+    ok_sev = cfg.get("severity") == "hard"
+    checks["vs3_severity_hard"] = ok_sev
+    detail_parts.append(f"VS-3 severity={cfg.get('severity')!r}, 期望='hard', 匹配={ok_sev}")
+
+    # VS-4: required_payload_fields 至少包含 3 项（model_state, optimizer_state, config_hash）
+    fields = cfg.get("required_payload_fields", [])
+    expected_fields = ["model_state", "optimizer_state", "config_hash"]
+    ok_fields = all(f in fields for f in expected_fields) and len(fields) >= 3
+    checks["vs4_required_fields"] = ok_fields
+    detail_parts.append(f"VS-4 required_payload_fields={fields}, 期望包含3项(model_state/optimizer_state/config_hash), 匹配={ok_fields}")
+
+    # VS-5: atomic_save.required == true
+    atomic = cfg.get("atomic_save", {})
+    ok_atomic_required = atomic.get("required") is True
+    checks["vs5_atomic_save_required"] = ok_atomic_required
+    detail_parts.append(f"VS-5 atomic_save.required={atomic.get('required')!r}, 期望=True, 匹配={ok_atomic_required}")
+
+    # VS-6: atomic_save.method 匹配原子写入模式
+    atomic_method = str(atomic.get("method", ""))
+    ok_atomic_method = atomic_method in ("temp_then_rename", "atomic_write")
+    checks["vs6_atomic_save_method"] = ok_atomic_method
+    detail_parts.append(f"VS-6 atomic_save.method={atomic_method!r}, 期望=temp_then_rename/atomic_write, 匹配={ok_atomic_method}")
+
+    # VS-7: config_hash_validation.required == true
+    chv = cfg.get("config_hash_validation", {})
+    ok_chv_required = chv.get("required") is True
+    checks["vs7_config_hash_validation_required"] = ok_chv_required
+    detail_parts.append(f"VS-7 config_hash_validation.required={chv.get('required')!r}, 期望=True, 匹配={ok_chv_required}")
+
+    # VS-8: config_hash_validation.mismatch_action 匹配拒绝模式
+    mismatch_action = str(chv.get("mismatch_action", ""))
+    ok_mismatch = mismatch_action in ("reject", "abort")
+    checks["vs8_mismatch_action_reject"] = ok_mismatch
+    detail_parts.append(f"VS-8 config_hash_validation.mismatch_action={mismatch_action!r}, 期望=reject/abort, 匹配={ok_mismatch}")
+
+    # VS-9: forbidden_patterns 至少包含 1 项
+    forbidden = cfg.get("forbidden_patterns", [])
+    ok_forbidden = len(forbidden) >= 1
+    checks["vs9_forbidden_patterns_min1"] = ok_forbidden
+    detail_parts.append(f"VS-9 forbidden_patterns 数量={len(forbidden)}, 期望>=1, 匹配={ok_forbidden}")
+
+    # VS-10: verification_requirements.code_audit == true
+    vr = cfg.get("verification_requirements", {})
+    ok_code_audit = vr.get("code_audit") is True
+    checks["vs10_code_audit_true"] = ok_code_audit
+    detail_parts.append(f"VS-10 code_audit={vr.get('code_audit')!r}, 期望=True, 匹配={ok_code_audit}")
+
+    # VS-11: manual_line == 353
+    ok_line = cfg.get("manual_line") == 353
+    checks["vs11_manual_line_353"] = ok_line
+    detail_parts.append(f"VS-11 manual_line={cfg.get('manual_line')!r}, 期望=353, 匹配={ok_line}")
+
+    # VS-12: manual_text 非空且包含关键描述
+    manual_text = cfg.get("manual_text", "")
+    ok_text = bool(manual_text) and "115" in str(manual_text) and "checkpoint" in str(manual_text) and "落盘" in str(manual_text)
+    checks["vs12_manual_text_valid"] = ok_text
+    detail_parts.append(f"VS-12 manual_text非空={bool(manual_text)}, 含关键描述={ok_text}")
+
+    # 汇总
+    passed = all(v is True for k, v in checks.items() if isinstance(v, bool))
+
+    return {
+        "code": "P115-checkpoint-format",
+        "name": "[115] checkpoint 落盘格式细则",
+        "severity": "hard", "passed": passed,
+        "detail": "checkpoint 落盘格式细则 gate 条款验证完成",
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+            "detail_parts": detail_parts,
+            "required_fields_count": len(fields),
+            "forbidden_patterns_count": len(forbidden),
         },
     }
 
@@ -21742,6 +21881,7 @@ _ALL = [
     p112_no_commented_code,
     p113_consult_docs,
     p114_temp_file_governance,
+    p115_checkpoint_format,
     p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,

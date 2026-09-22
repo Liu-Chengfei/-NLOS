@@ -1,0 +1,30 @@
+# 条款 [70] 评估并行：测试轨迹推理在 GPU 上按轨迹独立并行执行
+# 手册原文：docs/最终交付_异步手册_424条_20260917.md
+# （轨迹内窗口批大小 16，轨迹间不混批，评估协议不变）
+
+clause_id: "70"
+clause_name: "评估并行"
+
+evaluation_parallel:
+  gpu_execution: true
+  trajectory_batch_size: 16
+  no_batch_mixing: true
+  evaluation_protocol_unchanged: true
+  description: "测试轨迹推理在 GPU 上按轨迹独立并行执行，窗口批大小 16，轨迹间不混批，评估协议不变"
+
+constraint_declaration:
+  trajectory_independent_parallel: true
+  no_mixing_across_trajectories: true
+  gpu_execution_default: true
+  window_batch_size: 16
+
+boundaries:
+  forbidden:
+    - "轨迹间混批"
+    - "非 GPU 执行评估推理"
+    - "修改评估协议"
+  required:
+    - "评估推理必须在 GPU 上执行"
+    - "轨迹间不混批"
+    - "窗口批大小保持 16"
+    - "评估协议保持不变"

@@ -350,7 +350,7 @@
 **\[112]**\*\* **禁止注释掉的代码**（死代码路径使评审无法判定是否静默生效确有历史需要 → 移入 `sandbox/` 并注明 git commit）
 **\[113]**\*\* 把"允许且应当查阅技术文档"从声明变成实现流程中的固定动作）\*\* ——执行者在**写代码、配环境、调接口、设数值精度模式（TF32/AMP/确定性）时， 应当主动查阅公开技术文档（PyTorch/CUDA/NumPy 等官方文档、库 API 说明、 环境配置文档），不凭记忆写 API 用法： 查什么 ——接口签名与参数语义、 dtype/shape 约定、精度模式（autocast/GradScaler/确定性开关）的正确写法、版本兼容性（nvcc/nvidia-smi/torch/gcc 四件套）
 \[114] 临时文件治理——临时调试脚本（`bash\_tool\_\*.py`、一次性探针）跑完**立即删除或移入 sandbox/ 并标注用途\*\*，不留在实验代码目录
-**\[115]**\*\* **checkpoint 落盘格式细则（硬约束， 结果持久化的落盘实现细则）
+[115] checkpoint 落盘格式细则——检查点文件必须包含 model_state、optimizer_state、config_hash，落盘必须是原子操作（temp + rename），config_hash 必须与当前配置匹配
 \[116]** 日志含 git commit + 配置 hash。
 
 ## Stage 3 · 生成数据：数据生成、校验与注入

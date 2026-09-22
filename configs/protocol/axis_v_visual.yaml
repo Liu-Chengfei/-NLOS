@@ -67,3 +67,9 @@ verification:
   - 'V1黑屏: 增量置零，scaling→0，每序列1-2次'
   - 'V2特征丢失: 特征10-20/帧，σ放大5倍，占轨迹20-40%'
   - 'V3关键帧中断: 增量缺失(质量触发)，间隙0.5-3s，恢复跳变0.3-1m'
+constraint_declaration:
+  axis_type: 视觉里程计（VIO）质量退化
+  a_axis_frame_missing: 数据不在（时间戳级缺失）
+  v1_definition: 数据在但置零
+  v2_definition: 数据在但变糙（σ×5）
+  v3_definition: 数据不在（质量触发）+ 恢复跳变

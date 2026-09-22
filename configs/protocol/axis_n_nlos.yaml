@@ -43,6 +43,11 @@ gears:
     physical_description: 完全遮挡极端
 governance_phase: '0'
 note: 纯偏差定义。全档固定 4 锚、可解率 100%。不可解帧归 M 轴。
+constraint_declaration:
+  nlos_type: pure_bias
+  anchor_count_fixed: 4
+  solvability: '100%'
+  unsolvable_frames_to: M
 verification:
   checkpoints:
   - N0档NLOS占比0-5%，偏差~0

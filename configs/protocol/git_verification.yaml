@@ -4,11 +4,11 @@
 
 clause_id: "79"
 clause_name: "git 核验"
+severity: hard
 
 git_verification:
   status_clean: true
   commit_recorded: true
   description: "git 状态干净 + commit 已记录"
-  allow_pass: true
 
 manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第314行"

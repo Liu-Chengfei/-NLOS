@@ -1,0 +1,32 @@
+# 条款 [69] CPU 角色分层描述
+# 手册原文：docs/最终交付_异步手册_424条_20260917.md
+# CPU 仅限非训练负载与 CPU 空闲协助训练的关系验证
+
+clause_id: "69"
+
+cpu_non_training_only:
+  enabled: true
+  scope: "GPU 空闲时 CPU 仅做非训练负载"
+  description: "GPU 有空闲算力时，CPU 默认只承担数据生成、评估、预处理等非训练任务"
+  tasks:
+    - "数据生成"
+    - "评估"
+    - "预处理"
+
+cpu_idle_training:
+  enabled: true
+  scope: "GPU 排满后 CPU 可承接剩余训练单元"
+  description: "GPU 算力排满后，CPU 可追加承接剩余训练单元作为空闲协助"
+  tasks:
+    - "剩余训练单元"
+
+no_conflict: true
+priority_rule: "GPU 有空时 CPU 只做非训练负载；GPU 排满时 CPU 可承接剩余训练单元"
+
+boundaries:
+  forbidden:
+    - "GPU 有空时 CPU 介入训练"
+    - "GPU 排满时 CPU 拒绝剩余训练单元"
+  required:
+    - "CPU 非训练分工与 CPU 空闲协助不冲突"
+    - "GPU 有空按前者，GPU 排满按后者"

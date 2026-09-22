@@ -1,0 +1,11 @@
+clause_id: "68"
+clause_name: "执行偏差（deviation）验证"
+
+execution_deviation:
+  table_name: "execution_deviation"
+  audit_series: "E"
+  scope: "漏跑/换机/中断恢复"
+  does_not_affect_protocol_definition: true
+
+experiment_dir_structure:
+  naming_pattern: "run-<日期>-<seed>-<method>-<config_hash>"

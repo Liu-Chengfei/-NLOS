@@ -1,0 +1,48 @@
+# 条款 [193] 先审执行再查数据适配
+# 手册原文：docs/异步实验_执行手册_终版v15_总纲条款版.md
+# 先审执行再查数据适配：第一问排查执行问题，第二问查数据适配，结论须带前提短语
+
+clause_id: "193"
+severity: hard
+
+execution_order:
+  first_question:
+    description: "先审执行——排查执行层面的问题（代码根因、执行偏差、硬件故障、环境差异）"
+    audit_items:
+      - "E-1: 检查代码版本与生成器 commit 是否一致"
+      - "E-2: 检查执行日志中是否有异常/报错/超时"
+      - "E-3: 检查 GPU 利用率/显存占用是否符合预期"
+      - "E-4: 检查是否有遗漏的 seed 或单元未执行"
+      - "E-5: 检查 seed 初始化是否与 manifest 一致"
+      - "E-6: 检查评估/推理是否按协议执行"
+  second_question:
+    description: "再查数据适配——执行问题排除后方检查数据适配问题"
+    check_items:
+      - "字段映射是否正确"
+      - "坐标系转换是否一致"
+    prerequisite: "执行层面问题已审至无可再审"
+    note: "不排除执行偏差尚未审尽的可能，结论表述须带'在已排除执行/代码根因的前提下'"
+
+conclusion_grammar:
+  require_prerequisite_phrase: true
+  prerequisite_phrase: "在已排除执行/代码根因的前提下"
+  forbidden_without_phrase:
+    - "数据适配有问题导致结果差异（缺少前提短语）"
+    - "代码逻辑正确但数据不适配（缺少前提短语）"
+
+boundaries:
+  forbidden:
+    - "跳过第一问直接查数据适配"
+    - "先宣称代码逻辑正确再排查执行问题"
+    - "执行问题未排除即下数据适配结论"
+    - "忽略执行偏差可能性"
+  required:
+    - "先完成第一问（执行排查）方可进入第二问"
+    - "执行须审至无可再审"
+    - "结论必须带前提短语"
+    - "不得排除执行偏差尚未审尽的可能"
+
+related_clauses:
+  - "192"
+  - "584"
+  - "597"

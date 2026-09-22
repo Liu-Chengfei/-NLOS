@@ -1,0 +1,23 @@
+# 条款 [73] 无 GPU 环境实测 -> 确认报错停而非静默 CPU 训练
+# 手册原文：docs/最终交付_异步手册_424条_20260917.md
+# CPU 空闲协助（执行模式/执行模式·CPU 空闲协助）CPU 承接仅限 GPU 排满后启用的剩余训练单元
+
+clause_id: "73"
+clause_name: "无 GPU 环境实测确认报错停而非静默 CPU 训练"
+
+gpu_error_handling:
+  verified: true
+  cpu_idle_assistance: true
+  cpu_only_for_full_gpu: true
+  description: "无 GPU 环境实测确认：GPU 不可用时训练报错停止（fail-fast），绝不静默退化为 CPU 训练。CPU 空闲协助仅在 GPU 排满后启用，且仅承接剩余训练单元。"
+
+boundaries:
+  forbidden:
+    - "GPU 不可用时静默退化为 CPU 训练"
+    - "无 GPU 环境下继续训练而不报错"
+    - "CPU 空闲协助在 GPU 未排满时启用"
+  required:
+    - "无 GPU 环境实测必须确认报错停"
+    - "报错信息须明确提示 GPU 不可用"
+    - "CPU 承接仅限 GPU 排满后的剩余训练单元"
+    - "训练启动前须验证 GPU 可用性"
