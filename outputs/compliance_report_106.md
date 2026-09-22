@@ -2,12 +2,12 @@
 
 **条款**: 决策日志（decision log）：每次代码变更必须记录在决策日志中，包含变更时间、变更描述、变更原因、影响范围、关联 git commit（决策日志即变更治理载体）
 **条款编号**: [106]
-**手册真源**: `docs/最终交付_异步手册_424条_20260917.md` 第 377 行
+**手册真源**: `docs/最终交付_异步手册_424条_20260917.md` 第 344 行
 **约束等级**: HARD
 **配置路径**: `configs/protocol/clause106_decision_log.yaml`
 **实现路径**: `src/liquidloc/analysis/clause_gates.py::p106_decision_log()`
 **数据文件**: `decision_log.json`
-**AGENTS.md 行号**: 375
+**AGENTS.md 行号**: 344
 
 ---
 
@@ -15,7 +15,7 @@
 
 > **[106]**\*\* **动作清单**： **决策日志（decision log）**：每次代码变更必须记录在决策日志中，包含变更时间、变更描述、变更原因、影响范围、关联 git commit（决策日志即变更治理载体）
 
-手册原文位置：`docs/最终交付_异步手册_424条_20260917.md` 第 377 行
+手册原文位置：`docs/最终交付_异步手册_424条_20260917.md` 第 344 行
 
 ---
 
@@ -25,7 +25,7 @@
 |---------|----------|---|---------|
 | clause_id | `clause_id` | "106" | 条款编号 |
 | clause_name | `clause_name` | "决策日志（decision log）" | 条款名称 |
-| manual_line | `manual_line` | 377 | 手册行号 |
+| manual_line | `manual_line` | 344 | 手册行号 |
 | severity | `severity` | "hard" | 约束等级 |
 | decision_log_file | `decision_log_file` | "decision_log.json" | 决策日志文件 |
 | entry_fields | `entry_fields` | [timestamp, change_description, reason, impact_scope, git_commit] | 5 个必填字段 |
@@ -40,7 +40,7 @@
 |---|--------|------|------|
 | 1 | clause_id == "106" | `configs/protocol/clause106_decision_log.yaml` | PASS |
 | 2 | severity == "hard" | `configs/protocol/clause106_decision_log.yaml` | PASS |
-| 3 | manual_line == 377 | `configs/protocol/clause106_decision_log.yaml` | PASS |
+| 3 | manual_line == 344 | `configs/protocol/clause106_decision_log.yaml` | PASS |
 | 4 | decision_log_file == "decision_log.json" | `configs/protocol/clause106_decision_log.yaml` | PASS |
 | 5 | entry_fields 包含 5 个必填字段 | `configs/protocol/clause106_decision_log.yaml` | PASS |
 | 6 | change_types 包含 4 类变更 | `configs/protocol/clause106_decision_log.yaml` | PASS |
@@ -69,9 +69,8 @@
 >>> print(r['passed'])
 True
 >>> print(r['evidence']['checks'])
-{'clause_id': True, 'severity_hard': True, 'manual_line_377': True,
- 'decision_log_file_set': True, 'entry_fields_5_items': True,
- 'change_types_4_items': True, 'minimum_entries_2': True, 'manual_exists': True,
+{'clause_id': True, 'manual_line_344': True, 'entry_fields_5_complete': True,
+ 'git_commit_binding': True, 'manual_exists': True,
  'decision_log_data_file_exists': True, 'decision_log_has_entries': True,
  'decision_log_entry_count': True, 'decision_log_change_types_covered': True,
  'decision_log_entry_fields_complete': True, 'decision_log_git_commit_binding': True}

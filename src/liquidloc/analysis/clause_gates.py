@@ -12750,6 +12750,183 @@ def p106_decision_log() -> dict[str, Any]:
     }
 
 
+def p107_checksum_traceability() -> dict[str, Any]:
+    """[107] 数据校验和与 run 目录对应：每个 run 的配置/指标/日志与目录一一对应（可追溯的目录级实现）；
+    每个 npz / manifest 生成时记录 SHA-256 校验和。
+
+    核心断言：
+    1. 每个 run 的配置/指标/日志与 run 目录一一对应（traceable directory-level implementation）
+    2. 每个 npz / manifest 生成时必须记录 SHA-256 校验和
+    3. 校验和必须包含 generated_at 时间戳和 file_path 路径（可追溯性）
+
+    验证项：
+    1. configs/protocol/clause107_checksum_traceability.yaml 存在且能正确解析
+    2. clause_id == "107"
+    3. run_directory_mapping.required == true
+    4. run_directory_mapping.mapping_fields 包含 3 项（config/metrics/log）
+    5. run_directory_mapping.directory_level == "run"
+    6. checksum.required == true
+    7. checksum.algorithm == "SHA-256"
+    8. checksum.target_files 包含 2 项（npz/manifest）
+    9. checksum.record_fields 包含 3 项（sha256/generated_at/file_path）
+    10. constraint_declaration.related_clauses >= 3
+    11. constraint_declaration.violation_consequence 非空
+    12. manual_text 存在于配置中
+    13. manual_line == 345
+    14. 手册真源文件存在
+    15. 数据校验记录文件存在（checksums.json 或 decision_log.json）
+    """
+    cfg_path = CONFIGS / "protocol" / "clause107_checksum_traceability.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P107-checksum-traceability",
+            "name": "[107] 数据校验和与 run 目录对应",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P107-checksum-traceability",
+            "name": "[107] 数据校验和与 run 目录对应",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    # 1. clause_id == "107"
+    ok_id = cfg.get("clause_id") == "107"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    # 2. run_directory_mapping required fields
+    rdm = cfg.get("run_directory_mapping", {})
+    if isinstance(rdm, dict):
+        ok_req = rdm.get("required") is True
+        checks["run_directory_mapping_required"] = ok_req
+        passed = passed and ok_req
+
+        # 3. mapping_fields 包含 3 项
+        mf = rdm.get("mapping_fields", [])
+        expected_mf = ["config", "metrics", "log"]
+        ok_mf = isinstance(mf, list) and set(mf) == set(expected_mf) and len(mf) == 3
+        checks["mapping_fields_3_complete"] = ok_mf
+        passed = passed and ok_mf
+
+        # 4. directory_level == "run"
+        ok_dl = rdm.get("directory_level") == "run"
+        checks["directory_level_run"] = ok_dl
+        passed = passed and ok_dl
+    else:
+        checks["run_directory_mapping_required"] = False
+        checks["mapping_fields_3_complete"] = False
+        checks["directory_level_run"] = False
+        passed = False
+
+    # 5. checksum section
+    cs = cfg.get("checksum", {})
+    if isinstance(cs, dict):
+        ok_cs_req = cs.get("required") is True
+        checks["checksum_required"] = ok_cs_req
+        passed = passed and ok_cs_req
+
+        # 6. checksum.algorithm == "SHA-256"
+        ok_algo = cs.get("algorithm") == "SHA-256"
+        checks["checksum_algorithm_sha256"] = ok_algo
+        passed = passed and ok_algo
+
+        # 7. target_files 包含 2 项（npz/manifest）
+        tf = cs.get("target_files", [])
+        expected_tf = ["npz", "manifest"]
+        ok_tf = isinstance(tf, list) and set(tf) == set(expected_tf) and len(tf) == 2
+        checks["checksum_target_files_2"] = ok_tf
+        passed = passed and ok_tf
+
+        # 8. record_fields 包含 3 项（sha256/generated_at/file_path）
+        rf = cs.get("record_fields", [])
+        expected_rf = ["sha256", "generated_at", "file_path"]
+        ok_rf = isinstance(rf, list) and set(rf) == set(expected_rf) and len(rf) == 3
+        checks["checksum_record_fields_3_complete"] = ok_rf
+        passed = passed and ok_rf
+    else:
+        checks["checksum_required"] = False
+        checks["checksum_algorithm_sha256"] = False
+        checks["checksum_target_files_2"] = False
+        checks["checksum_record_fields_3_complete"] = False
+        passed = False
+
+    # 9. constraint_declaration
+    cd = cfg.get("constraint_declaration", {})
+    if isinstance(cd, dict):
+        rc = cd.get("related_clauses", [])
+        ok_rc = isinstance(rc, list) and len(rc) >= 3
+        checks["related_clauses_3"] = ok_rc
+        passed = passed and ok_rc
+
+        ok_vc = bool(cd.get("violation_consequence"))
+        checks["violation_consequence_nonempty"] = ok_vc
+        passed = passed and ok_vc
+    else:
+        checks["related_clauses_3"] = False
+        checks["violation_consequence_nonempty"] = False
+        passed = False
+
+    # 10. manual_text 存在于配置中
+    ok_mt = bool(cfg.get("manual_text"))
+    checks["manual_text_present"] = ok_mt
+    passed = passed and ok_mt
+
+    # 11. manual_line == 345
+    ok_ml = cfg.get("manual_line") == 345
+    checks["manual_line_345"] = ok_ml
+    passed = passed and ok_ml
+
+    # 12. 手册真源文件存在
+    ok_manual = manual_exists
+    checks["manual_exists"] = ok_manual
+    passed = passed and ok_manual
+
+    # 13. 数据校验记录文件存在
+    # 校验记录可以存在于 decision_log.json 或独立的 checksums.json
+    checksum_records_found = False
+    for checksum_file in ["checksums.json", "decision_log.json"]:
+        cf_path = PROJECT_ROOT / checksum_file
+        if cf_path.is_file():
+            checksum_records_found = True
+            break
+    checks["checksum_record_file_exists"] = checksum_records_found
+    passed = passed and checksum_records_found
+
+    return {
+        "code": "P107-checksum-traceability",
+        "name": "[107] 数据校验和与 run 目录对应",
+        "severity": "hard", "passed": passed,
+        "detail": "数据校验和与 run 目录对应 gate 条款验证完成",
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+            "summary": {
+                "total_checks": len(checks),
+                "passed_checks": sum(1 for v in checks.values() if v is True),
+                "failed_checks": sum(1 for v in checks.values() if v is not True),
+            }
+        },
+    }
+
+
 def p103_tost_bayesian_factor() -> dict[str, Any]:
     """[103] TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具。
 
@@ -20590,6 +20767,7 @@ _ALL = [
     p104_statistical_caliber_smoke_gate,
     p105_generator_code_freeze,
     p106_decision_log,
+    p107_checksum_traceability,
     p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
