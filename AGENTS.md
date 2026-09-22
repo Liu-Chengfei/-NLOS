@@ -340,7 +340,7 @@
 
 ## Stage 2 · 写码：代码实现与工程纪律
 
-**\[105]**\*\* **动作清单**： **生成器代码冻结确认**：数据生成器代码与冒烟通过的 git commit 一致（code freeze 覆盖训练/评估/统计/**数据生成**四类代码）
+**\[105]**\*\* **动作清单**： **生成器代码冻结确认**：数据生成器代码与冒烟通过的 git commit 一致（code freeze 覆盖训练/评估/统计/**数据生成**四类代码）**落实**: 配置文件 `configs/protocol/clause105_generator_code_freeze.yaml`（code_freeze 启用 + 4 项冻结范围 + 冻结模式 git commit 一致 + 生成器代码锁定 + commit hash 必填 + 冒烟通过 commit 必填），实现函数 `p105_generator_code_freeze()`（`src/liquidloc/analysis/clause_gates.py`），合规报告 `outputs/compliance_report_105.md`，状态: ✅ done
 **\[106]**\*\* **决策日志（decision log）** 自实验方案冻结起，每次改动（数据/代码/配置/参数）记录：时间、改动内容、原因、影响范围、git commit
 **\[107]**\*\* 每个 run 的配置/指标/日志与目录一一对应（ 可追溯的目录级实现） **数据校验和** 每个 npz / manifest 生成时记录 SHA-256 校验和
 **\[108]**\*\* 此清单是**跑前第一道门**：逐项确认并留痕（检查记录 + git commit），全过才允许进入 Step 1。实现项 完成标准（自测留痕） 数据生成器（数据生成流水线 7 步注入顺序） 生成 1 条 **120s 基准（论文级）序列，

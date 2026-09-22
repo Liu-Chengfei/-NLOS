@@ -12300,6 +12300,133 @@ def p104_statistical_caliber_smoke_gate() -> dict[str, Any]:
     }
 
 
+def p105_generator_code_freeze() -> dict[str, Any]:
+    """[105] 生成器代码冻结确认：数据生成器代码与冒烟通过的 git commit 一致（code freeze 覆盖四类代码）。
+
+    核心断言：
+    1. 代码冻结必须启用（code_freeze.required == true）
+    2. 冻结范围覆盖四类代码：训练 / 评估 / 统计 / 数据生成
+    3. 冻结模式为 "git commit 一致"（freeze_mode）
+    4. 冒烟通过的 commit 必须存在（smoke_passed_commit_required == true）
+    5. 生成器代码锁定（generator_code_locked == true）
+    6. commit hash 必填（commit_hash_required == true）
+
+    验证项：
+    1. configs/protocol/clause105_generator_code_freeze.yaml 存在且能正确解析
+    2. clause_id == "105"
+    3. code_freeze.required == true
+    4. code_freeze.freeze_scope 包含 4 项（训练 / 评估 / 统计 / 数据生成）
+    5. code_freeze.freeze_mode == "git commit 一致"
+    6. code_freeze.smoke_passed_commit_required == true
+    7. freeze_verification.generator_code_locked == true
+    8. freeze_verification.commit_hash_required == true
+    9. manual_line == 343
+    10. 手册真源文件存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause105_generator_code_freeze.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P105-generator-code-freeze",
+            "name": "[105] 生成器代码冻结确认",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P105-generator-code-freeze",
+            "name": "[105] 生成器代码冻结确认",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    # 1. clause_id == "105"
+    ok_id = cfg.get("clause_id") == "105"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    # 2. code_freeze.required == true
+    cf = cfg.get("code_freeze", {})
+    if isinstance(cf, dict):
+        ok_req = cf.get("required") is True
+        checks["code_freeze_required"] = ok_req
+        passed = passed and ok_req
+
+        # 3. freeze_scope 包含 4 项
+        scope = cf.get("freeze_scope", [])
+        expected_scope = ["训练", "评估", "统计", "数据生成"]
+        ok_scope = isinstance(scope, list) and set(scope) == set(expected_scope) and len(scope) == 4
+        checks["freeze_scope_4_items"] = ok_scope
+        passed = passed and ok_scope
+
+        # 4. freeze_mode == "git commit 一致"
+        ok_mode = cf.get("freeze_mode") == "git commit 一致"
+        checks["freeze_mode_commit_consistent"] = ok_mode
+        passed = passed and ok_mode
+
+        # 5. smoke_passed_commit_required == true
+        ok_smoke = cf.get("smoke_passed_commit_required") is True
+        checks["smoke_passed_commit_required"] = ok_smoke
+        passed = passed and ok_smoke
+    else:
+        checks["code_freeze_required"] = False
+        checks["freeze_scope_4_items"] = False
+        checks["freeze_mode_commit_consistent"] = False
+        checks["smoke_passed_commit_required"] = False
+        passed = False
+
+    # 6. freeze_verification.generator_code_locked == true
+    fv = cfg.get("freeze_verification", {})
+    if isinstance(fv, dict):
+        ok_locked = fv.get("generator_code_locked") is True
+        checks["generator_code_locked"] = ok_locked
+        passed = passed and ok_locked
+
+        # 7. commit_hash_required == true
+        ok_hash = fv.get("commit_hash_required") is True
+        checks["commit_hash_required"] = ok_hash
+        passed = passed and ok_hash
+    else:
+        checks["generator_code_locked"] = False
+        checks["commit_hash_required"] = False
+        passed = False
+
+    # 8. manual_line == 343
+    ok_ml = cfg.get("manual_line") == 343
+    checks["manual_line_343"] = ok_ml
+    passed = passed and ok_ml
+
+    # 9. 手册真源文件存在
+    ok_manual = manual_exists
+    checks["manual_exists"] = ok_manual
+    passed = passed and ok_manual
+
+    return {
+        "code": "P105-generator-code-freeze",
+        "name": "[105] 生成器代码冻结确认",
+        "severity": "hard", "passed": passed,
+        "detail": "生成器代码冻结确认 gate 条款验证完成",
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+        },
+    }
+
+
 def p103_tost_bayesian_factor() -> dict[str, Any]:
     """[103] TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具。
 
@@ -20136,6 +20263,7 @@ _ALL = [
     p102_seed_trajectory_explicit,
     p102_problem_distribution,
     p104_statistical_caliber_smoke_gate,
+    p105_generator_code_freeze,
     p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,

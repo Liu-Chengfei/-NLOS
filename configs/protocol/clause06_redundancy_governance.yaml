@@ -7,5 +7,5 @@ no_commented_large_sections: true
 cleanup_scope: "this_repo_only"
 need_prior_ownership_check: true
 enforcement: "pre-commit钩子扫描_backup/_old/_copy/注释大块代码"
-manual_ref: "最终交付_异步手册_424条_20260917.md:159"
+manual_ref: "最终交付_异步手册_424条_20260917.md:167"
 verification_gate: "p6_redundancy_governance"
