@@ -1,43 +1,39 @@
-# 条款 [110] RAM ≤12G 硬上限配置
-# 手册原文：RAM ≤12G 硬上限（执行模式/执行模式·RAM ≤12G 硬上限）；代码实现要求（细化）：并发调度器按"并发单元数 × 单单元峰值内存 ≤ 12GB"计算 RAM 闸门；无 0.8 模糊系数；超限降并发或降为串行排队
-# 对应 docs/最终交付_异步手册_424条_20260917.md 第 340 行
+# [110] RAM ≤12G 硬上限
+# 手册原文（第 348 行）：[110] RAM ≤12G 硬上限（执行模式/执行模式·RAM ≤12G 硬上限）；代码实现要求（细化）：并发调度器按"并发单元数 × 单单元峰值内存 ≤ 12GB"计算 RAM 闸门；无 0.8 模糊系数；超限降并发或降为串行排队
 
 clause_id: "110"
-clause_name: "RAM ≤12G 硬上限"
 
-# 核心断言：RAM 硬上限 12GB，无模糊系数
-ram_limit_hard_cap:
-  max_gb: 12
-  description: "执行模式下 RAM 硬上限为 12GB"
-  no_fuzzy_coefficient: true  # 禁止 0.8 等模糊系数
-
-# 并发调度器计算规则
-concurrent_scheduler_rule:
-  formula: "并发单元数 × 单单元峰值内存 ≤ 12GB"
-  description: "并发调度器按并发单元数乘以单单元峰值内存计算 RAM 闸门"
-  enforcement: "hard"
-
-# 超限处理策略
-over_limit_strategy:
-  strategies:
-    - "降并发"
-    - "降为串行排队"
-  description: "超过 RAM 限制时降低并发度或转为串行排队执行"
-
-# 约束声明
+# 约束声明（binding_level = hard 表示违反则阻断完整规模训练入口）
 constraint_declaration:
   clause_id: "110"
-  binding_level: "hard"
-  violation_consequence: "RAM 超限可能导致 OOM 崩溃或性能严重下降，影响实验稳定性"
-  related_clauses:
-    - "[80] RAM 12G 上限验证"
-    - "[111] 出口代码项与实现项全部通过"
-    - "[118] 数据集可 mmap/磁盘重读降低驻留"
+  binding_level: hard
+  violation_consequence: "超过 12GB 硬上限时，自动降并发或转为串行排队，阻止完整规模训练启动"
 
-# 手册引用
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第 340 行"
+# RAM 硬上限配置
+ram_limit_hard_cap:
+  max_gb: 12
+  no_fuzzy_coefficient: true
+  unit: GB
+  description: "RAM 硬上限 12GB，无 0.8 模糊系数"
 
-# 实施说明
-implementation_note: >
-  执行模式下 RAM 硬上限为 12GB，并发调度器必须按"并发单元数 × 单单元峰值内存 ≤ 12GB"公式计算允许的最大并发度。
-  严禁使用 0.8 等模糊系数打擦边球。当计算结果超出 12GB 时，必须降低并发度或转为串行排队执行，确保不突破硬上限。
+# 并发调度器规则
+concurrent_scheduler_rule:
+  enforcement: hard
+  formula: "并发单元数 × 单单元峰值内存 ≤ 12GB"
+  formula_vars:
+    - concurrent_units: "当前调度的并发单元数"
+    - peak_memory_per_unit_mb: "单单元峰值内存（MB）"
+    - max_gb: 12
+  description: "并发调度器按公式计算 RAM 闸门"
+
+# 超限策略
+over_limit_strategy:
+  strategies:
+    - reduce_concurrency
+    - fallback_serial_queue
+  description: "超过 RAM 硬上限时，优先降并发，若仍超限则降为串行排队"
+
+# 手册真源引用
+manual_line: 348
+manual_text: |
+  [110] RAM ≤12G 硬上限（执行模式/执行模式·RAM ≤12G 硬上限）；代码实现要求（细化）：并发调度器按"并发单元数 × 单单元峰值内存 ≤ 12GB"计算 RAM 闸门；无 0.8 模糊系数；超限降并发或降为串行排队

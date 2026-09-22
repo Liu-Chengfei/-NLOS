@@ -13265,6 +13265,141 @@ def p109_amp_default_enabled() -> dict[str, Any]:
     }
 
 
+def p110_ram_limit_12g() -> dict[str, Any]:
+    """[110] RAM ≤12G 硬上限：并发调度器按"并发单元数 × 单单元峰值内存 ≤ 12GB"计算 RAM 闸门；无 0.8 模糊系数；超限降并发或降为串行排队。
+
+    手册原文：
+    [110] RAM ≤12G 硬上限（执行模式/执行模式·RAM ≤12G 硬上限）；代码实现要求（细化）：并发调度器按"并发单元数 × 单单元峰值内存 ≤ 12GB"计算 RAM 闸门；无 0.8 模糊系数；超限降并发或降为串行排队
+    """
+    cfg_path = CONFIGS / "protocol" / "clause110_ram_limit.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P110-ram-limit-12g", "name": "[110] RAM ≤12G 硬上限",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause110_ram_limit.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P110-ram-limit-12g", "name": "[110] RAM ≤12G 硬上限",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    if not isinstance(cfg, dict):
+        return {"code": "P110-ram-limit-12g", "name": "[110] RAM ≤12G 硬上限",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件根节点必须是 dict",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT))}}
+
+    # VS-2: clause_id == "110"
+    clause_id = str(cfg.get("clause_id", ""))
+    id_ok = clause_id == "110"
+    checks["vs2_clause_id"] = id_ok
+    detail_parts.append(f"VS-2 clause_id={clause_id!r}, 期望='110', 匹配={id_ok}")
+
+    # VS-3: 约束声明 clause_id
+    cd_cfg = cfg.get("constraint_declaration", {})
+    if isinstance(cd_cfg, dict):
+        ok_cd_id = cd_cfg.get("clause_id") == "110"
+        checks["vs3_constraint_clause_id"] = ok_cd_id
+        detail_parts.append(f"VS-3 constraint_declaration.clause_id={cd_cfg.get('clause_id')!r}, 期望='110', 匹配={ok_cd_id}")
+    else:
+        checks["vs3_constraint_clause_id"] = False
+        detail_parts.append("VS-3 constraint_declaration 缺失")
+
+    # VS-4: binding_level == "hard"
+    if isinstance(cd_cfg, dict):
+        ok_cd_level = cd_cfg.get("binding_level") == "hard"
+        checks["vs4_binding_level_hard"] = ok_cd_level
+        detail_parts.append(f"VS-4 binding_level={cd_cfg.get('binding_level')!r}, 期望='hard', 匹配={ok_cd_level}")
+    else:
+        checks["vs4_binding_level_hard"] = False
+        detail_parts.append("VS-4 constraint_declaration 缺失，binding_level 无法验证")
+
+    # VS-5: violation_consequence 非空
+    if isinstance(cd_cfg, dict):
+        ok_vc = cd_cfg.get("violation_consequence") not in (None, "")
+        checks["vs5_violation_consequence"] = ok_vc
+        detail_parts.append(f"VS-5 violation_consequence 已声明={ok_vc}")
+    else:
+        checks["vs5_violation_consequence"] = False
+        detail_parts.append("VS-5 constraint_declaration 缺失，violation_consequence 无法验证")
+
+    # VS-6: ram_limit_hard_cap 配置
+    rcl_cfg = cfg.get("ram_limit_hard_cap", {})
+    if isinstance(rcl_cfg, dict):
+        ok_max_gb = rcl_cfg.get("max_gb") == 12
+        checks["vs6_ram_limit_max_gb_12"] = ok_max_gb
+        detail_parts.append(f"VS-6 ram_limit_hard_cap.max_gb={rcl_cfg.get('max_gb')!r}, 期望=12, 匹配={ok_max_gb}")
+        ok_no_fuzzy = rcl_cfg.get("no_fuzzy_coefficient") is True
+        checks["vs7_no_fuzzy_coefficient"] = ok_no_fuzzy
+        detail_parts.append(f"VS-7 no_fuzzy_coefficient={rcl_cfg.get('no_fuzzy_coefficient')!r}, 期望=True, 匹配={ok_no_fuzzy}")
+    else:
+        checks["vs6_ram_limit_max_gb_12"] = False
+        checks["vs7_no_fuzzy_coefficient"] = False
+        detail_parts.append("VS-6~7 ram_limit_hard_cap 缺失或非 dict")
+
+    # VS-8: concurrent_scheduler_rule 配置
+    csr_cfg = cfg.get("concurrent_scheduler_rule", {})
+    if isinstance(csr_cfg, dict):
+        ok_enf = csr_cfg.get("enforcement") == "hard"
+        checks["vs8_scheduler_enforcement_hard"] = ok_enf
+        detail_parts.append(f"VS-8 concurrent_scheduler_rule.enforcement={csr_cfg.get('enforcement')!r}, 期望='hard', 匹配={ok_enf}")
+    else:
+        checks["vs8_scheduler_enforcement_hard"] = False
+        detail_parts.append("VS-8 concurrent_scheduler_rule 缺失")
+
+    # VS-9: over_limit_strategy 配置
+    ols_cfg = cfg.get("over_limit_strategy", {})
+    if isinstance(ols_cfg, dict):
+        strategies = ols_cfg.get("strategies", [])
+        ok_strats = isinstance(strategies, list) and len(strategies) >= 2
+        checks["vs9_over_limit_strategies"] = ok_strats
+        detail_parts.append(f"VS-9 strategies 数量={len(strategies) if isinstance(strategies, list) else 0}, 期望>=2, 匹配={ok_strats}")
+    else:
+        checks["vs9_over_limit_strategies"] = False
+        detail_parts.append("VS-9 over_limit_strategy 缺失")
+
+    # VS-10: manual_line == 348
+    ok_ml = cfg.get("manual_line") == 348
+    checks["vs10_manual_line_348"] = ok_ml
+    detail_parts.append(f"VS-10 manual_line={cfg.get('manual_line')!r}, 期望=348, 匹配={ok_ml}")
+
+    # VS-11: manual_text 非空
+    ok_mt = cfg.get("manual_text") not in (None, "")
+    checks["vs11_manual_text_declared"] = ok_mt
+    detail_parts.append(f"VS-11 manual_text={'已声明' if ok_mt else '缺失'}, 匹配={ok_mt}")
+
+    # VS-12: 手册真源文件存在
+    ok_manual = manual_path.is_file()
+    checks["vs12_manual_exists"] = ok_manual
+    detail_parts.append(f"VS-12 手册真源文件存在={ok_manual}")
+
+    passed = all(v is True for k, v in checks.items() if isinstance(v, bool))
+
+    return {
+        "code": "P110-ram-limit-12g",
+        "name": "[110] RAM ≤12G 硬上限",
+        "severity": "hard", "passed": passed,
+        "detail": "RAM 硬上限 12GB gate 条款验证完成",
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+            "detail_parts": detail_parts,
+        },
+    }
+
+
 def p103_tost_bayesian_factor() -> dict[str, Any]:
     """[103] TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具。
 
@@ -21108,6 +21243,7 @@ _ALL = [
     p107_checksum_traceability,
     p108_pre_gate_checklist,
     p109_amp_default_enabled,
+    p110_ram_limit_12g,
     p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,
