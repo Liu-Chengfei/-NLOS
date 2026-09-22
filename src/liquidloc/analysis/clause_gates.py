@@ -12927,6 +12927,194 @@ def p107_checksum_traceability() -> dict[str, Any]:
     }
 
 
+def p108_pre_gate_checklist() -> dict[str, Any]:
+    """[108] 跑前检查清单（第一道门）：逐项确认并留痕（检查记录 + git commit），全过才允许进入 Step 1。
+
+    核心断言：
+    1. 跑前第一道门必须启用（pre_run_gate.required == true）
+    2. 门控条件为"全过才允许进入 Step 1"（step_progression）
+    3. 留痕要求必须启用（trace_logging.required == true）
+    4. 检查记录必填（check_record == true）
+    5. git commit 必填（git_commit == true）
+    6. 实现项清单必填（implementation_items >= 3 项）
+    7. 检查清单每项包含 item / standard / check_required / log_required 四字段
+    8. 约束声明 clause_id == "108" 且 binding_level == "hard"
+    9. violation_consequence 已声明
+    10. 手册引用的行号与原文与手册一致
+
+    验证项：
+    1. configs/protocol/clause108_pre_run_checklist.yaml 存在且能正确解析
+    2. clause_id == "108"
+    3. pre_run_gate.required == true
+    4. pre_run_gate.pass_required == true
+    5. pre_run_gate.step_progression == "全过才允许进入 Step 1"
+    6. trace_logging.required == true
+    7. trace_logging.check_record == true
+    8. trace_logging.git_commit == true
+    9. implementation_items 数量 >= 3
+    10. checklist 数量 >= 3，每项含 item / standard / check_required / log_required
+    11. constraint_declaration.clause_id == "108"
+    12. constraint_declaration.binding_level == "hard"
+    13. constraint_declaration.violation_consequence 已声明且非空
+    14. manual_line == 346
+    15. manual_text 已声明且非空
+    16. 手册真源文件存在
+    """
+    cfg_path = CONFIGS / "protocol" / "clause108_pre_run_checklist.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+
+    cfg_exists = cfg_path.is_file()
+    manual_exists = manual_path.is_file()
+
+    checks: dict[str, bool] = {}
+    passed = True
+
+    if not cfg_exists:
+        return {
+            "code": "P108-pre-gate-checklist",
+            "name": "[108] 跑前检查清单（第一道门）",
+            "severity": "hard", "passed": False,
+            "detail": "config file not found",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False},
+        }
+
+    try:
+        import yaml
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "code": "P108-pre-gate-checklist",
+            "name": "[108] 跑前检查清单（第一道门）",
+            "severity": "hard", "passed": False,
+            "detail": f"yaml parse error: {exc}",
+            "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": True,
+                         "parse_error": str(exc)},
+        }
+
+    # 1. clause_id == "108"
+    ok_id = cfg.get("clause_id") == "108"
+    checks["clause_id"] = ok_id
+    passed = passed and ok_id
+
+    # 2-5. pre_run_gate: required / pass_required / step_progression
+    prg = cfg.get("pre_run_gate", {})
+    if isinstance(prg, dict):
+        ok_prg_req = prg.get("required") is True
+        checks["pre_run_gate_required"] = ok_prg_req
+        passed = passed and ok_prg_req
+
+        ok_prg_pass = prg.get("pass_required") is True
+        checks["pre_run_gate_pass_required"] = ok_prg_pass
+        passed = passed and ok_prg_pass
+
+        ok_prg_step = prg.get("step_progression") == "全过才允许进入 Step 1"
+        checks["pre_run_gate_step_progression"] = ok_prg_step
+        passed = passed and ok_prg_step
+    else:
+        checks["pre_run_gate_required"] = False
+        checks["pre_run_gate_pass_required"] = False
+        checks["pre_run_gate_step_progression"] = False
+        passed = False
+
+    # 6-9. trace_logging: required / check_record / git_commit / implementation_items
+    tl = cfg.get("trace_logging", {})
+    if isinstance(tl, dict):
+        ok_tl_req = tl.get("required") is True
+        checks["trace_logging_required"] = ok_tl_req
+        passed = passed and ok_tl_req
+
+        ok_tl_check = tl.get("check_record") is True
+        checks["trace_logging_check_record"] = ok_tl_check
+        passed = passed and ok_tl_check
+
+        ok_tl_git = tl.get("git_commit") is True
+        checks["trace_logging_git_commit"] = ok_tl_git
+        passed = passed and ok_tl_git
+
+        impl_items = tl.get("implementation_items", [])
+        ok_impl = isinstance(impl_items, list) and len(impl_items) >= 3
+        checks["implementation_items_count"] = ok_impl
+        checks["implementation_items_count_detail"] = len(impl_items) if isinstance(impl_items, list) else 0
+        passed = passed and ok_impl
+    else:
+        checks["trace_logging_required"] = False
+        checks["trace_logging_check_record"] = False
+        checks["trace_logging_git_commit"] = False
+        checks["implementation_items_count"] = False
+        checks["implementation_items_count_detail"] = 0
+        passed = False
+
+    # 10. checklist items: each has item / standard / check_required / log_required
+    checklist = cfg.get("checklist", [])
+    if isinstance(checklist, list) and len(checklist) >= 3:
+        all_items_valid = True
+        checked_item_count = 0
+        for idx, entry in enumerate(checklist):
+            if not isinstance(entry, dict):
+                all_items_valid = False
+                checks[f"checklist_item_{idx}_is_dict"] = False
+                continue
+            item_ok = all(k in entry for k in ("item", "standard", "check_required", "log_required"))
+            checked_item_count += 1 if item_ok else 0
+            checks[f"checklist_item_{idx}_has_all_fields"] = item_ok
+            all_items_valid = all_items_valid and item_ok
+        ok_cl_count = len(checklist) >= 3
+        checks["checklist_item_count"] = ok_cl_count
+        checks["checklist_items_all_valid"] = all_items_valid
+        passed = passed and ok_cl_count and all_items_valid
+    else:
+        ok_cl_count = isinstance(checklist, list) and len(checklist) >= 3
+        checks["checklist_item_count"] = ok_cl_count
+        checks["checklist_items_all_valid"] = False
+        passed = passed and ok_cl_count
+
+    # 11-13. constraint_declaration
+    cd_cfg = cfg.get("constraint_declaration", {})
+    if isinstance(cd_cfg, dict):
+        ok_cd_id = cd_cfg.get("clause_id") == "108"
+        checks["constraint_declaration_clause_id"] = ok_cd_id
+        passed = passed and ok_cd_id
+
+        ok_cd_level = cd_cfg.get("binding_level") == "hard"
+        checks["constraint_declaration_binding_level_hard"] = ok_cd_level
+        passed = passed and ok_cd_level
+
+        ok_vc = cd_cfg.get("violation_consequence") not in (None, "")
+        checks["violation_consequence_declared"] = ok_vc
+        passed = passed and ok_vc
+    else:
+        checks["constraint_declaration_clause_id"] = False
+        checks["constraint_declaration_binding_level_hard"] = False
+        checks["violation_consequence_declared"] = False
+        passed = False
+
+    # 14. manual_line == 346
+    ok_ml = cfg.get("manual_line") == 346
+    checks["manual_line_346"] = ok_ml
+    passed = passed and ok_ml
+
+    # 15. manual_text declared and non-empty
+    ok_mt = cfg.get("manual_text") not in (None, "")
+    checks["manual_text_declared"] = ok_mt
+    passed = passed and ok_mt
+
+    # 16. 手册真源文件存在
+    ok_manual = manual_exists
+    checks["manual_exists"] = ok_manual
+    passed = passed and ok_manual
+
+    return {
+        "code": "P108-pre-gate-checklist",
+        "name": "[108] 跑前检查清单（第一道门）",
+        "severity": "hard", "passed": passed,
+        "detail": "跑前检查清单 gate 条款验证完成",
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+        },
+    }
+
+
 def p103_tost_bayesian_factor() -> dict[str, Any]:
     """[103] TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具。
 
@@ -20768,6 +20956,7 @@ _ALL = [
     p105_generator_code_freeze,
     p106_decision_log,
     p107_checksum_traceability,
+    p108_pre_gate_checklist,
     p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,

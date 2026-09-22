@@ -4,6 +4,8 @@
 
 clause_id: "108"
 clause_name: "跑前检查清单（第一道门）"
+manual_line: 346
+manual_text: "此清单是**跑前第一道门**：逐项确认并留痕（检查记录 + git commit），全过才允许进入 Step 1。实现项 完成标准（自测留痕） 数据生成器（数据生成流水线 7 步注入顺序） 生成 1 条 **120s 基准（论文级）序列**，"
 
 # 核心断言：跑前第一道门检查
 pre_run_gate:
@@ -55,7 +57,7 @@ constraint_declaration:
     - "[111] 出口代码项与实现项全部通过"
 
 # 手册引用
-manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第 338 行"
+manual_ref: "docs/最终交付_异步手册_424条_20260917.md 第 346 行"
 
 # 实施说明
 implementation_note: >
