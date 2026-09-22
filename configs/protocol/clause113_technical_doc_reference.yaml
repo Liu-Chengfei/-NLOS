@@ -60,4 +60,7 @@ verification_requirements:
 # 配置文件路径
 config_version: "1.0"
 last_updated: "2026-09-18"
-manual_reference: "docs/最终交付_异步手册_424条_20260917.md 第 343 行"
+manual_line: 351
+manual_reference: "docs/最终交付_异步手册_424条_20260917.md 第 351 行"
+manual_text: |
+  **[113]** 把"允许且应当查阅技术文档"从声明变成实现流程中的固定动作——执行者在写代码、配环境、调接口、设数值精度模式（TF32/AMP/确定性）时，应当主动查阅公开技术文档（PyTorch/CUDA/NumPy 等官方文档、库 API 说明、环境配置文档），不凭记忆写 API 用法：查什么——接口签名与参数语义、dtype/shape 约定、精度模式（autocast/GradScaler/确定性开关）的正确写法、版本兼容性（nvcc/nvidia-smi/torch/gcc 四件套）
