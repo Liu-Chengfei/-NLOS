@@ -35,3 +35,8 @@ sandbox_exemption:
 enforcement:
   block_on_commented_code_in_source: true
   require_sandbox_relocation: true
+
+# 手册引用
+manual_line: 350
+manual_text: |
+  **[112]** 禁止注释掉的代码（死代码路径使评审无法判定是否静默生效确有历史需要 → 移入 `sandbox/` 并注明 git commit）

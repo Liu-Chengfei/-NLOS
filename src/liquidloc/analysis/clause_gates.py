@@ -13400,6 +13400,199 @@ def p110_ram_limit_12g() -> dict[str, Any]:
     }
 
 
+def p112_no_commented_code() -> dict[str, Any]:
+    """[112] 禁止注释掉的代码（死代码路径使评审无法判定是否静默生效 → 移入 sandbox/ 并注明 git commit）。
+
+    手册原文：
+    [112] **禁止注释掉的代码**（死代码路径使评审无法判定是否静默生效确有历史需要 → 移入 `sandbox/` 并注明 git commit）
+
+    验证项：
+    1. configs/protocol/clause112_no_commented_code.yaml 存在且能正确解析
+    2. clause_id == "112"
+    3. forbid_commented_out_code == true
+    4. handling_protocol.sandbox_directory == "sandbox/"
+    5. handling_protocol.requires_git_commit_note == true
+    6. handling_protocol.must_not_remain_in_source == true
+    7. sandbox_exemption.allowed == true
+    8. sandbox_exemption.requires_git_commit_reference == true
+    9. check_scope 包含源码目录
+    10. manual_line == 350
+    11. manual_text 非空且包含关键描述
+    12. 扫描 src/ 下 .py 文件是否存在连续 ≥3 行的注释掉的代码（疑似死代码路径）
+    13. 验证 sandbox/ 目录存在（作为注释代码的唯一豁免存放位置）
+    """
+    from pathlib import Path as _Path
+    import re as _re
+    cfg_path = CONFIGS / "protocol" / "clause112_no_commented_code.yaml"
+    manual_path = PROJECT_ROOT / "docs" / "最终交付_异步手册_424条_20260917.md"
+    checks: dict[str, bool | str] = {}
+    detail_parts: list[str] = []
+
+    # VS-1: 配置文件存在
+    cfg_exists = cfg_path.is_file()
+    if not cfg_exists:
+        return {"code": "P112-no-commented-code", "name": "[112] 禁止注释掉的代码",
+                "severity": "hard", "passed": False,
+                "detail": "配置文件 clause112_no_commented_code.yaml 不存在",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "exists": False}}
+    checks["vs1_cfg_exists"] = True
+    detail_parts.append(f"VS-1 配置文件存在=True, 路径={cfg_path.relative_to(PROJECT_ROOT)}")
+
+    # 解析 YAML
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"code": "P112-no-commented-code", "name": "[112] 禁止注释掉的代码",
+                "severity": "hard", "passed": False,
+                "detail": f"YAML 解析失败: {exc}",
+                "evidence": {"cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)), "parse_error": str(exc)}}
+
+    # VS-2: clause_id == "112"
+    ok_cid = cfg.get("clause_id") == "112"
+    checks["vs2_clause_id_112"] = ok_cid
+    detail_parts.append(f"VS-2 clause_id={cfg.get('clause_id')!r}, 期望='112', 匹配={ok_cid}")
+
+    # VS-3: forbid_commented_out_code == true
+    ok_fcc = cfg.get("forbid_commented_out_code") is True
+    checks["vs3_forbid_commented_out_code_true"] = ok_fcc
+    detail_parts.append(f"VS-3 forbid_commented_out_code={cfg.get('forbid_commented_out_code')!r}, 期望=True, 匹配={ok_fcc}")
+
+    # VS-4: handling_protocol.sandbox_directory == "sandbox/"
+    hp = cfg.get("handling_protocol", {})
+    if isinstance(hp, dict):
+        ok_sd = hp.get("sandbox_directory") == "sandbox/"
+        checks["vs4_sandbox_directory"] = ok_sd
+        detail_parts.append(f"VS-4 handling_protocol.sandbox_directory={hp.get('sandbox_directory')!r}, 期望='sandbox/', 匹配={ok_sd}")
+        ok_gcn = hp.get("requires_git_commit_note") is True
+        checks["vs5_requires_git_commit_note"] = ok_gcn
+        detail_parts.append(f"VS-5 requires_git_commit_note={hp.get('requires_git_commit_note')!r}, 期望=True, 匹配={ok_gcn}")
+        ok_mns = hp.get("must_not_remain_in_source") is True
+        checks["vs6_must_not_remain_in_source"] = ok_mns
+        detail_parts.append(f"VS-6 must_not_remain_in_source={hp.get('must_not_remain_in_source')!r}, 期望=True, 匹配={ok_mns}")
+    else:
+        checks["vs4_sandbox_directory"] = False
+        checks["vs5_requires_git_commit_note"] = False
+        checks["vs6_must_not_remain_in_source"] = False
+        detail_parts.append("VS-4~6 handling_protocol 缺失")
+
+    # VS-7: sandbox_exemption
+    se = cfg.get("sandbox_exemption", {})
+    if isinstance(se, dict):
+        ok_sa = se.get("allowed") is True
+        checks["vs7_sandbox_exemption_allowed"] = ok_sa
+        detail_parts.append(f"VS-7 sandbox_exemption.allowed={se.get('allowed')!r}, 期望=True, 匹配={ok_sa}")
+        ok_rcr = se.get("requires_git_commit_reference") is True
+        checks["vs8_requires_git_commit_reference"] = ok_rcr
+        detail_parts.append(f"VS-8 requires_git_commit_reference={se.get('requires_git_commit_reference')!r}, 期望=True, 匹配={ok_rcr}")
+    else:
+        checks["vs7_sandbox_exemption_allowed"] = False
+        checks["vs8_requires_git_commit_reference"] = False
+        detail_parts.append("VS-7~8 sandbox_exemption 缺失")
+
+    # VS-9: check_scope 包含源码目录
+    cs = cfg.get("check_scope", [])
+    ok_scope = isinstance(cs, list) and "src/" in cs
+    checks["vs9_check_scope_src"] = ok_scope
+    detail_parts.append(f"VS-9 check_scope 包含 src/={ok_scope}")
+
+    # VS-10: enforcement 配置
+    enf = cfg.get("enforcement", {})
+    if isinstance(enf, dict):
+        ok_bcc = enf.get("block_on_commented_code_in_source") is True
+        checks["vs10_block_on_commented_code"] = ok_bcc
+        detail_parts.append(f"VS-10 block_on_commented_code_in_source={enf.get('block_on_commented_code_in_source')!r}, 期望=True, 匹配={ok_bcc}")
+        ok_rsr = enf.get("require_sandbox_relocation") is True
+        checks["vs11_require_sandbox_relocation"] = ok_rsr
+        detail_parts.append(f"VS-11 require_sandbox_relocation={enf.get('require_sandbox_relocation')!r}, 期望=True, 匹配={ok_rsr}")
+    else:
+        checks["vs10_block_on_commented_code"] = False
+        checks["vs11_require_sandbox_relocation"] = False
+        detail_parts.append("VS-10~11 enforcement 缺失")
+
+    # VS-12: manual_line == 350
+    ok_ml = cfg.get("manual_line") == 350
+    checks["vs12_manual_line_350"] = ok_ml
+    detail_parts.append(f"VS-12 manual_line={cfg.get('manual_line')!r}, 期望=350, 匹配={ok_ml}")
+
+    # VS-13: manual_text 非空
+    ok_mt = cfg.get("manual_text") not in (None, "")
+    checks["vs13_manual_text_declared"] = ok_mt
+    detail_parts.append(f"VS-13 manual_text={'已声明' if ok_mt else '缺失'}, 匹配={ok_mt}")
+
+    # VS-14: manual_text 包含关键描述
+    manual_text = cfg.get("manual_text", "")
+    ok_kw = isinstance(manual_text, str) and len(manual_text) > 0 and "sandbox" in manual_text.lower()
+    checks["vs14_manual_text_sandbox_keyword"] = ok_kw
+    detail_parts.append(f"VS-14 manual_text 包含 'sandbox' 关键词={ok_kw}")
+
+    # VS-15: sandbox/ 目录存在
+    sandbox_dir = PROJECT_ROOT / "sandbox"
+    ok_sandbox = sandbox_dir.is_dir()
+    checks["vs15_sandbox_dir_exists"] = ok_sandbox
+    detail_parts.append(f"VS-15 sandbox/ 目录存在={ok_sandbox}, 路径={sandbox_dir.relative_to(PROJECT_ROOT)}")
+
+    # VS-16: 扫描 src/ 下 .py 文件是否存在连续 ≥3 行的注释掉的代码（疑似死代码路径）
+    # 检测策略：寻找连续 ≥3 行以 `#` 开头的 Python 代码行（含缩进），
+    # 且这些行看起来像可执行代码而非纯文档注释
+    _code_like_pattern = _re.compile(r'^#\s*(def|class|return|import|from|if|for|while|try|except|with|print|self\.|\w+\(|=\s*|#\s*\w+)', _re.IGNORECASE)
+    src_dir = PROJECT_ROOT / "src"
+    commented_blocks_found: list[str] = []
+    if src_dir.is_dir():
+        for py_file in sorted(src_dir.rglob("*.py")):
+            rel = py_file.relative_to(PROJECT_ROOT)
+            try:
+                lines = py_file.read_text(encoding="utf-8", errors="replace").splitlines()
+            except Exception:
+                continue
+            consecutive_commented = 0
+            consecutive_start = 0
+            consecutive_lines: list[str] = []
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if stripped.startswith("#") and len(stripped) > 1:
+                    # 跳过纯注释行（如 clause 描述注释），只保留看起来像代码的
+                    if _code_like_pattern.match(stripped):
+                        consecutive_commented += 1
+                        consecutive_lines.append(f"L{i}: {stripped}")
+                    else:
+                        # 纯注释不触发连续计数
+                        if consecutive_commented >= 3:
+                            commented_blocks_found.append(f"{rel}:{consecutive_start}-{i - consecutive_commented}\n  " + "\n  ".join(consecutive_lines[:6]))
+                        consecutive_commented = 0
+                        consecutive_start = i + 1
+                        consecutive_lines = []
+                else:
+                    if consecutive_commented >= 3:
+                        commented_blocks_found.append(f"{rel}:{consecutive_start}-{i - 1}\n  " + "\n  ".join(consecutive_lines[:6]))
+                    consecutive_commented = 0
+                    consecutive_start = i + 1
+                    consecutive_lines = []
+            # 文件结尾检查
+            if consecutive_commented >= 3:
+                commented_blocks_found.append(f"{rel}:{consecutive_start}-{len(lines)}\n  " + "\n  ".join(consecutive_lines[:6]))
+
+    ok_no_commented = len(commented_blocks_found) == 0
+    checks["vs16_no_commented_code_in_src"] = ok_no_commented
+    detail_parts.append(f"VS-16 扫描 src/ 发现疑似死代码注释块数量={len(commented_blocks_found)}, 期望=0, 匹配={ok_no_commented}")
+    if commented_blocks_found:
+        detail_parts.append(f"  发现死代码注释块位置: {commented_blocks_found[0]}")
+
+    passed = all(v is True for k, v in checks.items() if isinstance(v, bool))
+
+    return {
+        "code": "P112-no-commented-code",
+        "name": "[112] 禁止注释掉的代码",
+        "severity": "hard", "passed": passed,
+        "detail": "禁止注释掉的代码 gate 条款验证完成",
+        "evidence": {
+            "cfg_path": str(cfg_path.relative_to(PROJECT_ROOT)),
+            "checks": checks,
+            "detail_parts": detail_parts,
+            "commented_blocks_found": commented_blocks_found[:5] if commented_blocks_found else [],
+        },
+    }
+
+
 def p103_tost_bayesian_factor() -> dict[str, Any]:
     """[103] TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具。
 
@@ -20436,7 +20629,7 @@ def p8_submit_self_check() -> dict[str, Any]:
     checks["agents_md_exists"] = agents_exists
     if agents_exists:
         agents_text = agents_path.read_text(encoding="utf-8")
-        checks["agents_md_has_clause_8_section"] = "## [8]" in agents_text
+        checks["agents_md_has_clause_8_section"] = r"**\[8]**" in agents_text
     else:
         checks["agents_md_has_clause_8_section"] = False
 
@@ -20618,7 +20811,7 @@ def p9_compliance_report_format() -> dict[str, Any]:
     checks["agents_md_exists"] = agents_exists
     if agents_exists:
         agents_text = agents_path.read_text(encoding="utf-8")
-        checks["agents_md_has_clause_9_section"] = "## [9]" in agents_text
+        checks["agents_md_has_clause_9_section"] = r"**\[9]**" in agents_text
     else:
         checks["agents_md_has_clause_9_section"] = False
 
@@ -20797,7 +20990,7 @@ def p10_four_step_closure() -> dict[str, Any]:
     # 11. AGENTS.md
     agents_exists = agents_path.is_file()
     checks["agents_md_exists"] = agents_exists
-    checks["agents_md_has_clause_10"] = agents_exists and "## [10]" in agents_path.read_text(encoding="utf-8")
+    checks["agents_md_has_clause_10"] = agents_exists and r"**\[10]**" in agents_path.read_text(encoding="utf-8")
 
     # 12. 状态表
     status_exists = status_table_path.is_file()
@@ -21244,6 +21437,7 @@ _ALL = [
     p108_pre_gate_checklist,
     p109_amp_default_enabled,
     p110_ram_limit_12g,
+    p112_no_commented_code,
     p103_tost_bayesian_factor,
     p91_anchor_fixed_4_m1_clustered,
     p182_manifest,

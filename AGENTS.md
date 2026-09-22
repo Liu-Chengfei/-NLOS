@@ -336,16 +336,16 @@
 \*\*\[101]\*\*\*\* 输出对齐；合格标准：五个方法的评估输入为\*\*同一批测试轨迹\*\*（配对 ），RMSE 口径一致（Sim 对齐/2D/世界系/warm-up 剔除，///）
 \*\*\[102]\*\*\*\* 七成情况是"假象"（评估口径/单 seed 偶然）或"任务压力不足"，两成是"实现/机制未生效"，一成才是真问题。
 \*\*\[103]\*\*\*\* TOST 等效性检验与贝叶斯因子（BF）是主张"无差异"的正规工具—— \*\*判定链（按顺序执行，任一环节进入正式出口即停止）\*\*： \*\*预设等效边界（SESOI，实验方案冻结时定， 预注册口径）\*\*：在方案冻结时预设\*\*最小有意义效应（SESOI）\*\* ——本实验为 LNN vs EKF 相对提升的\*\*实际判定下限 33%（窗口内数学可达下限，见 Part 0）\*\*， 等效边界取该值的 ±50%（即相对提升 ±16.5% 内视为"等效/无实际差异"）
-\*\*\[104]\*\*\*\* 统计口径→统计脚本冒烟验证 gate；统计口径变更 → 重新冒烟验证（gate）。**落实**: 配置文件 `configs/protocol/clause104_smoke_test_gate.yaml`（统计口径 4 项范围定义 + gate 条件 3 项 + 冒烟验证 6 项组件 + 6 步验证流程 + 5 项验证项），实现函数 `p104_statistical_caliber_smoke_gate()`（`src/liquidloc/analysis/clause_gates.py`），合规报告 `docs/audit/compliance_report_104.md`，状态: ✅ done
+\*\*\[104]\*\*\*\* 统计口径→统计脚本冒烟验证 gate；统计口径变更 → 重新冒烟验证（gate）
 
 ## Stage 2 · 写码：代码实现与工程纪律
 
-**\[105]**\*\* **动作清单**： **生成器代码冻结确认**：数据生成器代码与冒烟通过的 git commit 一致（code freeze 覆盖训练/评估/统计/**数据生成**四类代码）**落实**: 配置文件 `configs/protocol/clause105_generator_code_freeze.yaml`（code_freeze 启用 + 4 项冻结范围 + 冻结模式 git commit 一致 + 生成器代码锁定 + commit hash 必填 + 冒烟通过 commit 必填），实现函数 `p105_generator_code_freeze()`（`src/liquidloc/analysis/clause_gates.py`），合规报告 `outputs/compliance_report_105.md`，状态: ✅ done
-**\[106]**\*\* **决策日志（decision log）** 自实验方案冻结起，每次改动（数据/代码/配置/参数）记录：时间、改动内容、原因、影响范围、git commit**落实**: 配置文件 `configs/protocol/clause106_decision_log.yaml`（decision_log 启用 + 4 项覆盖改动类型 + 5 项条目必填字段 + git commit 绑定），实现函数 `p106_decision_log()`（`src/liquidloc/analysis/clause_gates.py`），合规报告 `outputs/compliance_report_106.md`，状态: ✅ done
-**\[107]**\*\* 每个 run 的配置/指标/日志与目录一一对应（ 可追溯的目录级实现） **数据校验和** 每个 npz / manifest 生成时记录 SHA-256 校验和**落实**: 配置文件 `configs/protocol/clause107_checksum_traceability.yaml`（run_directory_mapping 启用 + 3 项映射字段 config/metrics/log + SHA-256 校验和 + 2 项目标文件 npz/manifest + 3 项记录字段 sha256/generated_at/file_path），实现函数 `p107_checksum_traceability()`（`src/liquidloc/analysis/clause_gates.py`），合规报告 `outputs/compliance_report_107.md`，状态: ✅ done
-**\[108]**\*\* 此清单是**跑前第一道门**：逐项确认并留痕（检查记录 + git commit），全过才允许进入 Step 1。实现项 完成标准（自测留痕） 数据生成器（数据生成流水线 7 步注入顺序） 生成 1 条 **120s 基准（论文级）序列，**落实**: 配置文件 `configs/protocol/clause108_pre_run_checklist.yaml`（pre_run_gate 启用 + 3 项门控条件 + 留痕要求启用 + 3 项 trace_logging 字段 + 3 项实现项清单 + checklist >=3 项 + 约束声明 clause_id=108 binding_level=hard + 手册引用行346），实现函数 `p108_pre_gate_checklist()`（`src/liquidloc/analysis/clause_gates.py`），合规报告 `outputs/compliance_report_108.md`，状态: ✅ done
-\[109] AMP 混合精度默认启用（三网络同一设置）；代码实现要求（细化）：AMP 开关写入 manifest**落实**: 配置文件 `configs/protocol/clause109_amp_manifest_write.yaml`（amp_default_enabled 启用 + three_networks_same_setting 启用 + 3 项网络 LNN/EKF/LSTM + amp_switch_manifest 启用 + 4 项 required_fields + 约束声明 clause_id=109 binding_level=hard + 手册引用行347），实现函数 `p109_amp_default_enabled()`（`src/liquidloc/analysis/clause_gates.py`），合规报告 `outputs/compliance_report_109.md`，状态: ✅ done
-\[110]** **RAM ≤12G 硬上限**（执行模式/执行模式·RAM ≤12G 硬上限）；代码实现要求（细化）：并发调度器按"并发单元数 × 单单元峰值内存 ≤ 12GB"计算 RAM 闸门；无 0.8 模糊系数；超限降并发或降为串行排队**落实**: 配置文件 `configs/protocol/clause110_ram_limit.yaml`（ram_limit_hard_cap 启用 + max_gb=12 + no_fuzzy_coefficient=true + concurrent_scheduler_rule 启用 + 3 项公式/硬限/无系数 + over_limit_strategy 启用 + 2 项策略降并发/串行排队 + 约束声明 clause_id=110 binding_level=hard + 手册引用行348），实现函数 `p110_ram_limit_12g()`（`src/liquidloc/analysis/clause_gates.py`），合规报告 `outputs/compliance_report_110.md`，状态: ✅ done
+**\[105]**\*\* **动作清单**： **生成器代码冻结确认**：数据生成器代码与冒烟通过的 git commit 一致（code freeze 覆盖训练/评估/统计/**数据生成**四类代码）
+**\[106]**\*\* **决策日志（decision log）** 自实验方案冻结起，每次改动（数据/代码/配置/参数）记录：时间、改动内容、原因、影响范围、git commit
+**\[107]**\*\* 每个 run 的配置/指标/日志与目录一一对应（ 可追溯的目录级实现） **数据校验和** 每个 npz / manifest 生成时记录 SHA-256 校验和
+**\[108]**\*\* 此清单是**跑前第一道门**：逐项确认并留痕（检查记录 + git commit），全过才允许进入 Step 1。实现项 完成标准（自测留痕） 数据生成器（数据生成流水线 7 步注入顺序） 生成 1 条 **120s 基准（论文级）序列，
+\[109] AMP 混合精度默认启用（三网络同一设置）；代码实现要求（细化）：AMP 开关写入 manifest
+\[110]** **RAM ≤12G 硬上限**（执行模式/执行模式·RAM ≤12G 硬上限）；代码实现要求（细化）：并发调度器按"并发单元数 × 单单元峰值内存 ≤ 12GB"计算 RAM 闸门；无 0.8 模糊系数；超限降并发或降为串行排队
 **\[111]**\*\* **出口**：代码项 与 实现项 全部通过并留痕（git commit + 自测日志）→ 进入 Step 1
 **\[112]**\*\* **禁止注释掉的代码**（死代码路径使评审无法判定是否静默生效确有历史需要 → 移入 `sandbox/` 并注明 git commit）
 **\[113]**\*\* 把"允许且应当查阅技术文档"从声明变成实现流程中的固定动作）\*\* ——执行者在**写代码、配环境、调接口、设数值精度模式（TF32/AMP/确定性）时， 应当主动查阅公开技术文档（PyTorch/CUDA/NumPy 等官方文档、库 API 说明、 环境配置文档），不凭记忆写 API 用法： 查什么 ——接口签名与参数语义、 dtype/shape 约定、精度模式（autocast/GradScaler/确定性开关）的正确写法、版本兼容性（nvcc/nvidia-smi/torch/gcc 四件套）
