@@ -18,12 +18,7 @@ from typing import Any  # 用于类型注解。
 from liquidloc.common.validation import coerce_finite_scalar, is_string_like, require_iterable, require_keys, require_not_none  # 复用通用输入校验工具。
 from liquidloc.protocol.metric_schema import get_metric_meta, get_metric_order  # 复用指标协议中的元信息和顺序。
 
-# 手册 P22 两步推断：全局检验先行，后者若不显著则为探索性
-from liquidloc.analysis.handbook_p22_statistics import friedman_test  # 全局检验（P22 整体-局部分层推断硬约束）
-
-# 手册 P22 硬约束：5 方法 10 对两两比较用 Holm-Bonferroni 多重比较校正。
-# BH-FDR 仍保留为 _bh_fdr_adjust_p_values 用于非 handbook P22 场景。
-from liquidloc.analysis.handbook_p22_statistics import holm_bonferroni_adjust  # 手册 P22 校正函数。
+from scipy.stats import friedmanchisquare  # P22 全局检验（Friedman χ² 近似）
 
 
 def _normalize_name_list(values: Any, *, name: str) -> list[str]:  # 把名字列表规范化成去重后的非空字符串列表。
@@ -621,6 +616,27 @@ def run_pairwise_tests(  # 对每个指标的组间组合做成对检验。
     return test_rows  # 返回所有 pairwise test 结果。
 
 
+def holm_bonferroni_adjust(p_values: Sequence[float]) -> list[float]:
+    """Holm-Bonferroni 逐步递减校正（控制 FWER），等价于 P22 硬约束要求的校正方式。
+
+    算法：对升序排名的 p 值，第 i 个（1-indexed）乘以 (n - i + 1)，裁剪到 [0,1]，
+    再从大到小取累积最小值保证单调性。
+    """
+    n = len(p_values)
+    if n == 0:
+        return []
+    sorted_idx = sorted(range(n), key=lambda i: p_values[i])
+    sorted_p = [p_values[i] for i in sorted_idx]
+    adjusted = [min(float(p) * (n - j), 1.0) for j, p in enumerate(sorted_p)]
+    for j in range(n - 2, -1, -1):
+        if adjusted[j] > adjusted[j + 1]:
+            adjusted[j] = adjusted[j + 1]
+    result = [0.0] * n
+    for rank, orig_idx in enumerate(sorted_idx):
+        result[orig_idx] = adjusted[rank]
+    return result
+
+
 def _bh_fdr_adjust_p_values(p_values: Sequence[float]) -> list[float]:  # 做 BH-FDR 多重比较校正。
     """做单调的 Benjamini-Hochberg FDR 多重比较校正（非 handbook P22 路径专用）。
 
@@ -628,12 +644,11 @@ def _bh_fdr_adjust_p_values(p_values: Sequence[float]) -> list[float]:  # 做 BH
     再从大 rank 往小 rank 取累积最小值强制单调不下降，保证校正后的 p 值
     单调性。校正结果裁剪到 [0, 1] 区间。
 
-    适用范围：本函数是 BH-FDR 的私有实现，仅用于**非 handbook P22** 的 FDR 风格
-    校正场景。手册 P22 硬约束"两两比较附 Holm-Bonferroni 多重比较校正"必须用
+    适用范围：本函数是 BH-FDR 的私有实现，仅用于**非 P22** 的 FDR 风格
+    校正场景。P22 硬约束"两两比较附 Holm-Bonferroni 多重比较校正"必须用
     ``holm_bonferroni_adjust``（控制 FWER 而非 FDR），该函数已由
     ``run_significance_tests`` 直接调用。本函数保留是为了：
-    1. ``handbook_p22_statistics.run_p22_full_analysis`` 需要同时报告 Holm 与 BH-FDR 两种结果。
-    2. 未来非 P22 场景仍可能用到 BH-FDR 风格校正。
+    1. 未来非 P22 场景仍可能用到 BH-FDR 风格校正。
 
     输入合同：p_values 的元素必须是 [0, 1] 区间内的有限 float。非数值类型
     （含 bool/bytearray/numpy.str_）、NaN/Inf、超出 [0, 1] 区间的值均视为
@@ -789,7 +804,8 @@ def run_global_test_paired(  # P22: 整体检验（先全局后局部）
         blocks = [[per_method_vals[m][b] for m in range(len(per_method_vals))] for b in range(min_len)]
         labels = list(grouped_values[metric_name].keys()) if method_labels is None else method_labels
         labels = [str(lab[0]) if isinstance(lab, tuple) else str(lab) for lab in labels]
-        return friedman_test(blocks, labels)
+        stat, p_val = friedmanchisquare(*blocks)
+        return {"statistic": float(stat), "p_value": float(p_val), "method": "friedman_chisq"}
     except Exception:
         return None
 
@@ -850,11 +866,11 @@ def run_significance_tests(  # 对外入口：从原始表直接跑完整统计�
         pairing_keys=normalized_pairing_keys,  # 可选配对字段。
     )  # pairwise tests 结束。
     p_values = [test_row["p_value"] for test_row in test_rows]  # 提取所有原始 p 值。
-    # 手册 P22 硬约束：两两比较用 Holm-Bonferroni 控制 FWER。
+    # P22 硬约束：两两比较用 Holm-Bonferroni 控制 FWER。
     adjusted_p_values = holm_bonferroni_adjust(p_values)  # 做多重比较校正。
 
     # P22: 两步推断 —— 先跑 Friedman 全局检验，若不显著（p>=0.05），所有局部分析标为 exploratory
-    alpha = 0.05  # 手册 P22/CODE-1 显著性水平
+    alpha = 0.05  # P22/CODE-1 显著性水平
     global_result = run_global_test_paired(grouped_values, metric_names[0] if metric_names else "rmse")
     is_global_significant = global_result is not None and global_result.get("p_value", 1.0) < alpha
     is_exploratory = not is_global_significant

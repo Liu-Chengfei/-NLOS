@@ -1,7 +1,7 @@
-"""P19 deterministic 种子体系实现（手册 Part 2 P19 硬约束）。
+"""P19 deterministic 种子体系实现。
 
 本模块是种子体系的单源真相（SSOT），包含：
-- TRAIN_SEEDS × DATA_SEED_MULTIPLIER = N × 3 个完整种子组合（手册要求 5×3=15）。
+- TRAIN_SEEDS × DATA_SEED_MULTIPLIER = N × 3 个完整种子组合（5×3=15）。
 - PYTHONHASHSEED=0 在所有启动路径的置顶设置。
 - pipeline 入口设种子（train_pipeline / eval_pipeline / inference_pipeline）。
 
@@ -19,7 +19,7 @@ import random
 import sys
 
 # ============================================================================
-# P19-1: 训练种子常量（手册 line ~120，要求 5×3=15 个种子组合）
+# P19-1: 训练种子常量（line ~120，要求 5×3=15 个种子组合）
 # ============================================================================
 # 5 个训练种子 × 3 个数据种子乘数 = 15 个独立种子组合（可完整填满 paper_main.yaml 的 seed 维度）。
 TRAIN_SEEDS: tuple[int, ...] = (42, 2024, 7, 314, 999)
@@ -32,7 +32,7 @@ def get_full_seed_grid() -> list[int]:
 
 
 # ============================================================================
-# P19-2: PYTHONHASHSEED=0（手册 line ~121）
+# P19-2: PYTHONHASHSEED=0（line ~121）
 # 说明：此变量必须在进程启动时设置（import 前），模块无法在运行时修改它。
 # 因此本函数在启动脚本（run_train.sh / conda activate hook）调用，模块内提供
 # 审计函数供入口脚本调用。
@@ -86,7 +86,7 @@ def is_pythonhashseed_enforced() -> bool:
 
 
 # ============================================================================
-# P19-3: pipeline 入口设种子（手册 line ~122）
+# P19-3: pipeline 入口设种子（line ~122）
 # ============================================================================
 def set_pipeline_seed(seed: int, deterministic: bool = True) -> dict:
     """在 pipeline 入口设种子（调用 set_global_seed 并额外设置 CUBLAS）。

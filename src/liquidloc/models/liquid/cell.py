@@ -410,8 +410,8 @@ class LiquidCell(nn.Module):
         #   e9 OOD N3 大残差 state 不漂移, 同分布 N0/N1 时正常更新.
         # B2 v5: input_dim 从 hidden 改为 2*hidden (cat(prev_state, backbone) 维度).
         self.forget_root_projection = nn.Linear(self.hidden_dim * 2, self.hidden_dim)  # B2 v5: input-conditioned forget gate
-        # 配置: 是否启用 B2 v4/v5 forget_root (默认 True). 设 False 回 B2 v1/v3 行为 (用于 ablation).
-        self.enable_forget_root = bool(cfg.get("enable_forget_root", True))
+        # B2 v4/v5 forget_root 始终启用
+        self.enable_forget_root = True
 
         self.output_norm = nn.LayerNorm(self.hidden_dim)  # 输出归一化：对更新后的状态做 LayerNorm，稳定数值。
         self._feature_index_by_name = {name: index for index, name in enumerate(self.feature_order)}  # 特征名到索引的映射表，供坏观测评估按名字定位特征。

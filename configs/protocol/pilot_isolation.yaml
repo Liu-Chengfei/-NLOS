@@ -1,5 +1,0 @@
-# [726]-[730] pilot 实验隔离策略
-# 手册原文：pilot 实验不并入正式统计；所有站点共享同一 pilot 环境（isolation_sites: 0）
-clause_name: "[726]-[730] pilot 隔离"
-isolation_sites: 0
-description: "所有站点共享同一 pilot 环境，不建立独立的 pilot 隔离站点；pilot 实验数据不并入正式统计"

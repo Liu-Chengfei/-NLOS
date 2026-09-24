@@ -1,6 +1,6 @@
-"""异步高NLOS实验全流程保障手册 P16 EKF 初始化协议（紧耦合 EKF 关键环节）。
+"""P16 EKF 初始化协议（紧耦合 EKF 关键环节）。
 
-P16 硬约束（手册 line 172）：
+P16 硬约束（line 172）：
 - 初始位置取序列首帧 UWB 三边测量解（≥3 锚有效时）
 - 若首帧锚数 <3 或 uwb_valid=0 → 延迟初始化：用零位 + 大协方差 P0（位置 100m²、yaw π² 量级）
 - 初始 yaw 取 VIO 首帧朝向（vio_yaw[0]），VIO 无效时置 0 + 大协方差
@@ -25,14 +25,14 @@ import numpy as np
 from liquidloc.common.validation import coerce_finite_scalar
 from liquidloc.estimators.state_definition import state_items
 
-# 手册 P16 硬约束常量：P0 对角值。
+# P16 硬约束常量：P0 对角值。
 # 位置 100 m² = 10 m 标准差；yaw π² ≈ π² ≈ 9.87 ≈ yaw std ≈ π rad 量级。
 INITIAL_POSITION_UNCERTAINTY_M2: float = 100.0
 INITIAL_YAW_UNCERTAINTY_RAD2: float = math.pi ** 2  # π² ≈ 9.87
 INITIAL_VELOCITY_UNCERTAINTY_MPS2: float = 1.0  # 1 m/s 标准差
 INITIAL_BIAS_UNCERTAINTY: float = 1e-4  # 偏置初值小不确定性
 INITIAL_EXTRA_UNCERTAINTY: float = 1e-4  # uwb_clock_bias / vio_scale 不确定性初值
-# 三边测量最小锚数门槛（手册 P16：≥3 锚有效时才走三边测量解）。
+# 三边测量最小锚数门槛（P16：≥3 锚有效时才走三边测量解）。
 TRILATERATION_MIN_ANCHORS: int = 3
 
 
@@ -182,7 +182,7 @@ def build_p0_diagonal(
     delayed_init: bool,
     initial_position_yaw: bool,
 ) -> tuple[list[float], str]:
-    """按手册 P16 构造 P0 对角向量（与 state_items 同序）。
+    """按 P16 构造 P0 对角向量（与 state_items 同序）。
 
     参数:
         delayed_init: True 表示首帧 <3 锚有效（位置用零位 + 大 P0）
@@ -239,7 +239,7 @@ def ekf_init_protocol_p16(
     *,
     anchor_lookup: Mapping[Any, tuple[float, float, float]],
 ) -> dict[str, Any]:
-    """手册 P16 EKF 初始化协议统一入口。
+    """P16 EKF 初始化协议统一入口。
 
     参数:
         uwb_events / vio_events: 首批 UWB/VIO 事件序列
@@ -277,7 +277,7 @@ def ekf_init_protocol_p16(
         initial_state["px"] = float(position_xy[0])
         initial_state["py"] = float(position_xy[1])
     if initial_yaw_present:
-        initial_state["yaw"] = float(vio_yaw)  # 手册 P16：初始 yaw 取 VIO 首帧朝向
+        initial_state["yaw"] = float(vio_yaw)  # P16：初始 yaw 取 VIO 首帧朝向
     # 5. 构造 P0 对角
     diag, mode = build_p0_diagonal(
         delayed_init=delayed_init,

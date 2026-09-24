@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260923T104300001Z-3144-d2b4736ef38b",
+  "runId": "20260923T104300001Z-3144-d2b4736ef38b",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": [
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/Enumerate.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affectsCompletion": false
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "6e50f3a1cc37fd968aa6d42e1e03613b44ba73f02cf0c74006db7ba6023307a2",
+  "rulesVersion": "unavailable",
+  "sessionHash": "d6576d686430322ff277c6233fe01c905e45eacdbb077803aaeff9497709f121",
+  "reportRef": ".mimosa/reports/task-review-sess_ffa82dc3-ee46-4ad8-8bc3-b25f72bb12ec-20260923T104300001Z-3144-d2b4736ef38b.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "src/liquidloc/models/liquid/cell.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/pipelines/eval_pipeline.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/scenarios/scene_sampler.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/scenarios/geometry_motion_envelope.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-23T10:43:00.303Z"
+}

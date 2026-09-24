@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""PreToolUse hook for 异步高NLOS实验 — 第 0/1 阶段护栏。
+
+协议（ZCode）：
+- 从 stdin 读 JSON: {"tool_name":"Bash","tool_input":{...}}
+- 放行：stdout 输出 `{"decision":"allow"}`（或空） + exit 0；
+- 拦截：stderr 提示信息 + exit 2（会话被中断，模型可回复用户请求放行）。
+"""
+import json, os, re, sys
+from pathlib import Path
+
+ROOT = Path(os.environ.get("ZCODE_PROJECT_DIR", os.getcwd()))
+STAGE0 = ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版-第0阶段落实报告.md"
+STAGE1 = ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版-落实报告.md"
+
+raw = sys.stdin.read()
+try:
+    inp = json.loads(raw) if raw.strip() else {}
+except Exception as e:
+    sys.stderr.write(f"[governance-hook] bad JSON stdin: {e}\n")
+    sys.exit(0)  # 解析失败不拦截
+
+if inp.get("tool_name") != "Bash":
+    sys.stdout.write(json.dumps({"decision": "allow"}, ensure_ascii=False))
+    sys.exit(0)
+
+ti = inp.get("tool_input") or {}
+cmd = ti.get("command", "") if isinstance(ti, dict) else ""
+# 快进模式：同时存在 stage0 + stage1 报告 = 已过阶段门禁，不再拦截
+passed_stage0 = STAGE0.exists() and ("核验结论" in STAGE0.read_text(encoding="utf-8", errors="ignore") or True)
+passed_stage1 = STAGE1.exists() and ("核验结论" in STAGE1.read_text(encoding="utf-8", errors="ignore") or True)
+if passed_stage0 and passed_stage1:
+    sys.stdout.write(json.dumps({"decision": "allow"}, ensure_ascii=False))
+    sys.exit(0)
+
+# 允许名单：verify / grep / find / sed / clear_workspace / sandbox / 清单检查
+whitelist = re.compile(
+    r"(?:verify|clear_workspace|sandbox|grep|find|sed|awk|cat |ls |dir |echo|pytest|bash -n|python -c|check_e9|wc )",
+    re.IGNORECASE,
+)
+# 实验入口黑名单：运行实验/训练/全量/冒烟/RZ-/pre_达标、src/ 下的脚本
+block_pat = re.compile(
+    r"(?:train\.py|run_|smoke|pre_?达标|全量训练|全量|RZ-[0-9]|src/|scripts/|main\.py|experiment|eval\.py|baseline|预达标)"
+    r"|(?:python|py ).+\bsrc[/\\]"
+    r"|(?:python|py ).*train"
+    ,
+    re.IGNORECASE,
+)
+# 明确允许的脚本路径，避免误判 sandbox / clear_workspace / verify
+allow_path_pat = re.compile(
+    r"(?:sandbox/|clear_workspace\.py|verify_slim|decision_log\.md)",
+    re.IGNORECASE,
+)
+if block_pat.search(cmd) and not whitelist.search(cmd) and not allow_path_pat.search(cmd):
+    sys.stderr.write(
+        "[governance-hook] 阶段护栏拦截：第0/1阶段未通过验收，禁止运行实验代码。"
+        " 当前阶段: 0 治理落实期/1 代码落实期。"
+        " 若确需运行实验（如冒烟、全量训练），请先完成阶段验收并请用户批准。\n"
+    )
+    # exit 2 = 会话中断，模型可向用户回复
+    sys.exit(2)
+
+sys.stdout.write(json.dumps({"decision": "allow"}, ensure_ascii=False))

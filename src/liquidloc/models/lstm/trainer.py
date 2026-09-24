@@ -73,7 +73,7 @@ _SCALING_NEUTRAL_FLOOR = 1.0  # 缩放输出的中性下限，保证不会压到
 _EPOCH_FIXED_PROBE_LIMIT = 8  # 每轮固定探针样本数上限，用于跟踪预测变化。
 _BATCH_DIAGNOSTIC_PROBE_LIMIT = 4  # 每个 batch 仅保留少量逐样本探针，避免论文级训练下诊断载荷失控。
 _EPOCH_ARTIFACT_BATCH_LIMIT = 1  # 每个 epoch 的 artifact 仅保留首个 batch 明细，避免长预算训练下诊断载荷无界增长。
-_BIAS_HUBER_DELTA = 1.345  # 手册 §B15: Huber δ=1.345 白化域 95% 效率  # UWB bias 监督用 Huber 损失的 delta，更稳地处理长尾 NLOS 偏置。
+_BIAS_HUBER_DELTA = 1.345  # Huber δ=1.345 白化域 95% 效率  # UWB bias 监督用 Huber 损失的 delta，更稳地处理长尾 NLOS 偏置。
 _SCALING_LOG_EPS = 1e-6  # scaling 转对数前的数值稳定项。
 _GLOBAL_L2_WEIGHT = 1e-4  # 显式全局 L2 正则权重。
 _LSTM_CALIBRATION_WEIGHT = 0.08  # risk calibration 的默认辅助权重。

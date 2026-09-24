@@ -32,10 +32,6 @@ def test_load_registry_and_get_entry():
     entry = get_dataset_entry('miluv', registry)
     assert entry['dataset_name'] == 'miluv'
     assert entry['reader'].endswith('miluv_reader.py')
-    ntu_entry = get_dataset_entry('ntu_viral', registry)
-    assert ntu_entry['dataset_name'] == 'ntu_viral'
-    assert ntu_entry['reader'].endswith('ntu_viral_reader.py')
-    assert ntu_entry['prepare_script'] == 'scripts/03_prepare_ntu_viral_data.py'
 
 
 def test_get_dataset_entry_normalizes_case():
@@ -46,7 +42,7 @@ def test_get_dataset_entry_normalizes_case():
 
 
 def test_normalize_public_dataset_name_lowercases_and_strips():
-    assert normalize_public_dataset_name('  NTU_VIRAL  ') == 'ntu_viral'
+    assert normalize_public_dataset_name('  MILUV  ') == 'miluv'
 
 
 def test_load_registry_uses_default_discovery_path(monkeypatch):
@@ -86,11 +82,11 @@ def test_util_dataset_is_registered_as_public_dataset():
 
 def test_registry_lists_public_datasets():
     registry = load_public_dataset_registry(Path(__file__).resolve().parents[2] / 'configs' / 'datasets' / 'public_dataset_registry.yaml')
-    # 注册表 2026-09 扩展：除官方公开面（miluv/ntu_viral/util）外，还包含
+    # 注册表 2026-09 扩展：除官方公开面（miluv/util）外，还包含
     # 补充路由入口 sim 与 sim_e9_protocol_20260726（协议级仿真数据集，非官方公开
     # benchmark 面，仅用于 §6/§8 主表与 §12 消融的仿真路由）。
     assert registry_mod.list_public_dataset_names(registry) == [
-        'miluv', 'ntu_viral', 'sim', 'sim_e9_protocol_20260726', 'util',
+        'miluv', 'sim', 'sim_e9_protocol_20260726', 'util',
     ]
 
 
@@ -98,17 +94,13 @@ def test_public_dataset_readiness_stays_smoke_scoped():
     registry = {
         'datasets': {
             'miluv': {'reader': 'x', 'release_tier': 'smoke_only', 'paper_full_ready': False},
-            'ntu_viral': {'reader': 'y', 'release_tier': 'full_ready', 'paper_full_ready': True, 'public_benchmark_smoke_ready': False},
         }
     }
 
     miluv_ready = inspect_public_dataset_readiness('miluv', registry)
-    ntu_ready = inspect_public_dataset_readiness('ntu_viral', registry)
 
     assert miluv_ready['public_benchmark_smoke_ready'] is True
     assert miluv_ready['paper_full_ready'] is False
-    assert ntu_ready['public_benchmark_smoke_ready'] is False
-    assert ntu_ready['paper_full_ready'] is True
 
 
 def test_registered_dataset_outside_official_public_benchmark_surface_stays_not_ready():

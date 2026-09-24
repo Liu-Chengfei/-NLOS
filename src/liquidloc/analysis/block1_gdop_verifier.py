@@ -1,10 +1,10 @@
-"""BLOCK-1 锚点坐标 × GDOP 验证器（异步高NLOS实验全流程保障手册 Part 0 / S2）。
+"""BLOCK-1 锚点坐标 × GDOP 验证器。
 
-本模块对照手册 Part 0 / S2 锚点坐标表和 GDOP≈1.19 的约束，
-验证实际 sim_e9 数据中 anchor_layout.json 的锚点坐标是否与手册一致。
+本模块对照锚点坐标表和 GDOP≈1.19 的约束，
+验证实际 sim_e9 数据中 anchor_layout.json 的锚点坐标是否一致。
 不一致时将偏差量化并写入 .audit/anchor_gdop_audit.json，供实验门控（I-1）使用。
 
-手册 Part 0 / S2 锚点坐标：
+参考锚点坐标（S2 协议基准）：
     A1 锚: (2,  2) m
     A2 锚: (18, 3) m
     A3 锚: (6, 17) m
@@ -29,25 +29,27 @@ from liquidloc.common.validation import coerce_finite_scalar  # D9 value contrac
 
 
 __all__ = [
-    "HANDBOOK_S2_ANCHOR_POSITIONS",
-    "HANDBOOK_S2_ANCHOR_IDS",
+    "S2_ANCHOR_IDS",
+    "S2_ANCHOR_POSITIONS",
+    "S2_GDOP_TARGET",
+    "S2_GDOP_TOL",
     "compute_gdop",
     "compute_gdop_for_trajectory",
-    "verify_anchor_layout_against_handbook",
+    "verify_anchor_layout_against_reference",
     "run_block1_audit",
 ]
 
 
-# 手册 Part 0 / S2 锚点坐标（A1-A4，共 4 个，对应好几何基准）
-HANDBOOK_S2_ANCHOR_IDS = ("A1", "A2", "A3", "A4")
-HANDBOOK_S2_ANCHOR_POSITIONS: dict[str, tuple[float, float]] = {
+# 参考锚点坐标（A1-A4，共 4 个，对应好几何基准）
+S2_ANCHOR_IDS = ("A1", "A2", "A3", "A4")
+S2_ANCHOR_POSITIONS: dict[str, tuple[float, float]] = {
     "A1": (2.0, 2.0),
     "A2": (18.0, 3.0),
     "A3": (6.0, 17.0),
     "A4": (16.0, 18.0),
 }
-HANDBOOK_S2_GDOP = 1.19  # 手册 Part 0 声明的 GDOP 基线
-HANDBOOK_S2_GDOP_TOL = 0.20  # ±20% 容差（BLOCK-1 / P4 约束，对齐 s9_validate_seeds.GDOP_TOL）
+S2_GDOP_TARGET = 1.19  # S2 协议基准 GDOP
+S2_GDOP_TOL = 0.20  # ±20% 容差（BLOCK-1 / P4 约束，对齐 s9_validate_seeds.GDOP_TOL）
 
 
 def _gdop_from_matrix(H: np.ndarray) -> float:
@@ -55,7 +57,7 @@ def _gdop_from_matrix(H: np.ndarray) -> float:
 
     GDOP = sqrt(trace((H.T H)^{-1}))，
     其中 H 的每一行对应一个锚点对(tag,anchor)的观测量对 (px,py) 的偏导。
-    公式推导见手册 Part 0 / S2。
+    公式推导见参考资料 S2。
     """
     HT_H = H.T @ H
     try:
@@ -136,17 +138,17 @@ def compute_gdop_for_trajectory(
     }
 
 
-def verify_anchor_layout_against_handbook(
+def verify_anchor_layout_against_reference(
     anchor_layout: dict[str, Any],
 ) -> dict[str, Any]:
-    """将一个 anchor_layout dict 对照手册 S2 锚点坐标进行验证。
+    """将一个 anchor_layout dict 对照 S2 锚点坐标进行验证。
 
     参数:
         anchor_layout: 必须含 anchor_ids / anchor_positions / layout_id 字段。
 
     返回:
         dict，含 match（bool）、max_anchor_position_error_m、per_anchor_errors_m、
-        actual_gdop（质心处）、handbook_gdop、gdop_error_rel、gdop_pass（bool）字段。
+        actual_gdop（质心处）、reference_gdop、gdop_error_rel、gdop_pass（bool）字段。
 
     异常:
         ValueError: anchor_layout 缺字段。
@@ -190,10 +192,10 @@ def verify_anchor_layout_against_handbook(
 
     # GDOP 基线：
     # 1. 有 geometry_report.gdop_value 时用真实 GDOP（从锚点手算）
-    # 2. 否则 fallback 到手册 S2 的 GDOP=1.19
+    # 2. 否则 fallback 到参考 GDOP=1.19
     # 注意：geometry_report.gdop_value (= geom_condition) 是协议档位索引，不是真实 GDOP。
     # 真实 GDOP 由锚点实际位置决定，需要手算。
-    handbook_gdop = compute_gdop(HANDBOOK_S2_ANCHOR_POSITIONS)
+    reference_gdop = compute_gdop(S2_ANCHOR_POSITIONS)
     actual_gdop = compute_gdop(actual_dict)
     expected_gdop = actual_gdop  # 自比较：验证锚点自洽性
 
@@ -207,7 +209,7 @@ def verify_anchor_layout_against_handbook(
 
     # anchor 位置匹配：仅要求 anchor 数量一致 + 坐标有限（不自检具体值）
     # 不同 K 档位自然产生不同锚点分布；具体 GDOP 是旋转/平移不变的量，已在上面验证
-    id_count_match = len(actual_dict) == len(HANDBOOK_S2_ANCHOR_IDS)
+    id_count_match = len(actual_dict) == len(S2_ANCHOR_IDS)
     positions_finite = all(
         math.isfinite(x) and math.isfinite(y) for x, y in actual_dict.values()
     )
@@ -215,14 +217,14 @@ def verify_anchor_layout_against_handbook(
     # 质心距离（用于诊断，不作为 PASS 判据）
     cx_a = sum(p[0] for p in actual_dict.values()) / len(actual_dict) if actual_dict else 0.0
     cy_a = sum(p[1] for p in actual_dict.values()) / len(actual_dict) if actual_dict else 0.0
-    cx_h = sum(p[0] for p in HANDBOOK_S2_ANCHOR_POSITIONS.values()) / len(HANDBOOK_S2_ANCHOR_POSITIONS)
-    cy_h = sum(p[1] for p in HANDBOOK_S2_ANCHOR_POSITIONS.values()) / len(HANDBOOK_S2_ANCHOR_POSITIONS)
+    cx_h = sum(p[0] for p in S2_ANCHOR_POSITIONS.values()) / len(S2_ANCHOR_POSITIONS)
+    cy_h = sum(p[1] for p in S2_ANCHOR_POSITIONS.values()) / len(S2_ANCHOR_POSITIONS)
     centroid_dist = math.sqrt((cx_a - cx_h) ** 2 + (cy_a - cy_h) ** 2)
     per_anchor_dists["centroid"] = centroid_dist
 
     # GDOP 相对偏差（用于诊断）
-    if math.isfinite(handbook_gdop) and handbook_gdop > 0:
-        gdop_rel_diff = abs(actual_gdop - handbook_gdop) / handbook_gdop
+    if math.isfinite(reference_gdop) and reference_gdop > 0:
+        gdop_rel_diff = abs(actual_gdop - reference_gdop) / reference_gdop
     else:
         gdop_rel_diff = float("nan")
 
@@ -232,14 +234,14 @@ def verify_anchor_layout_against_handbook(
     #   (1) 锚点数量足够 (>=4)
     #   (2) 坐标有限（数据未损坏）
     #   (3) GDOP 在合理范围（< 3.0）
-    # 不再强制锚点坐标与手册 S2 完全一致（那是 S9 的职责，S9 用 use_protocol_trajectory=True）
+    # 不再强制锚点坐标与 S2 参考坐标完全一致（那是 S9 的职责，S9 用 use_protocol_trajectory=True）
     match = bool(anchor_count_ok and positions_finite and gdop_reasonableness)
 
     max_error = centroid_dist  # 仅用于诊断报告
 
     return {
         "match": match,
-        "handbook_gdop": handbook_gdop,
+        "reference_gdop": reference_gdop,
         "actual_gdop": actual_gdop,
         "expected_gdop": expected_gdop,
         "gdop_rel_diff": gdop_rel_diff,
@@ -248,7 +250,7 @@ def verify_anchor_layout_against_handbook(
         "gdop_reasonableness": gdop_reasonableness,
         "max_anchor_position_error_m": max_error,
         "per_anchor_position_error_m": per_anchor_dists,
-        "handbook_anchor_ids": list(HANDBOOK_S2_ANCHOR_IDS),
+        "reference_anchor_ids": list(S2_ANCHOR_IDS),
         "actual_anchor_ids": list(actual_dict.keys()),
         "anchor_ids_match": id_count_match,
         "layout_id": anchor_layout.get("layout_id"),
@@ -262,7 +264,7 @@ def run_block1_audit(
 ) -> dict[str, Any]:
     """在指定 data_root 下扫描所有序列的 anchor_layout.json 并验证。
 
-    读取所有 sim_e9 序列的 anchor_layout.json，对照手册 S2 坐标表进行验证，
+    读取所有 sim_e9 序列的 anchor_layout.json，对照 S2 坐标表进行验证，
     汇总报告写入 output_path（默认 .audit/anchor_gdop_audit.json）。
 
     参数:
@@ -308,7 +310,7 @@ def run_block1_audit(
             continue
         try:
             layout = json.loads(anchor_path.read_text(encoding="utf-8"))
-            result = verify_anchor_layout_against_handbook(layout)
+            result = verify_anchor_layout_against_reference(layout)
         except Exception as exc:
             result = {"error": str(exc)}
         result["seq_id"] = seq_dir.name
@@ -325,8 +327,8 @@ def run_block1_audit(
         "total_seqs": len(seq_dirs),
         "pass_count": n_pass,
         "mismatch_count": n_mismatch,
-        "handbook_gdop": HANDBOOK_S2_GDOP,
-        "gdop_tolerance_rel": HANDBOOK_S2_GDOP_TOL,
+        "reference_gdop": S2_GDOP_TARGET,
+        "gdop_tolerance_rel": S2_GDOP_TARGET_TOL,
         "max_allowed_anchor_error_m": 1e-3,
         "pass": n_mismatch == 0,
         "details": details,

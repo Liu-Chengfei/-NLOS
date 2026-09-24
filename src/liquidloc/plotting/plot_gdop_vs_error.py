@@ -1,4 +1,4 @@
-"""GDOP-vs-error dual-curve plotter (异步高NLOS实验全流程保障手册 Part 3 §0-V5).
+"""GDOP-vs-error dual-curve plotter (实验规范 Part 3 §0-V5).
 
 Renders a dual-axis time-series: GDOP on the left axis (geometry quality) and
 the per-frame positioning error on the right axis (one method). The §0-V5

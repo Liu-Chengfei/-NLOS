@@ -451,7 +451,6 @@ def assert_geometry_motion_envelope(
     anchor_layout: Mapping[str, Any],
     *,
     profile: str = "main_table",
-    allow_high_anchor_count: bool = False,
 ) -> dict[str, Any]:
     """断言轨迹+锚点满足协议包络；失败抛 ValueError。
 
@@ -459,8 +458,6 @@ def assert_geometry_motion_envelope(
     ----
     profile:
         ``main_table`` 使用完整 B20–B23；``smoke`` 仅做极弱检查。
-    allow_high_anchor_count:
-        True 时允许 K3 以外的几何档位（压力消融）；主表应 False。
     """
     envelope = compute_trajectory_envelope(gt_rows)
     anchors = compute_anchor_geometry_stats(anchor_layout)
@@ -494,7 +491,7 @@ def assert_geometry_motion_envelope(
     anchor_count = int(anchors["anchor_count"])
     if not is_integer(anchor_count):
         raise TypeError("anchor_count must be integer-like")
-    max_anchors = 8 if allow_high_anchor_count else int(cfg["anchor_count_max_main"])
+    max_anchors = int(cfg["anchor_count_max_main"])
 
     # §8.2.1 表行 9「与锚点几何匹配: 轨迹主要落在锚点凸包内或边界附近」。
     # 主表要求轨迹在凸包内的样本占比 ≥ 0.15（"主要"语义含"至少接触锚区"）。

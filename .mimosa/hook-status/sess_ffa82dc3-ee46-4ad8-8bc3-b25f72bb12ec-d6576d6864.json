@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-09-23T10:52:06.724Z",
+  "sessionId": "sess_ffa82dc3-ee46-4ad8-8bc3-b25f72bb12ec",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "configs/datasets/public_dataset_registry.yaml",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 7,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

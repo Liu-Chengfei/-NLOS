@@ -76,7 +76,7 @@ def _bundle(method_name: str, *, second_px: float) -> dict:
     """构造一个标准 prediction bundle 字典，用于测试。
 
     Args:
-        method_name: 方法名称（如 "ekf"、"robust_ekf"）。
+        method_name: 方法名称（如 "ekf"、"ekf"）。
         second_px: 第二个状态点的 px 坐标，用于控制轨迹差异。
 
     Returns:
@@ -290,7 +290,7 @@ def test_eval_pipeline_outputs_feed_script19_high_level_consumers(tmp_path, caps
         {
             "prediction_bundles": [
                 _bundle("ekf", second_px=0.03),
-                _bundle("robust_ekf", second_px=0.30),
+                _bundle("ekf", second_px=0.30),
             ],
             "ground_truth_root": FIXTURE_ROOT,
             "output_root": eval_root,
@@ -304,7 +304,7 @@ def test_eval_pipeline_outputs_feed_script19_high_level_consumers(tmp_path, caps
     prediction_index_path.parent.mkdir(parents=True, exist_ok=True)
     prediction_bundles = [
         _bundle("ekf", second_px=0.03),
-        _bundle("robust_ekf", second_px=0.30),
+        _bundle("ekf", second_px=0.30),
     ]
     prediction_index = []
     for index, bundle in enumerate(prediction_bundles):

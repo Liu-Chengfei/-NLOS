@@ -62,7 +62,7 @@ conclusion_priority: [rmse, mean_rmse, std_rmse, p95, failure_rate, mae]
 public_benchmark:
   # 当前官方公开验证面允许的数据集，属于主结论和 paper-grade 对比必须对齐的固定范围。
   # 其他已注册 public route 只能作为补充/未来扩展入口，不能自动并入当前官方公开 benchmark 面。
-  allowed_datasets: [miluv, ntu_viral]
+  allowed_datasets: [miluv]
   # 使用冻结评测拆分，避免数据边界漂移。
   # 冻结意味着拆分方式（哪些序列用于评测）一旦确定就不再改变，
   # 防止通过调整拆分来优化结果。

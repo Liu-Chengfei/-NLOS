@@ -60,7 +60,6 @@ def test_normal_case():
     assert list(experiment_result.to_dict().keys()) == [
         "snapshot_version",
         "experiment_id",
-        "non_main_table",
         "model_results",
         "aggregate_metrics",
     ]
@@ -85,7 +84,7 @@ def test_boundary_case():
     sequence_result = {
         "seq_id": "seq_boundary",
         "scene_code": "S(A3,N3,V3,K0,M0)",
-        "model_name": "robust_ekf",
+        "model_name": "ekf",
         "metric_dict": _metric_dict(),
     }
     experiment_result = {

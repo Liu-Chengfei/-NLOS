@@ -46,11 +46,10 @@ frozen_axes:
 
 # 参与比较的方法。
 # ekf：标准 EKF（固定 R + 共享卡方，无 Huber）。
-# robust_ekf：鲁棒 EKF（共享卡方 + 固定 Huber）。
 # lstm_ekf：LSTM 增强 EKF。
 # liquid_ekf：液态网络增强 EKF（proposed，LNN）。
 # transformer_ekf：Transformer 增强 EKF。
-methods: [ekf, robust_ekf, lstm_ekf, liquid_ekf, transformer_ekf]  # 异步高NLOS实验全流程保障手册 Part 0 §13：5 方法必跑（EKF/Robust-EKF/LSTM/LNN/Transformer）。
+methods: [ekf, lstm_ekf, liquid_ekf, transformer_ekf]  # 4 方法必跑（EKF/LSTM/LNN/Transformer）。
 
 # 数据根目录（Pre-6 读取 sim_meta.json 统计唯一种子数 ≥5）。
 raw_root: data/raw/sim_e9_main
@@ -75,8 +74,8 @@ s9_report_keys:
   - boundary
   - schema
 
-# I-3: 5 方法 basename（在 available_methods_basename 中）。
-available_methods_basename: [ekf, robust_ekf, lstm, liquid, transformer]  # 第 8 阶段修复 HIGH-1: liquid_ekf 的 basename 是 'liquid', 不是 'lnn'。
+# I-3: 4 方法 basename（在 available_methods_basename 中）。
+available_methods_basename: [ekf, lstm, liquid, transformer]  # 第 8 阶段修复 HIGH-1: liquid_ekf 的 basename 是 'liquid', 不是 'lnn'。
 
 # I-4: 统计脚本 P22 全输出可跑通。
 stats_script_outputs:

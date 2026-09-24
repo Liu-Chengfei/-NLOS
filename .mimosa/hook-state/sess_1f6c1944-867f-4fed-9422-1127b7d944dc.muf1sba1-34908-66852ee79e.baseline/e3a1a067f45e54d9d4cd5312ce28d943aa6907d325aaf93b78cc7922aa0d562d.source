@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Extract all Stage 1 clause texts [6]-[143] from handbook and output as JSON."""
+import re
+import json
+import sys
+
+MANUAL = r"E:\异步高NLOS\docs\异步实验_执行手册_终版v15_总纲条款版.md"
+
+with open(MANUAL, "r", encoding="utf-8") as f:
+    lines = f.readlines()
+
+# Find all clause markers **[n]**
+clause_markers = []
+for i, line in enumerate(lines):
+    m = re.match(r'^\*\*\[(\d+)\]\*\*', line)
+    if m:
+        clause_markers.append((int(m.group(1)), i))
+
+print(f"Total clauses found: {len(clause_markers)}")
+print(f"First clause: [{clause_markers[0][0]}] at line {clause_markers[0][1]+1}")
+print(f"Last clause: [{clause_markers[-1][0]}] at line {clause_markers[-1][1]+1}")
+
+# Extract clauses [6]-[143]
+target_start, target_end = 6, 143
+stage1_clauses = []
+for idx, (num, start_line) in enumerate(clause_markers):
+    if num < target_start:
+        continue
+    if num > target_end:
+        break
+    # Find end line (next clause marker or section end)
+    if idx + 1 < len(clause_markers):
+        end_line = clause_markers[idx + 1][1]
+    else:
+        end_line = len(lines)
+    
+    # Extract clause text (strip leading ** and trailing whitespace)
+    clause_text = "".join(lines[start_line:end_line]).strip()
+    # Remove the **[n]** marker prefix
+    clause_text = re.sub(r'^\*\*\[\d+\]\*\*', '', clause_text).strip()
+    # Remove trailing whitespace and excessive newlines
+    clause_text = re.sub(r'\n+', '\n', clause_text).strip()
+    
+    stage1_clauses.append({
+        "number": num,
+        "start_line": start_line + 1,  # 1-based
+        "end_line": end_line,  # 1-based (exclusive)
+        "text": clause_text,
+        "original": "".join(lines[start_line:end_line]).strip()
+    })
+
+print(f"\nStage 1 clauses [{target_start}]-[{target_end}]: {len(stage1_clauses)} entries")
+for c in stage1_clauses[:5]:
+    print(f"  [{c['number']}] L{c['start_line']}-{c['end_line']}: {c['text'][:80]}...")
+print("  ...")
+
+# Save to JSON for later use
+with open(r"E:\异步高NLOS\.zcode\stage1_clauses.json", "w", encoding="utf-8") as f:
+    json.dump(stage1_clauses, f, ensure_ascii=False, indent=2)
+
+print(f"\nSaved to .zcode/stage1_clauses.json")

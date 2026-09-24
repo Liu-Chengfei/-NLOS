@@ -272,7 +272,7 @@ class PublicBenchmarkPipeline(PipelineAPI):
                 "output_root": output_root / "core",  # core 子目录。
                 "project_root": normalized_cfg.get("project_root"),  # 项目根目录。
                 # 与 MILUV 路径保持一致：CorePipeline 默认 retain_prediction_bundles=True，
-                # 这里显式默认 True，避免 NTU VIRAL 路径 prediction_bundles 恒空导致
+                # 这里显式默认 True，避免 prediction_bundles 恒空导致
                 # 18_run_public_benchmarks.py 评估交接必然抛 ValueError。
                 "retain_prediction_bundles": bool(normalized_cfg.get("retain_prediction_bundles", True)),
             }

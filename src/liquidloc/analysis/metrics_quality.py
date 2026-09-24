@@ -1,8 +1,5 @@
 """P7/P8/P9/P21/P27/P33/P34/P36 缺失项实施模块。
 
-本模块把手册 Part 0 S3 (P7/P8/P9) 和 P21/P27/P33/P34/P36 落地为可直接调用的函数，
-供 prepare_pipeline / train_pipeline / eval_pipeline 调用。
-
 P7  RotationLink (IMU 绕圈测试)
 P8  单位一致性 (rad, m, [-π, π])
 P9  Sim(3) 对齐 (Umeyama / scale-aware)
@@ -11,6 +8,9 @@ P27 激活值统计 (4 head 可视化)
 P33 Best-val checkpoint 协议
 P34 过拟合检测
 P36 RMSE + MAE + trimmed mean + median + P95 + P50 口径
+
+本模块把这些落地为可直接调用的函数，
+供 prepare_pipeline / train_pipeline / eval_pipeline 调用。
 """
 
 from __future__ import annotations
@@ -879,50 +879,8 @@ def compute_config_hash(cfg: Mapping[str, Any]) -> str:
 
 
 # ============================================================================
-# P22 stats 工具（从 handbook_p22_statistics.py 导出便捷包装）
+# NLOS 诊断工具
 # ============================================================================
-
-# 完整实现在 handbook_p22_statistics.py；这里做懒导入避免循环
-_p22_mod = None
-
-
-def _get_p22():
-    global _p22_mod
-    if _p22_mod is None:
-        import importlib
-        _p22_mod = importlib.import_module("liquidloc.analysis.handbook_p22_statistics")
-    return _p22_mod
-
-
-def run_holm_bonferroni(
-    p_values: list[float],
-    alpha: float = ALPHA,
-) -> dict[str, Any]:
-    """P22: Holm-Bonferroni 逐步校正。"""
-    m = _get_p22()
-    return m.run_holm_bonferroni_correction(p_values, alpha)
-
-
-def run_tost_equivalence(
-    effect: float,
-    ci_lower: float,
-    ci_upper: float,
-    epsilon: float,
-) -> dict[str, Any]:
-    """P22: TOST 等效性检验。"""
-    m = _get_p22()
-    return m.run_tost(lower=ci_lower, upper=ci_upper, epsilon=epsilon, effect=effect)
-
-
-def run_bf01_bayes_factor(
-    errors_lnn: np.ndarray,
-    errors_method: np.ndarray,
-    prior_width: float = 1.0,
-) -> dict[str, Any]:
-    """P22: BF01 Bayes Factor (方法 vs LNN)。"""
-    m = _get_p22()
-    return m.compute_bf01(errors_lnn, errors_method, prior_width=prior_width)
-
 
 def compute_nlos_recall(
     risk_trace: Any,
@@ -930,7 +888,7 @@ def compute_nlos_recall(
     *,
     threshold: float = 0.5,
 ) -> dict[str, Any]:
-    """D18 诊断动作 — NLOS 检出率（手册 Part 3 §第五层）。
+    """D18 诊断动作 — NLOS 检出率。
 
     以 ``nl_flag`` 为真值算 NLOS 检出能力：
         recall = (risk>=threshold ∧ nl_flag==1) / (nl_flag==1)
@@ -1025,7 +983,7 @@ def slice_bias_by_nlos_level(
     bias_trace: Any,
     nl_flag: Any,
 ) -> dict[str, Any]:
-    """D19 诊断动作 — bias 头激活按 NLOS / LOS 切片（手册 Part 3 §第五层）。
+    """D19 诊断动作 — bias 头激活按 NLOS / LOS 切片。
 
     把 bias 头时序按 ``nl_flag`` 切成 NLOS / LOS 两段，比较 bias 头是否在
     NLOS 高偏差段（注入 mu=2-6m 的系统性正偏差）激活更强。如果 NLOS bias
@@ -1106,7 +1064,7 @@ def check_activation_mask_alignment(
     *,
     activation_quantile: float = 0.75,
 ) -> dict[str, Any]:
-    """D20 诊断动作 — 4 头激活 × scene_mask 对齐度（手册 Part 3 §第五层）。
+    """D20 诊断动作 — 4 头激活 × scene_mask 对齐度。
 
     每个头在按 ``activation_quantile`` 分位数阈值二值化后算 IoU / precision /
     recall / F1。risk / bias 头应该和 NLOS mask 强对齐（IoU 高），uwb /
@@ -1215,6 +1173,4 @@ __all__ = [
     "compute_nlos_recall",
     "slice_bias_by_nlos_level",
     "check_activation_mask_alignment",
-    # P22 wrappers
-    "run_holm_bonferroni", "run_tost_equivalence", "run_bf01_bayes_factor",
 ]

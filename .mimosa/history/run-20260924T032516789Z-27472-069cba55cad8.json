@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20260924T032516789Z-27472-069cba55cad8",
+  "runStatus": "inconclusive",
+  "errors": [
+    "bash-discovery:.venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h: bash_discovery_incomplete: project enumeration exceeded 5000 reviewable files",
+    "candidate-select:tests/estimators/test_ekf_core.py: candidate_limit_exceeded: 18 changed reviewable file(s) were not scanned because the limit is 20",
+    "baseline:.venv-gpu/Lib/site-packages/torch/include/c10/util/ExclusivelyOwnedTensorTraits.h: baseline_partial: baseline exceeded 5000 candidate files",
+    "scan:src/liquidloc/common/constants.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/factories/estimator_factory.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/pipelines/core_pipeline.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/protocol/experiment_gates.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/estimators/state_definition.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/common/angle_utils.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/fusion/bias_adapter.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/protocol/event_schema.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/protocol/scene_axis_protocol.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/scenarios/async_levels.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/sensors/imu_model.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/dataio/sim_materializer.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/estimators/predict_step.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/estimators/uwb_update_step.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/estimators/vision_update_step.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/scenarios/nlos_levels.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/estimators/ekf_core.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+  ],
+  "target": ".",
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "8dfaac44b25cc2e1f1403979187a033adf26d54cf977d3049dbf8f9ca6365bcd",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-09-24T03:25:16.789Z",
+  "timing": {
+    "startedAt": "2026-09-24T03:25:10.311Z",
+    "completedAt": "2026-09-24T03:25:16.789Z",
+    "durationMs": 6478
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 1,
+    "bySeverity": {
+      "high": 1
+    },
+    "byStatus": {
+      "blocked": 1
+    }
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "bash_discovery_incomplete": 1,
+      "candidate_limit_exceeded": 1,
+      "baseline_partial": 1,
+      "scanner_failed": 17,
+      "project_check_failed": 20
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-sess_1f6c1944-867f-4fed-9422-1127b7d944dc-20260924T032516789Z-27472-069cba55cad8.json"
+}

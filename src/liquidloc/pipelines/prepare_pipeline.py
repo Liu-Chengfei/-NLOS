@@ -31,7 +31,7 @@ from copy import deepcopy  # 用于深拷贝 scene_parameters，避免所有事�
 from pathlib import Path  # 用于处理输出目录路径。
 from typing import Any  # 用于给字典做宽松标注。
 
-from liquidloc.common.constants import DATASET_NAME_MILUV, DATASET_NAME_NTU_VIRAL, DATASET_NAME_SIM, DATASET_NAME_UTIL  # 数据集名字常量（单源真相，D9 漂移根因修复）。
+from liquidloc.common.constants import DATASET_NAME_MILUV, DATASET_NAME_SIM, DATASET_NAME_UTIL  # 数据集名字常量（单源真相，D9 漂移根因修复）。
 from liquidloc.common.io_utils import dumps_json_text  # 严格 JSON 序列化工具（清单文件仍用 JSON 写）。
 from liquidloc.common.paths import get_standard_dirs, resolve_output_root  # 解析标准目录和统一输出根目录。
 from liquidloc.common.types import StageResult  # 流水线统一返回结构。
@@ -53,7 +53,6 @@ from liquidloc.dataio.manifests.dataset_checks import (
 )
 from liquidloc.dataio.manifests.dataset_checks import run_dataset_checks  # 运行数据集合法性检查。
 from liquidloc.dataio.readers.miluv_reader import read_miluv_sequence  # 读 MILUV 原始数据。
-from liquidloc.dataio.readers.ntu_viral_reader import read_ntu_viral_sequence  # 读 NTU VIRAL 原始数据。
 from liquidloc.dataio.readers.sim_reader import read_sim_sequence  # 读仿真数据。
 from liquidloc.dataio.readers.util_reader import read_util_sequence  # 读 util 数据。
 from liquidloc.interfaces.pipeline_api import PipelineAPI, normalize_pipeline_cfg  # 流水线接口基类与统一配置规整 helper。
@@ -288,7 +287,7 @@ def _enforce_sim_materialized_contract(raw_root: Any) -> None:
 class PreparePipeline(PipelineAPI):
     """原始数据准备流水线。
 
-    负责把不同数据集（sim/miluv/ntu_viral/util）的原始输入读出来，
+    负责把不同数据集（sim/miluv/util）的原始输入读出来，
     做字段映射、数据检查、事件构建和清单生成。
     """
 
@@ -319,8 +318,8 @@ class PreparePipeline(PipelineAPI):
             "scene_id": cfg.get("scene_id"),
         }, "PreparePipeline.run 入口参数")
         dataset_name = cfg.get('dataset_name')  # 读取数据集名称。
-        if dataset_name not in {DATASET_NAME_SIM, DATASET_NAME_MILUV, DATASET_NAME_NTU_VIRAL, DATASET_NAME_UTIL}:  # 只支持这四种数据集。
-            raise ValueError('dataset_name must be one of: sim, miluv, ntu_viral, util')
+        if dataset_name not in {DATASET_NAME_SIM, DATASET_NAME_MILUV, DATASET_NAME_UTIL}:  # 只支持这三种数据集。
+            raise ValueError('dataset_name must be one of: sim, miluv, util')
 
         seq_ids = list(cfg.get('seq_ids') or [])  # 需要准备的序列列表。
         if not seq_ids:  # 序列不能为空。
@@ -344,7 +343,7 @@ class PreparePipeline(PipelineAPI):
         if len(set(seq_ids)) != len(seq_ids):  # 序列 ID 不允许重复。
             raise ValueError('seq_ids must not contain duplicates')
 
-        # B04: 测试轨迹数 ≥ 20 条有效计分轨（手册 §0.4 / §9 / §14）。
+        # B04: 测试轨迹数 ≥ 20 条有效计分轨（§0.4 / §9 / §14）。
         # 豁免通道（2026-09-06 AUDIT_REPORT §4 修门位置错误）: 真实实验路径仍 ≥20 硬门；
         # smoke_mode / quick_full_rule='quick_smoke_scale__full_real_execution_required' 视为
         # 冒烟/单轨调通场景, 跳过 B04 计数检查, 与 eval_pipeline.py:615 口径对齐.
@@ -361,7 +360,7 @@ class PreparePipeline(PipelineAPI):
         for seq_id in seq_ids:  # 逐条序列处理。
             # BUG-008 修复 (2026-09-06 §10 阶段 12 审计): sim_e9_main 是 seed0/sim_curve_01 嵌套结构,
             # seq_id 含路径分隔符. sim 路径下 read_sim_sequence 自己接受嵌套路径; 通用
-            # validate_path_component 仅对 miluv/ntu_viral/util 等单层 seq_id 生效.
+            # validate_path_component 仅对 miluv/util 等单层 seq_id 生效.
             if dataset_name != DATASET_NAME_SIM:  # sim 走 sim_reader 自己路径校验, 跳过通用 path traversal 检查.
                 validate_path_component(seq_id, name='seq_id')  # 校验 seq_id 不含路径穿越字符，防止下游拼接 {seq_id}_events.json 时路径穿越，与 core_pipeline.py / eval_pipeline.py 模式一致。
             # BUG-009 修复 (2026-09-06 §10 阶段 12 审计): sim 嵌套 seq_id 'seed0/sim_curve_01'
@@ -381,13 +380,6 @@ class PreparePipeline(PipelineAPI):
                     raise ValueError("field_mapping must be a non-empty mapping for MILUV")
                 normalized_field_mapping = dict(field_mapping)  # 复制一份映射表，避免后续链路改写调用方对象。
                 raw_bundle, read_report = read_miluv_sequence(seq_id, raw_root)  # 读取 MILUV 原始 bundle。
-                internal_bundle, mapping_report = map_external_fields(raw_bundle, normalized_field_mapping)  # 字段映射。
-                read_report['mapping_report'] = mapping_report  # 把映射报告挂回读取报告。
-            elif dataset_name == DATASET_NAME_NTU_VIRAL:  # NTU VIRAL 也需要字段映射。
-                if not isinstance(field_mapping, Mapping) or not field_mapping:  # NTU VIRAL 必须提供非空字段映射。
-                    raise ValueError("field_mapping must be a non-empty mapping for NTU VIRAL")
-                normalized_field_mapping = dict(field_mapping)  # 复制一份映射表，避免后续链路改写调用方对象。
-                raw_bundle, read_report = read_ntu_viral_sequence(seq_id, raw_root)  # 读取 NTU VIRAL 原始 bundle。
                 internal_bundle, mapping_report = map_external_fields(raw_bundle, normalized_field_mapping)  # 字段映射。
                 read_report['mapping_report'] = mapping_report  # 把映射报告挂回读取报告。
             else:  # util 也走映射路径。

@@ -1,0 +1,481 @@
+{
+  "schema_version": "mimosa-task-review/v2",
+  "run_id": "20260924T031944019Z-18400-330c5d813c8e",
+  "run_status": "inconclusive",
+  "errors": [
+    {
+      "stage": "bash-discovery",
+      "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h",
+      "reason": "bash_discovery_incomplete: project enumeration exceeded 5000 reviewable files"
+    },
+    {
+      "stage": "baseline",
+      "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h",
+      "reason": "baseline_partial: baseline exceeded 5000 candidate files"
+    },
+    {
+      "stage": "scan",
+      "target": "tests/scripts/test_orchestration_scripts.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "tests/protocol/test_vio_path.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "tests/estimators/test_ekf_core.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "scripts/15_build_six_cmp_aggregate.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "scripts/16_write_six_cmp_scaffold.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    }
+  ],
+  "coverage": {
+    "schema_version": "mimosa-hook-coverage/v1",
+    "status": "partial",
+    "scope": "hook_observed_diff",
+    "baseline": {
+      "complete": false,
+      "captured_files": 5000,
+      "candidate_limit": 5000,
+      "truncated": true,
+      "enumeration_error_count": 0,
+      "snapshot_error_count": 0,
+      "compensated_target_count": 5
+    },
+    "change_tracking": {
+      "touched_observed": 0,
+      "touched_retained": 0,
+      "truncated": false,
+      "bash_mutation": true,
+      "bash_discovered": 5,
+      "bash_discovery_limit": 80,
+      "bash_discovery_truncated": false
+    },
+    "candidates": {
+      "eligible_files": 5,
+      "selected_files": 5,
+      "limit": 20,
+      "truncated": false
+    },
+    "scanning": {
+      "required_files": 5,
+      "scanned_files": 0,
+      "skipped_files": 0,
+      "failed_files": 5,
+      "project_checks_required": 0,
+      "project_checks_completed": 0
+    },
+    "notification": {
+      "eligible_findings": 0,
+      "detailed_findings": 0,
+      "detail_limit": 3,
+      "truncated": false
+    },
+    "reason_counts": {
+      "bash_discovery_incomplete": 1,
+      "baseline_partial": 1,
+      "scanner_failed": 5,
+      "project_check_failed": 7
+    },
+    "reasons": [
+      {
+        "code": "bash_discovery_incomplete",
+        "stage": "bash-discovery",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h",
+        "detail": "project enumeration exceeded 5000 reviewable files",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "tests/scripts/test_orchestration_scripts.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "tests/protocol/test_vio_path.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "tests/estimators/test_ekf_core.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "scripts/15_build_six_cmp_aggregate.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "scripts/16_write_six_cmp_scaffold.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "bash-discovery",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h",
+        "detail": "bash_discovery_incomplete: project enumeration exceeded 5000 reviewable files",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h",
+        "detail": "baseline_partial: baseline exceeded 5000 candidate files",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "tests/scripts/test_orchestration_scripts.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "tests/protocol/test_vio_path.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "tests/estimators/test_ekf_core.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "scripts/15_build_six_cmp_aggregate.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "scripts/16_write_six_cmp_scaffold.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      }
+    ],
+    "reasons_truncated": false
+  },
+  "generated_at": "2026-09-24T03:19:44.019Z",
+  "session_id": "sess_98c82e37-6f0c-494d-9642-3980d11594c7",
+  "target": ".",
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "rules_version": "unavailable",
+  "diff_hash": "670cbcc3a25d03ac67286231d239a7e5f2b944c313142d18d855033012ae7733",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 5,
+    "changed_files": [
+      {
+        "file": "scripts/15_build_six_cmp_aggregate.py",
+        "ranges": [
+          {
+            "start": 263,
+            "end": 263
+          },
+          {
+            "start": 266,
+            "end": 267
+          },
+          {
+            "start": 272,
+            "end": 272
+          },
+          {
+            "start": 275,
+            "end": 275
+          },
+          {
+            "start": 278,
+            "end": 278
+          },
+          {
+            "start": 281,
+            "end": 281
+          },
+          {
+            "start": 283,
+            "end": 283
+          },
+          {
+            "start": 300,
+            "end": 300
+          },
+          {
+            "start": 307,
+            "end": 307
+          },
+          {
+            "start": 319,
+            "end": 319
+          },
+          {
+            "start": 330,
+            "end": 330
+          },
+          {
+            "start": 333,
+            "end": 333
+          },
+          {
+            "start": 335,
+            "end": 335
+          },
+          {
+            "start": 340,
+            "end": 340
+          },
+          {
+            "start": 348,
+            "end": 348
+          },
+          {
+            "start": 351,
+            "end": 351
+          },
+          {
+            "start": 358,
+            "end": 358
+          },
+          {
+            "start": 366,
+            "end": 366
+          },
+          {
+            "start": 385,
+            "end": 385
+          },
+          {
+            "start": 387,
+            "end": 388
+          },
+          {
+            "start": 391,
+            "end": 391
+          },
+          {
+            "start": 393,
+            "end": 393
+          },
+          {
+            "start": 407,
+            "end": 407
+          },
+          {
+            "start": 422,
+            "end": 422
+          },
+          {
+            "start": 426,
+            "end": 426
+          },
+          {
+            "start": 428,
+            "end": 428
+          },
+          {
+            "start": 430,
+            "end": 430
+          },
+          {
+            "start": 438,
+            "end": 438
+          },
+          {
+            "start": 447,
+            "end": 447
+          }
+        ],
+        "before_hash": "1bd0e6b23ccd726b2f5ff2631b90c9c36ac7ff8b4c7373453c165e3c2be54da2",
+        "after_hash": "e16c1aca3956c769e2b71042b9f1b11ec0be33fd8e1c1fff9f4b469eec8e1aac"
+      },
+      {
+        "file": "scripts/16_write_six_cmp_scaffold.py",
+        "ranges": [
+          {
+            "start": 143,
+            "end": 143
+          },
+          {
+            "start": 148,
+            "end": 148
+          },
+          {
+            "start": 158,
+            "end": 158
+          },
+          {
+            "start": 168,
+            "end": 168
+          },
+          {
+            "start": 172,
+            "end": 172
+          },
+          {
+            "start": 201,
+            "end": 201
+          },
+          {
+            "start": 203,
+            "end": 204
+          }
+        ],
+        "before_hash": "95ae48290bc45c4c4f3ec358a4963d74ea35a5bb706a916df684ffcd46c0bae8",
+        "after_hash": "5468bad28f1825fea12078799f6dfb19e29ab256f6c3ef4357dc1fb09ab5ad9a"
+      },
+      {
+        "file": "tests/estimators/test_ekf_core.py",
+        "ranges": [
+          {
+            "start": 1784,
+            "end": 1784
+          },
+          {
+            "start": 1991,
+            "end": 1991
+          }
+        ],
+        "before_hash": "154a1ed2f90d0b5cc93a573f69df02974ec23519c51f2b8d38fec109d0cf234f",
+        "after_hash": "88a082004e801f650058bc20b4ac9d081fdf3d02baf121d6bf4f73cd4c5f64df"
+      },
+      {
+        "file": "tests/protocol/test_vio_path.py",
+        "ranges": [
+          {
+            "start": 182,
+            "end": 183
+          },
+          {
+            "start": 196,
+            "end": 197
+          }
+        ],
+        "before_hash": "66607a768164409c649122de1887520fa76c48d279794a22196f76385fdbcd68",
+        "after_hash": "c227a38ce24322efc59d7583a72f6afc7616d16f9ad300d96321dc791e20ab3f"
+      },
+      {
+        "file": "tests/scripts/test_orchestration_scripts.py",
+        "ranges": [
+          {
+            "start": 1971,
+            "end": 1971
+          },
+          {
+            "start": 1974,
+            "end": 1974
+          },
+          {
+            "start": 1976,
+            "end": 1976
+          },
+          {
+            "start": 1978,
+            "end": 1979
+          },
+          {
+            "start": 1989,
+            "end": 1989
+          },
+          {
+            "start": 2009,
+            "end": 2009
+          },
+          {
+            "start": 2011,
+            "end": 2011
+          },
+          {
+            "start": 2046,
+            "end": 2046
+          }
+        ],
+        "before_hash": "bf703592650f03a74966e7ebe65260ebb8ed9c1794320c07367566e964084743",
+        "after_hash": "1adc7990cda113873e3b427de2fc268f0217d782030bf90d8ea26274f83909f4"
+      }
+    ]
+  },
+  "timing": {
+    "started_at": "2026-09-24T03:19:38.398Z",
+    "completed_at": "2026-09-24T03:19:44.019Z",
+    "duration_ms": 5621,
+    "measurement": "hook_wall_clock"
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "model_calls": 0,
+    "measurement": "known-zero"
+  },
+  "telemetry": {
+    "schemaVersion": "mimosa-gate-telemetry/v1",
+    "profile": "gate",
+    "operation": "Stop",
+    "outcome": "partial/INCONCLUSIVE",
+    "latencyMs": 5621,
+    "peakMemoryBytes": 110198784,
+    "memoryMeasurement": "max-observed-process-rss",
+    "scannedFiles": 0,
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "measurement": "not-applicable"
+    },
+    "denyCount": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "total": 0,
+      "modelCalls": 0,
+      "measurement": "known-zero"
+    }
+  },
+  "finding_count": 0,
+  "rewake_finding_count": 0,
+  "evidence_boundary": {
+    "scan": "candidate",
+    "static_fix_verification": "observed_static_only",
+    "runtime_verification": "not_performed"
+  },
+  "finding_events": [],
+  "findings": [],
+  "artifacts": {
+    "immutable_report": ".mimosa/reports/task-review-sess_98c82e37-6f0c-494d-9642-3980d11594c7-20260924T031944019Z-18400-330c5d813c8e.json",
+    "latest_report": ".mimosa/reports/task-review-sess_98c82e37-6f0c-494d-9642-3980d11594c7.json",
+    "history_summary": ".mimosa/history/run-20260924T031944019Z-18400-330c5d813c8e.json"
+  }
+}

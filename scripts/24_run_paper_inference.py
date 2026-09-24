@@ -33,8 +33,8 @@ def parse_args():
     parser.add_argument("--output-root", type=str, default="outputs/e20_paper_main")
     parser.add_argument("--mode", type=str, default="quick", choices=["quick", "full"])
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--methods", type=str, nargs="+", default=["ekf", "robust_ekf", "lstm_ekf", "liquid_ekf", "transformer_ekf"],
-                        help="手册 Part 0 §13：5 方法必跑；ekf/robust_ekf 为传统融合无需 checkpoint，lstm/liquid/transformer 为神经网络需加载 ckpt")
+    parser.add_argument("--methods", type=str, nargs="+", default=["ekf", "lstm_ekf", "liquid_ekf", "transformer_ekf"],
+                        help="P25：4 方法必跑；ekf 为传统融合无需 checkpoint，lstm/liquid/transformer 为神经网络需加载 ckpt")
     parser.add_argument("--max-sequences", type=int, default=None, help="cap on number of seq_ids to run (quick 默认 40)")
     return parser.parse_args()
 

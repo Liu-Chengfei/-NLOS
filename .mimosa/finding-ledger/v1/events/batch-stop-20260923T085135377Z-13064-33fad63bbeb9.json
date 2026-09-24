@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260923T085135377Z-13064-33fad63bbeb9",
+  "runId": "20260923T085135377Z-13064-33fad63bbeb9",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": [
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/complex_math.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affectsCompletion": false
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "rulesVersion": "unavailable",
+  "sessionHash": "05e7570e9e1ab0c3b77922ed50751884a3ddcdd4798645bfed241bca451cf42a",
+  "reportRef": ".mimosa/reports/task-review-sess_71555325-2ec0-4c0c-b5fe-59fe8ca90d9c-20260923T085135377Z-13064-33fad63bbeb9.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [],
+  "recordedAt": "2026-09-23T08:51:35.708Z"
+}

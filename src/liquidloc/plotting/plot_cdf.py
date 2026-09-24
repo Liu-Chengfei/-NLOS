@@ -1,7 +1,7 @@
-"""Five-method error CDF plotter (异步高NLOS实验全流程保障手册 Part 3 §0-V6 + F-1).
+"""Four-method error CDF plotter (实验规范 Part 3 §0-V6 + F-1).
 
-Renders the empirical CDF of per-trajectory errors for all five methods
-(LNN / LSTM / Transformer / EKF / Robust-EKF) on the same axes, with P50/P95
+Renders the empirical CDF of per-trajectory errors for all four methods
+(LNN / LSTM / Transformer / EKF) on the same axes, with P50/P95
 markers drawn on the plot and self-contained caption indicating data layer /
 sample size / significance. This is the F-1 figure in the handbook T/F
 delivery list (handbook lines 661) and supports the D3/D29 narrative
@@ -42,7 +42,7 @@ __all__ = [
 ]
 
 
-_METHOD_ORDER = ("lnn", "lstm", "transformer", "ekf", "robust_ekf")  # mandated by handbook Part 0.
+_METHOD_ORDER = ("lnn", "lstm", "transformer", "ekf")  # mandated by handbook Part 0.
 # J-5: Delegated to _okabe_ito_palette so there is one canonical source of truth.
 # METHOD_COLORS is re-imported above to avoid circular dep at module level.
 
@@ -200,7 +200,6 @@ if __name__ == "__main__":
         "lstm": np.abs(_rng.normal(4.2, 1.0, 200)),
         "transformer": np.abs(_rng.normal(4.5, 1.1, 200)),
         "ekf": np.abs(_rng.normal(6.5, 1.5, 200)),
-        "robust_ekf": np.abs(_rng.normal(6.7, 1.6, 200)),
     }
     out = render_cdf_figure(
         err_by_method=_errs,

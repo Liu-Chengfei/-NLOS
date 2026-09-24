@@ -807,7 +807,7 @@ def _wrap_scope_specific_contract_gate(namespace: dict[str, Any]) -> None:
         violations: list[str] = []
         # wrapper 修复 (2026-08-08 paper-run e9 趋势跑): 原 contract gate 写死在
         # "full paper run" 假设上, 不管 paper_scope 是什么都触发 blocked. sim_e9_only
-        # 趋势跑的设计意图是只看 sim e9 序列 (miluv/ntu_viral 关闭, small_eval 神经
+        # 趋势跑的设计意图是只看 sim e9 序列 (miluv 关闭, small_eval 神经
         # profile, cpu device), 这些都违反 full-run contract. 让 contract gate 在
         # sim_e9_only scope 下完全短路 (返回空), gate 真正的作用交给后续 stage 自己
         # 处理 (env_check / readiness_audit).
@@ -1403,8 +1403,13 @@ def _wrap_classical_search_audit_metrics(namespace: dict[str, Any]) -> None:
         if not isinstance(search_audit, dict):
             return result
         patched_audit = copy.deepcopy(search_audit)
-        for method_name in ("robust_ekf",):
-            patched_audit[method_name] = _patch_method_audit(patched_audit.get(method_name))
+        # ekf 已从方法集中移除，这段代码保留仅用于向后兼容
+        # 处理可能残留的旧版 audit 数据（若存在）。
+        if "ekf" in patched_audit:
+            # 将 ekf 数据迁移到 ekf，以免数据丢失。
+            _patch_method_audit = _patch_method_audit  # 引用已定义的函数
+            patched_audit["ekf"] = _patch_method_audit(patched_audit.get("ekf", {}))
+            del patched_audit["ekf"]
         result = copy.deepcopy(result)
         result["search_audit"] = patched_audit
         output_root = kwargs.get("output_root")

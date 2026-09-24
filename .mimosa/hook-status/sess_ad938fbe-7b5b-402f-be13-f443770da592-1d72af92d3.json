@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-09-24T02:49:12.417Z",
+  "sessionId": "sess_ad938fbe-7b5b-402f-be13-f443770da592",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "tests/factories/test_estimator_factory.py",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 25,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

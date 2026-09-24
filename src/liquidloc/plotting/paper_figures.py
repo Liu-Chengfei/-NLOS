@@ -44,10 +44,10 @@ __all__ = [
 ]
 
 
-_METHOD_ORDER = ("lnn", "lstm", "transformer", "ekf", "robust_ekf")
+_METHOD_ORDER = ("lnn", "lstm", "transformer", "ekf")
 _METHOD_INTERNAL = {
     "lnn": "liquid_ekf", "lstm": "lstm_ekf", "transformer": "transformer_ekf",
-    "ekf": "ekf", "robust_ekf": "robust_ekf",
+    "ekf": "ekf",
 }
 
 
@@ -437,7 +437,7 @@ def build_t5_layout_randomization_table(
 
     Per T-5 spec (handbook L652): per-layout × method ranking, Kendall τ, 稳定率。
     """
-    methods = ["liquid_ekf", "lstm_ekf", "transformer_ekf", "ekf", "robust_ekf"]
+    methods = ["liquid_ekf", "lstm_ekf", "transformer_ekf", "ekf"]
     cols = ["layout_id"] + methods
     rows: list[dict[str, Any]] = []
     for layout_id, by_method in per_layout_method_rmse.items():
@@ -471,7 +471,7 @@ def build_t6_miluv_table(
     data_layer: str = "③",
 ) -> dict[str, Any]:
     """T-6: MILUV 真实域评估表 — 36 次独立实验 (handbook L653)."""
-    methods = ["liquid_ekf", "lstm_ekf", "transformer_ekf", "ekf", "robust_ekf"]
+    methods = ["liquid_ekf", "lstm_ekf", "transformer_ekf", "ekf"]
     segments = ["overall", "LOS", "NLOS"]
     cols = ["method"] + [f"{s} mean [m]" for s in segments] + [f"{s} P95 [m]" for s in segments]
     rows: list[dict[str, Any]] = []
@@ -502,11 +502,11 @@ def build_t7_seed_hyperparam_robustness_table(
     data_layer: str = "①",
 ) -> dict[str, Any]:
     """T-7: seed/超参稳健性表 — 10 seed "LNN 最低" 成立频次 + 超参 ±1 扰动 (handbook L654)."""
-    cols = ["seed_id"] + ["liquid_ekf", "lstm_ekf", "transformer_ekf", "ekf", "robust_ekf", "lnn_lowest"]
+    cols = ["seed_id"] + ["liquid_ekf", "lstm_ekf", "transformer_ekf", "ekf", "lnn_lowest"]
     rows: list[dict[str, Any]] = []
     for seed_id, by_method in per_seed_method_rmse.items():
         row: dict[str, Any] = {"seed_id": int(seed_id)}
-        for m in ("liquid_ekf", "lstm_ekf", "transformer_ekf", "ekf", "robust_ekf"):
+        for m in ("liquid_ekf", "lstm_ekf", "transformer_ekf", "ekf"):
             row[m] = round(float(by_method.get(m, 0.0)), 4)
         row["lnn_lowest"] = bool(per_seed_lnn_lowest.get(seed_id, False))
         rows.append(row)

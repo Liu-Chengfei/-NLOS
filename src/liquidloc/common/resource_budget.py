@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
 """资源预算管理器：RAM ≤12GB 硬上限 + 并行度 = min(GPU, RAM, 待执行)。
 
-手册 C-6/C-7 硬约束：
-  - C-6：并发调度器按 "并发单元数 × 单单元峰值内存 ≤ 12GB" 计算 RAM 闸门
-  - C-7：调度器并行度 = min(GPU 允许并发, RAM 允许并发, 待执行单元数)
+  - 并发调度器按 "并发单元数 × 单单元峰值内存 ≤ 12GB" 计算 RAM 闸门
+  - 调度器并行度 = min(GPU 允许并发, RAM 允许并发, 待执行单元数)
 
 本模块提供：
   - PsUtilMemoryProbe：读取系统总内存、可用内存
@@ -16,7 +14,7 @@ import math
 from pathlib import Path
 from typing import Any, Optional
 
-# 硬上限：手册 C-6 RAM ≤12G
+# 硬上限：RAM ≤12G
 RAM_LIMIT_GB: float = 12.0
 RAM_LIMIT_BYTES: float = RAM_LIMIT_GB * 1024 * 1024 * 1024  # 12 GB
 
@@ -106,7 +104,6 @@ class NVMLGpuProbe:
 def estimate_unit_peak_memory_mb(executor_type: str) -> float:
     """估算单个执行单元的峰值内存（MB）。
     
-    手册 [1011] 要求：并发单元按 "单元数 × 峰值内存 ≤ 12GB" 计。
     此函数返回经验估算值，实际值由 runtime ram_peak 字段覆盖。
     """
     # 经验值：每单元约占 2.5GB 显存 + 1GB 系统内存
@@ -126,12 +123,7 @@ def compute_parallel_limits(
     allow_multi_gpu: bool = True,
 ) -> dict[str, Any]:
     """计算并行度 = min(GPU, RAM, 待执行)。
-    
-    手册 C-7：
-      - gpu_parallel = floor(显存总量 / 单元显存占用)
-      - ram_parallel = floor(12GB / 单元峰值内存)
-      - final_parallel = min(gpu_parallel, ram_parallel, n_pending)
-    
+
     返回 dict 包含：
       - gpu_count: 检测到的 GPU 数量
       - gpu_parallel: GPU 允许的最大并发度
@@ -160,17 +152,17 @@ def compute_parallel_limits(
     ram_probe = PsUtilMemoryProbe()
     total_ram_gb = ram_probe.get_total_memory_gb()
     
-    # 手册要求：单元峰值内存 × 并发数 ≤ 12GB
+    # 要求：单元峰值内存 × 并发数 ≤ 12GB
     unit_peak_gb = unit_peak_memory_mb / 1024.0
     ram_parallel = int(RAM_LIMIT_GB / unit_peak_gb) if unit_peak_gb > 0 else 0
     
     # 并行度 = min(GPU 并发, RAM 并发, 待执行)
     final_parallel = min(gpu_parallel, ram_parallel, n_pending)
     if gpu_parallel == 0 and ram_parallel > 0:
-        # 无 GPU，CPU 空闲协助（C-5）：仅在 GPU 排满后才启动
-        final_parallel = 0  # 训练入口 C-4 已报错，故此处为 0
+        # 无 GPU，CPU 空闲协助：仅在 GPU 排满后才启动
+        final_parallel = 0  # 训练入口 已报错，故此处为 0
     
-    # 断言：无 GPU 时 final_parallel 必须为 0（C-4 约束）
+    # 断言：无 GPU 时 final_parallel 必须为 0
     if gpu_count == 0:
         final_parallel = 0
     
@@ -189,8 +181,8 @@ def compute_parallel_limits(
 
 def verify_ram_budget(manifest_path: Path) -> dict[str, Any]:
     """从 manifest 读取每个单元的实际峰值内存，验证总计是否 ≤ 12GB。
-    
-    手册 C-6：运行期冒烟实测单单元峰值内存（psutil 探针）。
+
+    运行期冒烟实测单单元峰值内存（psutil 探针）。
     """
     import json
     

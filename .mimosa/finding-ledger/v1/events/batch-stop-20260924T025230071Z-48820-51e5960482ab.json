@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260924T025230071Z-48820-51e5960482ab",
+  "runId": "20260924T025230071Z-48820-51e5960482ab",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": [
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affectsCompletion": false
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "19a0d995b5172140489f5d8e38cd8ead0628e5c5bad1044ee3e0619d2d2f48f3",
+  "rulesVersion": "unavailable",
+  "sessionHash": "1d72af92d3fa645e7c07f6917faf07f21838fea3450173fac9dd0dededd2d9de",
+  "reportRef": ".mimosa/reports/task-review-sess_ad938fbe-7b5b-402f-be13-f443770da592-20260924T025230071Z-48820-51e5960482ab.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "tests/scripts/test_run_paper_experiments.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "tests/scripts/test_build_six_cmp_aggregate.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "tests/factories/test_estimator_factory.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-24T02:52:30.385Z"
+}

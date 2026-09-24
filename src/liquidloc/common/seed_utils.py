@@ -56,7 +56,7 @@ def cuda_runtime_usable() -> bool:  # 判断当前 PyTorch 运行时是否真的
     本函数位于 common 层但使用 CUDA 张量，这是有意为之的检测逻辑而非计算逻辑：
     - 目的是验证 CUDA 运行时是否真正可用，而非执行 GPU 计算
     - CUDA 张量操作被 try/except 包裹，无 CUDA 环境时安全返回 False
-    - 本函数不违反 AGENTS.md 第 5 节"CPU 默认"规则，因为它只做可用性检测
+    - 本函数不违反"CPU 默认"规则，因为它只做可用性检测
     - 调用方应根据返回值决定是否使用 GPU，而非假设 GPU 可用
     """
     try:  # 先尝试导入 torch。
@@ -174,11 +174,11 @@ def set_global_seed(seed: int, deterministic: bool = True) -> dict:  # 设置全
             torch.use_deterministic_algorithms(deterministic)  # 按需启用确定性算法。
             deterministic_algorithms_set = True  # 记录全局确定性算法已设置。
 
-        # P19 硬约束：TF32 开关显式设置并写入 manifest（手册 line 211）
-        # 三网络与 EKF/Robust-EKF 共用同一设置（不允许 LNN FP32 + LSTM TF32 等精度不一致）
-        # 显式 False 保证跨机/跨版本浮点可复现（PyTorch 默认 Ampere+ 上 allow_tf32=True）。
-        # 确定性模式(deterministic=True)必须关闭 TF32，否则逐bit可复现(P19/[584])被破坏；
-        # 非确定性模式允许 TF32 提速。手册[264]要求"显式设置"，两种取值均显式写入报告。
+# P19 硬约束：TF32 开关显式设置并写入 manifest
+# 三网络与 EKF/EKF 共用同一设置（不允许 LNN FP32 + LSTM TF32 等精度不一致）
+# 显式 False 保证跨机/跨版本浮点可复现（PyTorch 默认 Ampere+ 上 allow_tf32=True）。
+# 确定性模式(deterministic=True)必须关闭 TF32，否则逐bit可复现被破坏；
+# 非确定性模式允许 TF32 提速。显式设置两种取值均写入报告。
         _tf32_flag = (not deterministic)  # deterministic=True → allow_tf32=False（可复现）
         if hasattr(torch.backends.cuda, "matmul"):
             torch.backends.cuda.matmul.allow_tf32 = _tf32_flag

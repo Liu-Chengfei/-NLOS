@@ -1,0 +1,5 @@
+# 估计器名字常量（单源真相，D9 配置表面漂移根因修复）。
+# factories/estimator_factory.py _SUPPORTED、_validate_estimator_cfg 专属校验分支、
+# create_estimator 路由均从此处引用，禁止在各模块本地重复定义相同字面量。
+ESTIMATOR_NAME_EKF: str = "ekf"  # 标准 EKF 估计器名字。
+ESTIMATOR_NAME_SGPR: str = "sgpr"  # 纯 SGPR 估计器名字（§16.1 封闭对手集，当前无真实 SGPR 主体，工厂层主动 raise NotImplementedError，防止误用占位名）。

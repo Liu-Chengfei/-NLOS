@@ -756,7 +756,7 @@ def _build_phase_control_summary(
 def _build_score_role_summary() -> dict[str, Any]:
     """Describe the current runtime roles of optimization/control/export scores.
 
-    P33 修复（handbook 手册 P33 三网络统一 best-val checkpoint 选择协议）：
+    P33 修复（三网络统一 best-val checkpoint 选择协议）：
         三网络（LSTM/Transformer/Liquid）必须使用统一的「验证集最优（best-val）」checkpoint
         选择准则，禁止各方法自由选点。
         本函数以前声明 `paper_checkpoint_selection_must_use: "export_score"`，这是 Liquid 端

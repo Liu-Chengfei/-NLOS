@@ -1,0 +1,20 @@
+"""Runtime configuration adapters used by protocol validators."""
+from __future__ import annotations
+
+from liquidloc.common.config_utils import find_project_root, load_yaml_config
+
+
+def scene_scale_fgo_mismatch_flag(t_eff_min_s: float) -> bool:
+    """Return whether the frozen FGO filter contract exceeds the scene-scale bound."""
+    try:
+        fgo_cfg = load_yaml_config(find_project_root() / "configs" / "models" / "fgo.yaml")
+        tau_filt = fgo_cfg.get("tau_filt_s")
+        if tau_filt is None:
+            return False
+        tau_upper = min(5.0, 0.2 * float(t_eff_min_s))
+        return float(tau_filt) > tau_upper + 1e-9
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return False
+
+
+__all__ = ("scene_scale_fgo_mismatch_flag",)

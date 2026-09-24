@@ -178,7 +178,7 @@ paper_spec:
       - [10.0, 18.0, 2.5]
     # K1：4 锚点（主档，绑 N2/N3 — handbook S2 协议裁决项）
     # 准则 §4 GDOP 主用布局：A1(2,2)/A2(18,3)/A3(6,17)/A4(16,18) 非对称分布，
-    # 实测 GDOP ≈1.19（活动区凸包内缩 1.5m 轨迹带），手册允许 K 档归属协议裁决。
+    # 实测 GDOP ≈1.19（活动区凸包内缩 1.5m 轨迹带），协议裁决 K 档归属。
     K1:
       - [2.0, 2.0, 2.5]
       - [18.0, 3.0, 2.5]
@@ -199,8 +199,8 @@ paper_spec:
 
   # §7.2 规模与划分
   scale:
-    per_seed_sequences: 200      # quick test: 200 序列/seed，n_seed=10 → 2000 seqs（手册 S3）
-    n_seed: 10                    # 手册 S3 硬约束：10 seed × 5 method = 50 单元（论文级唯一基线）
+    per_seed_sequences: 200      # quick test: 200 序列/seed，n_seed=10 → 2000 seqs（S3）
+    n_seed: 10                    # S3 硬约束：10 seed × 5 method = 50 单元（论文级唯一基线）
     train_test_ratio: 0.1       # 1:9 序列级划分（200 train / 1800 test per seed）
 
   # §7.3 frozen axes (v27 协议对齐)

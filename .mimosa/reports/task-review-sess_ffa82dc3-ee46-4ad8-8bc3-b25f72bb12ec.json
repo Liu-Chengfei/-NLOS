@@ -1,0 +1,412 @@
+{
+  "schema_version": "mimosa-task-review/v2",
+  "run_id": "20260923T105334480Z-41280-25efb9b67326",
+  "run_status": "completed",
+  "errors": [],
+  "coverage": {
+    "schema_version": "mimosa-hook-coverage/v1",
+    "status": "complete",
+    "scope": "hook_observed_diff",
+    "baseline": {
+      "complete": false,
+      "captured_files": 5000,
+      "candidate_limit": 5000,
+      "truncated": true,
+      "enumeration_error_count": 0,
+      "snapshot_error_count": 0,
+      "compensated_target_count": 3
+    },
+    "change_tracking": {
+      "touched_observed": 3,
+      "touched_retained": 3,
+      "truncated": false,
+      "bash_mutation": false,
+      "bash_discovered": 0,
+      "bash_discovery_limit": 80,
+      "bash_discovery_truncated": false
+    },
+    "candidates": {
+      "eligible_files": 3,
+      "selected_files": 3,
+      "limit": 20,
+      "truncated": false
+    },
+    "scanning": {
+      "required_files": 2,
+      "scanned_files": 2,
+      "skipped_files": 0,
+      "failed_files": 0,
+      "project_checks_required": 0,
+      "project_checks_completed": 0
+    },
+    "notification": {
+      "eligible_findings": 6,
+      "detailed_findings": 0,
+      "detail_limit": 3,
+      "truncated": true
+    },
+    "reason_counts": {
+      "baseline_partial": 1
+    },
+    "reasons": [
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/Enumerate.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affects_completion": false
+      }
+    ],
+    "reasons_truncated": false
+  },
+  "generated_at": "2026-09-23T10:53:34.480Z",
+  "session_id": "sess_ffa82dc3-ee46-4ad8-8bc3-b25f72bb12ec",
+  "target": ".",
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "rules_version": "unavailable",
+  "diff_hash": "57f77ba80be8241f895fcf04251cbc3efe53a887bd46f662f9715f9146399550",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 2,
+    "changed_files": [
+      {
+        "file": "src/liquidloc/dataio/sim_materializer.py",
+        "ranges": [
+          {
+            "start": 325,
+            "end": 2898
+          }
+        ],
+        "before_hash": "bac2a8a7b0f786995844032d7703511f43cba2d326cdc24c6d53de73cf6ced36",
+        "after_hash": "066b3bbc69f3e2411a66c2beac5ec581d45962437e419535cf36182e1e4483c3"
+      },
+      {
+        "file": "src/liquidloc/protocol/result_schema.py",
+        "ranges": [
+          {
+            "start": 65,
+            "end": 65
+          }
+        ],
+        "before_hash": "42651787c803d7349e31e27098e7ae54d69fbcec257da10001397fc43a01f1e9",
+        "after_hash": "445ed9c0978be8491f249877ddcb9751cd212c095ea02bb9142fc15cc3edecc8"
+      }
+    ]
+  },
+  "timing": {
+    "started_at": "2026-09-23T10:53:33.480Z",
+    "completed_at": "2026-09-23T10:53:34.480Z",
+    "duration_ms": 1000,
+    "measurement": "hook_wall_clock"
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "model_calls": 0,
+    "measurement": "known-zero"
+  },
+  "telemetry": {
+    "schemaVersion": "mimosa-gate-telemetry/v1",
+    "profile": "gate",
+    "operation": "Stop",
+    "outcome": "complete",
+    "latencyMs": 1000,
+    "peakMemoryBytes": 150269952,
+    "memoryMeasurement": "max-observed-process-rss",
+    "scannedFiles": 2,
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "measurement": "not-applicable"
+    },
+    "denyCount": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "total": 0,
+      "modelCalls": 0,
+      "measurement": "known-zero"
+    }
+  },
+  "finding_count": 6,
+  "rewake_finding_count": 0,
+  "evidence_boundary": {
+    "scan": "candidate",
+    "static_fix_verification": "observed_static_only",
+    "runtime_verification": "not_performed"
+  },
+  "finding_events": [
+    {
+      "finding_id": "mimosa-11e0827fa787c6408a1ec495",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 1931,
+      "severity": "high",
+      "category": "弱随机数",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-23T10:53:34.480Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "3f6cf9c9c4ef16c5e236336b838da111aec77c7f16528d0938895bdf8c23cb2b",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-11e0827fa787c6408a1ec495",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 1931,
+      "severity": "low",
+      "category": "不安全的随机数",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-23T10:53:34.480Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "3f6cf9c9c4ef16c5e236336b838da111aec77c7f16528d0938895bdf8c23cb2b",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-79617c2d96ff82a28246a267",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 1957,
+      "severity": "high",
+      "category": "弱随机数",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-23T10:53:34.480Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "c69978252a1bbeffe10c61e599a63fac568f53881a9bda87a8489288690cdb34",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-79617c2d96ff82a28246a267",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 1957,
+      "severity": "low",
+      "category": "不安全的随机数",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-23T10:53:34.480Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "c69978252a1bbeffe10c61e599a63fac568f53881a9bda87a8489288690cdb34",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-b474a3f8c16de305c44ba3d4",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 2377,
+      "severity": "high",
+      "category": "弱随机数",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-23T10:53:34.480Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "9baa7dac226bb4a6f0ba9419af88f37199f956df79026b8af340121fa170276e",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-b474a3f8c16de305c44ba3d4",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 2377,
+      "severity": "low",
+      "category": "不安全的随机数",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-23T10:53:34.480Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "9baa7dac226bb4a6f0ba9419af88f37199f956df79026b8af340121fa170276e",
+        "runtime_oracle": false
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "mimosa-11e0827fa787c6408a1ec495",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 1931,
+      "end_line": 1931,
+      "severity": "high",
+      "category": "弱随机数",
+      "kind": "semgrep",
+      "advisory": true,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": "src/liquidloc/dataio/sim_materializer.py",
+          "line": 1931,
+          "evidence_hash": "3f6cf9c9c4ef16c5e236336b838da111aec77c7f16528d0938895bdf8c23cb2b",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-11e0827fa787c6408a1ec495",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 1931,
+      "end_line": 1931,
+      "severity": "low",
+      "category": "不安全的随机数",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": "src/liquidloc/dataio/sim_materializer.py",
+          "line": 1931,
+          "evidence_hash": "3f6cf9c9c4ef16c5e236336b838da111aec77c7f16528d0938895bdf8c23cb2b",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-79617c2d96ff82a28246a267",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 1957,
+      "end_line": 1957,
+      "severity": "high",
+      "category": "弱随机数",
+      "kind": "semgrep",
+      "advisory": true,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": "src/liquidloc/dataio/sim_materializer.py",
+          "line": 1957,
+          "evidence_hash": "c69978252a1bbeffe10c61e599a63fac568f53881a9bda87a8489288690cdb34",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-79617c2d96ff82a28246a267",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 1957,
+      "end_line": 1957,
+      "severity": "low",
+      "category": "不安全的随机数",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": "src/liquidloc/dataio/sim_materializer.py",
+          "line": 1957,
+          "evidence_hash": "c69978252a1bbeffe10c61e599a63fac568f53881a9bda87a8489288690cdb34",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-b474a3f8c16de305c44ba3d4",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 2377,
+      "end_line": 2377,
+      "severity": "high",
+      "category": "弱随机数",
+      "kind": "semgrep",
+      "advisory": true,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": "src/liquidloc/dataio/sim_materializer.py",
+          "line": 2377,
+          "evidence_hash": "9baa7dac226bb4a6f0ba9419af88f37199f956df79026b8af340121fa170276e",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-b474a3f8c16de305c44ba3d4",
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "line": 2377,
+      "end_line": 2377,
+      "severity": "low",
+      "category": "不安全的随机数",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": "src/liquidloc/dataio/sim_materializer.py",
+          "line": 2377,
+          "evidence_hash": "9baa7dac226bb4a6f0ba9419af88f37199f956df79026b8af340121fa170276e",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    }
+  ],
+  "artifacts": {
+    "immutable_report": ".mimosa/reports/task-review-sess_ffa82dc3-ee46-4ad8-8bc3-b25f72bb12ec-20260923T105334480Z-41280-25efb9b67326.json",
+    "latest_report": ".mimosa/reports/task-review-sess_ffa82dc3-ee46-4ad8-8bc3-b25f72bb12ec.json",
+    "history_summary": ".mimosa/history/run-20260923T105334480Z-41280-25efb9b67326.json"
+  }
+}

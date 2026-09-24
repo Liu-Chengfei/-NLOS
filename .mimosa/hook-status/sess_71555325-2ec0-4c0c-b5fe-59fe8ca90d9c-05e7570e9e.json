@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-09-23T08:40:12.111Z",
+  "sessionId": "sess_71555325-2ec0-4c0c-b5fe-59fe8ca90d9c",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "tests/pipelines/test_section10_4_window_size_parity.py",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 23,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

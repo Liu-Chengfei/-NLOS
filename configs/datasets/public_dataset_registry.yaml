@@ -36,36 +36,6 @@ datasets:
     # mini_seq, mini_seq_02 是当前冻结的评测序列标识。
     frozen_public_eval_seq_ids: [mini_seq, mini_seq_02]
 
-  # ---- NTU VIRAL 数据集 ----
-  # NTU VIRAL 是公开验证面允许的另一个数据集，与 MILUV 共享同一 benchmark 脚本。
-  ntu_viral:
-    # 数据读取器路径，指向负责解析 NTU VIRAL 原始格式的 reader 模块。
-    reader: src/liquidloc/dataio/readers/ntu_viral_reader.py
-    # 数据准备脚本路径，负责将原始数据转换为统一 schema 格式。
-    prepare_script: scripts/03_prepare_ntu_viral_data.py
-    # 公开 benchmark 执行脚本路径，与 MILUV 共享同一脚本。
-    benchmark_script: scripts/18_run_public_benchmarks.py
-    # 数据下载脚本路径，与 MILUV 共享同一下载脚本。
-    download_script: scripts/16_download_public_datasets.py
-    # 官方数据根目录，存放从官方源下载的未经修改的原始数据。
-    official_root: data/public/official/ntu_viral
-    # 落地原始数据目录，下载后或手工导入后的原始数据存放位置。
-    landed_raw_root: data/raw/ntu_viral
-    # 有用资产列表，NTU VIRAL 不含 anchor_layout.json。
-    # imu.json : IMU 传感器数据  uwb.json : UWB 测距数据
-    # vio.json : VIO 视觉里程计数据  gt.json : 真值数据
-    useful_assets: [imu.json, uwb.json, vio.json, gt.json]
-    # VIO 后端类型，json 表示 VIO 数据以 JSON 格式存储。
-    vio_backend: json
-    # 适配器脚本，负责把 flight archive 转换为 read_ntu_viral_sequence 可消费的目录结构。
-    # 不在仓库依赖范围内的是 rospy/rosbag Python 绑定，因此 IMU/UWB 当前为占位。
-    adapter_script: scripts/19_unpack_ntu_viral_archives.py
-    # 发布层级，smoke_only 表示当前仅支持烟雾测试级别的验证。
-    release_tier: smoke_only
-    # 论文完整验证就绪标志，false 表示当前数据/流程尚未达到论文级完整验证标准。
-    paper_full_ready: false
-    # 冻结公开评测序列 ID 列表，mini_seq 是当前冻结的评测序列标识。
-    frozen_public_eval_seq_ids: [mini_seq]
 
   # ---- UTIL 补充数据集 ----
   # UTIL 是补充路由，不属于当前官方公开 benchmark 面。
@@ -102,7 +72,7 @@ datasets:
     frozen_public_eval_seq_ids: null
 
   # ---- SIM E9 协议仿真数据集 ----
-  # SIM E9 是协议级仿真数据集，提供 §6/§8 主表与 §12 消融实验的真实仿真数据。
+  # SIM E9 是协议级仿真数据集，提供 §6/§8 主表实验的真实仿真数据。
   # 它不属于官方公开 benchmark 面，仅作为补充/扩展实验路由入口（supplementary route）。
   # Supplementary route only; not part of the official public benchmark surface.
   sim_e9_protocol_20260726:

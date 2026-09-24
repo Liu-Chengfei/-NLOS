@@ -7,10 +7,6 @@ from liquidloc.dataio.readers.miluv_reader import (  # 重新导出 MILUV 读取
     inspect_miluv_raw_readiness,  # 检查 MILUV 原始目录是否可用于端到端烟雾测试。
     read_miluv_sequence,  # 读取一条 MILUV 序列并返回原始包。
 )
-from liquidloc.dataio.readers.ntu_viral_reader import (  # 重新导出 NTU VIRAL 读取与就绪检查函数。
-    inspect_ntu_viral_raw_readiness,  # 检查 NTU VIRAL 原始目录是否可用于公开基准烟雾测试。
-    read_ntu_viral_sequence,  # 读取一条 NTU VIRAL 序列并返回原始包。
-)
 from liquidloc.dataio.readers.sim_reader import read_sim_sequence  # 重新导出仿真数据读取入口。
 from liquidloc.dataio.readers.util_reader import (  # 重新导出 UTIL 读取与就绪检查函数。
     inspect_util_raw_readiness,  # 检查 UTIL 原始目录是否可用于烟雾测试。
@@ -41,10 +37,8 @@ def list_sequence_dirs(raw_root: Path) -> list[Path]:
 __all__ = (  # 显式声明本包对外公开的读取 API。
     "audit_miluv_official_sample",  # MILUV 官方样例审计入口。
     "inspect_miluv_raw_readiness",  # MILUV 原始目录就绪检查入口。
-    "inspect_ntu_viral_raw_readiness",  # NTU VIRAL 原始目录就绪检查入口。
     "list_sequence_dirs",  # 序列目录列表函数。
     "read_miluv_sequence",  # MILUV 序列读取入口。
-    "read_ntu_viral_sequence",  # NTU VIRAL 序列读取入口。
     "read_sim_sequence",  # 仿真序列读取入口。
     "inspect_util_raw_readiness",  # UTIL 原始目录就绪检查入口。
     "read_util_sequence",  # 工具序列读取入口。

@@ -10,7 +10,6 @@ from __future__ import annotations
 - 协议门控对 seq_ids 和 split 的归一化
 - 空白 split / 空白路径的拒绝
 - 非公开数据集（util）的拒绝
-- NTU VIRAL 真实链路冒烟测试
 - 相对路径锚定到 project_root
 
 被测模块：liquidloc.pipelines.public_pipeline"""

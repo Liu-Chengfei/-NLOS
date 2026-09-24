@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260923T105334480Z-41280-25efb9b67326",
+  "runId": "20260923T105334480Z-41280-25efb9b67326",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": [
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/Enumerate.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affectsCompletion": false
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "57f77ba80be8241f895fcf04251cbc3efe53a887bd46f662f9715f9146399550",
+  "rulesVersion": "unavailable",
+  "sessionHash": "d6576d686430322ff277c6233fe01c905e45eacdbb077803aaeff9497709f121",
+  "reportRef": ".mimosa/reports/task-review-sess_ffa82dc3-ee46-4ad8-8bc3-b25f72bb12ec-20260923T105334480Z-41280-25efb9b67326.json",
+  "events": [
+    {
+      "eventId": "hook-2c460bd57260c45cd5d8eea24a7ea2ee",
+      "findingId": "mimosa-11e0827fa787c6408a1ec495",
+      "type": "finding_observed",
+      "at": "2026-09-23T10:53:34.480Z",
+      "identity": {
+        "projectRelativeFile": "src/liquidloc/dataio/sim_materializer.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "3f6cf9c9c4ef16c5e236336b838da111aec77c7f16528d0938895bdf8c23cb2b",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 1931,
+      "endLine": 1931,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "3f6cf9c9c4ef16c5e236336b838da111aec77c7f16528d0938895bdf8c23cb2b"
+      },
+      "sequence": 0
+    },
+    {
+      "eventId": "hook-9a2f7a9e6e9b6d5efd30dad52ce5bfea",
+      "findingId": "mimosa-79617c2d96ff82a28246a267",
+      "type": "finding_observed",
+      "at": "2026-09-23T10:53:34.480Z",
+      "identity": {
+        "projectRelativeFile": "src/liquidloc/dataio/sim_materializer.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "c69978252a1bbeffe10c61e599a63fac568f53881a9bda87a8489288690cdb34",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 1957,
+      "endLine": 1957,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "c69978252a1bbeffe10c61e599a63fac568f53881a9bda87a8489288690cdb34"
+      },
+      "sequence": 1
+    },
+    {
+      "eventId": "hook-62bd5a02e583f350b17c7b7c09a7ecd8",
+      "findingId": "mimosa-b474a3f8c16de305c44ba3d4",
+      "type": "finding_observed",
+      "at": "2026-09-23T10:53:34.480Z",
+      "identity": {
+        "projectRelativeFile": "src/liquidloc/dataio/sim_materializer.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "9baa7dac226bb4a6f0ba9419af88f37199f956df79026b8af340121fa170276e",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 2377,
+      "endLine": 2377,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "9baa7dac226bb4a6f0ba9419af88f37199f956df79026b8af340121fa170276e"
+      },
+      "sequence": 2
+    }
+  ],
+  "observedFindingIds": [
+    "mimosa-11e0827fa787c6408a1ec495",
+    "mimosa-79617c2d96ff82a28246a267",
+    "mimosa-b474a3f8c16de305c44ba3d4",
+    "mimosa-85186826fdd586c819dfa895"
+  ],
+  "verifiedFiles": [
+    {
+      "file": "src/liquidloc/dataio/sim_materializer.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/protocol/result_schema.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-23T10:53:34.799Z"
+}

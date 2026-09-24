@@ -23,6 +23,8 @@
 
 from __future__ import annotations  # 启用延迟注解求值，允许类型标注前向引用
 
+from liquidloc.pipelines.training_runtime import resolve_train_device as _resolve_train_device_impl
+
 from copy import deepcopy  # 深拷贝估计器配置，避免污染默认 EKF 配置缓存或调用方对象。
 import json  # JSON 序列化/反序列化，读取 gt.json 等文件
 import math  # 数学运算：sqrt、isfinite、pi 等
@@ -43,7 +45,7 @@ from liquidloc.common.constants import MODALITY_UWB, MODALITY_VIO
 from liquidloc.common.constants import ESTIMATOR_NAME_EKF  # EKF 估计器名字单源常量（D9 漂移根因修复，禁止本地 'ekf' 字面量）
 from liquidloc.common.constants import MODEL_NAME_LIQUID, MODEL_NAME_LSTM, MODEL_NAME_TRANSFORMER  # 模型名字单源常量（D9 漂移根因修复，禁止本地 'liquid_ekf'/'lstm_ekf' 字面量）
 from liquidloc.common.constants import MODEL_INTERMEDIATE_KEYS  # 四头输出头键名单源常量（D9 漂移根因修复，禁止本地重复定义四头元组）
-from liquidloc.common.constants import DEVICE_AUTO, DEVICE_CPU, DEVICE_CUDA, ALLOWED_TRAIN_DEVICES  # 训练设备请求单源常量（D9 漂移根因修复，禁止本地 'auto'/'cpu'/'cuda' 字面量）
+from liquidloc.common.constants import DEVICE_CUDA  # 训练报告中使用的 CUDA 常量。
 from liquidloc.common.constants import ALLOWED_RUN_MODES  # 运行模式单源常量（D9 漂移根因修复，禁止本地 {'quick','full'} 字面量集合）
 from liquidloc.common.constants import PAYLOAD_KEYS  # 每种模态对应的 payload 键名注册表
 from liquidloc.common.constants import RISK_PARTIAL_DAMPING_COEFF  # 安全模式衰减系数
@@ -387,50 +389,13 @@ def _resolve_train_device(
     *,
     allow_auto_cuda: bool,
 ) -> dict[str, Any]:
-    """解析训练设备请求，决定最终使用 CPU 还是 CUDA。
-
-    Args:
-        device_request: 设备请求字符串，可为 auto/cpu/cuda 或 None。
-        allow_auto_cuda: auto 模式下是否允许自动选择 CUDA。
-
-    Returns:
-        包含 requested_device/selected_device/cuda_available/cuda_runtime_available 的字典。
-
-    Raises:
-        ValueError: device_request 不是合法设备选项。
-        TypeError: device_request 既不是 None 也不是字符串。
-    """
-    # 解析设备请求，决定使用 CPU 还是 CUDA
-    if device_request is None:  # 未指定时默认 auto
-        requested_device = DEVICE_AUTO
-    elif is_string_like(device_request):  # 字符串请求：归一化大小写与空格
-        requested_device = str(device_request).strip().lower()
-    else:  # 非 None 非字符串：拒绝，避免 str() 静默掩盖非法类型（D8 根因修复）
-        raise TypeError(
-            f"device must be a string or None, got {type(device_request).__name__}"
-        )
-    if requested_device not in ALLOWED_TRAIN_DEVICES:  # 检查是否为合法设备选项
-        raise ValueError(
-            f"device must be one of {sorted(ALLOWED_TRAIN_DEVICES)}, got: {device_request!r}"
-        )
-
-    cuda_available = bool(torch.cuda.is_available())  # 检查 PyTorch 是否检测到 CUDA
-    cuda_runtime_available = bool(cuda_available and cuda_runtime_usable())  # 检查 CUDA 运行时是否真正可用
-    if requested_device == DEVICE_CPU:  # 明确请求 CPU 时，忽略 CUDA 可用性
-        selected_device = DEVICE_CPU  # 选择 CPU
-    elif requested_device == DEVICE_CUDA and cuda_runtime_available:  # 请求 CUDA 且可用时
-        selected_device = DEVICE_CUDA  # 选择 CUDA
-    elif requested_device == DEVICE_CUDA:  # 请求 CUDA 但不可用时，降级到 CPU
-        selected_device = DEVICE_CPU  # 降级到 CPU
-    else:  # auto 模式：根据条件自动选择
-        selected_device = DEVICE_CUDA if allow_auto_cuda and cuda_runtime_available else DEVICE_CPU  # auto 模式下，允许时优先 CUDA
-
-    return {  # 构建设备报告字典
-        'requested_device': requested_device,  # 用户请求的设备
-        'selected_device': selected_device,  # 最终选择的设备
-        'cuda_available': cuda_available,  # PyTorch 是否检测到 CUDA
-        'cuda_runtime_available': cuda_runtime_available,  # CUDA 运行时是否真正可用
-    }
+    """Compatibility wrapper retaining the pipeline monkeypatch seam."""
+    return _resolve_train_device_impl(
+        device_request,
+        allow_auto_cuda=allow_auto_cuda,
+        cuda_available_fn=torch.cuda.is_available,
+        cuda_runtime_fn=cuda_runtime_usable,
+    )
 
 
 def _build_quick_closure_note() -> dict[str, Any]:
@@ -508,7 +473,7 @@ def _enforce_train_device_constraints(cfg: dict[str, Any], device_report: dict[s
 
     检查规则：
     - 请求 CUDA 但不可用时，抛出 RuntimeError
-    - **断点续跑契约（手册 P25）：full / quick 模式均允许使用 checkpoint_path
+    - **断点续跑契约（P25）：full / quick 模式均允许使用 checkpoint_path
       作"断点续跑"，不再强制从头训练**。但在冒烟 → 全量 gate 阶段（smoke_check=True）
       下仍要求从头训练，以保证冒烟阶段不被 checkpoint 状态污染（P19 可复现）。
     - 调用方必须保证：冒烟（全量 gate ①）→ 全量 code freeze → 全量；code freeze 后
@@ -542,7 +507,7 @@ def _enforce_train_device_constraints(cfg: dict[str, Any], device_report: dict[s
             f'checkpoint_path must be a str, Path, or None, got {type(raw_checkpoint_path).__name__}'
         )
 
-    # 手册 P25 断点续跑契约：full / quick 均允许 checkpoint_path（不强制从头训练）。
+    # P25 断点续跑契约：full / quick 均允许 checkpoint_path（不强制从头训练）。
     # 仅在显式声明 smoke_check=True 时要求从头训练，保证冒烟不被 checkpoint 污染。
     # 不带 smoke_check 时保持旧约束（full/quick 必须从头训练），保证旧测试与契约不变。
     smoke_check = bool(cfg.get('smoke_check', False))
@@ -1435,7 +1400,7 @@ def _resolve_event_quality_score(event: Mapping[str, Any]) -> float:
     if quality is not None:  # quality 值可用
         if is_bool_like(quality):  # bool 不能静默当成 0/1，否则会篡改风险标签语义。
             raise TypeError("quality must be numeric, got bool")
-        quality_value = coerce_finite_scalar(quality, name='quality')  # 一次性完成 float 转换 + isfinite 校验（D5 数值安全，与 quality_model.py / robust_ekf_core.py 同口径）
+        quality_value = coerce_finite_scalar(quality, name='quality')  # 一次性完成 float 转换 + isfinite 校验（D5 数值安全，与 quality_model.py / ekf_core.py 同口径）
         # 与推理侧 _resolve_quality 语义一致：直接 clamp 到 [0, 1]。
         # 推理侧对 >1.0 的值直接截断为 1.0（最高质量），不做 /10 反转归一化。
         quality_score = min(1.0, max(0.0, quality_value))  # 截断到 0~1
@@ -2111,9 +2076,6 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
     if int(_window_size_raw) <= 0:
         raise ValueError(f"window.size must be a positive integer, got {_window_size_raw!r}")
     window_size = int(_window_size_raw)  # 窗口大小：每个窗口包含的历史步数。D7：移除未使用的 step_size（window_cfg.get('step') 全程未被消费，属死代码；当前 trailing window 实现不依赖步长，仅取尾部 window_size 条事件，对齐 core_pipeline.py L793 同口径修复）。
-    # 违反项 29 修复：手册 P29 硬约束——窗口 W=128 步 @150Hz = 0.85s。
-    # 显式校验 window_size=128；非 128 时给出明确报错（不让步长偷偷漂移），
-    # 与 precheck_orchestrator.check_P20_window / check_P29_windowing 口径一致。
     # 例外：单元/冒烟 fixture 只有 2~13 个事件，永远填不满 128 窗（P31 会返回空窗）。
     # 仿照 allow_cross_set_leakage 先例，允许 window.allow_smoke_window=true 显式声明
     # 偏离（仅限 smoke/单元场景）；真实配置（lstm_ekf.yaml/liquid_ekf.yaml）不设此旗标，
@@ -2122,10 +2084,10 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
     _EXPECTED_WINDOW_SIZE = WINDOW_SIZE
     if window_size != _EXPECTED_WINDOW_SIZE and not _allow_smoke_window:
         raise ValueError(
-            f"违反项 29 (手册 P29): window.size must be exactly {_EXPECTED_WINDOW_SIZE} steps "
+            f"违反项 29 (P29): window.size must be exactly {_EXPECTED_WINDOW_SIZE} steps "
             f"@150Hz = 0.85s, got {window_size}; W != {WINDOW_SIZE} 会破坏离线消融的窗口公平性。"
         )
-    # 违反项 29 修复：手册 P29 硬约束——warm-up 前 10s 不进评估。
+    # 违反项 29 修复：P29 硬约束——warm-up 前 10s 不进评估。
     # warmup_s 必须显式声明（默认 10.0），用于前端在窗口切片时剔除前 10s。
     warmup_s_raw = window_cfg.get('warmup_s', WARMUP_S)
     try:
@@ -2136,7 +2098,7 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
         )
     if warmup_s < 0.0 or not math.isfinite(warmup_s):
         raise ValueError(
-            f"违反项 29 (手册 P29): window.warmup_s must be finite and non-negative, got {warmup_s!r}"
+            f"违反项 29 (P29): window.warmup_s must be finite and non-negative, got {warmup_s!r}"
         )
     # 从估计器中获取锚点查找表
     anchor_lookup = dict(getattr(estimator, '_anchor_lookup', {}) or {})
@@ -2166,7 +2128,7 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
         """
         # 从配置中提取状态历史列表（warmup 过滤前；后面会随 history 一起切到 filtered_state_history）
         state_history = list((cfg or {}).get('state_history') or [])
-        # 违反项 29 修复：手册 P29 硬约束——warm-up 前 10s 不进评估。
+        # 违反项 29 修复：P29 硬约束——warm-up 前 10s 不进评估。
         # 对 history 和 state_history 做时间过滤，只保留 warmup_s 之后的事件。
         # event['t'] 是事件时间戳（浮点秒），过滤后确保训练窗口全在稳态区。
         if warmup_s > 0.0:
@@ -2216,7 +2178,7 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
             anchor_lookup=anchor_lookup or None,
         )
 
-        # 违反项 31 修复：手册 P31 硬约束——空轨迹、极短序列、M1 长间隙在轨迹首尾。
+        # 违反项 31 修复：P31 硬约束——空轨迹、极短序列、M1 长间隙在轨迹首尾。
         # 不产生人工尖峰；长间隙不触发除零/NaN。
         # 当 filtered_history 不足一个完整 window_size 时，跳过此次构窗（返回空特征），
         # 让上游 caller 自然丢弃该样本，不让极短序列污染训练。
@@ -2258,7 +2220,7 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
                 'event_time_window': empty_event_t,
                 'warmup_excluded_short_seq': True,  # 违反项 29/31: 序列过短，标记样本丢弃。
             }
-        # 违反项 29/31 修复：手册 P29/P31 硬约束——窗口不跨序列边界；
+        # 违反项 29/31 修复：P29/P31 硬约束——窗口不跨序列边界；
         # IMU 高频段不跨序列拼接（窗口内必须是同一序列的事件）。
         # event['meta']['seq_id'] 与 window_history[0]['meta']['seq_id'] 必一致，
         # 否则说明上游 caller 误把多条序列事件拼到同一 history，禁止构窗。
@@ -2269,7 +2231,7 @@ def _build_feature_window_builder(model_cfg: Mapping[str, Any], estimator: Any):
         if (event_seq_id is not None and first_hist_seq_id is not None
                 and str(event_seq_id) != str(first_hist_seq_id)):
             raise ValueError(
-                f"违反项 29 (手册 P29): 窗口不跨序列边界，但 event.seq_id={event_seq_id!r} "
+                f"违反项 29 (P29): 窗口不跨序列边界，但 event.seq_id={event_seq_id!r} "
                 f"与 history[0].seq_id={first_hist_seq_id!r} 不一致；禁止跨序列构窗。"
             )
         # 为每个历史事件构建特征向量和缺失掩码
@@ -2456,7 +2418,7 @@ def _build_liquid_samples(
         gt_rows = _normalize_gt_rows(gt_rows)
 
         # §A 修复: 训练时按序列 scene_parameters.axes.N.level 注入 NLOS 脉冲。
-        # 违反项 12 修复: 手册 P12 硬约束——训练/测试注入必须分布对称（ρ/μ/σ 同分布），
+        # 违反项 12 修复: P12 硬约束——训练/测试注入必须分布对称（ρ/μ/σ 同分布），
         # 且按整条序列划分。原状：sim_materializer 已按协议档位（如 N1.5）注入 NLOS，
         # 训练侧再强制注入 N3 协议 (nlos_ratio=0.37, μ=5.0m, σ=1.5m)，
         # 导致训练分布 (N3) 与测试分布 (N1.5) 不对称，bias 头学到的偏差量级是 N3 而非测试 N1.5，
@@ -2770,7 +2732,7 @@ def _split_train_and_val_samples(
     split_ids: list[str] | None = None,
     train_split_ids: list[str] | None = None,
     val_split_ids: list[str] | None = None,
-    val_sequences_per_seed: int = 2,  # 手册 P33 硬约束：每 seed 从训练池中独立划分 2 条 val 序列
+    val_sequences_per_seed: int = 2,  # P33 硬约束：每 seed 从训练池中独立划分 2 条 val 序列
     allow_cross_set_leakage: bool = False,  # 2026-09-05 RZ-2 smoke bypass: K1 数据仅 1 scene, 同 scene 必需 (论文级需 N1.5+N2 多 N scene 才能消, 本机资源受约束, deviated R-1)
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[str]]:
     """将样本列表切分为训练集和验证集。
@@ -2778,7 +2740,7 @@ def _split_train_and_val_samples(
     切分策略：
     1. 如果显式指定了 train_split_ids 或 val_split_ids，按指定切分
     2. 如果只有 1 个序列，按时间顺序前半训练后半验证
-    3. 如果有多个序列：手册 P33 硬约束 — 每 seed 独立划分 val_sequences_per_seed
+    3. 如果有多个序列：P33 硬约束 — 每 seed 独立划分 val_sequences_per_seed
        （默认 2）条 val 序列，其余做训练；7 变体共用同一划分（通过共享
        split_ids 列表传入实现；本函数本身只决定单次切分结果）
 
@@ -2787,7 +2749,7 @@ def _split_train_and_val_samples(
         split_ids: 全部序列 ID 列表。
         train_split_ids: 显式指定的训练序列 ID。
         val_split_ids: 显式指定的验证序列 ID。
-        val_sequences_per_seed: 每 seed 隐式切分时 val 序列条数（默认 2，手册 P33）。
+        val_sequences_per_seed: 每 seed 隐式切分时 val 序列条数（默认 2，P33）。
 
     Returns:
         (train_samples, val_samples, train_ids, val_ids) 元组。
@@ -2813,7 +2775,7 @@ def _split_train_and_val_samples(
         train_ids = list(unique_seq_ids)
         val_ids = list(unique_seq_ids)
     else:
-        # 手册 P33 硬约束：每 seed 隐式切分 val_sequences_per_seed=2 条 val 序列。
+        # P33 硬约束：每 seed 隐式切分 val_sequences_per_seed=2 条 val 序列。
         # 7 变体共用同一 val 划分：上游调用方传入相同的 split_ids 列表
         # （来自 _resolve_split_for_variant 的统一切分entry），本函数决定单次切分结果。
         # 7 变体entry须显式传 val_split_ids（由"按 seed 划分 2 条"统一生成），

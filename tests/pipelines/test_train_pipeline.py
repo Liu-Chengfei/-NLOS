@@ -2803,7 +2803,7 @@ def test_split_train_and_val_samples_uses_distinct_seq_ids():
         split_ids=['seq_a', 'seq_b', 'seq_c'],
     )
 
-    # 手册 P33 硬约束: 每 seed 隐式切分取最后 2 条序列做 val (val_sequences_per_seed=2)。
+    # P33 硬约束: 每 seed 隐式切分取最后 2 条序列做 val (val_sequences_per_seed=2)。
     assert train_ids == ['seq_a']
     assert val_ids == ['seq_b', 'seq_c']
     assert {sample['seq_id'] for sample in train_samples} == {'seq_a'}

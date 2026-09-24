@@ -1,4 +1,4 @@
-"""违反即处置协议实现（手册条款 [13]）。
+"""违反即处置协议实现。
 
 执行中任何环节发现违反本文档（gate 未过 / 未清场 / 审计失败 / 统计口径不符 /
 数据或权重污染等）→ 立即直接处置：
@@ -41,7 +41,7 @@ class ViolationRecord:
     """
 
     violation_type: str  # e.g. "gate_failed", "audit_failed", "data_pollution"
-    source: str  # e.g. "precheck_orchestrator.check_P1_composition"
+    source: str  # e.g. "gate_failed", "audit_failed"
     affected_paths: list[str] = field(default_factory=list)
     timestamp: str = ""  # ISO 8601 格式，空时自动填入当前 UTC 时间
     evidence: dict[str, Any] = field(default_factory=dict)

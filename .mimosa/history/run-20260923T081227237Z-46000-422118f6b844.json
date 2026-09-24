@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20260923T081227237Z-46000-422118f6b844",
+  "runStatus": "inconclusive",
+  "errors": [
+    "bash-discovery:.venv-gpu/Lib/site-packages/torch/include/c10/util/CallOnce.h: bash_discovery_incomplete: project enumeration exceeded 5000 reviewable files",
+    "baseline:.venv-gpu/Lib/site-packages/torch/include/c10/util/CallOnce.h: baseline_partial: baseline exceeded 5000 candidate files"
+  ],
+  "target": ".",
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-09-23T08:12:27.237Z",
+  "timing": {
+    "startedAt": "2026-09-23T08:12:22.350Z",
+    "completedAt": "2026-09-23T08:12:27.237Z",
+    "durationMs": 4887
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 0,
+    "bySeverity": {},
+    "byStatus": {}
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "bash_discovery_incomplete": 1,
+      "baseline_partial": 1,
+      "project_check_failed": 2
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-sess_71555325-2ec0-4c0c-b5fe-59fe8ca90d9c-20260923T081227237Z-46000-422118f6b844.json"
+}

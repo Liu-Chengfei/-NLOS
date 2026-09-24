@@ -1,4 +1,4 @@
-"""Heading / yaw-arrow plotter (异步高NLOS实验全流程保障手册 Part 3 §0-V4).
+"""Heading / yaw-arrow plotter (实验规范 Part 3 §0-V4).
 
 Renders a 2-D trajectory with a heading arrow drawn every N steps. The arrow length
 is fixed in metres; the arrow direction encodes the per-step yaw. This is the

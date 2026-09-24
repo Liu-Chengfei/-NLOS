@@ -45,7 +45,6 @@ from __future__ import annotations  # 允许延迟求值的类型注解，支持
 
 import copy  # 深拷贝工具，用于安全复制配置字典，避免共享引用导致意外修改。
 import math  # 数学函数，用于 log、expm1 等常数计算。
-import pickle  # 反序列化异常类型检查，用于区分 checkpoint 加载失败的具体原因。
 from collections.abc import Iterator, Mapping  # Iterator 用于 parameters() 返回类型注解；Mapping 映射协议基类，用于判断配置是否为字典类对象。
 from dataclasses import dataclass, field  # dataclass 定义轻量数据类；field 声明带默认值的字段。
 from liquidloc.common.validation import coerce_finite_scalar, is_bool_like, is_integer, is_real, is_string_like  # 统一判断标量数值和字符串类型。
@@ -57,18 +56,13 @@ from torch import nn  # 神经网络模块基类，用于定义网络层和模�
 from torch.nn import functional as F  # 函数式接口，用于 softplus 等 RiskCalibration 内部运算。
 
 from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS  # 桥接层业务阈值字典，包含 risk_min/risk_max。
-from liquidloc.common.paths import get_standard_dirs  # 项目标准目录解析，用于相对路径转绝对路径。
 from liquidloc.common.seed_utils import cuda_runtime_usable  # CUDA 运行时可用性检查，区分"硬件有 GPU"和"运行时能用"。
 from liquidloc.common.types import ModelIntermediate  # 模型推理中间结果数据类，包含 bias/risk/scaling 字段。
 from liquidloc.common.constants import (  # 模型输出偏置上界常量；输出头键名单源真相（D9 根因修复）；模态名、模型名、风险先验常量与读出上下文键名（单源真相）；ram_peak 换算因子与下限（D9 漂移根因修复）；训练设备请求单源常量（D9 漂移根因修复）。
-    ALLOWED_TRAIN_DEVICES,
     BRIDGE_BIAS_MAX,
     CONTEXT_DIM,
     CONTEXT_FEATURE_KEYS,
-    DEVICE_AUTO,
     DEVICE_CPU,
-    DEVICE_CUDA,
-    DEVICE_CUDA_PREFIX,
     LIQUID_READOUT_CONTEXT_KEYS,
     MODEL_INTERMEDIATE_KEYS,
     MODEL_NAME_LIQUID,
@@ -79,6 +73,15 @@ from liquidloc.common.constants import (  # 模型输出偏置上界常量；输
     RAM_PEAK_FLOOR_MB,
     RAM_PEAK_PARAMS_PER_MB,
     RISK_PRIOR_LOGIT,
+)
+from liquidloc.factories.model_runtime import (
+    build_module_runtime_resource_meta as _shared_build_module_runtime_resource_meta,
+    load_checkpoint_payload as _shared_load_checkpoint_payload,
+    merge_checkpoint_model_cfg as _shared_merge_checkpoint_model_cfg,
+    move_modules_to_device as _shared_move_modules_to_device,
+    resolve_checkpoint_path as _shared_resolve_checkpoint_path,
+    resolve_explicit_runtime_device as _shared_resolve_explicit_runtime_device,
+    resolve_liquid_network_cfg as _shared_resolve_liquid_network_cfg,
 )
 from liquidloc.interfaces.model_api import ModelAPI  # 模型接口协议，定义 infer_intermediate / state_dict 等方法签名。
 # 注：neutral_floor_softplus 延迟到 _neutral_floor_scaling_softplus 内部导入，
@@ -1453,260 +1456,21 @@ _LIQUID_LEGACY_OPTIONAL_NETWORK_KEYS = (
 )
 
 
-def _resolve_checkpoint_path(checkpoint_path: str | Path, cfg: Mapping[str, Any]) -> Path:
-    """将 checkpoint 路径解析为绝对路径。
-
-    如果传入的是绝对路径，直接返回；如果是相对路径，则基于配置中的
-    ``project_root`` 拼接为绝对路径。
-
-    参数
-    ----------
-    checkpoint_path : str | Path
-        原始 checkpoint 路径，可以是绝对或相对路径。
-    cfg : Mapping[str, Any]
-        配置字典，需要包含 ``project_root`` 键（当路径为相对时）。
-
-    返回
-    -------
-    Path
-        解析后的绝对路径对象。
-
-    异常
-    ------
-    ValueError
-        当路径为相对路径但配置中缺少 ``project_root`` 时抛出。
-    """
-    path = Path(checkpoint_path).expanduser()  # 展开 ~ 为用户主目录。
-    if path.is_absolute():  # 如果已经是绝对路径，直接返回。
-        return path
-    project_root = cfg.get("project_root")  # 从配置中取项目根目录。
-    if project_root is None:  # 配置中没有项目根目录则无法解析相对路径。
-        raise ValueError(
-            f"_resolve_checkpoint_path: checkpoint_path={checkpoint_path!r}; "
-            "relative checkpoint_path requires cfg.project_root or an absolute path"
-        )
-    return get_standard_dirs(project_root)["project_root"] / path  # 拼接项目根目录和相对路径。
-
-
-def _load_checkpoint_payload(checkpoint_path: str | Path) -> Mapping[str, Any]:
-    """从磁盘加载 checkpoint 文件，强制在 CPU 上反序列化。
-
-    使用 ``weights_only=True`` 防止执行任意代码，只允许加载张量和
-    基本数据结构。如果加载失败且原因是非安全对象，则抛出 ValueError。
-
-    参数
-    ----------
-    checkpoint_path : str | Path
-        checkpoint 文件的绝对路径。
-
-    返回
-    -------
-    Mapping[str, Any]
-        checkpoint 内容，必须是字典类映射。
-
-    异常
-    ------
-    ValueError
-        当 checkpoint 包含不安全的序列化对象时抛出。
-    TypeError
-        当 checkpoint 内容不是映射类型时抛出。
-    """
-    path = Path(checkpoint_path)  # 确保路径对象类型。
-    try:
-        payload = torch.load(path, map_location=DEVICE_CPU, weights_only=True)  # 强制 CPU 反序列化，禁止执行任意代码。
-    except Exception as exc:  # pragma: no cover - 精确的 torch 异常类型随版本变化。
-        message = str(exc).lower()  # 将异常消息转小写，方便关键字匹配。
-        if isinstance(exc, pickle.UnpicklingError) or "weights only load failed" in message or "unsupported global" in message:
-            raise ValueError(f"unsupported serialized objects: {path}") from exc  # 不安全的序列化对象，转换为 ValueError。
-        raise  # 其他异常直接向上抛出。
-    if not isinstance(payload, Mapping):  # checkpoint 内容必须是映射，否则无法按键访问。
-        raise TypeError(f"checkpoint payload must be a Mapping, got {type(payload).__name__}: {path}")
-    return payload  # 返回校验通过的 checkpoint 映射。
+# Runtime helpers live in model_runtime; these aliases preserve the factory's
+# private compatibility seams for callers and tests.
+_resolve_checkpoint_path = _shared_resolve_checkpoint_path
+_load_checkpoint_payload = _shared_load_checkpoint_payload
+_move_modules_to_device = _shared_move_modules_to_device
+_merge_checkpoint_model_cfg = _shared_merge_checkpoint_model_cfg
+_resolve_liquid_network_cfg = _shared_resolve_liquid_network_cfg
+_build_module_runtime_resource_meta = _shared_build_module_runtime_resource_meta
 
 
 def _resolve_explicit_runtime_device(cfg: Mapping[str, Any] | None) -> torch.device:
-    """根据配置解析运行时设备，默认 CPU。
-
-    检查 ``inference_device`` 键。显式请求 ``cuda`` / ``cuda:N`` 且 CUDA
-    运行时可用时返回 GPU；``auto`` 在工厂层固定回退 CPU（AGENTS.md §5：
-    训练管线才通过 ``trainer._resolve_runtime_device`` 把 ``auto`` 解析为
-    GPU）；其余情况一律返回 CPU。
-
-    参数
-    ----------
-    cfg : Mapping[str, Any] | None
-        配置字典，可能包含 ``inference_device`` 键。
-
-    返回
-    -------
-    torch.device
-        解析后的设备对象（cpu 或 cuda / cuda:N）。
-
-    异常
-    ------
-    ValueError
-        当设备字符串不是 ``cpu``、``cuda``、``cuda:N`` 或 ``auto`` 时抛出。
-    """
-    if not isinstance(cfg, Mapping):  # 配置不是映射，视为无设备请求。
-        return torch.device(DEVICE_CPU)
-    raw_request = cfg.get("inference_device")  # 读取 inference_device 键。
-    if raw_request is None:  # 没有该键，默认 CPU。
-        return torch.device(DEVICE_CPU)
-    request = str(raw_request).strip().lower()  # 统一转小写字符串，去除首尾空格。
-    if not request or request == DEVICE_CPU:  # 空字符串或 "cpu" 都表示 CPU。
-        return torch.device(DEVICE_CPU)
-    if request == DEVICE_CUDA:  # 显式请求默认 CUDA 设备。
-        if torch.cuda.is_available() and cuda_runtime_usable():  # CUDA 硬件可用且运行时可用。
-            return torch.device(DEVICE_CUDA)
-        return torch.device(DEVICE_CPU)
-    if request.startswith(DEVICE_CUDA_PREFIX):  # 显式请求指定 CUDA 设备索引。
-        if torch.cuda.is_available() and cuda_runtime_usable():  # CUDA 硬件可用且运行时可用。
-            return torch.device(request)
-        return torch.device(DEVICE_CPU)
-    if request != DEVICE_AUTO:  # 其余字符串都不是合法请求。
-        raise ValueError(
-            f"inference_device must be one of 'cpu', 'cuda', 'cuda:N', or 'auto'; got {raw_request!r}"
-        )
-    # AGENTS.md §5: factories 默认 CPU，auto 在工厂层也回退 CPU；
-    # 训练管线通过 trainer._resolve_runtime_device 显式请求 CUDA 后再 .to(device)。
-    return torch.device(DEVICE_CPU)
-
-
-def _move_modules_to_device(modules: tuple[Any, ...], device: torch.device) -> None:
-    """将一组模块移动到指定设备。
-
-    跳过 ``None`` 和没有 ``to`` 方法的对象。
-
-    参数
-    ----------
-    modules : tuple[Any, ...]
-        待移动的模块元组，可以包含 None。
-    device : torch.device
-        目标设备。
-    """
-    for module in modules:  # 遍历所有模块。
-        if module is not None and hasattr(module, "to"):  # 跳过 None 和无 to 方法的对象。
-            module.to(device)  # 就地移动模块参数和缓冲区到目标设备。
-
-
-def _merge_checkpoint_model_cfg(base_cfg: Mapping[str, Any], model_cfg: Mapping[str, Any]) -> dict[str, Any]:
-    """合并基础配置与 checkpoint 内嵌的模型配置。
-
-    合并策略：checkpoint 中的 ``feature_order``、``window``、``network``
-    会覆盖基础配置中的同名键；``hidden_dim``、``input_dim``、``output_heads``
-    写入 ``network`` 子字典。
-
-    参数
-    ----------
-    base_cfg : Mapping[str, Any]
-        基础配置（来自工厂调用时的 cfg）。
-    model_cfg : Mapping[str, Any]
-        checkpoint 内嵌的模型配置。
-
-    返回
-    -------
-    dict[str, Any]
-        合并后的配置字典。
-
-    异常
-    ------
-    TypeError
-        当 checkpoint 的 ``network`` 不是映射时抛出。
-    """
-    merged_cfg = dict(base_cfg)  # 以基础配置为底，浅拷贝一份。
-    for key in ("feature_order", "window"):  # feature_order 和 window 允许 checkpoint 完全覆盖。
-        if key in model_cfg:  # 如果 checkpoint 提供了该键。
-            merged_cfg[key] = copy.deepcopy(model_cfg[key])  # 深拷贝覆盖，避免共享引用。
-
-    if "network" in model_cfg:  # checkpoint 提供了 network 子配置。
-        network_cfg = dict(merged_cfg.get("network") or {})  # 取出基础 network 配置，空则用空字典。
-        checkpoint_network_cfg = model_cfg["network"]  # 取出 checkpoint 的 network 配置（已确认存在）。
-        if not isinstance(checkpoint_network_cfg, Mapping):  # network 必须是映射。
-            raise TypeError(
-                f"checkpoint model_cfg.network must be a mapping when provided; "
-                f"got {type(checkpoint_network_cfg).__name__}"
-            )
-        network_cfg.update(copy.deepcopy(checkpoint_network_cfg))  # checkpoint network 覆盖基础 network。
-        merged_cfg["network"] = network_cfg  # 写回合并后的 network。
-
-    if "hidden_dim" in model_cfg:  # checkpoint 提供了 hidden_dim，写入 network 子字典。
-        merged_cfg.setdefault("network", {})  # 确保 network 子字典存在。
-        merged_cfg["network"]["hidden_dim"] = copy.deepcopy(model_cfg["hidden_dim"])
-    if "input_dim" in model_cfg:  # checkpoint 提供了 input_dim，写入 network 子字典。
-        merged_cfg.setdefault("network", {})
-        merged_cfg["network"]["input_dim"] = copy.deepcopy(model_cfg["input_dim"])
-    if "output_heads" in model_cfg:  # checkpoint 提供了 output_heads，写入 network 子字典。
-        merged_cfg.setdefault("network", {})
-        merged_cfg["network"]["output_heads"] = copy.deepcopy(model_cfg["output_heads"])
-
-    return merged_cfg  # 返回合并后的完整配置。
-
-
-def _resolve_liquid_network_cfg(cfg: Mapping[str, Any]) -> dict[str, Any]:
-    """解析并校验 Liquid 网络配置。
-
-    从配置中提取 ``network`` 子字典，校验 ``hidden_dim`` 和 ``input_dim``
-    的类型与范围。``hidden_dim`` 缺省时回退到 44（对齐
-    ``docs/liquid_architecture_current.md`` §5.1 与 ``configs/models/liquid_ekf.yaml``）。
-    ``output_heads`` 缺省时回退到 ``_LIQUID_OUTPUT_KEYS``；若显式提供，则顺序与
-    数量必须与 ``_LIQUID_OUTPUT_KEYS`` 完全一致，否则抛出 ``ValueError``。
-
-    参数
-    ----------
-    cfg : Mapping[str, Any]
-        完整模型配置字典。
-
-    返回
-    -------
-    dict[str, Any]
-        解析后的网络配置字典。
-
-    异常
-    ------
-    TypeError
-        当 ``network`` 不是映射，或 ``hidden_dim`` / ``input_dim`` 不是整数时抛出。
-    ValueError
-        当 ``hidden_dim`` 不为正数，或 ``output_heads`` 与固定顺序不一致时抛出。
-    """
-    raw_network_cfg = cfg.get("network") or {}  # 取出 network 子配置，空则用空字典。
-    if not isinstance(raw_network_cfg, Mapping):  # network 必须是映射。
-        raise TypeError(
-            f"cfg.network must be a mapping when provided, got {type(raw_network_cfg).__name__}"
-        )
-
-    resolved_cfg = dict(raw_network_cfg)  # 浅拷贝 network 配置。
-    raw_hidden_dim = resolved_cfg.get("hidden_dim", 44)  # 取 hidden_dim，默认 44（对齐 docs §5.1 与 liquid_ekf.yaml）。
-    if not is_integer(raw_hidden_dim):  # 布尔值不是合法整数。
-        raise TypeError(
-            f"cfg.network.hidden_dim must be an integer, got {type(raw_hidden_dim).__name__}: {raw_hidden_dim!r}"
-        )
-    if raw_hidden_dim < 1:  # hidden_dim 必须为正。
-        raise ValueError(f"cfg.network.hidden_dim must be positive, got {raw_hidden_dim}")
-
-    raw_input_dim = resolved_cfg.get("input_dim")  # 取 input_dim，可能为 None。
-    if raw_input_dim is not None:  # 显式提供了 input_dim。
-        if not is_integer(raw_input_dim):  # 布尔值不是合法整数。
-            raise TypeError(
-                f"cfg.network.input_dim must be an integer when provided, "
-                f"got {type(raw_input_dim).__name__}: {raw_input_dim!r}"
-            )
-        if raw_input_dim < 1:  # input_dim 小于 1 视为无效，回退到自动推断。
-            raw_input_dim = None
-    elif cfg.get("feature_order"):  # 没有显式 input_dim，但有 feature_order，用特征数推断。
-        raw_input_dim = len(list(cfg.get("feature_order") or []))
-
-    resolved_cfg["hidden_dim"] = raw_hidden_dim  # 写回校验后的 hidden_dim。
-    resolved_cfg["input_dim"] = raw_input_dim  # 写回校验后的 input_dim（可能为 None）。
-    resolved_output_heads = list(resolved_cfg.get("output_heads") or _LIQUID_OUTPUT_KEYS)  # 输出头默认为四元组。
-    if resolved_output_heads != list(_LIQUID_OUTPUT_KEYS):  # 输出头顺序和数量都不能偏，与四头冻结合同一致。
-        raise ValueError(
-            f"cfg.network.output_heads must keep the fixed order "
-            f"['bias', 'risk', 'uwb_scaling', 'vio_scaling'], got {resolved_output_heads!r}"
-        )
-    resolved_cfg["output_heads"] = resolved_output_heads  # 写回校验后的输出头列表。
-    if cfg.get("feature_order"):  # 如果配置中有 feature_order，也写入网络配置。
-        resolved_cfg["feature_order"] = list(cfg.get("feature_order") or [])
-    return resolved_cfg  # 返回解析后的网络配置。
+    return _shared_resolve_explicit_runtime_device(
+        cfg,
+        cuda_usable_fn=cuda_runtime_usable,
+    )
 
 
 def _coerce_scalar_tensor(value: Any, *, name: str) -> torch.Tensor:
@@ -2310,43 +2074,234 @@ def _coerce_structured_window(window_tensor: Any) -> dict[str, Any]:
     }
 
 
-# ---------------------------------------------------------------------------
-# 模块级常量：运行时资源元数据默认参数量。
-# ram_peak 换算因子（RAM_PEAK_PARAMS_PER_MB）与下限（RAM_PEAK_FLOOR_MB）统一
-# 从 common/constants.py 引入，与 estimators/ekf_core.py 共用单源真相，
-# 避免跨文件硬编码 1.0/256.0 造成配置表面漂移（D9）。
-# ---------------------------------------------------------------------------
+# 未构建网络时仍需要稳定的默认资源元数据；资源估算实现统一位于 model_runtime。
 _RUNTIME_RESOURCE_DEFAULT_PARAMS: float = 0.0  # 网络未构建时的默认参数量。
 
 
-def _build_module_runtime_resource_meta(module: nn.Module | tuple[nn.Module | None, ...]) -> dict[str, float]:
-    """计算模块的运行时资源元数据（参数量和峰值内存估算）。
+class _NeuralModelLifecycleMixin:
+    """Share the lifecycle contract of the LSTM and Transformer backends.
 
-    参数
-    ----------
-    module : nn.Module | tuple[nn.Module | None, ...]
-        单个模块或模块元组（可含 None）。
-
-    返回
-    -------
-    dict[str, float]
-        包含 params、ram_peak、ram_peak_mb 的字典。
+    The two sequence backends differ only in network construction and legacy
+    network-state preparation. Keeping those hooks local to each backend
+    avoids duplicating checkpoint, device, and output-contract behavior.
     """
-    if isinstance(module, nn.Module):  # 单个模块包装为元组。
-        modules = (module,)
-    else:  # 模块元组，过滤掉 None。
-        modules = tuple(item for item in module if item is not None)
-    params = float(sum(int(parameter.numel()) for item in modules for parameter in item.parameters()))  # 统计总参数量。
-    ram_peak_mb = max(RAM_PEAK_FLOOR_MB, params / RAM_PEAK_PARAMS_PER_MB)  # 用冻结换算因子估算峰值内存（MB），与 ekf_core 保持同口径。
-    return {
-        "params": params,  # 总参数量。
-        "ram_peak": ram_peak_mb,  # 峰值内存（MB），与 ram_peak_mb 相同。
-        "ram_peak_mb": ram_peak_mb,  # 峰值内存（MB）。
-    }
+
+    def _initialize_model(self, *, network_type: str, log_label: str) -> None:
+        from liquidloc.common.tee_logger import print_dict
+
+        network_cfg = self.cfg.get("network") if isinstance(self.cfg, dict) else None
+        print_dict(
+            {
+                "name": self.name,
+                "network_type": network_type,
+                "network_hidden_dim": (network_cfg or {}).get("hidden_dim")
+                if isinstance(network_cfg, dict)
+                else None,
+                "network_input_dim": (network_cfg or {}).get("input_dim")
+                if isinstance(network_cfg, dict)
+                else None,
+                "has_checkpoint_path": "checkpoint_path" in (self.cfg or {})
+                if isinstance(self.cfg, dict)
+                else False,
+                "checkpoint_path": (self.cfg or {}).get("checkpoint_path")
+                if isinstance(self.cfg, dict)
+                else None,
+                "window": (self.cfg or {}).get("window") if isinstance(self.cfg, dict) else None,
+            },
+            log_label,
+        )
+        raw_feature_order = self.cfg.get("feature_order")
+        if raw_feature_order is None:
+            self.expected_feature_order = []
+        elif isinstance(raw_feature_order, (list, tuple)):
+            self.expected_feature_order = list(raw_feature_order)
+        else:
+            raise ValueError(
+                "feature_order must be a list or tuple of strings or None, "
+                f"got {type(raw_feature_order).__name__}"
+            )
+        self.checkpoint_meta = {}
+        self.expected_feature_order_required = bool(self.expected_feature_order)
+
+        checkpoint_path = self.cfg.get("checkpoint_path")
+        if checkpoint_path is not None:
+            if isinstance(checkpoint_path, str) and not checkpoint_path.strip():
+                raise ValueError("checkpoint_path must not be empty when present")
+            self.load_checkpoint(checkpoint_path)
+        else:
+            self._build_modules()
+            self._apply_runtime_device()
+            self._refresh_runtime_resource_meta()
+
+    def _apply_runtime_device(self) -> None:
+        device = _resolve_explicit_runtime_device(self.cfg)
+        _move_modules_to_device((self.network, self.risk_calibration), device)
+        self.runtime_device = str(device)
+
+    def _refresh_runtime_resource_meta(self) -> None:
+        if self.network is None:
+            self.runtime_resource_meta = {
+                "params": _RUNTIME_RESOURCE_DEFAULT_PARAMS,
+                "ram_peak": RAM_PEAK_FLOOR_MB,
+                "ram_peak_mb": RAM_PEAK_FLOOR_MB,
+            }
+        else:
+            self.runtime_resource_meta = _build_module_runtime_resource_meta(
+                (self.network, self.risk_calibration)
+            )
+        self.params = coerce_finite_scalar(
+            self.runtime_resource_meta["params"], name="runtime_resource_meta.params"
+        )
+        self.ram_peak = coerce_finite_scalar(
+            self.runtime_resource_meta["ram_peak"], name="runtime_resource_meta.ram_peak"
+        )
+        self.ram_peak_mb = coerce_finite_scalar(
+            self.runtime_resource_meta["ram_peak_mb"], name="runtime_resource_meta.ram_peak_mb"
+        )
+
+    def reset(self) -> None:
+        """Sequence state is reset inside each backend's forward boundary."""
+        return None
+
+    def train(self) -> None:
+        self.network.train()
+        self.risk_calibration.train()
+
+    def eval(self) -> None:
+        self.network.eval()
+        self.risk_calibration.eval()
+
+    def parameters(self):
+        yield from self.network.parameters()
+        yield from self.risk_calibration.parameters()
+
+    def _normalize_window(self, window_tensor: Any) -> Any:
+        if not self.expected_feature_order_required:
+            return window_tensor
+        if not isinstance(window_tensor, Mapping):
+            raise TypeError(
+                f"{self.name} with cfg/checkpoint expected_feature_order requires a structured "
+                "feature window mapping to validate expected_feature_order; "
+                f"got {type(window_tensor).__name__}"
+            )
+        source = _coerce_structured_window(window_tensor)
+        if source["feature_order"] != self.expected_feature_order:
+            raise ValueError(
+                "window_tensor.feature_order must match the model expected_feature_order; "
+                f"expected {self.expected_feature_order}, got {source['feature_order']}"
+            )
+        return source
+
+    def predict_intermediate_tensors(self, window_tensor: Any) -> dict[str, torch.Tensor]:
+        normalized_window = self._normalize_window(window_tensor)
+        raw_output = self.network(normalized_window)
+        raw_outputs = _coerce_output_vector(raw_output, output_keys=_LIQUID_OUTPUT_KEYS)
+        raw_outputs["risk"] = self.risk_calibration(raw_outputs["risk"])
+        normalized = _normalize_lstm_output_tensors(raw_outputs, risk_already_calibrated=True)
+        modality = _resolve_modality_from_normalized_window(normalized_window)
+        if modality == MODALITY_UWB:
+            safe_vio = torch.nan_to_num(normalized["vio_scaling"], nan=0.0, posinf=0.0, neginf=0.0)
+            normalized["vio_scaling"] = torch.clamp(
+                safe_vio, min=_SCALING_NEUTRAL_FLOOR, max=_SCALING_CEILING
+            )
+        elif modality == MODALITY_VIO:
+            safe_uwb = torch.nan_to_num(normalized["uwb_scaling"], nan=0.0, posinf=0.0, neginf=0.0)
+            normalized["uwb_scaling"] = torch.clamp(
+                safe_uwb, min=_SCALING_NEUTRAL_FLOOR, max=_SCALING_CEILING
+            )
+        return normalized
+
+    def infer_intermediate(self, window_tensor: Any) -> ModelIntermediate:
+        with torch.no_grad():
+            normalized_outputs = self.predict_intermediate_tensors(window_tensor)
+            bias_key, risk_key, uwb_scaling_key, vio_scaling_key = MODEL_INTERMEDIATE_KEYS
+            return ModelIntermediate(
+                bias=round(float(normalized_outputs[bias_key].detach().item()), 6),
+                risk=round(float(normalized_outputs[risk_key].detach().item()), 6),
+                uwb_scaling=float(normalized_outputs[uwb_scaling_key].detach().item()),
+                vio_scaling=float(normalized_outputs[vio_scaling_key].detach().item()),
+            )
+
+    def state_dict(self) -> dict[str, Any]:
+        return {
+            "network": self.network.state_dict(),
+            "risk_calibration": self.risk_calibration.state_dict(),
+        }
+
+    def _prepare_network_state_dict(self, network_state: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Allow a backend to migrate network-only legacy state."""
+        return network_state
+
+    def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
+        if not isinstance(state_dict, Mapping):
+            raise TypeError("state_dict must be a mapping")
+        network_state = state_dict.get("network", state_dict)
+        if not isinstance(network_state, Mapping):
+            raise ValueError("state_dict must contain a network state mapping")
+        self.network.load_state_dict(self._prepare_network_state_dict(network_state))
+
+        calibration_state = state_dict.get("risk_calibration")
+        if isinstance(calibration_state, Mapping):
+            patched_calibration_state = dict(calibration_state)
+            current_calibration_state = self.risk_calibration.state_dict()
+            for state_key, state_value in current_calibration_state.items():
+                patched_calibration_state.setdefault(state_key, state_value)
+            self.risk_calibration.load_state_dict(patched_calibration_state)
+
+    def load_checkpoint(self, checkpoint_path: str | Path) -> dict[str, Any]:
+        path = _resolve_checkpoint_path(checkpoint_path, self.cfg)
+        if not path.is_file():
+            import sys as _sys
+
+            print(
+                f"[load_checkpoint] WARNING: checkpoint file not found at {path}; "
+                "falling back to default cfg + random initialization. "
+                "Run scripts/05_train_lstm.py / 06_train_liquid.py / "
+                "07_train_transformer.py to produce a real checkpoint first.",
+                file=_sys.stderr,
+                flush=True,
+            )
+            self._build_modules()
+            self._apply_runtime_device()
+            self._refresh_runtime_resource_meta()
+            return {}
+
+        payload = _load_checkpoint_payload(path)
+        model_cfg = payload.get("model_cfg")
+        if model_cfg is None:
+            model_cfg = {}
+        if not isinstance(model_cfg, Mapping):
+            raise TypeError("checkpoint model_cfg must be a mapping")
+
+        self.cfg = _merge_checkpoint_model_cfg(self.cfg, model_cfg)
+        feature_order = self.cfg.get("feature_order")
+        if feature_order is None:
+            feature_order = payload.get("feature_order")
+        self.expected_feature_order = list(feature_order or [])
+        self.expected_feature_order_required = bool(self.expected_feature_order)
+        self._build_modules()
+
+        state_dict = payload.get("model_state")
+        if state_dict is None:
+            state_dict = payload.get("state_dict")
+        if state_dict is None:
+            raise ValueError("checkpoint payload must contain model_state")
+        self.load_state_dict(state_dict)
+        self.checkpoint_meta = {
+            "checkpoint_path": str(path),
+            "checkpoint_format": payload.get("checkpoint_format"),
+            "best_epoch": payload.get("best_epoch"),
+            "best_loss": payload.get("best_loss"),
+            "train_window_count": payload.get("train_window_count"),
+            "val_window_count": payload.get("val_window_count"),
+        }
+        self._apply_runtime_device()
+        self._refresh_runtime_resource_meta()
+        return dict(payload)
 
 
 @dataclass(slots=True)
-class _LSTMModel(ModelAPI):
+class _LSTMModel(_NeuralModelLifecycleMixin, ModelAPI):
     """LSTM-EKF 模型的工厂实例。
 
     封装 LSTM 网络的创建、checkpoint 加载、推理和状态管理。
@@ -2392,38 +2347,10 @@ class _LSTMModel(ModelAPI):
     runtime_device: str = field(init=False, default=DEVICE_CPU)  # 运行时设备，默认 CPU。
 
     def __post_init__(self) -> None:
-        """数据类初始化后处理：解析配置、加载 checkpoint 或构建网络。"""
-        from liquidloc.common.tee_logger import print_dict
-        _network_cfg = self.cfg.get("network") if isinstance(self.cfg, dict) else None
-        print_dict({
-            "name": self.name,
-            "network_hidden_dim": (_network_cfg or {}).get("hidden_dim") if isinstance(_network_cfg, dict) else None,
-            "network_input_dim": (_network_cfg or {}).get("input_dim") if isinstance(_network_cfg, dict) else None,
-            "has_checkpoint_path": "checkpoint_path" in (self.cfg or {}) if isinstance(self.cfg, dict) else False,
-            "checkpoint_path": (self.cfg or {}).get("checkpoint_path") if isinstance(self.cfg, dict) else None,
-            "window": (self.cfg or {}).get("window") if isinstance(self.cfg, dict) else None,
-        }, "_LSTMModel.__init__ 入口参数")
-        raw_feature_order = self.cfg.get("feature_order")  # 取出原始特征顺序（可能为 None）。
-        if raw_feature_order is None:  # 键缺失或显式 None，视为无特征顺序要求。
-            self.expected_feature_order = []
-        elif isinstance(raw_feature_order, (list, tuple)):  # 列表或元组，拷贝为新的 list。
-            self.expected_feature_order = list(raw_feature_order)
-        else:  # 其它类型（字符串、数值等）违反 feature_order 数据合同。
-            raise ValueError(
-                f"feature_order must be a list or tuple of strings or None, got {type(raw_feature_order).__name__}"
-            )
-        self.checkpoint_meta = {}  # 初始化 checkpoint 元数据为空。
-        self.expected_feature_order_required = bool(self.expected_feature_order)  # 有特征顺序时要求校验。
-
-        checkpoint_path = self.cfg.get("checkpoint_path")  # 取出 checkpoint 路径。
-        if checkpoint_path is not None:  # 配置中指定了 checkpoint。
-            if isinstance(checkpoint_path, str) and not checkpoint_path.strip():  # 空字符串或纯空白视为配置错误。
-                raise ValueError("checkpoint_path must not be empty when present")
-            self.load_checkpoint(checkpoint_path)  # 加载 checkpoint。
-        else:  # 无 checkpoint，从零构建。
-            self._build_modules()  # 构建网络模块。
-            self._apply_runtime_device()  # 应用运行时设备。
-            self._refresh_runtime_resource_meta()  # 刷新资源元数据。
+        self._initialize_model(
+            network_type="LSTMNetwork",
+            log_label="_LSTMModel.__init__ 入口参数",
+        )
 
     def _build_modules(self) -> None:
         """构建 LSTM 网络模块和风险校准模块。"""
@@ -2433,25 +2360,10 @@ class _LSTMModel(ModelAPI):
         self.risk_calibration = RiskCalibration()  # 创建风险校准模块，与 Liquid 对齐。
 
     def _apply_runtime_device(self) -> None:
-        """根据配置将网络模块移动到运行时设备。"""
-        device = _resolve_explicit_runtime_device(self.cfg)  # 解析运行时设备。
-        _move_modules_to_device((self.network, self.risk_calibration), device)  # 将网络和校准模块移动到设备。
-        self.runtime_device = str(device)  # 记录运行时设备（保留完整字符串，含 cuda:N 索引，与 trainer._resolve_runtime_device 返回的设备字符串语义对齐）。
+        return _NeuralModelLifecycleMixin._apply_runtime_device(self)
 
     def _refresh_runtime_resource_meta(self) -> None:
-        """刷新运行时资源元数据（参数量和内存估算）。"""
-        if self.network is None:  # 网络未构建时使用默认值。
-            self.runtime_resource_meta = {
-                "params": _RUNTIME_RESOURCE_DEFAULT_PARAMS,  # 默认参数量。
-                "ram_peak": RAM_PEAK_FLOOR_MB,  # 默认峰值内存（MB）。
-                "ram_peak_mb": RAM_PEAK_FLOOR_MB,  # 默认峰值内存（MB）。
-            }
-        else:  # 网络已构建，计算实际资源。
-            self.runtime_resource_meta = _build_module_runtime_resource_meta((self.network, self.risk_calibration))
-        # 用 coerce_finite_scalar 校验有限性，拒绝 NaN/Inf（D5 数值安全）；[key] 访问保证键缺失时报错而非静默失败（D3）。
-        self.params = coerce_finite_scalar(self.runtime_resource_meta["params"], name="runtime_resource_meta.params")  # 更新参数量。
-        self.ram_peak = coerce_finite_scalar(self.runtime_resource_meta["ram_peak"], name="runtime_resource_meta.ram_peak")  # 更新峰值内存。
-        self.ram_peak_mb = coerce_finite_scalar(self.runtime_resource_meta["ram_peak_mb"], name="runtime_resource_meta.ram_peak_mb")  # 更新峰值内存（MB）。
+        return _NeuralModelLifecycleMixin._refresh_runtime_resource_meta(self)
 
     def reset(self) -> None:
         """重置模型级状态（前提指导 §1.4 学习隐状态按轨重置）。
@@ -2468,22 +2380,16 @@ class _LSTMModel(ModelAPI):
         （例如推理缓存、KV cache、轨迹级统计量等），必须在本方法里显式清零,
         否则 §1.4 被破。
         """
-        return None
+        return _NeuralModelLifecycleMixin.reset(self)
 
     def train(self) -> None:
-        """将网络和风险校准模块设置为训练模式。"""
-        self.network.train()  # 调用 nn.Module.train()。
-        self.risk_calibration.train()  # 校准模块也进入训练模式。
+        return _NeuralModelLifecycleMixin.train(self)
 
     def eval(self) -> None:
-        """将网络和风险校准模块设置为评估模式。"""
-        self.network.eval()  # 调用 nn.Module.eval()。
-        self.risk_calibration.eval()  # 校准模块也进入评估模式。
+        return _NeuralModelLifecycleMixin.eval(self)
 
     def parameters(self):
-        """迭代器：产出网络和风险校准模块的所有可学习参数。"""
-        yield from self.network.parameters()  # 委托给网络的 parameters()。
-        yield from self.risk_calibration.parameters()  # 委托给风险校准的 parameters()。
+        yield from _NeuralModelLifecycleMixin.parameters(self)
 
     def _normalize_window(self, window_tensor: Any) -> Any:
         """校验特征窗口的特征顺序是否与期望一致。
@@ -2507,21 +2413,7 @@ class _LSTMModel(ModelAPI):
         ValueError
             当特征顺序不匹配时抛出。
         """
-        if not self.expected_feature_order_required:  # 不需要特征顺序校验。
-            return window_tensor
-        if not isinstance(window_tensor, Mapping):  # 需要校验但窗口不是映射。
-            raise TypeError(
-                f"{self.name} with cfg/checkpoint expected_feature_order requires a structured "
-                "feature window mapping to validate expected_feature_order; "
-                f"got {type(window_tensor).__name__}"
-            )
-        source = _coerce_structured_window(window_tensor)  # 校验并转换窗口。
-        if source["feature_order"] != self.expected_feature_order:  # 特征顺序不匹配。
-            raise ValueError(
-                "window_tensor.feature_order must match the model expected_feature_order; "
-                f"expected {self.expected_feature_order}, got {source['feature_order']}"
-            )
-        return source  # 返回校验后的窗口。
+        return _NeuralModelLifecycleMixin._normalize_window(self, window_tensor)
 
     def predict_intermediate_tensors(self, window_tensor: Any) -> dict[str, torch.Tensor]:
         """前向推理，返回归一化后的中间张量字典。
@@ -2536,26 +2428,7 @@ class _LSTMModel(ModelAPI):
         dict[str, torch.Tensor]
             归一化后的输出字典，包含 bias、risk、uwb_scaling、vio_scaling。
         """
-        normalized_window = self._normalize_window(window_tensor)  # 标准化窗口。
-        raw_output = self.network(normalized_window)  # 网络前向推理。
-        raw_outputs = _coerce_output_vector(raw_output, output_keys=_LIQUID_OUTPUT_KEYS)  # 将输出向量拆分为各头标量。
-        # 先对原始 risk 做校准（含 sigmoid），与 Liquid 路径对齐，避免双重 sigmoid。
-        raw_outputs["risk"] = self.risk_calibration(raw_outputs["risk"])  # risk 先校准：softplus(a)*raw+b -> sigmoid。
-        normalized = _normalize_lstm_output_tensors(raw_outputs, risk_already_calibrated=True)  # 归一化输出张量（risk 已校准，只做线性映射）。
-        # v3 改造：放宽 scaling_ceiling 从 1.0 -> 2.5，同时保持 scaling_min=0.5
-        # D9：模态比较必须引用 MODALITY_UWB/MODALITY_VIO 单源常量，禁止硬编码字符串漂移。
-        # 软掩码：non-current modality scaling 被 clamp 到 [scaling_min, scaling_ceiling]
-        # 第十八轮穷举自审修复：禁止硬编码 scaling_ceiling 值，统一引用 _SCALING_CEILING 单源常量
-        # （与 apply_liquid_modality_output_contract 同口径，§12.3-C2a 三网同一写入口闭合）。
-        modality = _resolve_modality_from_normalized_window(normalized_window)  # 从窗口提取模态。
-        scaling_ceiling = _SCALING_CEILING  # 单源常量：BRIDGE_THRESHOLDS["non_current_scaling_ceiling"]
-        if modality == MODALITY_UWB:  # 当前是 UWB 模态。
-            _safe_vio = torch.nan_to_num(normalized["vio_scaling"], nan=0.0, posinf=0.0, neginf=0.0)
-            normalized["vio_scaling"] = torch.clamp(_safe_vio, min=_SCALING_NEUTRAL_FLOOR, max=scaling_ceiling)  # VIO 缩放 soft-mask
-        elif modality == MODALITY_VIO:  # 当前是 VIO 模态。
-            _safe_uwb = torch.nan_to_num(normalized["uwb_scaling"], nan=0.0, posinf=0.0, neginf=0.0)
-            normalized["uwb_scaling"] = torch.clamp(_safe_uwb, min=_SCALING_NEUTRAL_FLOOR, max=scaling_ceiling)  # UWB 缩放 soft-mask
-        return normalized
+        return _NeuralModelLifecycleMixin.predict_intermediate_tensors(self, window_tensor)
 
     def infer_intermediate(self, window_tensor: Any) -> ModelIntermediate:
         """无梯度推理，返回 ModelIntermediate 数据类。
@@ -2570,17 +2443,7 @@ class _LSTMModel(ModelAPI):
         ModelIntermediate
             推理中间结果，包含 bias、risk、uwb_scaling、vio_scaling。
         """
-        with torch.no_grad():  # 禁用梯度计算，节省内存。
-            normalized_outputs = self.predict_intermediate_tensors(window_tensor)  # 前向推理。
-            # D9：引用 MODEL_INTERMEDIATE_KEYS 单源真相，禁止硬编码键名漂移；
-            # 与 _coerce_output_vector / _normalize_lstm_output_tensors 的键名同源。
-            bias_key, risk_key, uwb_scaling_key, vio_scaling_key = MODEL_INTERMEDIATE_KEYS
-            return ModelIntermediate(
-                bias=round(float(normalized_outputs[bias_key].detach().item()), 6),  # bias 保留 6 位小数。
-                risk=round(float(normalized_outputs[risk_key].detach().item()), 6),  # risk 保留 6 位小数。
-                uwb_scaling=float(normalized_outputs[uwb_scaling_key].detach().item()),  # UWB 缩放因子。
-                vio_scaling=float(normalized_outputs[vio_scaling_key].detach().item()),  # VIO 缩放因子。
-            )
+        return _NeuralModelLifecycleMixin.infer_intermediate(self, window_tensor)
 
     def state_dict(self) -> dict[str, Any]:
         """返回模型状态字典，包含网络和风险校准模块的状态。
@@ -2590,10 +2453,7 @@ class _LSTMModel(ModelAPI):
         dict[str, Any]
             包含 "network" 和 "risk_calibration" 键的状态字典。
         """
-        return {
-            "network": self.network.state_dict(),  # LSTM 网络状态（output_layer 在网络内部，由 network 状态覆盖）。
-            "risk_calibration": self.risk_calibration.state_dict(),  # 风险校准状态，与 Liquid 共享同一单调校准模块。
-        }
+        return _NeuralModelLifecycleMixin.state_dict(self)
 
     def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
         """加载模型状态字典，支持旧版 checkpoint 的输出层权重填充。
@@ -2613,45 +2473,7 @@ class _LSTMModel(ModelAPI):
         ValueError
             当 network 状态不是映射时抛出。
         """
-        if not isinstance(state_dict, Mapping):  # state_dict 必须是映射。
-            raise TypeError("state_dict must be a mapping")
-
-        # 取出网络状态：当前协议要求 "network" 键；旧版裸网络状态字典无该键时回退到 state_dict 本身。
-        if "network" in state_dict:
-            network_state = state_dict["network"]
-        else:  # 旧版 checkpoint 直接存储裸网络状态。
-            network_state = state_dict
-        if not isinstance(network_state, Mapping):  # 网络状态必须是映射。
-            raise ValueError("state_dict must contain a network state mapping")
-
-        output_layer_weight = network_state.get("output_layer.weight")  # 取出输出层权重。
-        if torch.is_tensor(output_layer_weight):  # 如果有权重张量。
-            current_weight = self.network.output_layer.weight  # 当前模型的输出层权重。
-            if (  # 检查是否需要填充：checkpoint 权重列数小于当前模型。
-                output_layer_weight.ndim == 2  # 必须是 2D 权重。
-                and current_weight.ndim == 2  # 当前权重也是 2D。
-                and int(output_layer_weight.shape[0]) == int(current_weight.shape[0])  # 行数一致。
-                and int(output_layer_weight.shape[1]) < int(current_weight.shape[1])  # 列数更少，需要填充。
-            ):
-                padded_weight = current_weight.detach().clone()  # 克隆当前权重作为填充模板，继承当前权重设备。
-                padded_weight.zero_()  # 清零。
-                source_weight = output_layer_weight.to(current_weight.device)  # 显式迁移到当前权重设备，避免跨设备赋值。
-                padded_weight[:, : int(source_weight.shape[1])] = source_weight  # 前部对齐填入旧权重。
-                network_state = dict(network_state)  # 转为可变字典。
-                network_state["output_layer.weight"] = padded_weight  # 替换为填充后的权重。
-
-        self.network.load_state_dict(network_state)  # 加载网络状态。
-
-        # 加载风险校准状态，兼容旧 checkpoint 无 risk_calibration 键或缺少新增键的情况。
-        calibration_state = state_dict.get("risk_calibration")  # 取出校准状态。
-        if isinstance(calibration_state, Mapping):  # checkpoint 提供了校准状态。
-            patched_calibration_state = dict(calibration_state)  # 可变副本。
-            current_calibration_state = self.risk_calibration.state_dict()  # 当前校准的完整状态。
-            for state_key, state_value in current_calibration_state.items():  # 逐个检查校准状态键。
-                if state_key not in patched_calibration_state:  # checkpoint 缺失该键。
-                    patched_calibration_state[state_key] = state_value  # 用当前值补齐。
-            self.risk_calibration.load_state_dict(patched_calibration_state)  # 加载校准状态。
-        # 否则保持初始化默认值。
+        return _NeuralModelLifecycleMixin.load_state_dict(self, state_dict)
 
     def load_checkpoint(self, checkpoint_path: str | Path) -> dict[str, Any]:
         """从磁盘加载 checkpoint，合并配置并恢复模型状态。
@@ -2681,60 +2503,7 @@ class _LSTMModel(ModelAPI):
         这允许 E9 实验在缺少预训练 ckpt 时仍能跑通（基线降级），
         并打印 warning 提醒用户先跑 05/06/07 真训练并存 ckpt 后重跑。
         """
-        path = _resolve_checkpoint_path(checkpoint_path, self.cfg)  # 解析为绝对路径。
-        # 阶段 12 修复: checkpoint 缺失容忍 (3 个 model 类共用此逻辑)
-        if not path.is_file():
-            import sys as _sys
-            print(
-                f"[load_checkpoint] WARNING: checkpoint file not found at {path}; "
-                f"falling back to default cfg + random initialization. "
-                f"Run scripts/05_train_lstm.py / 06_train_liquid.py / 07_train_transformer.py "
-                f"to produce a real checkpoint first.",
-                file=_sys.stderr,
-                flush=True,
-            )
-            # 提前返回前必须构建模块，否则 self.network 停留 None，与
-            # docstring「随机初始化继续运行」承诺不符，.eval()/forward 直接 AttributeError。
-            self._build_modules()  # 用默认 cfg 构建网络与风险校准模块。
-            self._apply_runtime_device()  # 应用运行时设备。
-            self._refresh_runtime_resource_meta()  # 刷新资源元数据（与无 checkpoint 路径同口径）。
-            return {}  # 返回空 payload, 模型走默认 cfg + 随机初始化
-        payload = _load_checkpoint_payload(path)  # 加载 checkpoint 内容。
-        model_cfg = payload.get("model_cfg")  # 取出内嵌模型配置（保留 falsy 真值交由后续类型校验）。
-        if model_cfg is None:  # 键缺失或显式 None 才回退到空映射。
-            model_cfg = {}
-        if not isinstance(model_cfg, Mapping):  # model_cfg 必须是映射，捕获 0/False/"" 等 falsy 非映射值。
-            raise TypeError("checkpoint model_cfg must be a mapping")
-
-        merged_cfg = _merge_checkpoint_model_cfg(self.cfg, model_cfg)  # 合并基础配置和 checkpoint 配置。
-        self.cfg = merged_cfg  # 更新配置。
-        feature_order = merged_cfg.get("feature_order")  # 优先用合并后的 feature_order（显式空列表也保留）。
-        if feature_order is None:  # 合并配置未提供才回退到 payload 顶层 feature_order。
-            feature_order = payload.get("feature_order")
-        if feature_order is None:  # 均未提供则视为无特征顺序要求。
-            feature_order = []
-        self.expected_feature_order = list(feature_order)  # 更新特征顺序。
-        self.expected_feature_order_required = bool(self.expected_feature_order)  # 更新校验标志。
-        self._build_modules()  # 用合并后的配置重建网络。
-
-        state_dict = payload.get("model_state")  # 优先取 model_state（保留空字典等 falsy 真值）。
-        if state_dict is None:  # model_state 缺失才回退到 legacy state_dict 键。
-            state_dict = payload.get("state_dict")
-        if state_dict is None:  # 必须有模型状态，缺失属于值合同违例。
-            raise ValueError("checkpoint payload must contain model_state")
-        self.load_state_dict(state_dict)  # 加载模型状态。
-
-        self.checkpoint_meta = {  # 记录 checkpoint 元数据。
-            "checkpoint_path": str(path),  # checkpoint 文件路径。
-            "checkpoint_format": payload.get("checkpoint_format"),  # 格式版本。
-            "best_epoch": payload.get("best_epoch"),  # 最佳训练轮次。
-            "best_loss": payload.get("best_loss"),  # 最佳损失值。
-            "train_window_count": payload.get("train_window_count"),  # 训练窗口数。
-            "val_window_count": payload.get("val_window_count"),  # 验证窗口数。
-        }
-        self._apply_runtime_device()  # 应用运行时设备。
-        self._refresh_runtime_resource_meta()  # 刷新资源元数据。
-        return dict(payload)  # 返回完整 payload。
+        return _NeuralModelLifecycleMixin.load_checkpoint(self, checkpoint_path)
 
 
 @dataclass(slots=True)
@@ -3320,7 +3089,7 @@ class _LiquidModel(ModelAPI):
 
 
 @dataclass(slots=True)
-class _TransformerModel(ModelAPI):
+class _TransformerModel(_NeuralModelLifecycleMixin, ModelAPI):
     """Transformer-EKF 模型的工厂实例。
 
     封装 Transformer 网络的创建、checkpoint 加载、推理和状态管理。
@@ -3346,39 +3115,10 @@ class _TransformerModel(ModelAPI):
     runtime_device: str = field(init=False, default=DEVICE_CPU)  # 运行时设备，默认 CPU。
 
     def __post_init__(self) -> None:
-        """数据类初始化后处理：解析配置、加载 checkpoint 或构建网络。"""
-        from liquidloc.common.tee_logger import print_dict
-        _network_cfg = self.cfg.get("network") if isinstance(self.cfg, dict) else None
-        print_dict({
-            "name": self.name,
-            "network_type": "TransformerNetwork",
-            "network_hidden_dim": (_network_cfg or {}).get("hidden_dim") if isinstance(_network_cfg, dict) else None,
-            "network_input_dim": (_network_cfg or {}).get("input_dim") if isinstance(_network_cfg, dict) else None,
-            "has_checkpoint_path": "checkpoint_path" in (self.cfg or {}) if isinstance(self.cfg, dict) else False,
-            "checkpoint_path": (self.cfg or {}).get("checkpoint_path") if isinstance(self.cfg, dict) else None,
-            "window": (self.cfg or {}).get("window") if isinstance(self.cfg, dict) else None,
-        }, "_TransformerModel.__init__ 入口参数")
-        raw_feature_order = self.cfg.get("feature_order")
-        if raw_feature_order is None:
-            self.expected_feature_order = []
-        elif isinstance(raw_feature_order, (list, tuple)):
-            self.expected_feature_order = list(raw_feature_order)
-        else:
-            raise ValueError(
-                f"feature_order must be a list or tuple of strings or None, got {type(raw_feature_order).__name__}"
-            )
-        self.checkpoint_meta = {}
-        self.expected_feature_order_required = bool(self.expected_feature_order)
-
-        checkpoint_path = self.cfg.get("checkpoint_path")
-        if checkpoint_path is not None:
-            if isinstance(checkpoint_path, str) and not checkpoint_path.strip():
-                raise ValueError("checkpoint_path must not be empty when present")
-            self.load_checkpoint(checkpoint_path)
-        else:
-            self._build_modules()
-            self._apply_runtime_device()
-            self._refresh_runtime_resource_meta()
+        self._initialize_model(
+            network_type="TransformerNetwork",
+            log_label="_TransformerModel.__init__ 入口参数",
+        )
 
     def _build_modules(self) -> None:
         """构建 Transformer 网络模块和风险校准模块。"""
@@ -3387,24 +3127,10 @@ class _TransformerModel(ModelAPI):
         self.risk_calibration = RiskCalibration()  # 创建风险校准模块。
 
     def _apply_runtime_device(self) -> None:
-        """根据配置将网络模块移动到运行时设备。"""
-        device = _resolve_explicit_runtime_device(self.cfg)
-        _move_modules_to_device((self.network, self.risk_calibration), device)
-        self.runtime_device = str(device)
+        return _NeuralModelLifecycleMixin._apply_runtime_device(self)
 
     def _refresh_runtime_resource_meta(self) -> None:
-        """刷新运行时资源元数据（参数量和内存估算）。"""
-        if self.network is None:
-            self.runtime_resource_meta = {
-                "params": _RUNTIME_RESOURCE_DEFAULT_PARAMS,
-                "ram_peak": RAM_PEAK_FLOOR_MB,
-                "ram_peak_mb": RAM_PEAK_FLOOR_MB,
-            }
-        else:
-            self.runtime_resource_meta = _build_module_runtime_resource_meta((self.network, self.risk_calibration))
-        self.params = coerce_finite_scalar(self.runtime_resource_meta["params"], name="runtime_resource_meta.params")
-        self.ram_peak = coerce_finite_scalar(self.runtime_resource_meta["ram_peak"], name="runtime_resource_meta.ram_peak")
-        self.ram_peak_mb = coerce_finite_scalar(self.runtime_resource_meta["ram_peak_mb"], name="runtime_resource_meta.ram_peak_mb")
+        return _NeuralModelLifecycleMixin._refresh_runtime_resource_meta(self)
 
     def reset(self) -> None:
         """重置模型级状态（Transformer 无 hidden_state，跟 LSTM/Liquid 对齐）。
@@ -3412,167 +3138,60 @@ class _TransformerModel(ModelAPI):
         §1.4 兼容：Transformer 的注意力状态通过因果掩码在 forward 内自包含，
         跨轨不泄漏。本方法为 no-op。
         """
-        return None
+        return _NeuralModelLifecycleMixin.reset(self)
 
     def train(self) -> None:
-        self.network.train()
-        self.risk_calibration.train()
+        return _NeuralModelLifecycleMixin.train(self)
 
     def eval(self) -> None:
-        self.network.eval()
-        self.risk_calibration.eval()
+        return _NeuralModelLifecycleMixin.eval(self)
 
     def parameters(self):
-        yield from self.network.parameters()
-        yield from self.risk_calibration.parameters()
+        yield from _NeuralModelLifecycleMixin.parameters(self)
 
     def _normalize_window(self, window_tensor: Any) -> Any:
         """校验特征窗口的特征顺序是否与期望一致。"""
-        if not self.expected_feature_order_required:
-            return window_tensor
-        if not isinstance(window_tensor, Mapping):
-            raise TypeError(
-                f"{self.name} with cfg/checkpoint expected_feature_order requires a structured "
-                "feature window mapping to validate expected_feature_order; "
-                f"got {type(window_tensor).__name__}"
-            )
-        source = _coerce_structured_window(window_tensor)
-        if source["feature_order"] != self.expected_feature_order:
-            raise ValueError(
-                "window_tensor.feature_order must match the model expected_feature_order; "
-                f"expected {self.expected_feature_order}, got {source['feature_order']}"
-            )
-        return source
+        return _NeuralModelLifecycleMixin._normalize_window(self, window_tensor)
 
     def predict_intermediate_tensors(self, window_tensor: Any) -> dict[str, torch.Tensor]:
         """前向推理，返回归一化后的中间张量字典（与 _LSTMModel 完全相同逻辑）。"""
-        normalized_window = self._normalize_window(window_tensor)
-        raw_output = self.network(normalized_window)
-        raw_outputs = _coerce_output_vector(raw_output, output_keys=_LIQUID_OUTPUT_KEYS)
-        raw_outputs["risk"] = self.risk_calibration(raw_outputs["risk"])
-        normalized = _normalize_lstm_output_tensors(raw_outputs, risk_already_calibrated=True)
-        modality = _resolve_modality_from_normalized_window(normalized_window)
-        scaling_ceiling = _SCALING_CEILING
-        if modality == MODALITY_UWB:
-            _safe_vio = torch.nan_to_num(normalized["vio_scaling"], nan=0.0, posinf=0.0, neginf=0.0)
-            normalized["vio_scaling"] = torch.clamp(_safe_vio, min=_SCALING_NEUTRAL_FLOOR, max=scaling_ceiling)
-        elif modality == MODALITY_VIO:
-            _safe_uwb = torch.nan_to_num(normalized["uwb_scaling"], nan=0.0, posinf=0.0, neginf=0.0)
-            normalized["uwb_scaling"] = torch.clamp(_safe_uwb, min=_SCALING_NEUTRAL_FLOOR, max=scaling_ceiling)
-        return normalized
+        return _NeuralModelLifecycleMixin.predict_intermediate_tensors(self, window_tensor)
 
     def infer_intermediate(self, window_tensor: Any) -> ModelIntermediate:
         """无梯度推理，返回 ModelIntermediate 数据类（与 _LSTMModel 完全相同逻辑）。"""
-        with torch.no_grad():
-            normalized_outputs = self.predict_intermediate_tensors(window_tensor)
-            bias_key, risk_key, uwb_scaling_key, vio_scaling_key = MODEL_INTERMEDIATE_KEYS
-            return ModelIntermediate(
-                bias=round(float(normalized_outputs[bias_key].detach().item()), 6),
-                risk=round(float(normalized_outputs[risk_key].detach().item()), 6),
-                uwb_scaling=float(normalized_outputs[uwb_scaling_key].detach().item()),
-                vio_scaling=float(normalized_outputs[vio_scaling_key].detach().item()),
-            )
+        return _NeuralModelLifecycleMixin.infer_intermediate(self, window_tensor)
 
     def state_dict(self) -> dict[str, Any]:
         """返回模型状态字典（与 _LSTMModel 完全相同结构）。"""
-        return {
-            "network": self.network.state_dict(),
-            "risk_calibration": self.risk_calibration.state_dict(),
-        }
+        return _NeuralModelLifecycleMixin.state_dict(self)
 
     def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
         """加载模型状态字典，支持旧版 checkpoint 的输出层权重填充（与 _LSTMModel 完全相同逻辑）。"""
-        if not isinstance(state_dict, Mapping):
-            raise TypeError("state_dict must be a mapping")
-        if "network" in state_dict:
-            network_state = state_dict["network"]
-        else:
-            network_state = state_dict
-        if not isinstance(network_state, Mapping):
-            raise ValueError("state_dict must contain a network state mapping")
+        return _NeuralModelLifecycleMixin.load_state_dict(self, state_dict)
 
+    def _prepare_network_state_dict(self, network_state: Mapping[str, Any]) -> Mapping[str, Any]:
         output_layer_weight = network_state.get("output_layer.weight")
-        if torch.is_tensor(output_layer_weight):
-            current_weight = self.network.output_layer.weight
-            if (
-                output_layer_weight.ndim == 2
-                and current_weight.ndim == 2
-                and int(output_layer_weight.shape[0]) == int(current_weight.shape[0])
-                and int(output_layer_weight.shape[1]) < int(current_weight.shape[1])
-            ):
-                padded_weight = current_weight.detach().clone()
-                padded_weight.zero_()
-                source_weight = output_layer_weight.to(current_weight.device)
-                padded_weight[:, : int(source_weight.shape[1])] = source_weight
-                network_state = dict(network_state)
-                network_state["output_layer.weight"] = padded_weight
-
-        self.network.load_state_dict(network_state)
-
-        calibration_state = state_dict.get("risk_calibration")
-        if isinstance(calibration_state, Mapping):
-            patched_calibration_state = dict(calibration_state)
-            current_calibration_state = self.risk_calibration.state_dict()
-            for state_key, state_value in current_calibration_state.items():
-                if state_key not in patched_calibration_state:
-                    patched_calibration_state[state_key] = state_value
-            self.risk_calibration.load_state_dict(patched_calibration_state)
+        if not torch.is_tensor(output_layer_weight):
+            return network_state
+        current_weight = self.network.output_layer.weight
+        if not (
+            output_layer_weight.ndim == 2
+            and current_weight.ndim == 2
+            and int(output_layer_weight.shape[0]) == int(current_weight.shape[0])
+            and int(output_layer_weight.shape[1]) < int(current_weight.shape[1])
+        ):
+            return network_state
+        padded_weight = current_weight.detach().clone()
+        padded_weight.zero_()
+        source_weight = output_layer_weight.to(current_weight.device)
+        padded_weight[:, : int(source_weight.shape[1])] = source_weight
+        patched_network_state = dict(network_state)
+        patched_network_state["output_layer.weight"] = padded_weight
+        return patched_network_state
 
     def load_checkpoint(self, checkpoint_path: str | Path) -> dict[str, Any]:
         """从磁盘加载 checkpoint，合并配置并恢复模型状态（与 _LSTMModel 完全相同逻辑）。"""
-        path = _resolve_checkpoint_path(checkpoint_path, self.cfg)
-        # checkpoint 缺失容忍：与 _LSTMModel/_LiquidModel 同口径，缺失时降级为默认 cfg + 随机初始化。
-        if not path.is_file():
-            import sys as _sys
-            print(
-                f"[load_checkpoint] WARNING: checkpoint file not found at {path}; "
-                f"falling back to default cfg + random initialization. "
-                f"Run scripts/05_train_lstm.py / 06_train_liquid.py / 07_train_transformer.py "
-                f"to produce a real checkpoint first.",
-                file=_sys.stderr,
-                flush=True,
-            )
-            # 提前返回前必须构建模块，否则 self.network 停留 None（与 _LSTMModel 补丁同口径）。
-            self._build_modules()  # 用默认 cfg 构建网络与风险校准模块。
-            self._apply_runtime_device()  # 应用运行时设备。
-            self._refresh_runtime_resource_meta()  # 刷新资源元数据。
-            return {}  # 返回空 payload, 模型走默认 cfg + 随机初始化
-        payload = _load_checkpoint_payload(path)
-        model_cfg = payload.get("model_cfg")
-        if model_cfg is None:
-            model_cfg = {}
-        if not isinstance(model_cfg, Mapping):
-            raise TypeError("checkpoint model_cfg must be a mapping")
-
-        merged_cfg = _merge_checkpoint_model_cfg(self.cfg, model_cfg)
-        self.cfg = merged_cfg
-        feature_order = merged_cfg.get("feature_order")
-        if feature_order is None:
-            feature_order = payload.get("feature_order")
-        if feature_order is None:
-            feature_order = []
-        self.expected_feature_order = list(feature_order)
-        self.expected_feature_order_required = bool(self.expected_feature_order)
-        self._build_modules()
-
-        state_dict = payload.get("model_state")
-        if state_dict is None:
-            state_dict = payload.get("state_dict")
-        if state_dict is None:
-            raise ValueError("checkpoint payload must contain model_state")
-        self.load_state_dict(state_dict)
-
-        self.checkpoint_meta = {
-            "checkpoint_path": str(path),
-            "checkpoint_format": payload.get("checkpoint_format"),
-            "best_epoch": payload.get("best_epoch"),
-            "best_loss": payload.get("best_loss"),
-            "train_window_count": payload.get("train_window_count"),
-            "val_window_count": payload.get("val_window_count"),
-        }
-        self._apply_runtime_device()
-        self._refresh_runtime_resource_meta()
-        return dict(payload)
+        return _NeuralModelLifecycleMixin.load_checkpoint(self, checkpoint_path)
 
 
 def create_model(name: str, cfg: Mapping[str, Any] | None) -> ModelAPI:

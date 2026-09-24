@@ -437,14 +437,6 @@ def _compute_n_seed_from_bundles(bundles: list[dict[str, Any]]) -> int:  # §19.
     return max(len(repeat_ids), 1)  # 至少为 1，防止空数据误判。
 
 
-def _is_ablation_method(method_name: str) -> bool:  # §19.3：判断方法名是否为消融变体。
-    """消融方法名通常以 _wo_（without）或 _ablation_ 为后缀前缀。"""
-    if not method_name:
-        return False
-    m = str(method_name).lower()
-    return '_wo_' in m or '_ablation_' in m or m.startswith('ablation_')
-
-
 def _build_plotting_inputs(  # 把评估结果整理成绘图消费的标准输入结构。
     bundles: list[dict[str, Any]],  # 预测 bundle 列表，里面包含每个 case 的主结果。
     gt_records_by_case_ref: Mapping[str, list[dict[str, Any]]],  # case_ref -> 真值记录，用于轨迹对比。
@@ -830,35 +822,8 @@ class EvalPipeline(PipelineAPI):  # 把预测 bundle 转成评估结果、统计
                 'passed': not _seed_violated,
             }
 
-        # §19.3 M：消融实验过滤与「非主表·非本排序」标注。
-        # 判定依据（多信号取真，保证 primary_axis 未从 experiment_cfg 传播时也生效）：
-        #   1. eval_pipeline cfg 携带 primary_axis=ablation_variant / experiment_id 含 'ablation'
-        #   2. 显式 is_ablation / non_main_table 标志
-        #   3. 方法名本身携带消融标记（_wo_ / _ablation_ / ablation_ 前缀）
-        # 只要判定为消融实验：消融变体行从主表剔除，且整个输出标注 non_main_table。
         _primary_axis = str((cfg or {}).get('primary_axis') or (protocol_cfg or {}).get('primary_axis') or '')
         _experiment_id = str((cfg or {}).get('experiment_id') or '')
-        _is_ablation_experiment = bool(
-            str(_primary_axis).lower() in ('ablation_variant', 'ablation')
-            or 'ablation' in _experiment_id.lower()
-            or bool((cfg or {}).get('is_ablation', False))
-            or bool((cfg or {}).get('non_main_table', False))
-        )
-        _n_ablation_rows_removed = 0  # §19.3：记录本主表剔除的消融行数（供 audit_payload 标注「非主表·非本排序」）。
-        if metric_rows:
-            _n_before_ablation = len(metric_rows)
-            _any_ablation_row = any(_is_ablation_method(row.get('method_name', '')) for row in metric_rows)
-            if _is_ablation_experiment or _any_ablation_row:
-                metric_rows = [row for row in metric_rows if not _is_ablation_method(row.get('method_name', ''))]
-                _n_ablation_rows_removed = _n_before_ablation - len(metric_rows)
-            if _n_ablation_rows_removed > 0:
-                from liquidloc.common.tee_logger import print_dict as _print_dict  # 局部导入，避免循环。
-                _print_dict({
-                    'n_rows_before_ablation_filter': _n_before_ablation,
-                    'n_rows_after_ablation_filter': len(metric_rows),
-                    'removed_ablation_rows': _n_ablation_rows_removed,
-                    'is_ablation_experiment': _is_ablation_experiment,
-                }, "§19.3 M 消融过滤", prefix="[eval]")
 
         if smoke_without_gt:  # 缺真值的 smoke 只能验证链路，不能产出正式比较结论。
             statistics_payload = build_smoke_only_statistics_payload()
@@ -917,13 +882,6 @@ class EvalPipeline(PipelineAPI):  # 把预测 bundle 转成评估结果、统计
         audit_payload = {  # 审计载荷记录本次评估的关键决策和规模。
             'num_prediction_bundles': len(bundles),  # 本次评估输入的 bundle 总数。
             'num_metric_rows': len(metric_rows),  # 最终写出的长表指标行数。
-            # §19.3：记录消融行是否被剔除，主表须标明「非主表、非本排序」。
-            # 若任一消融行被剔除，本主表已不含消融对照，可追溯审计依据。
-            'ablation_rows_removed': _n_ablation_rows_removed,
-            # §19.3：整个实验层面标注。仅当 cfg 携带 primary_axis/experiment_id 等消融信号
-            # 时置 True；若方法名级已剔除消融变体但实验未显式标注，此处仍为 False 表示
-            # 「主表本身不含消融」——两者共同满足 §19.3「明确非主表」的可追溯要求。
-            'non_main_table': bool(_is_ablation_experiment),
             'best_method': best_method,  # 最终选出的最优方法。
             'best_method_by_priority': best_method,  # 保留一份同义字段，方便旧下游读取。
             'conclusion_priority': list(priority_metrics),  # D3：拷贝优先指标列表，隔离 audit_payload 与局部 priority_metrics 的引用，防止下游消费者改写 audit_report 时反向污染局部变量；与 _build_plotting_inputs L448 deepcopy 同口径。

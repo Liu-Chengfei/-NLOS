@@ -63,7 +63,7 @@ def _normalize_vio_rows(vio_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         new_row["dx"] = dx
         new_row["dy"] = dy
         new_row["dyaw"] = dyaw
-                # 缺 quality 字段时填 1.0（V0 健康档=vio_valid 全程 1，手册[414]）。
+                # 缺 quality 字段时填 1.0（V0 健康档=vio_valid 全程 1）。
         # **绝不使用 cov**（cov 是方差米²，不是质量置信度）。旧实现 cov→quality 把
         # 0.0004 方差灌成质量，经 risk=1-quality 折算出 risk≈0.9996，撞上 P35 的
         # vio_risk_hard_skip_threshold=0.05 → VIO 100% 硬跳过 → 经典 EKF 只剩 UWB+IMU

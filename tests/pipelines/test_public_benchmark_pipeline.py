@@ -3,7 +3,7 @@ from __future__ import annotations
 """公开基准测试流水线（public_benchmark_pipeline）测试模块。
 
 测试覆盖范围：
-- MILUV 和 NTU VIRAL 数据集的公开基准测试全链路
+- MILUV 数据集的公开基准测试全链路
 - 协议门控：数据集白名单、冻结评估集、调参禁止
 - 序列 ID 和 split 的归一化处理
 - 相对路径锚定到项目根目录
@@ -170,13 +170,13 @@ def test_pipeline_rejects_blank_split_before_routing(tmp_path):
         })
 
 
-def test_non_miluv_report_uses_routed_scene_tasks(tmp_path, monkeypatch):
-    """使用测试：non miluv report。\n\n验证被测功能正确使用 non miluv report，\n确保内部依赖被正确调用。
+def test_sim_report_uses_routed_scene_tasks(tmp_path, monkeypatch):
+    """SIM 报告使用路由场景任务。\n\n验证当数据集是 SIM 时，report 正确基于路由生成的 scene tasks。
     """
     _patch_dataset_entry_frozen_seq_ids(monkeypatch, ['seq_a'])
     routed_scene_tasks = [
-        {'task_id': 'public_00', 'scene_id': 'ntu_viral:seq_b', 'seq_id': 'seq_b', 'dataset_name': 'ntu_viral'},
-        {'task_id': 'public_01', 'scene_id': 'ntu_viral:seq_c', 'seq_id': 'seq_c', 'dataset_name': 'ntu_viral'},
+        {'task_id': 'public_00', 'scene_id': 'sim:mini_seq', 'seq_id': 'mini_seq', 'dataset_name': 'sim'},
+        {'task_id': 'public_01', 'scene_id': 'sim:mini_seq_02', 'seq_id': 'mini_seq_02', 'dataset_name': 'sim'},
     ]
     captured = {}
 
@@ -193,7 +193,7 @@ def test_non_miluv_report_uses_routed_scene_tasks(tmp_path, monkeypatch):
             artifacts=[str(event_path)],
             metadata={
                 'dataset_manifest': {'sequences': {'seq_a': {'seq_id': 'seq_a'}}},
-                'scene_manifest': {'scenes': [{'scene_id': 'ntu_viral:seq_a', 'seq_ids': ['seq_a']}]},
+                'scene_manifest': {'scenes': [{'scene_id': 'sim:mini_seq', 'seq_ids': ['mini_seq']}]},
             },
         )
 
@@ -224,23 +224,23 @@ def test_non_miluv_report_uses_routed_scene_tasks(tmp_path, monkeypatch):
         lambda self, pipeline_cfg=None, runtime_context=None: StageResult(
             stage_name='core_pipeline',
             artifacts=[],
-            metadata={'scene_tasks': list(routed_scene_tasks), 'prediction_bundles': [{'seq_id': 'seq_b'}, {'seq_id': 'seq_c'}]},
+            metadata={'scene_tasks': list(routed_scene_tasks), 'prediction_bundles': [{'seq_id': 'mini_seq'}, {'seq_id': 'mini_seq_02'}]},
         ),
     )
     result = run({
-        'dataset_name': 'ntu_viral',
-        'raw_root': tmp_path / 'ntu_viral_raw',
+        'dataset_name': 'sim',
+        'raw_root': tmp_path / 'sim_raw',
         'seq_ids': ['seq_a'],
         'methods': ['ekf'],
         'split': 'frozen_public_eval',
         'output_root': tmp_path / 'public',
     })
     assert result.metadata['scene_tasks'] == routed_scene_tasks
-    assert result.metadata['public_benchmark_report']['seq_ids'] == ['seq_b', 'seq_c']
+    assert result.metadata['public_benchmark_report']['seq_ids'] == ['mini_seq', 'mini_seq_02']
     assert result.metadata['public_benchmark_report']['prediction_bundle_count'] == len(routed_scene_tasks)
-    assert captured['ground_truth'] == {'raw_root': str(tmp_path / 'ntu_viral_raw'), 'seq_ids': ['seq_a']}
+    assert captured['ground_truth'] == {'raw_root': str(tmp_path / 'sim_raw'), 'seq_ids': ['seq_a']}
     assert captured['source_report']['seq_ids'] == ['seq_a']
-    assert captured['source_report']['default_source'] == 'ntu_viral_prepare_bridge'
+    assert captured['source_report']['default_source'] == 'sim_prepare_bridge'
 
 
 def test_non_miluv_pipeline_uses_gate_normalized_seq_ids_and_split_downstream(tmp_path, monkeypatch):
@@ -300,8 +300,8 @@ def test_non_miluv_pipeline_uses_gate_normalized_seq_ids_and_split_downstream(tm
     )
 
     result = run({
-        'dataset_name': 'ntu_viral',
-        'raw_root': tmp_path / 'ntu_viral_raw',
+        'dataset_name': 'miluv',
+        'raw_root': tmp_path / 'miluv_raw',
         'field_mapping': {'imu': {}, 'uwb': {}, 'vio': {}, 'gt': {}},
         'seq_ids': [' seq_a ', 'seq_a', 'seq_b '],
         'methods': ['ekf'],
@@ -313,77 +313,6 @@ def test_non_miluv_pipeline_uses_gate_normalized_seq_ids_and_split_downstream(tm
     assert captured['prepare_split'] == 'frozen_public_eval'
     assert result.metadata['protocol_gate']['seq_ids'] == ['seq_a', 'seq_b']
     assert result.metadata['protocol_gate']['split'] == 'frozen_public_eval'
-
-
-def test_ntu_viral_real_chain_smoke(tmp_path, monkeypatch):
-    """冒烟测试：ntu viral real chain。\n\n快速验证 ntu viral real chain 的基本功能可用，\n不深入检查细节，仅确认流程不崩溃。
-    """
-    anchor_layout = {'layout_id': 'ntu_seq_layout', 'anchor_ids': [1], 'anchor_positions': [[0.0, 0.0]]}
-    raw_root = tmp_path / 'ntu_viral_raw'
-    seq_dir = raw_root / 'ntu_seq'
-    seq_dir.mkdir(parents=True)
-    (seq_dir / 'anchor_layout.json').write_text(json.dumps({
-        **anchor_layout,
-    }), encoding='utf-8')
-    (seq_dir / 'imu.json').write_text(json.dumps([
-        {'timestamp': 0.0, 'ax': 0.0, 'ay': 0.0, 'gz': 0.0},
-    ]), encoding='utf-8')
-    (seq_dir / 'uwb.json').write_text(json.dumps([
-        {'timestamp': 0.1, 'anchor_id': 1, 'range': 1.0, 'valid': True, 'quality': 0.9},
-    ]), encoding='utf-8')
-    (seq_dir / 'vio.json').write_text(json.dumps([
-        {'timestamp': 0.2, 'dx': 0.05, 'dy': 0.0, 'dyaw': 0.0, 'quality': 0.8, 'tracked_features': 40, 'reproj_err': 0.5},
-    ]), encoding='utf-8')
-    (seq_dir / 'gt.json').write_text(json.dumps([
-        {'timestamp': 0.0, 'px': 0.0, 'py': 0.0, 'yaw': 0.0},
-        {'timestamp': 0.1, 'px': 0.1, 'py': 0.0, 'yaw': 0.0},
-        {'timestamp': 0.2, 'px': 0.2, 'py': 0.0, 'yaw': 0.0},
-        {'timestamp': 0.3, 'px': 0.3, 'py': 0.0, 'yaw': 0.0},
-    ]), encoding='utf-8')
-
-    real_core_pipeline_cls = public_pipeline.CorePipeline
-
-    class _InjectAnchorLayoutCorePipeline:
-        def run(self, payload, runtime_context=None):
-            payload = dict(payload)
-            payload['scene_tasks'] = [dict(task, anchor_layout=anchor_layout) for task in payload.get('scene_tasks', [])]
-            return real_core_pipeline_cls().run(payload, runtime_context=runtime_context)
-
-    _patch_dataset_entry_frozen_seq_ids(monkeypatch, ['ntu_seq'])
-    monkeypatch.setattr(public_pipeline, 'CorePipeline', lambda: _InjectAnchorLayoutCorePipeline())
-
-    result = run({
-        'dataset_name': 'ntu_viral',
-        'raw_root': raw_root,
-        'field_mapping': {
-            'imu': {'timestamp': 'timestamp', 'ax': 'ax', 'ay': 'ay', 'gz': 'gz'},
-            'uwb': {'timestamp': 'timestamp', 'anchor_id': 'anchor_id', 'range': 'range', 'valid': 'valid', 'quality': 'quality'},
-            'vio': {
-                'timestamp': 'timestamp',
-                'dx': 'dx',
-                'dy': 'dy',
-                'dyaw': 'dyaw',
-                'quality': 'quality',
-                'tracked_features': 'tracked_features',
-                'reproj_err': 'reproj_err',
-            },
-            'gt': {'timestamp': 'timestamp', 'px': 'px', 'py': 'py', 'yaw': 'yaw'},
-        },
-        'seq_ids': ['ntu_seq'],
-        'methods': ['ekf'],
-        'split': 'frozen_public_eval',
-        'output_root': tmp_path / 'public',
-    })
-
-    report = result.metadata['public_benchmark_report']
-    assert result.stage_name == 'public_benchmark_pipeline'
-    assert report['dataset_name'] == 'ntu_viral'
-    assert report['prediction_bundle_count'] == 1
-    assert len(result.metadata['prediction_index']) == 1
-    assert result.metadata['prediction_index'][0]['seq_id'] == 'ntu_seq'
-    assert result.metadata['prediction_index'][0]['method_name'] == 'ekf'
-    assert (tmp_path / 'public' / 'reports' / 'public_benchmark_report.json').is_file()
-    assert (tmp_path / 'public' / 'audits' / 'public_protocol_gate.json').is_file()
 
 
 def test_util_is_rejected_by_official_public_benchmark_gate(tmp_path):
@@ -466,7 +395,7 @@ def test_relative_registry_and_protocol_paths_are_project_root_anchored(tmp_path
             'aggregation_order': ['single_run', 'repeat_summary', 'scene_summary', 'experiment_conclusion'],
             'conclusion_priority': ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'mae'],
             'public_benchmark': {
-                'allowed_datasets': ['miluv', 'ntu_viral'],
+                'allowed_datasets': ['miluv'],
                 'frozen_eval_split': 'frozen_public_eval',
                 'tuning_forbidden': True,
                 'shared_split_required': True,

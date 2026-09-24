@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -27,6 +29,49 @@ __all__ = ("install_tee", "get_active_log_path", "uninstall_tee", "print_args", 
 _ACTIVE_LOG_PATH: Optional[Path] = None
 _ORIGINAL_STDOUT: Optional[Any] = None
 _ORIGINAL_STDERR: Optional[Any] = None
+
+
+def _get_git_commit_hash() -> str:
+    """获取当前 git HEAD 的短 hash（7 位），无 git 环境返回 'no-git'。"""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short=7", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+            cwd=Path(__file__).resolve().parent.parent.parent.parent,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return "no-git"
+
+
+def _compute_config_hash(config_path: str | Path) -> str:
+    """对配置文件内容计算 SHA256 前 12 位 hash。"""
+    try:
+        p = Path(config_path)
+        if not p.is_file():
+            return "no-config"
+        content = p.read_text(encoding="utf-8", errors="ignore")
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()[:12]
+    except Exception:
+        return "no-config"
+
+
+def _build_log_header(
+    run_name: str, log_file: Path, config_hash: str, git_commit: str,
+) -> str:
+    """构建包含 git commit 和 config hash 的日志头。"""
+    return (
+        f"{'=' * 80}\n"
+        f"# 实验运行日志\n"
+        f"# 创建时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\n"
+        f"# 日志文件: {log_file}\n"
+        f"# 运行名称: {run_name}\n"
+        f"# git_commit: {git_commit}\n"
+        f"# config_hash: {config_hash}\n"
+        f"{'=' * 80}\n"
+    )
 
 
 class _TeeStream:
@@ -107,12 +152,13 @@ class _TeeStream:
         return f"<tee:{self._stream_name}>"
 
 
-def install_tee(log_dir: str | Path, *, run_name: str = "run") -> Path:
+def install_tee(log_dir: str | Path, *, run_name: str = "run", config_path: str | Path = "") -> Path:
     """安装 tee，把 sys.stdout / sys.stderr 同时写入终端和日志文件。
 
     Args:
         log_dir: 日志文件存放目录，不存在会自动创建。
         run_name: 运行名称，用于日志文件命名（默认 "run"）。
+        config_path: 任务契约配置文件路径，用于计算 config hash（可选）。
 
     Returns:
         日志文件的绝对路径。
@@ -138,6 +184,10 @@ def install_tee(log_dir: str | Path, *, run_name: str = "run") -> Path:
     timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
     log_file = log_dir_path / f"{run_name}_{timestamp}.log"
 
+    # 获取 git commit 和 config hash（条款 [116] 要求）
+    git_commit = _get_git_commit_hash()
+    config_hash = _compute_config_hash(config_path) if config_path else "no-config"
+
     # 保存原始流
     _ORIGINAL_STDOUT = sys.stdout
     _ORIGINAL_STDERR = sys.stderr
@@ -145,15 +195,8 @@ def install_tee(log_dir: str | Path, *, run_name: str = "run") -> Path:
     # 以 utf-8 编码打开文件，避免中文乱码
     file_stream = open(log_file, "w", encoding="utf-8", buffering=1, newline="\n")
 
-    # 写入日志头
-    header = (
-        f"{'=' * 80}\n"
-        f"# 实验运行日志\n"
-        f"# 创建时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\n"
-        f"# 日志文件: {log_file}\n"
-        f"# 运行名称: {run_name}\n"
-        f"{'=' * 80}\n"
-    )
+    # 写入日志头（条款 [116]：包含 git commit + config hash）
+    header = _build_log_header(run_name, log_file, config_hash, git_commit)
     file_stream.write(header)
     file_stream.flush()
 

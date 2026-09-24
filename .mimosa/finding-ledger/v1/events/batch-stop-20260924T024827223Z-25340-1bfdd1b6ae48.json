@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260924T024827223Z-25340-1bfdd1b6ae48",
+  "runId": "20260924T024827223Z-25340-1bfdd1b6ae48",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": [
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affectsCompletion": false
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "fceaadd262700764d86f24d8a01dc1998bf06c2cc9decc680f9402cb4954e76f",
+  "rulesVersion": "unavailable",
+  "sessionHash": "6153567852b82bf72a8c01cfec0e2781d1fa3f6fd24bf0a9bd4abad8fd086214",
+  "reportRef": ".mimosa/reports/task-review-sess_a11d4681-4e21-45eb-b0a2-4392899ecac4-20260924T024827223Z-25340-1bfdd1b6ae48.json",
+  "events": [],
+  "observedFindingIds": [
+    "mimosa-c744cefed6c19de4321f436e",
+    "mimosa-726b3f3468b079f7d24b74b2"
+  ],
+  "verifiedFiles": [
+    {
+      "file": "scripts/16_download_public_datasets.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-24T02:48:27.550Z"
+}

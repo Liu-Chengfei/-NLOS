@@ -150,7 +150,7 @@ def test_section9_pulse_async_audit_in_audit_payload(tmp_path):
         result = run({
             'prediction_bundles': [
                 _make_bundle('ekf', second_px=0.03),
-                _make_bundle('robust_ekf', second_px=0.30),
+                _make_bundle('ekf', second_px=0.30),
             ],
             'ground_truth_root': FIXTURE_ROOT,
             'output_root': output_root / 'eval',
@@ -170,7 +170,7 @@ def test_section9_pulse_async_audit_in_audit_payload(tmp_path):
     assert aggr['cmp1_cmp5_at_risk_count'] == 2
     # method 维度: 每方法 1 条违规
     assert aggr['violations_by_method'].get('ekf') == 1
-    assert aggr['violations_by_method'].get('robust_ekf') == 1
+    assert aggr['violations_by_method'].get('ekf') == 1
     # seq 维度: 但 mini_seq 跨 2 bundle → 2 条违规
     assert aggr['violations_by_seq'].get('mini_seq') == 2
     # violations_detail 含 2 条完整副本

@@ -1,4 +1,4 @@
-"""Activation heatmap plotter for the 4 heads (异步高NLOS实验全流程保障手册 Part 3 §0-V3).
+"""Activation heatmap plotter for the 4 heads (实验规范 Part 3 §0-V3).
 
 Renders 4 stacked heatmap rows (risk / bias / uwb_scaling / vio_scaling) with a
 bottom NLOS-band row showing the `nl_flag` (or `scene_mask`) binary signal. This

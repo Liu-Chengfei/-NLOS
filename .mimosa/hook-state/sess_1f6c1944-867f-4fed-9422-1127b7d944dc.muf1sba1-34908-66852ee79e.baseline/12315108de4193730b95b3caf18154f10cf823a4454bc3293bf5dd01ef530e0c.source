@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""SessionStart hook for 异步高NLOS实验 — 会话启动/清空/压缩时注入治理上下文。
+
+协议（ZCode）：
+- 从 stdin 读一个 JSON 事件对象；
+- 向 stdout 写一条 JSON，前缀 `{"hookSpecificOutput":{"hookEventName":...`
+- 诊断输出 stderr（不用 stdout）。
+"""
+import json, os, sys
+from pathlib import Path
+
+ROOT = Path(os.environ.get("ZCODE_PROJECT_DIR", os.getcwd()))
+HAND = ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版.md"
+STAGE0 = ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版-第0阶段落实报告.md"
+MAIN = ROOT / "docs" / "异步实验_执行手册_终版v15_总纲条款版-落实报告.md"
+SKILL = ROOT / ".agents" / "skills" / "execution-report-gate" / "SKILL.md"
+
+raw = sys.stdin.read()
+try:
+    inp = json.loads(raw) if raw.strip() else {}
+except Exception as e:
+    sys.stderr.write(f"[governance-hook] bad JSON stdin: {e}\n")
+    sys.exit(1)
+
+stage = "未进入"
+if STAGE0.exists():
+    # very light heuristic: does the report contain 审核结论 -> 阶段 0
+    txt = STAGE0.read_text(encoding="utf-8", errors="ignore")
+    stage = "0 治理落实期（实验中）" if "核验结论" in txt else "0 治理落实期（报告未核验）"
+    if MAIN.exists() and "核验结论" in MAIN.read_text(encoding="utf-8", errors="ignore"):
+        stage = "1+ 已通过（执行期）"
+    elif "PASS" in txt:
+        stage = "0 治理期核验 PASS（待用户验收）"
+
+five = (
+    "五铁律（硬化为会话记忆）："
+    "①唯一真源=手册764条；②状态只认磁盘；③原文执行不摘要不改写；"
+    "④不做合理外推；⑤一步一验失败即停等用户批准。"
+)
+notice = (
+    "语言铁律：全程简体中文，专有名词/API/变量名/单位/期刊名可保留英文，"
+    "其余一律中文。"
+    "上下文压缩后必须重读 AGENTS.md + .agents/skills/execution-report-gate/SKILL.md（§1 为八字段格式唯一逐字载体）。"
+)
+
+ctx = f"[governance] {five} | 当前阶段：{stage} | {notice}"
+sys.stdout.write(
+    json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": ctx,
+            }
+        },
+        ensure_ascii=False,
+    )
+)
+sys.stderr.write(f"[governance] SessionStart source={inp.get('source','?')} stage={stage} skill={SKILL.exists()}\n")

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20260924T031944019Z-18400-330c5d813c8e",
+  "runStatus": "inconclusive",
+  "errors": [
+    "bash-discovery:.venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h: bash_discovery_incomplete: project enumeration exceeded 5000 reviewable files",
+    "baseline:.venv-gpu/Lib/site-packages/torch/include/c10/util/FileSystem.h: baseline_partial: baseline exceeded 5000 candidate files",
+    "scan:tests/scripts/test_orchestration_scripts.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:tests/protocol/test_vio_path.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:tests/estimators/test_ekf_core.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:scripts/15_build_six_cmp_aggregate.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:scripts/16_write_six_cmp_scaffold.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+  ],
+  "target": ".",
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "670cbcc3a25d03ac67286231d239a7e5f2b944c313142d18d855033012ae7733",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-09-24T03:19:44.019Z",
+  "timing": {
+    "startedAt": "2026-09-24T03:19:38.398Z",
+    "completedAt": "2026-09-24T03:19:44.019Z",
+    "durationMs": 5621
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 0,
+    "bySeverity": {},
+    "byStatus": {}
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "bash_discovery_incomplete": 1,
+      "baseline_partial": 1,
+      "scanner_failed": 5,
+      "project_check_failed": 7
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-sess_98c82e37-6f0c-494d-9642-3980d11594c7-20260924T031944019Z-18400-330c5d813c8e.json"
+}

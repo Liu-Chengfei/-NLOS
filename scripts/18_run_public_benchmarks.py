@@ -21,7 +21,6 @@ from liquidloc.dataio.registry.public_dataset_registry import (  # 统一公开�
     resolve_public_eval_seq_ids,
 )
 from liquidloc.dataio.readers.miluv_reader import inspect_miluv_raw_readiness  # 检查 MILUV 原始数据是否就绪。
-from liquidloc.dataio.readers.ntu_viral_reader import inspect_ntu_viral_raw_readiness  # 检查 NTU VIRAL 原始数据是否就绪。
 from liquidloc.pipelines.eval_pipeline import EvalPipeline  # 评估流水线入口。
 from liquidloc.pipelines.public_benchmark_pipeline import PublicBenchmarkPipeline  # 公开 benchmark 流水线入口。
 from liquidloc.protocol.experiment_gates import (  # 读取协议定义的官方公开 benchmark 白名单与论文级就绪检查。
@@ -69,8 +68,6 @@ def _inspect_public_raw_readiness(dataset_name: str, raw_root: str) -> dict[str,
     """检查公开数据集原始数据是否就绪。"""
     if dataset_name == "miluv":  # MILUV 走对应检查器。
         return inspect_miluv_raw_readiness(raw_root)  # 直接返回 MILUV 的就绪报告。
-    if dataset_name == "ntu_viral":  # NTU VIRAL 走对应检查器。
-        return inspect_ntu_viral_raw_readiness(raw_root)  # 直接返回 NTU VIRAL 的就绪报告。
     return {  # 不支持的数据集直接返回失败报告。
         "dataset_name": dataset_name,  # 报告里要保留数据集名。
         "raw_root": str(raw_root),  # 报告里要保留原始目录。

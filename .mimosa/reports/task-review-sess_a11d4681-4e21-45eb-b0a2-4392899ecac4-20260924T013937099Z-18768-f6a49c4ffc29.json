@@ -1,0 +1,977 @@
+{
+  "schema_version": "mimosa-task-review/v2",
+  "run_id": "20260924T013937099Z-18768-f6a49c4ffc29",
+  "run_status": "inconclusive",
+  "errors": [
+    {
+      "stage": "bash-discovery",
+      "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/ExclusivelyOwnedTensorTraits.h",
+      "reason": "bash_discovery_incomplete: project enumeration exceeded 5000 reviewable files"
+    },
+    {
+      "stage": "candidate-select",
+      "target": "src/liquidloc/factories/estimator_factory.py",
+      "reason": "candidate_limit_exceeded: 8 changed reviewable file(s) were not scanned because the limit is 20"
+    },
+    {
+      "stage": "baseline",
+      "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/env.h",
+      "reason": "baseline_partial: baseline exceeded 5000 candidate files"
+    },
+    {
+      "stage": "scan",
+      "target": "scripts/18_run_public_benchmarks.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "scripts/16_download_public_datasets.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/common/constants.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/dataio/readers/__init__.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/pipelines/prepare_pipeline.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/protocol/experiment_gates.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/dataio/sim_materializer.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/pipelines/public_benchmark_pipeline.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "tests/dataio/test_public_dataset_registry.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "tests/pipelines/test_public_benchmark_pipeline.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "scripts/20_run_paper_experiments.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "tests/protocol/test_experiment_gates.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "tests/scripts/test_download_public_datasets.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "tests/scripts/test_run_paper_experiments.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "tests/factories/test_estimator_factory.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/plotting/paper_figures.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/plotting/plot_cdf.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/plotting/_okabe_ito_palette.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/liquidloc/pipelines/core_pipeline.py",
+      "reason": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+    }
+  ],
+  "coverage": {
+    "schema_version": "mimosa-hook-coverage/v1",
+    "status": "partial",
+    "scope": "hook_observed_diff",
+    "baseline": {
+      "complete": false,
+      "captured_files": 5000,
+      "candidate_limit": 5000,
+      "truncated": true,
+      "enumeration_error_count": 0,
+      "snapshot_error_count": 4,
+      "compensated_target_count": 28
+    },
+    "change_tracking": {
+      "touched_observed": 15,
+      "touched_retained": 15,
+      "truncated": false,
+      "bash_mutation": true,
+      "bash_discovered": 28,
+      "bash_discovery_limit": 80,
+      "bash_discovery_truncated": false
+    },
+    "candidates": {
+      "eligible_files": 28,
+      "selected_files": 20,
+      "limit": 20,
+      "truncated": true
+    },
+    "scanning": {
+      "required_files": 19,
+      "scanned_files": 0,
+      "skipped_files": 0,
+      "failed_files": 19,
+      "project_checks_required": 0,
+      "project_checks_completed": 0
+    },
+    "notification": {
+      "eligible_findings": 0,
+      "detailed_findings": 0,
+      "detail_limit": 3,
+      "truncated": false
+    },
+    "reason_counts": {
+      "bash_discovery_incomplete": 1,
+      "candidate_limit_exceeded": 1,
+      "baseline_partial": 1,
+      "scanner_failed": 19,
+      "project_check_failed": 22
+    },
+    "reasons": [
+      {
+        "code": "bash_discovery_incomplete",
+        "stage": "bash-discovery",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/ExclusivelyOwnedTensorTraits.h",
+        "detail": "project enumeration exceeded 5000 reviewable files",
+        "affects_completion": true
+      },
+      {
+        "code": "candidate_limit_exceeded",
+        "stage": "candidate-select",
+        "target": "src/liquidloc/factories/estimator_factory.py",
+        "detail": "8 changed reviewable file(s) were not scanned because the limit is 20",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/env.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "scripts/18_run_public_benchmarks.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "scripts/16_download_public_datasets.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/common/constants.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/dataio/readers/__init__.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/pipelines/prepare_pipeline.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/protocol/experiment_gates.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/dataio/sim_materializer.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/pipelines/public_benchmark_pipeline.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "tests/dataio/test_public_dataset_registry.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "tests/pipelines/test_public_benchmark_pipeline.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "scripts/20_run_paper_experiments.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "tests/protocol/test_experiment_gates.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "tests/scripts/test_download_public_datasets.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "tests/scripts/test_run_paper_experiments.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "tests/factories/test_estimator_factory.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/plotting/paper_figures.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/plotting/plot_cdf.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/plotting/_okabe_ito_palette.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/pipelines/core_pipeline.py",
+        "detail": "spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "bash-discovery",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/ExclusivelyOwnedTensorTraits.h",
+        "detail": "bash_discovery_incomplete: project enumeration exceeded 5000 reviewable files",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "candidate-select",
+        "target": "src/liquidloc/factories/estimator_factory.py",
+        "detail": "candidate_limit_exceeded: 8 changed reviewable file(s) were not scanned because the limit is 20",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/env.h",
+        "detail": "baseline_partial: baseline exceeded 5000 candidate files",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "scripts/18_run_public_benchmarks.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "scripts/16_download_public_datasets.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/common/constants.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/dataio/readers/__init__.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/pipelines/prepare_pipeline.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/protocol/experiment_gates.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/dataio/sim_materializer.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/pipelines/public_benchmark_pipeline.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "tests/dataio/test_public_dataset_registry.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "tests/pipelines/test_public_benchmark_pipeline.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "scripts/20_run_paper_experiments.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "tests/protocol/test_experiment_gates.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "tests/scripts/test_download_public_datasets.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "tests/scripts/test_run_paper_experiments.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "tests/factories/test_estimator_factory.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/plotting/paper_figures.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/plotting/plot_cdf.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/plotting/_okabe_ito_palette.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/liquidloc/pipelines/core_pipeline.py",
+        "detail": "scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+        "affects_completion": true
+      }
+    ],
+    "reasons_truncated": false
+  },
+  "generated_at": "2026-09-24T01:39:37.099Z",
+  "session_id": "sess_a11d4681-4e21-45eb-b0a2-4392899ecac4",
+  "target": ".",
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "rules_version": "unavailable",
+  "diff_hash": "e9b24df3b488807e55cf46a11ec7cc15ac918299f72910dbfaf569f727883412",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 19,
+    "changed_files": [
+      {
+        "file": "scripts/16_download_public_datasets.py",
+        "ranges": [
+          {
+            "start": 7,
+            "end": 8
+          }
+        ],
+        "before_hash": "204ddd509efd790fcf37efef9c890d69cfe5a6479afbc00fd240d9b5ef9d89b1",
+        "after_hash": "d04fb6fbd4fd3471a2efe95b0590a0d48d960ac708e68776902445e65a6aa243"
+      },
+      {
+        "file": "scripts/18_run_public_benchmarks.py",
+        "ranges": [
+          {
+            "start": 24,
+            "end": 70
+          }
+        ],
+        "before_hash": "20e9ca1c1911e13003ab4031059b0351b2defc927a04d1603900fdb239be911a",
+        "after_hash": "d5ca30cb4351327e3df8cf45fe78af4559f43c68ca3526a960dafdc328d7fb8d"
+      },
+      {
+        "file": "scripts/20_run_paper_experiments.py",
+        "ranges": [
+          {
+            "start": 810,
+            "end": 810
+          },
+          {
+            "start": 1406,
+            "end": 1412
+          }
+        ],
+        "before_hash": "975adf937e3c2f0077bc68797e58d4a77a350ca1d5c9ff853f53752387e9f2ca",
+        "after_hash": "22bf1295ff4638f2ff7f84c0050da6a66349396409c580901981ac71684ba8f7"
+      },
+      {
+        "file": "src/liquidloc/common/constants.py",
+        "ranges": [
+          {
+            "start": 6,
+            "end": 6
+          }
+        ],
+        "before_hash": "aea44a83d010faf7420f935c894fe1b0f1d5421fa3d02d5faf80fbb25214e310",
+        "after_hash": "2cffa49fb06f9941256375aea695185ff51b2b596be0c85df1f5db523bc2ec3f"
+      },
+      {
+        "file": "src/liquidloc/dataio/readers/__init__.py",
+        "ranges": [
+          {
+            "start": 10,
+            "end": 41
+          }
+        ],
+        "before_hash": "69b74728e735015570760915c06dcec8a9f9ef5107810a7aeab271e29125b20e",
+        "after_hash": "449069ea020f5b127e4171877afa827b8ab9904afda402228cb6d8af6d09ffe1"
+      },
+      {
+        "file": "src/liquidloc/dataio/sim_materializer.py",
+        "ranges": [
+          {
+            "start": 2209,
+            "end": 2209
+          },
+          {
+            "start": 2352,
+            "end": 2352
+          }
+        ],
+        "before_hash": "066b3bbc69f3e2411a66c2beac5ec581d45962437e419535cf36182e1e4483c3",
+        "after_hash": "c472ea370c5a14eb7dbac9ec34b33b7cdf25ded5eea94f6fdf6f896a88818560"
+      },
+      {
+        "file": "src/liquidloc/pipelines/core_pipeline.py",
+        "ranges": [
+          {
+            "start": 2,
+            "end": 2
+          },
+          {
+            "start": 6,
+            "end": 6
+          }
+        ],
+        "before_hash": "477b609f2f7f78a2d8f92c92fee1e405102550c86c006db12debcd34186ae4cc",
+        "after_hash": "9d015f1932b33dc87db36244b745e18c9dd14c79cd21a2252c4f2c6f179876dc"
+      },
+      {
+        "file": "src/liquidloc/pipelines/prepare_pipeline.py",
+        "ranges": [
+          {
+            "start": 34,
+            "end": 34
+          },
+          {
+            "start": 290,
+            "end": 290
+          },
+          {
+            "start": 321,
+            "end": 322
+          },
+          {
+            "start": 363,
+            "end": 363
+          }
+        ],
+        "before_hash": "df46278fb0a5ec5277452bf6e1a9ac7beedefc8f07528c5d43acbce7509ae0eb",
+        "after_hash": "adceff94d7ba2ebe2acc680b4b39556b2538d8b88dc4342e8f9238a387956a97"
+      },
+      {
+        "file": "src/liquidloc/pipelines/public_benchmark_pipeline.py",
+        "ranges": [
+          {
+            "start": 275,
+            "end": 275
+          }
+        ],
+        "before_hash": "09374e2a2c47b868aed125cb7bf74a390a5db4355e3db603e294f1a49f39fe82",
+        "after_hash": "15846aad3b2fa1aa3d27d4525eac43ead6f10638691dc5aea1201a2ec59fe778"
+      },
+      {
+        "file": "src/liquidloc/plotting/_okabe_ito_palette.py",
+        "ranges": [
+          {
+            "start": 6,
+            "end": 8
+          },
+          {
+            "start": 16,
+            "end": 16
+          },
+          {
+            "start": 50,
+            "end": 50
+          },
+          {
+            "start": 70,
+            "end": 70
+          },
+          {
+            "start": 72,
+            "end": 72
+          },
+          {
+            "start": 74,
+            "end": 74
+          }
+        ],
+        "before_hash": "9ee8754452faf5686f8de1e3f18d433400db00b4805f6da48c9e23d6fde1f9c3",
+        "after_hash": "aeb876faeca4bdc61578de68f4176f8f354aebda30fb29b9d2ec78c6b889f41d"
+      },
+      {
+        "file": "src/liquidloc/plotting/paper_figures.py",
+        "ranges": [
+          {
+            "start": 47,
+            "end": 47
+          },
+          {
+            "start": 50,
+            "end": 50
+          }
+        ],
+        "before_hash": "edc978c408e86133144798a7f9cc10f087f43482c10e065fb43e7dcc7406ebfa",
+        "after_hash": "c9b1347f5af77aa4c8fde15586869040b31622605b4d903dac6f5b59e61256c2"
+      },
+      {
+        "file": "src/liquidloc/plotting/plot_cdf.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 1
+          },
+          {
+            "start": 3,
+            "end": 4
+          }
+        ],
+        "before_hash": "a3bfec1d246e9efdd3c2d9c93e6d38cf4b8a47e937ada805437c99961f676940",
+        "after_hash": "1c436c03f3c85da831270eb67595a981c1693fa1f7d2fee404dbad2bbc7e8ecb"
+      },
+      {
+        "file": "src/liquidloc/protocol/experiment_gates.py",
+        "ranges": [
+          {
+            "start": 94,
+            "end": 94
+          },
+          {
+            "start": 3032,
+            "end": 3032
+          }
+        ],
+        "before_hash": "07e139d3796b86c3e180e31e76584af6b537988d312917e5c8ea7b479b0c01bb",
+        "after_hash": "235c922be55873f7783843c417dfcf07f0df1e2033f118fc8b2b660c3d2ad349"
+      },
+      {
+        "file": "tests/dataio/test_public_dataset_registry.py",
+        "ranges": [
+          {
+            "start": 45,
+            "end": 45
+          },
+          {
+            "start": 85,
+            "end": 85
+          },
+          {
+            "start": 89,
+            "end": 89
+          }
+        ],
+        "before_hash": "793fabc3e6361640a70dc25f1bf8d8c89d0d257ea9ee1e4abb0acf6cbde665e0",
+        "after_hash": "9260599ea126143a6f5910a8309391749520806c0251099518925c2f63ebe4c7"
+      },
+      {
+        "file": "tests/factories/test_estimator_factory.py",
+        "ranges": [
+          {
+            "start": 6,
+            "end": 7
+          },
+          {
+            "start": 125,
+            "end": 125
+          },
+          {
+            "start": 134,
+            "end": 143
+          },
+          {
+            "start": 150,
+            "end": 152
+          },
+          {
+            "start": 294,
+            "end": 294
+          }
+        ],
+        "before_hash": "86cec1d98a1e1e62cb6e94a88ba7b56973d9ffc87c6d94bf154cbeeafcbe4b0e",
+        "after_hash": "1e991d16888b09957bca2e9c513edea24ed4780282de7ac492b4fd7755c2eb53"
+      },
+      {
+        "file": "tests/pipelines/test_public_benchmark_pipeline.py",
+        "ranges": [
+          {
+            "start": 6,
+            "end": 6
+          },
+          {
+            "start": 173,
+            "end": 174
+          },
+          {
+            "start": 178,
+            "end": 179
+          },
+          {
+            "start": 196,
+            "end": 196
+          },
+          {
+            "start": 227,
+            "end": 227
+          },
+          {
+            "start": 231,
+            "end": 232
+          },
+          {
+            "start": 239,
+            "end": 239
+          },
+          {
+            "start": 241,
+            "end": 241
+          },
+          {
+            "start": 243,
+            "end": 243
+          },
+          {
+            "start": 303,
+            "end": 304
+          },
+          {
+            "start": 398,
+            "end": 398
+          }
+        ],
+        "before_hash": "a89f7adf7b396b2ccd1be825a722210979a68b3312fdcd4cbe86a8fb1a52f0f2",
+        "after_hash": "dea352c5716873ac100e994952b9040e13188e6fefbee0bb0ef593217a0a2849"
+      },
+      {
+        "file": "tests/protocol/test_experiment_gates.py",
+        "ranges": [
+          {
+            "start": 43,
+            "end": 43
+          },
+          {
+            "start": 443,
+            "end": 444
+          },
+          {
+            "start": 446,
+            "end": 446
+          },
+          {
+            "start": 449,
+            "end": 449
+          },
+          {
+            "start": 612,
+            "end": 613
+          }
+        ],
+        "before_hash": "e7b29cdcfe4409190b101122b7b5f300e0110fa911bc93b2c114ff650fd4bf96",
+        "after_hash": "e75b3705445ec28e0f8b8f916fc941cc58ece20813d7baab337e0d8cb227480c"
+      },
+      {
+        "file": "tests/scripts/test_download_public_datasets.py",
+        "ranges": [
+          {
+            "start": 60,
+            "end": 63
+          },
+          {
+            "start": 69,
+            "end": 69
+          },
+          {
+            "start": 75,
+            "end": 77
+          },
+          {
+            "start": 84,
+            "end": 86
+          },
+          {
+            "start": 100,
+            "end": 100
+          },
+          {
+            "start": 107,
+            "end": 110
+          },
+          {
+            "start": 143,
+            "end": 143
+          },
+          {
+            "start": 158,
+            "end": 158
+          },
+          {
+            "start": 164,
+            "end": 167
+          },
+          {
+            "start": 173,
+            "end": 173
+          },
+          {
+            "start": 178,
+            "end": 180
+          },
+          {
+            "start": 192,
+            "end": 195
+          },
+          {
+            "start": 266,
+            "end": 269
+          },
+          {
+            "start": 276,
+            "end": 276
+          },
+          {
+            "start": 281,
+            "end": 281
+          }
+        ],
+        "before_hash": "ecd1f0d52c2c1d173661a16c6ea17eadccf4010139c4b125d9d356a4af39a224",
+        "after_hash": "5a488a91c8df41eeb2de6e95b05a47a27021e0683d5b810e46f6dcd1c3ea6263"
+      },
+      {
+        "file": "tests/scripts/test_run_paper_experiments.py",
+        "ranges": [
+          {
+            "start": 229,
+            "end": 229
+          },
+          {
+            "start": 233,
+            "end": 234
+          },
+          {
+            "start": 1500,
+            "end": 1500
+          },
+          {
+            "start": 1968,
+            "end": 1968
+          },
+          {
+            "start": 3047,
+            "end": 3047
+          },
+          {
+            "start": 3063,
+            "end": 3064
+          },
+          {
+            "start": 3075,
+            "end": 3075
+          },
+          {
+            "start": 3102,
+            "end": 3102
+          },
+          {
+            "start": 3502,
+            "end": 3502
+          },
+          {
+            "start": 3529,
+            "end": 3529
+          }
+        ],
+        "before_hash": "761b9f4ec3e9d378c8afca04a9f4501c7ea6f1ec059516f7ac6b7c81976be09a",
+        "after_hash": "3dee5af7d81dfb673235b8ee835bc5dae8d990f50d71b5572bc60b5c94e28ef2"
+      }
+    ]
+  },
+  "timing": {
+    "started_at": "2026-09-24T01:39:29.851Z",
+    "completed_at": "2026-09-24T01:39:37.099Z",
+    "duration_ms": 7248,
+    "measurement": "hook_wall_clock"
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "model_calls": 0,
+    "measurement": "known-zero"
+  },
+  "telemetry": {
+    "schemaVersion": "mimosa-gate-telemetry/v1",
+    "profile": "gate",
+    "operation": "Stop",
+    "outcome": "partial/INCONCLUSIVE",
+    "latencyMs": 7248,
+    "peakMemoryBytes": 108933120,
+    "memoryMeasurement": "max-observed-process-rss",
+    "scannedFiles": 0,
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "measurement": "not-applicable"
+    },
+    "denyCount": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "total": 0,
+      "modelCalls": 0,
+      "measurement": "known-zero"
+    }
+  },
+  "finding_count": 0,
+  "rewake_finding_count": 0,
+  "evidence_boundary": {
+    "scan": "candidate",
+    "static_fix_verification": "observed_static_only",
+    "runtime_verification": "not_performed"
+  },
+  "finding_events": [],
+  "findings": [],
+  "artifacts": {
+    "immutable_report": ".mimosa/reports/task-review-sess_a11d4681-4e21-45eb-b0a2-4392899ecac4-20260924T013937099Z-18768-f6a49c4ffc29.json",
+    "latest_report": ".mimosa/reports/task-review-sess_a11d4681-4e21-45eb-b0a2-4392899ecac4.json",
+    "history_summary": ".mimosa/history/run-20260924T013937099Z-18768-f6a49c4ffc29.json"
+  }
+}

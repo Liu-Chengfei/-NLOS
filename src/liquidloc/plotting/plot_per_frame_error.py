@@ -1,4 +1,4 @@
-"""Per-frame error time-series plotter (异步高NLOS实验全流程保障手册 Part 3 §0-V2).
+"""Per-frame error time-series plotter (实验规范 Part 3 §0-V2).
 
 Renders per-frame (x, y, yaw) error curves versus time for one method on one trajectory.
 This is the second of six "pre-flight visualization" checks (§0-V1..§0-V6). The figure

@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260924T013321097Z-5584-1a70b187fd6d",
+  "runId": "20260924T013321097Z-5584-1a70b187fd6d",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": [
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/Exception.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affectsCompletion": false
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "5e8433d670d1578aaf8555e20aa76e929a85079d8fe6094908005590ff5b63e3",
+  "rulesVersion": "unavailable",
+  "sessionHash": "1d72af92d3fa645e7c07f6917faf07f21838fea3450173fac9dd0dededd2d9de",
+  "reportRef": ".mimosa/reports/task-review-sess_ad938fbe-7b5b-402f-be13-f443770da592-20260924T013321097Z-5584-1a70b187fd6d.json",
+  "events": [],
+  "observedFindingIds": [
+    "mimosa-735abd4006b24a00e5326a50",
+    "mimosa-8c91a9fef67227f789b8b88f",
+    "mimosa-6b8ca586ff82dac0e5030de5",
+    "mimosa-3c4683ea156ad9bf4c88e1f5"
+  ],
+  "verifiedFiles": [
+    {
+      "file": "src/liquidloc/factories/estimator_factory.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "tests/factories/test_estimator_factory.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/common/constants.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/pipelines/core_pipeline.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/estimators/predict_step.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "scripts/24_run_paper_inference.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "scripts/20_run_paper_experiments.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/plotting/paper_figures.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/plotting/plot_cdf.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/protocol/experiment_gates.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "scripts/14_run_paired_statistics.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "scripts/15_build_six_cmp_aggregate.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/estimators/ekf_core.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/liquidloc/plotting/_okabe_ito_palette.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-24T01:33:21.414Z"
+}

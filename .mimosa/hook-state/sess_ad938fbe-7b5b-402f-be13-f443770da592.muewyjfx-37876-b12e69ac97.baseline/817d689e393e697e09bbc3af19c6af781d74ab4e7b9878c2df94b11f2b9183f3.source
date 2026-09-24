@@ -1,0 +1,316 @@
+"""
+Consolidated E9 protocol audit script.
+Runs all 6 checks and prints a final summary.
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+from collections import Counter
+
+# Use repo root as base
+REPO = Path(r"E:\Q4 - 副本")
+DATA_ROOT = REPO / "data" / "raw" / "sim_e9_protocol_20260726"
+MANIFEST = DATA_ROOT / "prepare_manifest.json"
+SRC = REPO / "src"
+sys.path.insert(0, str(SRC))
+
+import numpy as np
+
+
+def hr(title: str):
+    print("\n" + "=" * 70)
+    print(title)
+    print("=" * 70)
+
+
+# -------------------------------------------------------------------
+# 1. Load sim_e9 protocol data and print pool composition stats
+# -------------------------------------------------------------------
+def check_1_pool():
+    hr("CHECK 1: Pool composition A2/A3 x N2/N3")
+    with open(MANIFEST, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    seqs = manifest["dataset_manifest"]["sequences"]
+    # Normalize seq_dir: manifest on another machine has "E:\Q4\..." root.
+    # Use seq_id to reconstruct the correct local path.
+    for s in seqs:
+        s["seq_dir"] = str(DATA_ROOT / s["seq_id"])
+    print(f"Total sequences: {len(seqs)}")
+    print(f"Data root: {manifest['dataset_manifest']['data_root']}")
+    # Inspect axes override of base (non-seed) sequences
+    bases = [s for s in seqs if "_seed" not in s["seq_id"]]
+    print(f"Base sequences: {len(bases)}")
+    # Load 2 sample sim_meta files
+    for s in bases[:2]:
+        meta_p = Path(s["seq_dir"]) / "sim_meta.json"
+        if meta_p.exists():
+            with open(meta_p, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            print(f"\n  seq_id={s['seq_id']}")
+            print(f"    axes_override: {meta.get('axes_override')}")
+            print(f"    dt_imu={meta.get('dt_imu_override_s')}, "
+                  f"dt_uwb={meta.get('dt_uwb_override_s')}, "
+                  f"dt_vio={meta.get('dt_vio_override_s')}")
+            print(f"    v2_protocol_version={meta.get('v2_protocol_version')}")
+            print(f"    n_seed={meta.get('n_seed')}")
+            print(f"    generator_version={meta.get('generator_version')}")
+    # Aggregate axes for unique base layouts
+    a_levels = Counter()
+    n_levels = Counter()
+    layout_ids = Counter()
+    for s in bases:
+        meta_p = Path(s["seq_dir"]) / "sim_meta.json"
+        if meta_p.exists():
+            with open(meta_p, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            ao = meta.get("axes_override", {})
+            a_levels[ao.get("A", "?")] += 1
+            n_levels[ao.get("N", "?")] += 1
+            layout_ids[s["scene_id"]] += 1
+    print(f"\nA-level distribution across {len(bases)} base sequences:")
+    for k, v in sorted(a_levels.items()):
+        print(f"  A={k}: {v}")
+    print(f"N-level distribution across {len(bases)} base sequences:")
+    for k, v in sorted(n_levels.items()):
+        print(f"  N={k}: {v}")
+    print(f"Unique scene_ids: {len(layout_ids)}")
+
+
+# -------------------------------------------------------------------
+# 2. Compute K1 GDOP histogram on the trajectory grid
+# -------------------------------------------------------------------
+def gdop_for_position(p, anchors):
+    """Compute GDOP (2D) for a single point given anchor positions.
+
+    The standard formula is GDOP = sqrt(trace((H H^T)^-1)),
+    where H rows are unit direction vectors from p to each anchor.
+    For 2D with at least 3 anchors, this is well-defined.
+    """
+    p = np.asarray(p, dtype=float)
+    a = np.asarray(anchors, dtype=float)
+    diffs = a - p[np.newaxis, :]  # shape (N, 2)
+    ranges = np.linalg.norm(diffs, axis=1)
+    # Avoid division by zero
+    if np.any(ranges <= 0):
+        return float("inf")
+    # H rows are unit direction components
+    H = diffs / ranges[:, np.newaxis]
+    if H.shape[0] < 3:
+        return float("inf")
+    HtH = H.T @ H
+    try:
+        cov = np.linalg.inv(HtH)
+        return float(np.sqrt(np.trace(cov)))
+    except np.linalg.LinAlgError:
+        return float("inf")
+
+
+def check_2_gdop():
+    hr("CHECK 2: GDOP histogram on trajectory grid")
+    with open(MANIFEST, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    seqs = manifest["dataset_manifest"]["sequences"]
+    for s in seqs:
+        s["seq_dir"] = str(DATA_ROOT / s["seq_id"])
+    bases = [s for s in seqs if "_seed" not in s["seq_id"]]
+    sample = bases[0]
+    layout_p = Path(sample["seq_dir"]) / "anchor_layout.json"
+    with open(layout_p, "r", encoding="utf-8") as f:
+        layout = json.load(f)
+    anchors = layout["anchor_positions"]
+    print(f"Anchor positions ({layout['anchor_count']} anchors):")
+    for i, a in enumerate(anchors):
+        print(f"  {layout['anchor_ids'][i]}: ({a[0]:.3f}, {a[1]:.3f})")
+    print(f"  layout_id={layout.get('layout_id')}, "
+          f"K={layout.get('protocol_k_level')}, "
+          f"G={layout.get('protocol_geometry_level')}")
+    # Build a grid of test positions
+    anchors_np = np.array(anchors)
+    amin = anchors_np.min(axis=0)
+    amax = anchors_np.max(axis=0)
+    span = amax - amin
+    grid_x = np.linspace(amin[0] - 0.2 * span[0], amax[0] + 0.2 * span[0], 50)
+    grid_y = np.linspace(amin[1] - 0.2 * span[1], amax[1] + 0.2 * span[1], 50)
+    gdops = []
+    for x in grid_x:
+        for y in grid_y:
+            g = gdop_for_position((x, y), anchors)
+            if np.isfinite(g):
+                gdops.append(g)
+    gdops = np.array(gdops)
+    print(f"\nComputed GDOP at {len(gdops)} grid points")
+    print(f"  mean={gdops.mean():.3f}, std={gdops.std():.3f}, "
+          f"min={gdops.min():.3f}, max={gdops.max():.3f}, "
+          f"p95={np.percentile(gdops, 95):.3f}")
+    bins = [(1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, float("inf"))]
+    print("Histogram:")
+    for lo, hi in bins:
+        if hi == float("inf"):
+            count = int(np.sum(gdops >= lo))
+            label = f"  [{lo}, inf)"
+        else:
+            count = int(np.sum((gdops >= lo) & (gdops < hi)))
+            label = f"  [{lo}, {hi})"
+        pct = 100.0 * count / len(gdops) if len(gdops) else 0.0
+        print(f"{label}: {count} ({pct:.1f}%)")
+    mean_ok = 3.0 <= gdops.mean() <= 5.0
+    max_ok = gdops.max() <= 6.0
+    print(f"\n  Mean in [3,5]?  {mean_ok}  (mean={gdops.mean():.3f})")
+    print(f"  Max <= 6?       {max_ok}  (max={gdops.max():.3f})")
+
+
+# -------------------------------------------------------------------
+# 3. Check trajectory bounds within anchor convex hull
+# -------------------------------------------------------------------
+def check_3_bounds():
+    hr("CHECK 3: Trajectory bounds vs anchor convex hull")
+    with open(MANIFEST, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    seqs = manifest["dataset_manifest"]["sequences"]
+    for s in seqs:
+        s["seq_dir"] = str(DATA_ROOT / s["seq_id"])
+    bases = [s for s in seqs if "_seed" not in s["seq_id"]]
+    for s in bases[:2]:
+        seq_id = s["seq_id"]
+        gt_p = Path(s["seq_dir"]) / "gt.json"
+        layout_p = Path(s["seq_dir"]) / "anchor_layout.json"
+        with open(gt_p, "r", encoding="utf-8") as f:
+            gt = json.load(f)
+        with open(layout_p, "r", encoding="utf-8") as f:
+            layout = json.load(f)
+        anchors = np.array(layout["anchor_positions"])
+        gt_pts = np.array([(p["px"], p["py"]) for p in gt])
+        gt_min = gt_pts.min(axis=0)
+        gt_max = gt_pts.max(axis=0)
+        anc_min = anchors.min(axis=0)
+        anc_max = anchors.max(axis=0)
+        print(f"\n  seq_id={seq_id}")
+        print(f"  GT bbox:     x=[{gt_min[0]:7.3f}, {gt_max[0]:7.3f}], "
+              f"y=[{gt_min[1]:7.3f}, {gt_max[1]:7.3f}]")
+        print(f"  Anchor bbox: x=[{anc_min[0]:7.3f}, {anc_max[0]:7.3f}], "
+              f"y=[{anc_min[1]:7.3f}, {anc_max[1]:7.3f}]")
+        gt_in_bbox = ((gt_min >= anc_min - 1e-6).all()
+                      and (gt_max <= anc_max + 1e-6).all())
+        print(f"  All GT inside anchor bbox? {gt_in_bbox}")
+        try:
+            from scipy.spatial import ConvexHull
+            hull = ConvexHull(anchors)
+            # hull.equations has shape (n_facets, dim+1) ; inequality form.
+            # For a 2D hull with N anchors, the equations are n_facets x 3.
+            coeffs = hull.equations[:, :2]  # (n_facets, 2)
+            offsets = hull.equations[:, 2]  # (n_facets,)
+            # val[i, j] = coeffs[i] . gt_pts[j] + offsets[i]
+            val = gt_pts @ coeffs.T + offsets[np.newaxis, :]  # (n_gt, n_facets)
+            inside_mask = (val <= 1e-9).all(axis=1)
+            inside_count = int(inside_mask.sum())
+            total = len(gt_pts)
+            print(f"  Points inside anchor convex hull: "
+                  f"{inside_count}/{total} ({100*inside_count/total:.1f}%)")
+        except Exception as e:
+            print(f"  (scipy hull check failed: {e})")
+
+
+# -------------------------------------------------------------------
+# 4-6. Static code checks
+# -------------------------------------------------------------------
+def check_4_dyaw():
+    hr("CHECK 4: Rotation chain & dyaw units")
+    eb = SRC / "liquidloc" / "dataio" / "adapters" / "event_builder.py"
+    ps = SRC / "liquidloc" / "estimators" / "predict_step.py"
+    sm = SRC / "liquidloc" / "dataio" / "sim_materializer.py"
+    txt_eb = eb.read_text(encoding="utf-8")
+    txt_ps = ps.read_text(encoding="utf-8")
+    txt_sm = sm.read_text(encoding="utf-8")
+    has_dyaw_vio = "'dyaw'" in txt_eb
+    print(f"  VIO event has 'dyaw' field: {has_dyaw_vio}")
+    has_gz = "gz" in txt_ps and "yaw_rate" in txt_ps
+    has_yaw_integration = ("yaw_rate" in txt_ps
+                           and "wrap_angle_rad" in txt_ps)
+    print(f"  predict_step uses gz/gyro for yaw integration: {has_gz}")
+    print(f"  yaw integration with wrap_angle_rad: {has_yaw_integration}")
+    has_dyaw_gen = "dyaw" in txt_sm
+    has_gz_gen = "gz" in txt_sm
+    print(f"  sim_materializer generates 'dyaw' field: {has_dyaw_gen}")
+    print(f"  sim_materializer generates 'gz' (gyro z) field: {has_gz_gen}")
+    vio_p = DATA_ROOT / "sim_curve_01" / "vio.json"
+    if vio_p.exists():
+        with open(vio_p, "r", encoding="utf-8") as f:
+            vio = json.load(f)
+        dyaw_vals = np.array([r["dyaw"] for r in vio[:200]])
+        print(f"\n  Sample dyaw values (first 200) from sim_curve_01/vio.json:")
+        print(f"    min={dyaw_vals.min():.5f}, max={dyaw_vals.max():.5f}, "
+              f"abs_max={np.abs(dyaw_vals).max():.5f}")
+        if np.abs(dyaw_vals).max() < 2.0:
+            print("    -> Looks like RADIANS (typical per-step yaw increment)")
+        elif np.abs(dyaw_vals).max() < 200.0:
+            print("    -> Looks like DEGREES (typical per-step yaw increment)")
+        else:
+            print("    -> Unit uncertain, large values")
+    imu_p = DATA_ROOT / "sim_curve_01" / "imu.json"
+    if imu_p.exists():
+        with open(imu_p, "r", encoding="utf-8") as f:
+            imu = json.load(f)
+        gz_vals = np.array([r["gz"] for r in imu[:200]])
+        print(f"\n  Sample gz (gyro z) values (first 200):")
+        print(f"    min={gz_vals.min():.5f}, max={gz_vals.max():.5f}, "
+              f"abs_max={np.abs(gz_vals).max():.5f}")
+        if np.abs(gz_vals).max() < 10.0:
+            print("    -> Looks like RADIANS/SEC (typical for an IMU)")
+
+
+def check_5_rmse():
+    hr("CHECK 5: RMSE uses Umeyama alignment")
+    tm = SRC / "liquidloc" / "metrics" / "trajectory_metrics.py"
+    txt = tm.read_text(encoding="utf-8")
+    has_umeyama = "Umeyama" in txt or "_umeyama" in txt
+    rmse_aligned = ("Umeyama" in txt
+                    and ("aligned_pred" in txt
+                         and "_umeyama" in txt))
+    print(f"  Contains 'Umeyama' / '_umeyama': {has_umeyama}")
+    print(f"  Has Umeyama/SE3 alignment path: {rmse_aligned}")
+    for i, line in enumerate(txt.splitlines(), 1):
+        if "rmse" in line.lower() and ("aligned" in line.lower()
+                                        or "umeyama" in line.lower()):
+            print(f"  L{i}: {line.strip()[:120]}")
+
+
+def check_6_jitter_order():
+    hr("CHECK 6: Jitter injection order vs resampling")
+    al = SRC / "liquidloc" / "scenarios" / "async_levels.py"
+    cp = SRC / "liquidloc" / "pipelines" / "core_pipeline.py"
+    txt_al = al.read_text(encoding="utf-8")
+    txt_cp = cp.read_text(encoding="utf-8")
+    has_jitter_loop = ("jitter_seconds = random.Random" in txt_al
+                       and "jitter_seed" in txt_al)
+    has_apply_async_call = "apply_async_level" in txt_cp
+    has_resample = "resample" in txt_cp
+    cp_lines = txt_cp.splitlines()
+    for i, line in enumerate(cp_lines, 1):
+        if "apply_async_level" in line and "import" not in line:
+            print(f"  core_pipeline.py L{i}: {line.strip()[:120]}")
+        if "resample" in line and "import" not in line:
+            print(f"  core_pipeline.py L{i}: {line.strip()[:120]}")
+    for i, line in enumerate(txt_al.splitlines(), 1):
+        if "jitter_seconds = random.Random" in line:
+            print(f"  async_levels.py L{i}: {line.strip()[:120]}")
+            break
+    print(f"\n  apply_async_level called in core_pipeline: {has_apply_async_call}")
+    print(f"  async_levels injects jitter inline per event: {has_jitter_loop}")
+    print(f"  'resample' mentioned in core_pipeline: {has_resample}")
+
+
+def main():
+    check_1_pool()
+    check_2_gdop()
+    check_3_bounds()
+    check_4_dyaw()
+    check_5_rmse()
+    check_6_jitter_order()
+    hr("ALL CHECKS COMPLETE")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20260924T013937099Z-18768-f6a49c4ffc29",
+  "runStatus": "inconclusive",
+  "errors": [
+    "bash-discovery:.venv-gpu/Lib/site-packages/torch/include/c10/util/ExclusivelyOwnedTensorTraits.h: bash_discovery_incomplete: project enumeration exceeded 5000 reviewable files",
+    "candidate-select:src/liquidloc/factories/estimator_factory.py: candidate_limit_exceeded: 8 changed reviewable file(s) were not scanned because the limit is 20",
+    "baseline:.venv-gpu/Lib/site-packages/torch/include/c10/util/env.h: baseline_partial: baseline exceeded 5000 candidate files",
+    "scan:scripts/18_run_public_benchmarks.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:scripts/16_download_public_datasets.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/common/constants.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/dataio/readers/__init__.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/pipelines/prepare_pipeline.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/protocol/experiment_gates.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/dataio/sim_materializer.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/pipelines/public_benchmark_pipeline.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:tests/dataio/test_public_dataset_registry.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:tests/pipelines/test_public_benchmark_pipeline.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:scripts/20_run_paper_experiments.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:tests/protocol/test_experiment_gates.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:tests/scripts/test_download_public_datasets.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:tests/scripts/test_run_paper_experiments.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:tests/factories/test_estimator_factory.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/plotting/paper_figures.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/plotting/plot_cdf.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/plotting/_okabe_ito_palette.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT",
+    "scan:src/liquidloc/pipelines/core_pipeline.py: scanner_failed: spawnSync C:\\Program Files\\nodejs\\node.exe ETIMEDOUT"
+  ],
+  "target": ".",
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "diffHash": "e9b24df3b488807e55cf46a11ec7cc15ac918299f72910dbfaf569f727883412",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-09-24T01:39:37.099Z",
+  "timing": {
+    "startedAt": "2026-09-24T01:39:29.851Z",
+    "completedAt": "2026-09-24T01:39:37.099Z",
+    "durationMs": 7248
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 0,
+    "bySeverity": {},
+    "byStatus": {}
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "bash_discovery_incomplete": 1,
+      "candidate_limit_exceeded": 1,
+      "baseline_partial": 1,
+      "scanner_failed": 19,
+      "project_check_failed": 22
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-sess_a11d4681-4e21-45eb-b0a2-4392899ecac4-20260924T013937099Z-18768-f6a49c4ffc29.json"
+}

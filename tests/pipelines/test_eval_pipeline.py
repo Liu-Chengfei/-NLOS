@@ -84,7 +84,7 @@ def test_normal_case():
     result = run({
         'prediction_bundles': [
             _bundle('ekf', second_px=0.03, task_id='scene_00'),
-            _bundle('robust_ekf', second_px=0.30, task_id='scene_00'),
+            _bundle('ekf', second_px=0.30, task_id='scene_00'),
         ],
         'ground_truth_root': FIXTURE_ROOT,
         'output_root': output_root / 'eval',
@@ -108,7 +108,7 @@ def test_normal_case():
     rows_by_case: dict[str, list[str]] = {}
     for row in metric_rows:
         rows_by_case.setdefault(row['case_ref'], []).append(row['metric'])
-    assert set(rows_by_case) == {'scene_00::ekf::S(A2,N2,V2,K0,M0)', 'scene_00::robust_ekf::S(A2,N2,V2,K0,M0)'}
+    assert set(rows_by_case) == {'scene_00::ekf::S(A2,N2,V2,K0,M0)', 'scene_00::ekf::S(A2,N2,V2,K0,M0)'}
     assert all(metric_names == get_metric_order() for metric_names in rows_by_case.values())
     assert {row['metric'] for row in metric_rows if row['group'] == 'mechanism'} >= {'corr_scaling_error'}
     selected_case_refs = {
@@ -121,8 +121,8 @@ def test_normal_case():
         for case_group in result.metadata['selected_cases'].values()
         for case_obj in case_group
     }
-    assert selected_case_refs == {'scene_00::ekf::S(A2,N2,V2,K0,M0)', 'scene_00::robust_ekf::S(A2,N2,V2,K0,M0)'}
-    assert selected_methods == {'ekf', 'robust_ekf'}
+    assert selected_case_refs == {'scene_00::ekf::S(A2,N2,V2,K0,M0)', 'scene_00::ekf::S(A2,N2,V2,K0,M0)'}
+    assert selected_methods == {'ekf', 'ekf'}
     runtime_table_path = output_root / 'eval' / 'plotting_inputs' / 'runtime_table.json'
     assert runtime_table_path.is_file()
     runtime_rows = json.loads(runtime_table_path.read_text(encoding='utf-8'))
@@ -148,14 +148,14 @@ def test_selected_cases_tie_break_is_method_neutral():
     forward = run({
         'prediction_bundles': [
             _bundle('ekf', second_px=0.03, task_id='scene_00'),
-            _bundle('robust_ekf', second_px=0.03, task_id='scene_00'),
+            _bundle('ekf', second_px=0.03, task_id='scene_00'),
         ],
         'ground_truth_root': FIXTURE_ROOT,
         'output_root': output_root / 'eval_forward',
     })
     reverse = run({
         'prediction_bundles': [
-            _bundle('robust_ekf', second_px=0.03, task_id='scene_00'),
+            _bundle('ekf', second_px=0.03, task_id='scene_00'),
             _bundle('ekf', second_px=0.03, task_id='scene_00'),
         ],
         'ground_truth_root': FIXTURE_ROOT,
@@ -165,15 +165,15 @@ def test_selected_cases_tie_break_is_method_neutral():
     assert forward.metadata['selected_cases'] == reverse.metadata['selected_cases']
     assert [case_obj['case_ref'] for case_obj in forward.metadata['selected_cases']['main_cases']] == [
         'scene_00::ekf::S(A2,N2,V2,K0,M0)',
-        'scene_00::robust_ekf::S(A2,N2,V2,K0,M0)',
+        'scene_00::ekf::S(A2,N2,V2,K0,M0)',
     ]
     assert [case_obj['case_ref'] for case_obj in forward.metadata['selected_cases']['failure_cases']] == [
         'scene_00::ekf::S(A2,N2,V2,K0,M0)',
-        'scene_00::robust_ekf::S(A2,N2,V2,K0,M0)',
+        'scene_00::ekf::S(A2,N2,V2,K0,M0)',
     ]
     assert [case_obj['case_ref'] for case_obj in forward.metadata['selected_cases']['boundary_cases']] == [
         'scene_00::ekf::S(A2,N2,V2,K0,M0)',
-        'scene_00::robust_ekf::S(A2,N2,V2,K0,M0)',
+        'scene_00::ekf::S(A2,N2,V2,K0,M0)',
     ]
 
 
@@ -586,9 +586,9 @@ def test_eval_pipeline_uses_paired_wilcoxon_when_task_ids_align():
     run({
         'prediction_bundles': [
             _bundle('ekf', second_px=0.03, task_id='scene_00'),
-            _bundle('robust_ekf', second_px=0.04, task_id='scene_00'),
+            _bundle('ekf', second_px=0.04, task_id='scene_00'),
             _bundle('ekf', second_px=0.02, task_id='scene_01'),
-            _bundle('robust_ekf', second_px=0.01, task_id='scene_01'),
+            _bundle('ekf', second_px=0.01, task_id='scene_01'),
         ],
         'ground_truth_root': FIXTURE_ROOT,
         'output_root': output_root / 'eval',

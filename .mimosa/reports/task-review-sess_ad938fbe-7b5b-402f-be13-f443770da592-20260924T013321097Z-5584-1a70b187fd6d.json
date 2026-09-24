@@ -1,0 +1,426 @@
+{
+  "schema_version": "mimosa-task-review/v2",
+  "run_id": "20260924T013321097Z-5584-1a70b187fd6d",
+  "run_status": "completed",
+  "errors": [],
+  "coverage": {
+    "schema_version": "mimosa-hook-coverage/v1",
+    "status": "complete",
+    "scope": "hook_observed_diff",
+    "baseline": {
+      "complete": false,
+      "captured_files": 5000,
+      "candidate_limit": 5000,
+      "truncated": true,
+      "enumeration_error_count": 0,
+      "snapshot_error_count": 0,
+      "compensated_target_count": 15
+    },
+    "change_tracking": {
+      "touched_observed": 15,
+      "touched_retained": 15,
+      "truncated": false,
+      "bash_mutation": false,
+      "bash_discovered": 0,
+      "bash_discovery_limit": 80,
+      "bash_discovery_truncated": false
+    },
+    "candidates": {
+      "eligible_files": 15,
+      "selected_files": 15,
+      "limit": 20,
+      "truncated": false
+    },
+    "scanning": {
+      "required_files": 14,
+      "scanned_files": 14,
+      "skipped_files": 0,
+      "failed_files": 0,
+      "project_checks_required": 0,
+      "project_checks_completed": 0
+    },
+    "notification": {
+      "eligible_findings": 0,
+      "detailed_findings": 0,
+      "detail_limit": 3,
+      "truncated": false
+    },
+    "reason_counts": {
+      "baseline_partial": 1
+    },
+    "reasons": [
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".venv-gpu/Lib/site-packages/torch/include/c10/util/Exception.h",
+        "detail": "baseline exceeded 5000 candidate files",
+        "affects_completion": false
+      }
+    ],
+    "reasons_truncated": false
+  },
+  "generated_at": "2026-09-24T01:33:21.097Z",
+  "session_id": "sess_ad938fbe-7b5b-402f-be13-f443770da592",
+  "target": ".",
+  "revision": "355a9fefcf74362d3979b75bb4cc4f41dbc98fc4",
+  "rules_version": "unavailable",
+  "diff_hash": "5e8433d670d1578aaf8555e20aa76e929a85079d8fe6094908005590ff5b63e3",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 14,
+    "changed_files": [
+      {
+        "file": "scripts/14_run_paired_statistics.py",
+        "ranges": [
+          {
+            "start": 52,
+            "end": 52
+          },
+          {
+            "start": 54,
+            "end": 55
+          }
+        ],
+        "before_hash": "4f34d8d43430e64a79283adeb34388be3e735651cfb93ecd9cc07606fa88d978",
+        "after_hash": "fda613ae969930c85e47bc62610ec2b8a00292f79c70709256032c566d3a34d7"
+      },
+      {
+        "file": "scripts/15_build_six_cmp_aggregate.py",
+        "ranges": [
+          {
+            "start": 6,
+            "end": 6
+          },
+          {
+            "start": 13,
+            "end": 13
+          },
+          {
+            "start": 24,
+            "end": 24
+          }
+        ],
+        "before_hash": "c593c7180f4699ed96d60fecf53f0b62ad84183e051692fd124582d8bc9e7695",
+        "after_hash": "15f4644b45dff302d025bcb2565c48d2ba6daf638efc0f8192d1d3e6b8506b3e"
+      },
+      {
+        "file": "scripts/20_run_paper_experiments.py",
+        "ranges": [
+          {
+            "start": 810,
+            "end": 810
+          },
+          {
+            "start": 1406,
+            "end": 1412
+          }
+        ],
+        "before_hash": "975adf937e3c2f0077bc68797e58d4a77a350ca1d5c9ff853f53752387e9f2ca",
+        "after_hash": "22bf1295ff4638f2ff7f84c0050da6a66349396409c580901981ac71684ba8f7"
+      },
+      {
+        "file": "scripts/24_run_paper_inference.py",
+        "ranges": [
+          {
+            "start": 36,
+            "end": 37
+          }
+        ],
+        "before_hash": "4f9c5d4a290925fcbc51ed02295f71260412ac4b9c53397130874e9489c42ea8",
+        "after_hash": "7a8021452b1463aa42908e5babc541a52861e47483134993250add9e483c4488"
+      },
+      {
+        "file": "src/liquidloc/common/constants.py",
+        "ranges": [
+          {
+            "start": 6,
+            "end": 6
+          }
+        ],
+        "before_hash": "aea44a83d010faf7420f935c894fe1b0f1d5421fa3d02d5faf80fbb25214e310",
+        "after_hash": "2cffa49fb06f9941256375aea695185ff51b2b596be0c85df1f5db523bc2ec3f"
+      },
+      {
+        "file": "src/liquidloc/estimators/ekf_core.py",
+        "ranges": [
+          {
+            "start": 345,
+            "end": 345
+          },
+          {
+            "start": 358,
+            "end": 364
+          },
+          {
+            "start": 438,
+            "end": 438
+          },
+          {
+            "start": 440,
+            "end": 441
+          },
+          {
+            "start": 445,
+            "end": 446
+          },
+          {
+            "start": 458,
+            "end": 458
+          },
+          {
+            "start": 866,
+            "end": 866
+          },
+          {
+            "start": 920,
+            "end": 921
+          },
+          {
+            "start": 1070,
+            "end": 1071
+          },
+          {
+            "start": 1075,
+            "end": 1075
+          },
+          {
+            "start": 1260,
+            "end": 1260
+          },
+          {
+            "start": 1518,
+            "end": 1518
+          },
+          {
+            "start": 1527,
+            "end": 1527
+          }
+        ],
+        "before_hash": "30b4734c587eb4f6ddb86b32b4ccfaf2c2e1b470ff89f77049a88d625ed7f15a",
+        "after_hash": "c33deaee12b2a45ea3c6bce8a635ef263573b8c13f8bbff5efd63c65cc4fbf67"
+      },
+      {
+        "file": "src/liquidloc/estimators/predict_step.py",
+        "ranges": [
+          {
+            "start": 33,
+            "end": 34
+          },
+          {
+            "start": 45,
+            "end": 46
+          }
+        ],
+        "before_hash": "33c3a867664eead21f06efad1a194e136a70ce5ebd4b9fc2434f2328437aa901",
+        "after_hash": "dc72f9e08c5986bb41dce76c4b41dd757ec7e39bf82dca8c5fa0a01f918d0082"
+      },
+      {
+        "file": "src/liquidloc/factories/estimator_factory.py",
+        "ranges": [
+          {
+            "start": 48,
+            "end": 48
+          },
+          {
+            "start": 51,
+            "end": 51
+          },
+          {
+            "start": 59,
+            "end": 61
+          },
+          {
+            "start": 120,
+            "end": 120
+          },
+          {
+            "start": 275,
+            "end": 275
+          },
+          {
+            "start": 523,
+            "end": 523
+          },
+          {
+            "start": 530,
+            "end": 530
+          },
+          {
+            "start": 566,
+            "end": 566
+          }
+        ],
+        "before_hash": "ee1657c318e8de39b005ad6e3bc0425ac504de264b626aa49ba048ab51e2667d",
+        "after_hash": "a996ff0292e6bdb8e9136f74e610a7840523d9565e6c157ad26c65a21fd91fd8"
+      },
+      {
+        "file": "src/liquidloc/pipelines/core_pipeline.py",
+        "ranges": [
+          {
+            "start": 2,
+            "end": 2
+          },
+          {
+            "start": 6,
+            "end": 6
+          }
+        ],
+        "before_hash": "477b609f2f7f78a2d8f92c92fee1e405102550c86c006db12debcd34186ae4cc",
+        "after_hash": "9d015f1932b33dc87db36244b745e18c9dd14c79cd21a2252c4f2c6f179876dc"
+      },
+      {
+        "file": "src/liquidloc/plotting/_okabe_ito_palette.py",
+        "ranges": [
+          {
+            "start": 6,
+            "end": 8
+          },
+          {
+            "start": 16,
+            "end": 16
+          },
+          {
+            "start": 50,
+            "end": 50
+          },
+          {
+            "start": 70,
+            "end": 70
+          },
+          {
+            "start": 72,
+            "end": 72
+          },
+          {
+            "start": 74,
+            "end": 74
+          }
+        ],
+        "before_hash": "9ee8754452faf5686f8de1e3f18d433400db00b4805f6da48c9e23d6fde1f9c3",
+        "after_hash": "aeb876faeca4bdc61578de68f4176f8f354aebda30fb29b9d2ec78c6b889f41d"
+      },
+      {
+        "file": "src/liquidloc/plotting/paper_figures.py",
+        "ranges": [
+          {
+            "start": 47,
+            "end": 47
+          },
+          {
+            "start": 50,
+            "end": 50
+          }
+        ],
+        "before_hash": "edc978c408e86133144798a7f9cc10f087f43482c10e065fb43e7dcc7406ebfa",
+        "after_hash": "c9b1347f5af77aa4c8fde15586869040b31622605b4d903dac6f5b59e61256c2"
+      },
+      {
+        "file": "src/liquidloc/plotting/plot_cdf.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 1
+          },
+          {
+            "start": 3,
+            "end": 4
+          }
+        ],
+        "before_hash": "a3bfec1d246e9efdd3c2d9c93e6d38cf4b8a47e937ada805437c99961f676940",
+        "after_hash": "1c436c03f3c85da831270eb67595a981c1693fa1f7d2fee404dbad2bbc7e8ecb"
+      },
+      {
+        "file": "src/liquidloc/protocol/experiment_gates.py",
+        "ranges": [
+          {
+            "start": 94,
+            "end": 94
+          },
+          {
+            "start": 3032,
+            "end": 3032
+          }
+        ],
+        "before_hash": "07e139d3796b86c3e180e31e76584af6b537988d312917e5c8ea7b479b0c01bb",
+        "after_hash": "235c922be55873f7783843c417dfcf07f0df1e2033f118fc8b2b660c3d2ad349"
+      },
+      {
+        "file": "tests/factories/test_estimator_factory.py",
+        "ranges": [
+          {
+            "start": 6,
+            "end": 7
+          },
+          {
+            "start": 125,
+            "end": 125
+          },
+          {
+            "start": 134,
+            "end": 143
+          },
+          {
+            "start": 150,
+            "end": 152
+          },
+          {
+            "start": 294,
+            "end": 294
+          }
+        ],
+        "before_hash": "86cec1d98a1e1e62cb6e94a88ba7b56973d9ffc87c6d94bf154cbeeafcbe4b0e",
+        "after_hash": "1e991d16888b09957bca2e9c513edea24ed4780282de7ac492b4fd7755c2eb53"
+      }
+    ]
+  },
+  "timing": {
+    "started_at": "2026-09-24T01:33:19.422Z",
+    "completed_at": "2026-09-24T01:33:21.097Z",
+    "duration_ms": 1675,
+    "measurement": "hook_wall_clock"
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "model_calls": 0,
+    "measurement": "known-zero"
+  },
+  "telemetry": {
+    "schemaVersion": "mimosa-gate-telemetry/v1",
+    "profile": "gate",
+    "operation": "Stop",
+    "outcome": "complete",
+    "latencyMs": 1675,
+    "peakMemoryBytes": 146976768,
+    "memoryMeasurement": "max-observed-process-rss",
+    "scannedFiles": 14,
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "measurement": "not-applicable"
+    },
+    "denyCount": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "total": 0,
+      "modelCalls": 0,
+      "measurement": "known-zero"
+    }
+  },
+  "finding_count": 0,
+  "rewake_finding_count": 0,
+  "evidence_boundary": {
+    "scan": "candidate",
+    "static_fix_verification": "observed_static_only",
+    "runtime_verification": "not_performed"
+  },
+  "finding_events": [],
+  "findings": [],
+  "artifacts": {
+    "immutable_report": ".mimosa/reports/task-review-sess_ad938fbe-7b5b-402f-be13-f443770da592-20260924T013321097Z-5584-1a70b187fd6d.json",
+    "latest_report": ".mimosa/reports/task-review-sess_ad938fbe-7b5b-402f-be13-f443770da592.json",
+    "history_summary": ".mimosa/history/run-20260924T013321097Z-5584-1a70b187fd6d.json"
+  }
+}

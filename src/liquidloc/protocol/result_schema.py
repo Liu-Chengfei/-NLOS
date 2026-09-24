@@ -62,7 +62,7 @@ from liquidloc.protocol.version import SNAPSHOT_VERSION  # 快照版本号，写
 
 _SEQUENCE_RESULT_KEYS = ("seq_id", "scene_code", "model_name", "metric_dict")  # 单序列结果必需键。
 _EXPERIMENT_RESULT_KEYS = ("experiment_id", "model_results", "aggregate_metrics")  # 实验结果必需键。
-_EXPERIMENT_RESULT_OPTIONAL_KEYS = ("snapshot_version", "non_main_table")  # 实验结果可选键（由 to_dict() 自动写入）。non_main_table=True 表示该实验属于消融/副表，不得进入主表比较。
+_EXPERIMENT_RESULT_OPTIONAL_KEYS = ("snapshot_version",)  # 实验结果可选键（由 to_dict() 自动写入）。
 _SUMMARY_RESULT_KEYS = ("case_refs", "summary_stats")  # 汇总结果必需键。
 _METRIC_KEYS = tuple(get_metric_order())  # 冻结指标键元组，从 metric_schema 获取。
 
@@ -111,7 +111,6 @@ class ExperimentResult:
     experiment_id: str  # 实验标识符。
     model_results: tuple[SequenceResult | dict[str, Any], ...]  # 模型结果元组。
     aggregate_metrics: Mapping[str, int | float]  # 聚合指标映射。值接受 Python 原生 int/float 及 numpy 标量。
-    non_main_table: bool = False  # §19.3：消融/副表实验标记，True 时不得进入主表比较。
 
     def __post_init__(self) -> None:
         """构造后校验所有字段，确保结果载荷符合冻结协议模式，并将可变字段转为不可变容器。"""
@@ -126,7 +125,6 @@ class ExperimentResult:
         return {
             "snapshot_version": SNAPSHOT_VERSION,  # 快照版本号，标识快照格式兼容性。
             "experiment_id": self.experiment_id,  # 实验标识符。
-            "non_main_table": bool(self.non_main_table),  # §19.3：非主表标识（消融/副表实验不得进入主表比较）。
             "model_results": [  # 逐个转换模型结果。
                 result.to_dict() if isinstance(result, SequenceResult) else deepcopy(result)  # SequenceResult 转 dict，字典做深拷贝。
                 for result in self.model_results

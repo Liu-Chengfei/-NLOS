@@ -11,6 +11,7 @@
 
 from __future__ import annotations  # 允许后面用尚未定义的类型名做注解。
 
+import weakref
 from collections.abc import Mapping  # 用于判断是否是"键值映射"输入。
 from collections.abc import Sequence  # 用于描述可迭代序列型参数。
 from liquidloc.common.constants import CONTEXT_DIM, CONTEXT_FEATURE_KEYS, MAX_MODEL_DIM, MODEL_INTERMEDIATE_KEYS, MODALITY_UWB, MODALITY_VIO, RISK_PRIOR_LOGIT  # 模态名、风险先验常量与维度 OOM 上界单源真相，避免硬编码漂移；输出头键名单源真相（D9 根因修复）。
@@ -19,12 +20,49 @@ from typing import Any  # 用于承接不确定类型的配置和输入对象。
 
 import torch  # LSTM 和张量运算都依赖 PyTorch。
 from torch import nn  # 只需要神经网络层和初始化工具。
+from torch.nn import functional as F
 
 
 _OUTPUT_KEYS = MODEL_INTERMEDIATE_KEYS  # D9：引用单源真相常量，禁止本地重复定义；保留 _OUTPUT_KEYS 别名供本模块内部使用。
 _VALID_MODALITIES = frozenset({MODALITY_UWB, MODALITY_VIO})  # LSTM 合同只接受这两种有效模态，引用单源真相避免漂移。
 _CONTEXT_FEATURE_KEYS = CONTEXT_FEATURE_KEYS  # §11.3 / §12.3-C2b：从 common.constants 单源引用，禁止本地重复定义（第十三轮消除 LSTM/Liquid 独立常量副本隐患）。
 _CONTEXT_DIM = CONTEXT_DIM  # 同上单源引用，避免与 Liquid 端独立推导出不同维度数。
+
+
+class _LSTMOutputHeadView(nn.Module):
+    """Expose one named output row without registering duplicate parameters."""
+
+    def __init__(self, owner: "LSTMNetwork", index: int, key: str) -> None:
+        super().__init__()
+        self._owner_ref = weakref.ref(owner)
+        self._index = int(index)
+        self.key = key
+        self.in_features = owner.hidden_dim + owner.context_dim
+        self.out_features = 1
+
+    def _owner(self) -> "LSTMNetwork":
+        owner = self._owner_ref()
+        if owner is None:  # pragma: no cover - the view is owned by its network.
+            raise RuntimeError("LSTM output head owner has been collected")
+        return owner
+
+    @property
+    def weight(self) -> torch.Tensor:
+        """Return the canonical output-layer row for this named head."""
+        owner = self._owner()
+        return owner.output_layer.weight[self._index:self._index + 1]
+
+    @property
+    def bias(self) -> torch.Tensor:
+        """Return the canonical output-layer bias entry for this named head."""
+        owner = self._owner()
+        return owner.output_layer.bias[self._index:self._index + 1]
+
+    def reset_parameters(self) -> None:
+        self._owner()._reset_output_head_row(self._index, self.key)
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        return F.linear(inputs, self.weight, self.bias)
 
 
 def _coerce_supported_modality(value: Any, *, name: str) -> str:
@@ -462,7 +500,7 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
         self.hidden_dim = int(resolved_cfg["hidden_dim"])  # 保存隐藏层维度。
         self.num_layers = int(resolved_cfg["num_layers"])  # 保存 LSTM 层数。
         self.dropout = float(resolved_cfg["dropout"])  # 保存 dropout 概率。
-        self.output_heads = tuple(resolved_cfg["output_heads"])  # 保存输出头顺序，保证协议稳定。
+        output_head_names = tuple(resolved_cfg["output_heads"])
         self.context_dim = _CONTEXT_DIM  # 上下文维度固定，和特征抽取约定绑定。
         self.combined_input_dim = self.feature_dim * 2 if self.feature_dim else self.input_dim  # 兼容特征+掩码的联合输入维度。
 
@@ -478,35 +516,110 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
             batch_first=True,  # 输入张量采用 batch-first 布局。
             bidirectional=False,  # §10.1/§10.2 强制单向因果：禁止双向注意力看未来。
         )
-        # §100 头实现一致性：四个独立线性头，与 LNN/Transformer 逐头参数结构对齐；
-        # 只骨干不同，防止实现偏差污染对比。
-        self.output_heads = nn.ModuleDict({  # 用 ModuleDict 管理四个独立头。
-            key: nn.Linear(self.hidden_dim + self.context_dim, 1, bias=True)  # 每头独立权重和偏置。
-            for key in self.output_heads  # 按协议顺序创建 bias/risk/uwb_scaling/vio_scaling。
+        # Keep one registered parameter source. Named heads below are views into
+        # these rows, so callers and hooks retain the old output_heads API without
+        # creating a second optimizer/checkpoint state.
+        self.output_layer = nn.Linear(self.hidden_dim + self.context_dim, len(output_head_names), bias=True)
+        self.output_heads = nn.ModuleDict({
+            key: _LSTMOutputHeadView(self, index, key)
+            for index, key in enumerate(output_head_names)
         })
-        self._reset_output_heads_contract_biases()  # 初始化输出头偏置，保证默认先验稳定。
-
-    # §100 头实现一致性：四个独立头的偏置初始化，与 LNN/Transformer 逐头对齐。
+        self._reset_output_heads_contract_biases()
+    # §100 头实现一致性：四路命名视图共享唯一的联合输出层。
     def _reset_output_heads_contract_biases(self) -> None:
         """初始化每个输出头的权重和偏置，保证默认先验稳定。"""
-        for key, head in self.output_heads.items():
-            nn.init.xavier_uniform_(head.weight)  # 权重用 Xavier 初始化，保持数值尺度合理。
-            if head.bias is None:  # 如果这个头没有 bias，就不用再做任何事。
-                continue
-            with torch.no_grad():  # 初始化阶段不需要梯度记录。
-                head.bias.zero_()  # 先把所有偏置清零。
-                # 从冻结协议取 risk 头位置，避免硬编码索引漂移；显式校验该位置确实是 risk 头。
-                if key == "risk":
-                    head.bias.fill_(RISK_PRIOR_LOGIT)  # 给风险头一个先验偏置。
+        for index, key in enumerate(self.output_heads):
+            self._reset_output_head_row(index, key)
 
-    # 重置所有可学习参数到初始状态，与 LiquidNetwork.reset_parameters 同名同口径（D7 公平性）。
+    def _reset_output_head_row(self, index: int, key: str) -> None:
+        """Reset one canonical output row while preserving the risk prior."""
+        with torch.no_grad():
+            nn.init.xavier_uniform_(self.output_layer.weight[index:index + 1])
+            self.output_layer.bias[index].zero_()
+            if key == "risk":
+                self.output_layer.bias[index].fill_(RISK_PRIOR_LOGIT)
+
+    def load_state_dict(
+        self,
+        state_dict: Mapping[str, Any],
+        strict: bool = True,
+        assign: bool = False,
+    ) -> Any:
+        """Load canonical output rows and migrate pre-refactor named-head keys."""
+        if not isinstance(state_dict, Mapping):
+            raise TypeError("state_dict must be a mapping")
+
+        normalized_state = dict(state_dict)
+        legacy_head_keys = {
+            f"output_heads.{key}.{suffix}"
+            for key in self.output_heads
+            for suffix in ("weight", "bias")
+        }
+        has_legacy_heads = any(key in normalized_state for key in legacy_head_keys)
+        if has_legacy_heads:
+            current_state = super().state_dict()
+            # Checkpoints produced during the compatibility period contain both
+            # key families. The joint layer was the trained source, so it wins;
+            # named-head keys are only a fallback for genuinely old payloads.
+            if "output_layer.weight" not in normalized_state:
+                weight = current_state["output_layer.weight"].detach().clone()
+                for index, key in enumerate(self.output_heads):
+                    legacy_weight = normalized_state.get(f"output_heads.{key}.weight")
+                    if torch.is_tensor(legacy_weight) and legacy_weight.ndim == 2:
+                        rows = min(int(legacy_weight.shape[0]), 1)
+                        cols = min(int(legacy_weight.shape[1]), int(weight.shape[1]))
+                        weight[index:index + rows, :cols] = legacy_weight[:rows, :cols].to(
+                            device=weight.device, dtype=weight.dtype
+                        )
+                normalized_state["output_layer.weight"] = weight
+            if "output_layer.bias" not in normalized_state:
+                bias = current_state["output_layer.bias"].detach().clone()
+                for index, key in enumerate(self.output_heads):
+                    legacy_bias = normalized_state.get(f"output_heads.{key}.bias")
+                    if torch.is_tensor(legacy_bias) and legacy_bias.ndim == 1 and legacy_bias.numel() > 0:
+                        bias[index] = legacy_bias[0].to(device=bias.device, dtype=bias.dtype)
+                normalized_state["output_layer.bias"] = bias
+            for key in legacy_head_keys:
+                normalized_state.pop(key, None)
+
+        current_state = super().state_dict()
+        output_weight = normalized_state.get("output_layer.weight")
+        current_weight = current_state["output_layer.weight"]
+        if (
+            torch.is_tensor(output_weight)
+            and output_weight.ndim == 2
+            and output_weight.shape[0] == current_weight.shape[0]
+            and output_weight.shape[1] < current_weight.shape[1]
+        ):
+            padded_weight = current_weight.detach().clone()
+            padded_weight.zero_()
+            padded_weight[:, :output_weight.shape[1]] = output_weight.to(
+                device=padded_weight.device, dtype=padded_weight.dtype
+            )
+            normalized_state["output_layer.weight"] = padded_weight
+
+        output_bias = normalized_state.get("output_layer.bias")
+        current_bias = current_state["output_layer.bias"]
+        if (
+            torch.is_tensor(output_bias)
+            and output_bias.ndim == 1
+            and output_bias.shape[0] < current_bias.shape[0]
+        ):
+            padded_bias = current_bias.detach().clone()
+            padded_bias.zero_()
+            padded_bias[:output_bias.shape[0]] = output_bias.to(
+                device=padded_bias.device, dtype=padded_bias.dtype
+            )
+            normalized_state["output_layer.bias"] = padded_bias
+
+        return super().load_state_dict(normalized_state, strict=strict, assign=assign)
     def reset_parameters(self) -> None:
         """重置所有可学习参数到初始状态。
 
         重置范围：
         - input_projection（若存在）：委托给 nn.Linear.reset_parameters。
         - lstm：委托给 nn.LSTM.reset_parameters。
-        - output_heads：通过 _reset_output_heads_contract_biases 逐头重置，保留协议偏置契约。
+        - output_layer：通过 _reset_output_heads_contract_biases 逐行重置，保留协议偏置契约。
 
         与 LiquidNetwork.reset_parameters 保持同名同口径（D7 公平性）。
 
@@ -519,7 +632,7 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
         if self.input_projection is not None:  # 输入投影层存在时重置为默认初始化。
             self.input_projection.reset_parameters()
         self.lstm.reset_parameters()  # LSTM 重置为默认初始化。
-        self._reset_output_heads_contract_biases()  # 逐头输出层重置，保留协议偏置契约。
+        self._reset_output_heads_contract_biases()  # 逐行输出层重置，保留协议偏置契约。
 
     # 这个内部方法负责把任意输入统一成三维序列批次。
     def _coerce_sequence_batch(self, window_tensor: Any) -> torch.Tensor:
@@ -603,11 +716,12 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
         encoded_sequence, _ = self.lstm(sequence_batch)  # LSTM 编码整个序列。
         # 只取最后一个时间步，代表整段序列的主摘要。
         last_hidden = encoded_sequence[:, -1, :]  # 只取最后一个时间步的隐藏态。
-        # 把隐藏态和上下文拼起来，再逐头送入四个独立线性输出。
+        # 把隐藏态和上下文拼起来，再送入四个命名输出视图。
         fused = torch.cat([last_hidden, context_batch], dim=-1)  # 拼接隐藏态和上下文。
-        network_output = torch.stack([  # 逐头计算四路输出并堆叠为 batch×4×1。
-            self.output_heads[key](fused) for key in self.output_heads  # 按协议顺序拼接 bias/risk/uwb_scaling/vio_scaling。
-        ], dim=1).squeeze(-1)  # 去掉最后一维，输出形状 batch×4。
+        network_output = torch.cat(
+            [head(fused) for head in self.output_heads.values()],
+            dim=-1,
+        )  # 命名视图共享 output_layer 参数，同时保留逐头 hook 语义。
         if network_output.shape[0] == 1:  # 单样本时压掉 batch 维，方便外部消费。
             return network_output.squeeze(0)  # 返回一维四头向量。
         return network_output  # 多样本时保留 batch 维。
@@ -637,9 +751,10 @@ class LSTMNetwork(nn.Module):  # 结构化窗口对应的 LSTM 前端模型。
         # LSTM 主干先编码序列，再取最后时刻的隐藏态。
         encoded_sequence, _ = self.lstm(sequence_tensor)  # LSTM 正式编码。
         last_hidden = encoded_sequence[:, -1, :]  # 取最后时刻的隐藏态。
-        # 把隐藏态和上下文拼起来，逐头送入四个独立线性输出。
+        # 把隐藏态和上下文拼起来，再送入四个命名输出视图。
         fused = torch.cat([last_hidden, context_batch], dim=-1)  # 拼接隐藏态和上下文。
-        network_output = torch.stack([  # 逐头计算四路输出并堆叠为 1×4×1。
-            self.output_heads[key](fused) for key in self.output_heads  # 按协议顺序拼接 bias/risk/uwb_scaling/vio_scaling。
-        ], dim=1).squeeze(-1)  # 去掉最后一维，输出形状 1×4。
+        network_output = torch.cat(
+            [head(fused) for head in self.output_heads.values()],
+            dim=-1,
+        )  # 命名视图共享 output_layer 参数，同时保留逐头 hook 语义。
         return network_output.squeeze(0)  # 单样本窗口始终为 batch=1，去掉 batch 维返回一维四头向量。
