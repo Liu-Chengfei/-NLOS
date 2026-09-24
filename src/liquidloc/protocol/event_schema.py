@@ -352,7 +352,7 @@ def _validate_vio_payload(required_payload: dict[str, Any], required_payload_key
     # sensors.yaml vio_fields 已缩到 4 项 (dx, dy, dyaw, quality).
     # Round 6 审计 (子代理 #47ca7cc9) 揭露这是 P0 致命 bug: 任何 VIO 事件
     # validate_event → _validate_vio_payload → _payload_get("tracked_features")
-    # 必然 KeyError, 5 个模型 (ekf/robust_ekf/fgo/liquid_ekf/lstm_ekf)
+    # 必然 KeyError, 4 个模型 (ekf/liquid_ekf/lstm_ekf/sgpr)
     # 共享 extract_vio_measurement → validate_event 调用链全崩.
 
 

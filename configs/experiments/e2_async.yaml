@@ -19,11 +19,9 @@ frozen_axes:
 
 # 参与比较的方法。# 这里保留代表方法，便于观察异步对不同范式的影响。
 # ekf：标准 EKF，对异步无特殊处理，时间错位直接传播到状态估计。
-# robust_ekf：鲁棒 EKF，通过异常值抑制部分抵抗异步导致的观测异常。
-# fgo：因子图优化，可通过时间对齐因子部分缓解异步。
 # lstm_ekf：LSTM 增强 EKF，学习式方法可能学到异步模式。
 # liquid_ekf：液态网络增强 EKF，核心方法，期望在异步下表现最好。
-methods: [ekf, robust_ekf, lnn, lstm, transformer, liquid_ekf]  # 全 5 方法参与异步扫描。
+methods: [ekf, lstm, liquid_ekf]  # 全 3 方法参与异步扫描。
 
 # quick/full 模式覆盖项。# 这里按规模决定抽哪些异步等级。
 mode_overrides:

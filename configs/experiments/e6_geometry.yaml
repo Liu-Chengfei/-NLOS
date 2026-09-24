@@ -32,13 +32,11 @@ frozen_axes:
   # 几何扫描维：覆盖 sim_e9 实际拥有的 K3 (sim_curve_01) 和 K1 (sim_curve_02)。
   K: [K1, K3]  # K 轴档位扫描维（五轴档位协议 G 已并入 K）。
 
-# 参与比较的方法。# 覆盖传统、鲁棒和学习式方法，便于观察几何条件对不同范式的影响。
+# 参与比较的方法。# 覆盖传统和学习式方法，便于观察几何条件对不同范式的影响。
 # ekf：标准 EKF，对几何退化敏感，GDOP 恶化时精度下降明显。
-# robust_ekf：鲁棒 EKF，对几何退化有一定抵抗力。
-# fgo：因子图优化，可通过图结构部分缓解几何退化。
 # lstm_ekf：LSTM 增强 EKF，学习式方法可能学到几何退化模式。
 # liquid_ekf：液态网络增强 EKF，核心方法，期望在几何退化下表现最好。
-methods: [ekf, robust_ekf, fgo, lstm_ekf, liquid_ekf]  # 全方法参与几何扫描。
+methods: [ekf, lstm_ekf, liquid_ekf]  # 全方法参与几何扫描。
 
 # quick/full 下的运行规模。# public_sequence_category 模式下用 max_sequences 控制规模。
 mode_overrides:

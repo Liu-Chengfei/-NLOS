@@ -23,13 +23,11 @@ frozen_axes:
   # 显式冻结 M=M0 与六轴协议保持一致。
   M: M0  # 固定为无模态缺失。
 
-# 参与比较的方法。# 这些方法覆盖传统、鲁棒和学习式方案。
+# 参与比较的方法。# 这些方法覆盖传统和学习式方案。
 # ekf：标准 EKF，对多退化交互无特殊处理，预期交互效应最明显。
-# robust_ekf：鲁棒 EKF，部分抵抗多退化交互，但交互效应仍然存在。
-# fgo：因子图优化，鲁棒核函数可能部分缓解交互。
 # lstm_ekf：LSTM 增强 EKF，学习式方法可能学到部分交互模式。
 # liquid_ekf：液态网络增强 EKF，核心方法，期望在多退化交互下仍保持鲁棒。
-methods: [ekf, robust_ekf, fgo, lstm_ekf, liquid_ekf]  # 代表方法全量参与。
+methods: [ekf, lstm_ekf, liquid_ekf]  # 代表方法全量参与。
 
 # quick/full 模式覆盖项。# 这里的 quick 仍然需要较大的组合覆盖。
 mode_overrides:

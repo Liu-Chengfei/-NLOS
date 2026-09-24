@@ -124,11 +124,11 @@ def main(argv: list[str] | None = None) -> int:
 | 子比较 | rmse_liquid_ekf | rmse_opponent | rel_improve | pass_strict_gt | p_value | aggregate.json |
 |--------|-----------------|---------------|-------------|----------------|---------|----------------|
 | cmp1a liquid_ekf vs ekf | {_format_num(cmp1.get('cmp1a_liquid_vs_ekf', {}).get('rmse_mean_a'))} | {_format_num(cmp1.get('cmp1a_liquid_vs_ekf', {}).get('rmse_mean_b'))} | {_format_num(cmp1.get('cmp1a_liquid_vs_ekf', {}).get('rel_improve'))} | {cmp1.get('cmp1a_liquid_vs_ekf', {}).get('pass_strict_gt_flag')} | {_format_num(cmp1.get('cmp1a_liquid_vs_ekf', {}).get('p_value'))} | runs/cmp1/{args.version_id}/aggregate.json |
-| cmp1b liquid_ekf vs robust_ekf | {_format_num(cmp1.get('cmp1b_liquid_vs_robust_ekf', {}).get('rmse_mean_a'))} | {_format_num(cmp1.get('cmp1b_liquid_vs_robust_ekf', {}).get('rmse_mean_b'))} | {_format_num(cmp1.get('cmp1b_liquid_vs_robust_ekf', {}).get('rel_improve'))} | {cmp1.get('cmp1b_liquid_vs_robust_ekf', {}).get('pass_strict_gt_flag')} | {_format_num(cmp1.get('cmp1b_liquid_vs_robust_ekf', {}).get('p_value'))} | 同上 |
+| cmp1b liquid_ekf vs ekf | {_format_num(cmp1.get('cmp1b_liquid_vs_ekf', {}).get('rmse_mean_a'))} | {_format_num(cmp1.get('cmp1b_liquid_vs_ekf', {}).get('rmse_mean_b'))} | {_format_num(cmp1.get('cmp1b_liquid_vs_ekf', {}).get('rel_improve'))} | {cmp1.get('cmp1b_liquid_vs_ekf', {}).get('pass_strict_gt_flag')} | {_format_num(cmp1.get('cmp1b_liquid_vs_ekf', {}).get('p_value'))} | 同上 |
 
 **overall_pass_strict_gt_flag**: {cmp1.get('overall_pass_strict_gt_flag')}
 
-#### 比较 2: 两 EKF 同档 (标准 EKF ≈ Robust-EKF)
+#### 比较 2: 两 EKF 同档 (标准 EKF ≈ EKF)
 
 | 字段 | 值 |
 |------|-----|
@@ -140,23 +140,22 @@ def main(argv: list[str] | None = None) -> int:
 | p_value | {_format_num(cmp2.get('p_value'))} |
 | aggregate.json | runs/cmp2/{args.version_id}/aggregate.json |
 
-#### 比较 3: EKF > 无核 FGO (封印级 C, 5 子条件合取)
+#### 比较 3: EKF > 标准 EKF (封印级 C, 5 子条件合取)
 
 | 字段 | 值 |
 |------|-----|
 | rmse_ekf | {_format_num(cmp3.get('rmse_ekf'))} |
-| rmse_fgo | {_format_num(cmp3.get('rmse_fgo'))} |
+| rmse_b | {_format_num(cmp3.get('rmse_b'))} |
 | rel_improve | {_format_num(cmp3.get('rel_improve'))} |
 | pass_strict_gt_flag | {cmp3.get('pass_strict_gt_flag')} |
 | huber_forced_off | {cmp3.get('sub_flags', {}).get('huber_forced_off')} |
 | cold_start_flag | {cmp3.get('sub_flags', {}).get('cold_start_flag')} |
 | ell_over_tau_in_range | {cmp3.get('sub_flags', {}).get('ell_over_tau_in_range')} |
 | chi_square_on | {cmp3.get('sub_flags', {}).get('chi_square_on')} |
-| robust_weight_bypass_flag | {cmp3.get('sub_flags', {}).get('robust_weight_bypass_flag')} |
 | warning | {cmp3.get('warning', '')} |
 | aggregate.json | runs/cmp3/{args.version_id}/aggregate.json |
 
-#### 比较 4: 无核 FGO ? 纯 SGPR (不可测, SGPR 实现缺失, §29.5 不得用「≈」运算符)
+#### 比较 4: 标准 EKF ? 纯 SGPR (不可测, SGPR 实现缺失, §29.5 不得用「≈」运算符)
 
 | 字段 | 值 |
 |------|-----|
@@ -166,11 +165,11 @@ def main(argv: list[str] | None = None) -> int:
 | semantic | {cmp4.get('semantic')} |
 | aggregate.json | runs/cmp4/{args.version_id}/aggregate.json |
 
-#### 比较 5: 无核 FGO ?/> 小容量 LSTM+EKF (SGPR 落地前按 §29.5 勿提第三档身份)
+#### 比较 5: 标准 EKF ?/> 小容量 LSTM+EKF (SGPR 落地前按 §29.5 勿提第三档身份)
 
 | 字段 | 值 |
 |------|-----|
-| rmse_fgo_side (FGO 单档) | {_format_num(cmp5.get('rmse_fgo_side'))} |
+| rmse_ekf_side (EKF 单档) | {_format_num(cmp5.get('rmse_ekf_side'))} |
 | rmse_lstm_ekf | {_format_num(cmp5.get('rmse_lstm_ekf'))} |
 | rel_improve | {_format_num(cmp5.get('rel_improve'))} |
 | pass_strict_gt_flag | {cmp5.get('pass_strict_gt_flag')} |
@@ -199,10 +198,10 @@ def main(argv: list[str] | None = None) -> int:
 - **数据来源**: outputs/paper_run/sim_v3_tc_20260723/final_paper_test_scoring_5models.json + 5 method × 12 seq × 1 seed 跨种子聚合 metric_table.json
 - **N_seed 警告**: 当前 n_seed=1, 协议 §0.4 D4 要求 N_seed=30. 本次回填仅供框架链路验证, 不构成协议级实测通过结论.
 - **B24 警告**: {signing.get("note", "")}
-- **§29 降级**: cmp4/cmp6 因实现缺失降级为子排序, 主表 5 方法子排序可比；cmp5 在 SGPR 落地前按 §29.5 不写「第三档」身份, 仅以无核 FGO 单档参与 FGO ?/> LSTM 子排序
-- **重要发现 (cmp2 拆档)**: cmp2 标准 EKF vs Robust-EKF 中位相对差 = {_format_num(cmp2.get('delta_approx_median'))}, 远超 ε_≈=0.08, verdict = {cmp2.get('verdict')} (即两 EKF **不同档**, Robust 显著优于 Standard)
-- **重要发现 (cmp3 无核身份已对齐)**: 2026-07-26 起 fgo.yaml 删除 robust_weight/gate + FGOCore 强制 l2；huber_forced_off=true。历史 v5 若在旧配置表面下产出，须无核身份重跑后才能作 cmp3 结论
-- **重要发现 (cmp5 比较5反序)**: rmse_fgo_side={_format_num(cmp5.get('rmse_fgo_side'))} >> rmse_lstm_ekf={_format_num(cmp5.get('rmse_lstm_ekf'))}, rel_improve={_format_num(cmp5.get('rel_improve'))} (无核 FGO 单档当前弱于 LSTM+EKF, 与§29.5 子排序「FGO ?/> LSTM」不冲突)
+- **§29 降级**: cmp4/cmp6 因实现缺失降级为子排序, 主表 5 方法子排序可比；cmp5 在 SGPR 落地前按 §29.5 不写「第三档」身份, 仅以标准 EKF 单档参与 EKF ?/> LSTM 子排序
+- **重要发现 (cmp2 拆档)**: cmp2 标准 EKF vs EKF 中位相对差 = {_format_num(cmp2.get('delta_approx_median'))}, 远超 ε_≈=0.08, verdict = {cmp2.get('verdict')} (即两 EKF **不同档**, Robust 显著优于 Standard)
+- **重要发现 (cmp3 身份已对齐)**: 标准 EKF 量测噪声 R 固定值 (§16.2)。历史 v5 若在旧配置表面下产出，须重跑后才能作 cmp3 结论
+- **重要发现 (cmp5 比较5反序)**: rmse_ekf_side={_format_num(cmp5.get('rmse_ekf_side'))} >> rmse_lstm_ekf={_format_num(cmp5.get('rmse_lstm_ekf'))}, rel_improve={_format_num(cmp5.get('rel_improve'))} (标准 EKF 单档当前弱于 LSTM+EKF, 与§29.5 子排序「EKF ?/> LSTM」不冲突)
 
 ---
 

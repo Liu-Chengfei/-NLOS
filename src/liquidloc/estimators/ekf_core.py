@@ -23,7 +23,6 @@ import copy  # 深拷贝，防止嵌套配置被外部修改污染内部状态�
 
 import numpy as np  # 用来做矩阵和向量运算。
 
-from liquidloc.common.covariance_utils import build_effective_cov  # 复用协方差缩放适配器。
 from liquidloc.common.gt_utils import resolve_anchor_position  # 锚点位置解析的规范实现
 from liquidloc.common.types import MeasurementControl, ModelIntermediate, StateEstimate  # 统一的测量控制和状态容器类型。
 from liquidloc.common.constants import ESTIMATOR_NAME_EKF  # EKF 估计器名字常量（D9 单源真相）。
@@ -342,7 +341,7 @@ class EKFCore(EstimatorAPI):
         EKFCore.reset(self)  # 初始化完成后，立刻回到标准初态。
 
     # ──────────────────────────────────────────────
-    # 门控与鲁棒权重公共 helper（从 RobustEKFCore 提升）
+    # 门控与鲁棒权重配置解析
     # ──────────────────────────────────────────────
 
     def _gate_cfg(self) -> dict[str, Any]:
@@ -353,15 +352,6 @@ class EKFCore(EstimatorAPI):
         if not isinstance(gate, Mapping):
             raise TypeError("gate must be a mapping")
         return copy.deepcopy(gate)
-
-    def _robust_cfg(self) -> dict[str, Any]:
-        """取出 robust_weight 子配置。"""
-        robust_weight = self.cfg.get("robust_weight")
-        if robust_weight is None:
-            return {}
-        if not isinstance(robust_weight, Mapping):
-            raise TypeError("robust_weight must be a mapping")
-        return copy.deepcopy(robust_weight)
 
     def _quality_floor(self, modality: str) -> float:
         """按模态读取质量门槛。"""
@@ -399,9 +389,9 @@ class EKFCore(EstimatorAPI):
         # §11.1 silent-skip 守卫：当 cfg 显式声明了 `gate` 块（说明用户有意启用卡方门控）
         # 但 `mahalanobis_sq` 键缺失时，旧实现会静默回退 `float("inf")` → NIS 永不超阈 →
         # 共享卡方门禁被无声关闭。这违反 §11.1「卡方置信水平全员同一、参数同源」要求，
-        # 与 B14 audit 修正前的 `robust_ekf.yaml` 0.99 静默泄漏同源——属偷懒路径。
+        # 与 B14 audit 修正前的 `ekf.yaml` 0.99 静默泄漏同源——属偷懒路径。
         # 现改为 fail-loud：cfg 显式给了 `gate` 但缺 `mahalanobis_sq` 即抛 KeyError，逼显式落配置。
-        # 仅当 cfg 没有 `gate` 块时才允许 inf 兜底（与铁律 10 FGO 裸跑向后兼容）。
+        # 仅当 cfg 没有 `gate` 块时才允许 inf 兜底。
         if "gate" in self.cfg and self.cfg["gate"] is not None and "mahalanobis_sq" not in gate:
             raise KeyError(
                 "gate.mahalanobis_sq is missing while `gate` block is explicitly declared; "
@@ -434,32 +424,6 @@ class EKFCore(EstimatorAPI):
         value = coerce_finite_scalar(value, name="gate.mahalanobis_sq", min_value=0.0)
         return value
 
-    def _huber_weight(self, whitened_residual_norm: float) -> float:
-        """按 Huber 规则计算鲁棒权重。
-
-        身份纪律（cmp2）：
-        - **无** ``robust_weight`` 配置（标准 EKF 身份）→ 强制返回 1.0，不做 M 估计降权。
-        - **有** ``robust_weight``（Robust-EKF 身份）→ 按 type/delta 计算 Huber 权重。
-        禁止「标准 EKF yaml 写 Huber」却仍声称与 Robust 同档比较 2。
-        """
-        if is_bool_like(whitened_residual_norm):
-            raise TypeError("whitened_residual_norm must be numeric, got bool")
-        norm_value = coerce_finite_scalar(whitened_residual_norm, name="whitened_residual_norm", min_value=0.0)
-        robust_cfg = self._robust_cfg()
-        # 标准 EKF：无 robust_weight 块 → 平方损失（权重恒 1），与 Robust-EKF 身份分离。
-        if not robust_cfg:
-            return 1.0
-        robust_type = str(robust_cfg.get("type", "huber")).lower()
-        if robust_type != "huber":
-            raise ValueError(f"Unsupported robust weight type: {robust_type}")
-        delta_raw = robust_cfg.get("delta", 1.0)
-        if is_bool_like(delta_raw):
-            raise TypeError("robust_weight.delta must be numeric, got bool")
-        delta = coerce_finite_scalar(delta_raw, name="robust_weight.delta", min_value=0.0, inclusive=False)
-        if norm_value <= delta:
-            return 1.0
-        return max(delta / norm_value, 1e-6)
-
     def _quality_value(self, payload_section: Mapping[str, Any] | None) -> float:
         """从负载里提取 quality。
 
@@ -470,7 +434,7 @@ class EKFCore(EstimatorAPI):
         NLOS 二分类标签。tracked_features / reproj_err 字段已由铁律 3 Stage A1 删除（VIO schema
         根本不再有这两字段，sim_materializer L2283-2295 注释交叉验证），故 #21 中"特征数/重投影"
         候选标签在 schema 层已被排除，仅"质量"一项走本函数规范化为门控标量。
-        全员同一：EKF 本处 L450 + RobustEKF 继承 + FGO fgo_core.py:755 重写（引用 DEFAULT_THRESHOLDS
+        全员同一：EKF 本处引用 DEFAULT_THRESHOLDS
         单源常量更严格），4 项校验（非 Mapping → 1.0 / bool → TypeError / NaN → ValueError /
         范围 → ValueError）逻辑等价，三者行为同口径。
         """
@@ -534,7 +498,7 @@ class EKFCore(EstimatorAPI):
         z_anchor_m: float = 2.5,
         z_tag_m: float = 1.2,
     ) -> dict[str, Any]:
-        """手册 P16 EKF 初始化协议的统一入口（异步高NLOS实验全流程保障手册）。
+        """P16 EKF 初始化协议的统一入口。
 
         调用 ``ekf_init_protocol_p16`` 拿到 ``initial_state`` 与 ``init_cov_diagonal``，
         再以这两个值调用 ``self.reset(initial_state=...)`` 并重写 cov 为 P16 计算的对角向量。
@@ -543,7 +507,7 @@ class EKFCore(EstimatorAPI):
         参数:
             uwb_events: 首批 UWB 事件（建议取序列前若干帧，包含所有 4 锚的首次有效测量）。
             vio_events: 首批 VIO 事件（建议取序列前若干帧，包含首帧 vio_yaw）。
-            z_anchor_m / z_tag_m: 锚/tag z 高度（手册 S2 锚高 2.5m，tag 高 1.1-1.3m）。
+            z_anchor_m / z_tag_m: 锚/tag z 高度（锚高 2.5m，tag 高 1.1-1.3m）。
 
         返回:
             dict（与 ``ekf_init_protocol_p16`` 同结构）。
@@ -878,7 +842,7 @@ class EKFCore(EstimatorAPI):
                 "gate": {"passed": False, "rejected_by": "uwb_skip_update"},
             }
         uwb_payload = payload.get("uwb_payload")  # 提取 UWB 负载。
-        if uwb_payload is None:  # 负载缺失时无法执行更新，直接跳过（与 RobustEKFCore/FGOCore 对齐）。
+        if uwb_payload is None:  # 负载缺失时无法执行更新，直接跳过。
             return {
                 "modality": "uwb",
                 "update_applied": False,
@@ -932,8 +896,7 @@ class EKFCore(EstimatorAPI):
             modality="uwb",  # 本次处理的是 UWB。
             calibration_frozen=self._calibration_frozen,
         )
-        # UWB 更新只接受标量噪声（一维测距），非标量配置需在此显式拒绝，
-        # 与 robust_ekf_core 和 fgo_core 对齐，避免错误深入 run_uwb_update 后才暴露。
+# UWB 更新只接受标量噪声（一维测距），非标量配置需在此显式拒绝，
         try:
             noise_arr = np.asarray(effective_uwb_noise, dtype=float)
         except (TypeError, ValueError):
@@ -956,7 +919,7 @@ class EKFCore(EstimatorAPI):
         H = build_uwb_jacobian(x_prev, anchor_pos)
         S = coerce_finite_scalar((H @ self._covariance @ H.T)[0, 0] + scalar_noise, name="UWB innovation covariance")
         # §11.5 抖动注入：UWB 路径标量 S 与 VIO 路径同口径，缺 jitter fallback 是 v5 漏审。
-        # 三方法（EKF / Robust-EKF / FGO）UWB 路径 S<=0 拒绝前先尝试 jitter 修补；
+        # EKF UWB 路径 S<=0 拒绝前先尝试 jitter 修补；
         # 二次仍失败 → fail-loud（与 VIO 路径 _ensure_positive_definite_vio_innovation_covariance 同政策）。
         if S <= 0.0:
             from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS
@@ -976,17 +939,15 @@ class EKFCore(EstimatorAPI):
                              "nis": None, "mahalanobis_sq_threshold": self._nis_threshold("uwb")},
                     "robust": None,
                 }
-
-        robust_weight_applied = 1.0  # 默认不降权（无 gate 配置时）
         if self.cfg.get("gate") is not None:
             nis = float((residual * residual) / S)
             if not math.isfinite(nis):
                 return {
-            "modality": "uwb", "update_applied": False, "reason": "nonfinite_nis",
-            # §3.0.2 审计：UWB reject 声明 h_side。
-            "bias_writeport": "h_side",
-            "measurement_control": control_to_dict(control),
-            "covariance_report": cov_report, "robust_covariance_report": None,
+                    "modality": "uwb", "update_applied": False, "reason": "nonfinite_nis",
+                    # §3.0.2 审计：UWB reject 声明 h_side。
+                    "bias_writeport": "h_side",
+                    "measurement_control": control_to_dict(control),
+                    "covariance_report": cov_report, "robust_covariance_report": None,
                     "gate": {"passed": False, "rejected_by": "nonfinite_nis",
                              "quality": quality_gate, "nis": nis,
                              "mahalanobis_sq_threshold": self._nis_threshold("uwb")},
@@ -994,24 +955,16 @@ class EKFCore(EstimatorAPI):
                 }
             if nis > self._nis_threshold("uwb"):
                 return {
-            "modality": "uwb", "update_applied": False, "reason": "mahalanobis_sq",
-            # §3.0.2 审计：UWB reject 声明 h_side。
-            "bias_writeport": "h_side",
-            "measurement_control": control_to_dict(control),
-            "covariance_report": cov_report, "robust_covariance_report": None,
+                    "modality": "uwb", "update_applied": False, "reason": "mahalanobis_sq",
+                    # §3.0.2 审计：UWB reject 声明 h_side。
+                    "bias_writeport": "h_side",
+                    "measurement_control": control_to_dict(control),
+                    "covariance_report": cov_report, "robust_covariance_report": None,
                     "gate": {"passed": False, "rejected_by": "mahalanobis_sq",
                              "quality": quality_gate, "nis": nis,
                              "mahalanobis_sq_threshold": self._nis_threshold("uwb")},
                     "robust": None,
                 }
-            whitened = math.sqrt(max(nis, 0.0))
-            robust_weight_applied = self._huber_weight(whitened)
-            covariance_scale = 1.0 / max(robust_weight_applied, 1e-6)
-            effective_uwb_noise, robust_cov_report = build_effective_cov(
-                effective_uwb_noise, uwb_scaling=covariance_scale
-            )
-        else:
-            robust_cov_report = None
         x_upd, P_upd, update_info = run_uwb_update(
             x_prev,  # 更新前状态。
             self._covariance,  # 更新前协方差。
@@ -1082,16 +1035,15 @@ class EKFCore(EstimatorAPI):
         # §11.3-d 共享「VIO 无效」串项同源 v11 audit 修复：
         # v10 之前本处走捷径 `float(vio_payload.get("quality", 1.0))`，绕过
         # `self._quality_value()` 规范化（不校验 is_bool_like / coerce_finite_scalar /
-        # [0,1] 范围），与 Robust-EKF `robust_ekf_core.py:536` + FGO `fgo_core.py:2098`
-        # 不同源。后果：(a) np.bool_(False) 在 EKF 触发跳过而 Robust/FGO 抛 TypeError；
-        # (b) NaN 在 EKF 不跳过继续，Robust/FGO 抛 ValueError；(c) 大于 1.0 的 quality
-        # 在 EKF 接受进入后续，Robust/FGO 抛 ValueError。违 §11.3-d 「串联顺序全员固定」
+        # [0,1] 范围）。后果：(a) np.bool_(False) 在 EKF 触发跳过而 Robust 抛 TypeError；
+        # (b) NaN 在 EKF 不跳过继续，Robust 抛 ValueError；(c) 大于 1.0 的 quality
+        # 在 EKF 接受进入后续，Robust 抛 ValueError。违 §11.3-d 「串联顺序全员固定」
         # 与 `ekf_core.py:473-474` 自家注释「4 项校验逻辑等价」自相矛盾。
-        # v11 改为走 `_quality_value` 与 Robust/FGO 同口径同源规范化。
+        # v11 改为走 `_quality_value` 与 Robust 同口径同源规范化。
         try:
             vio_quality = self._quality_value(vio_payload)
         except (TypeError, ValueError):
-            # 规范化失败时（bool / NaN / 超界）仿 Robust/FGO raise 路径，
+            # 规范化失败时（bool / NaN / 超界）仿 Robust raise 路径，
             # 但 VIO 路径必须保护参考位姿 - 先重置再 raise。
             self._last_vio_reference_pose = self._current_pose_reference()
             self._last_vio_reference_pose_timestamp = self._timestamp
@@ -1260,20 +1212,88 @@ class EKFCore(EstimatorAPI):
                              "nis": nis, "mahalanobis_sq_threshold": self._nis_threshold("vio")},
                     "robust": None,
                 }
-            whitened = math.sqrt(max(nis, 0.0))
-            robust_weight = self._huber_weight(whitened)
-            covariance_scale = 1.0 / max(robust_weight, 1e-6)
-            effective_vio_cov, robust_cov_report = build_effective_cov(
-                effective_vio_cov, vio_scaling=covariance_scale,
+        if self.cfg.get("gate") is not None:
+            z_vio = build_vio_measurement(payload)
+            z_hat, residual, H, reference_pose_array = compute_vio_residual(
+                x_prev, z_vio, reference_pose=self._last_vio_reference_pose,
             )
-        else:
-            robust_cov_report = None
+            R_vio = _normalize_vio_covariance(effective_vio_cov)
+            S = H @ self._covariance @ H.T + R_vio
+            if not np.all(np.isfinite(S)):
+                raise ValueError("VIO innovation covariance must be finite")
+            try:
+                S = _ensure_positive_definite_vio_innovation_covariance(S, name="VIO innovation covariance")
+            except ValueError:
+                self._last_vio_reference_pose = self._current_pose_reference()
+                self._last_vio_reference_pose_timestamp = self._timestamp
+                return {
+                    "modality": "vio",
+                    "update_applied": False,
+                    "reason": "nonpositive_innovation_covariance",
+                    "measurement_control": control_to_dict(control),
+                    "covariance_report": cov_report,
+                    "robust_covariance_report": None,
+                    # §3.0.2 审计：VIO 不接受 NN bias，标记 "none"。
+                    "bias_writeport": "none",
+                    "gate": {"passed": False, "rejected_by": "nonpositive_innovation_covariance",
+                             "nis": None, "mahalanobis_sq_threshold": self._nis_threshold("vio")},
+                    "robust": None,
+                }
+            try:
+                nis = float(residual.T @ np.linalg.solve(S, residual))
+            except np.linalg.LinAlgError:
+                self._last_vio_reference_pose = self._current_pose_reference()
+                self._last_vio_reference_pose_timestamp = self._timestamp
+                return {
+                    "modality": "vio",
+                    "update_applied": False,
+                    "reason": "nonpositive_innovation_covariance",
+                    "measurement_control": control_to_dict(control),
+                    "covariance_report": cov_report,
+                    "robust_covariance_report": None,
+                    # §3.0.2 审计：VIO 不接受 NN bias。
+                    "bias_writeport": "none",
+                    "gate": {"passed": False, "rejected_by": "nonpositive_innovation_covariance",
+                             "nis": None, "mahalanobis_sq_threshold": self._nis_threshold("vio")},
+                    "robust": None,
+                }
+            if not math.isfinite(nis):
+                self._last_vio_reference_pose = self._current_pose_reference()
+                self._last_vio_reference_pose_timestamp = self._timestamp
+                return {
+                    "modality": "vio",
+                    "update_applied": False,
+                    "reason": "nonfinite_nis",
+                    "measurement_control": control_to_dict(control),
+                    "covariance_report": cov_report,
+                    "robust_covariance_report": None,
+                    # §3.0.2 审计：VIO 不接受 NN bias。
+                    "bias_writeport": "none",
+                    "gate": {"passed": False, "rejected_by": "nonfinite_nis",
+                             "nis": nis, "mahalanobis_sq_threshold": self._nis_threshold("vio")},
+                    "robust": None,
+                }
+            if nis > self._nis_threshold("vio"):
+                self._last_vio_reference_pose = self._current_pose_reference()
+                self._last_vio_reference_pose_timestamp = self._timestamp
+                return {
+                    "modality": "vio",
+                    "update_applied": False,
+                    "reason": "mahalanobis_sq",
+                    "measurement_control": control_to_dict(control),
+                    "covariance_report": cov_report,
+                    "robust_covariance_report": None,
+                    # §3.0.2 审计：VIO 不接受 NN bias。
+                    "bias_writeport": "none",
+                    "gate": {"passed": False, "rejected_by": "mahalanobis_sq",
+                             "nis": nis, "mahalanobis_sq_threshold": self._nis_threshold("vio")},
+                    "robust": None,
+                }
 
         # §6.4 #18 紧耦合角色硬子要求对应代码层落点：
         # VIO 因子/更新挂增量残差（reference_pose=上一帧参考位姿 self._last_vio_reference_pose）
         # 与 UWB 距离残差并列（_handle_uwb 同帧调 apply_uwb_update 同口径），而非先视觉里程计
-        # 积分成轨迹再松耦合（§6.4 #19）。三估计器同口径：EKF 本处 L1193 / RobustEKF
-        # robust_ekf_core.py:694 / FGO fgo_core.py:2224。残差锚定上一帧参考位姿，
+# 积分成轨迹再松耦合（§6.4 #19）。二方法同口径：EKF 本处。残差锚定上一帧参考位姿，
         # 通过 _update_from_vector 同步写回状态/协方差，并在 L1196 重置参考位姿为当前位姿。
         x_upd, P_upd, update_report = apply_vision_update(
             x_prev,  # 更新前状态。
@@ -1293,10 +1313,10 @@ class EKFCore(EstimatorAPI):
             "reason": "vio_update_success",
             "measurement_control": control_to_dict(control),
             "covariance_report": cov_report,
-            "robust_covariance_report": robust_cov_report,
+            "robust_covariance_report": None,
             # §3.0.2 审计要求：VIO 不接受 NN bias（build_measurement_control VIO 分支
             # 强制 bias_applied=0.0，残差定义在原始增量 z 上）。显式标记 "none"，
-            # 与 EKF UWB 路径 / Robust VIO / FGO VIO 同口径，便于顶层聚合审计。
+            # 与 EKF UWB 路径 / Robust VIO 同口径，便于顶层聚合审计。
             "bias_writeport": "none",
             "gate": {"passed": True, "rejected_by": None},
             **_vio_update_detail,
@@ -1531,7 +1551,7 @@ class EKFCore(EstimatorAPI):
                 anchor_pos = self._resolve_anchor_position(uwb_payload["anchor_id"])
                 # §3.0.2 / §3.1.2 / §12.2：联合路径不再对 raw 距离做 subtractive 改写
                 # 或 max(0,·) 等单方截断；raw_range 直接作为 z（与单模态 _handle_uwb 同口径：
-                # ekf_core.py:915 / robust_ekf_core.py:358 / fgo_core.py:1872），
+                # ekf_core.py:915 ），
                 # bias 进 h(·)。负值/非有限值由下游 run_uwb_update 的 coerce_finite_scalar
                 # 协议级数据校验拒绝（raise），不在联合路径单方 clamp 改写 raw 距离。
                 raw_range_i = float(uwb_payload["range"])
@@ -1540,7 +1560,7 @@ class EKFCore(EstimatorAPI):
 
                 # 身份纪律（前提指导 §3.2 / §3 事件流细节）：禁止仅 step_joint 私有
                 # nlos_sanity_gate 硬砍。大脉冲拒识必须走全员同一的 gate 卡方/质量门
-                # （configs/models/ekf.yaml 与 robust_ekf.yaml 的 mahalanobis_sq），
+                # （configs/models/ekf.yaml 的 mahalanobis_sq），
                 # 不得在 joint 路径再开单方法几何阈值通道。历史 nlos_sanity_gate 块已作废。
 
                 uwb_anchors_resolved.append((ax, ay))

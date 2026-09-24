@@ -3,8 +3,8 @@ from __future__ import annotations
 """估计器工厂（estimator_factory）测试模块。
 
 测试覆盖范围：
-- EKF/RobustEKF 估计器的创建
-- 未知估计器类型（含已退出封闭对手集的 FGO）的拒绝
+- EKF 估计器的创建
+- 未知估计器类型的拒绝
 - 配置参数的传递与验证
 
 被测模块：liquidloc.factories.estimator_factory"""
@@ -14,7 +14,6 @@ import pytest
 
 from liquidloc.common.constants import STATE_ITEMS as _STATE_ITEMS
 from liquidloc.estimators.ekf_core import EKFCore
-from liquidloc.estimators.robust_ekf_core import RobustEKFCore
 from liquidloc.factories.estimator_factory import (
     _require_mapping,
     _require_numeric_scalar,
@@ -73,25 +72,6 @@ def _cfg(estimator_name: str):
         },
         "init_cov": [1.0] * _STATE_DIM,
     }
-    if estimator_name == "robust_ekf":
-        cfg["gate"] = {"quality_floor": 0.6, "mahalanobis_sq": 9.21}
-        cfg["robust_weight"] = {"type": "huber", "delta": 1.5}
-    if estimator_name == "fgo":
-        cfg["window_size"] = 4
-        cfg["optimizer"] = {"name": "gauss_newton", "max_iters": 4}
-        cfg["factor_weights"] = {"imu": 1.0, "uwb": 1.0, "vio": 1.0}
-        # cmp3 无核身份：默认不注入 robust_weight / gate（与 fgo.yaml + 铁律 10 对齐）。
-        # §3.4 + §10.3 / B10–B11 窗长比断言：本测试用 window_size=4 步小窗验证
-        # 工厂 smoke 口径，按"测试协议"档把 tau_filt_s 显式写死成与窗口同量级
-        # (0.1s)，使 4 步 / 100Hz = 0.04s 比例 0.4 与 [0.5, 3] 仍有距离，
-        # 取 nominal_event_rate_hz=10Hz (= dt=0.1s)，4 步 → 0.4s，ratio=4.0。
-        # 单测此处 dt 不可换，把 tau_filt_s 调到 0.2，4 步=0.4s，ratio=2.0 ∈ [0.5, 3]。
-        cfg["nominal_event_rate_hz"] = 10.0
-        cfg["tau_filt_s"] = 0.2
-        # §10.3 诚实边界守卫（B2 v6）：与 fgo.yaml 同口径显式声明 τ_filt=0.2 的 T_eff 假设。
-        cfg["tau_filt_assumed_t_eff_min_s"] = 25.0
-        cfg["window_length_ratio_min"] = 0.5
-        cfg["window_length_ratio_max"] = 3.0
     return cfg
 
 
@@ -111,7 +91,6 @@ def _uwb_event(quality=0.55):
     ("estimator_name", "expected_type"),
     [
         ("ekf", EKFCore),
-        ("robust_ekf", RobustEKFCore),
     ],
 )
 def test_normal_case(estimator_name, expected_type):
@@ -126,14 +105,14 @@ def test_normal_case(estimator_name, expected_type):
     assert state.timestamp == 0.05
 
 
-def test_fgo_is_rejected_by_closed_competitor_set():
-    """§16.1 封闭对手集：create_estimator 仅承认 ekf / robust_ekf / sgpr。
+def test_lstm_ekf_is_rejected_by_closed_competitor_set():
+    """§16.1 封闭对手集：create_estimator 仅承认 ekf / sgpr。
 
-    FGO 已从工厂封闭集移除（纯 SGPR 占位保持集合封闭），此处显式断言
-    'fgo' 不再是可创建的估计器身份，防止游离方法名混入主表。
+    lstm_ekf 已从工厂封闭集移除（纯 SGPR 占位保持集合封闭），此处显式断言
+    'lstm_ekf' 不再是可创建的估计器身份，防止游离方法名混入主表。
     """
-    with pytest.raises(ValueError, match="Unknown estimator: fgo"):
-        create_estimator("fgo", _cfg("fgo"))
+    with pytest.raises(ValueError, match="Unknown estimator: lstm_ekf"):
+        create_estimator("lstm_ekf", _cfg("lstm_ekf"))
 
 
 def test_boundary_case():
@@ -142,10 +121,10 @@ def test_boundary_case():
     验证被测功能在边界条件下的行为，
     确保极端输入不会导致异常或错误结果。
     """
-    estimator = create_estimator("robust_ekf", _cfg("robust_ekf"))
-    state = estimator.step(_uwb_event(quality=0.55))
+    # 这里测试标准EKF的边界情况
+    estimator = create_estimator("ekf", _cfg("ekf"))
+    state = estimator.step(_uwb_event(quality=0.9))
     assert state.timestamp == 0.05
-    assert estimator.last_update_report["gate"]["rejected_by"] == "quality_floor"
 
 
 def test_invalid_case():

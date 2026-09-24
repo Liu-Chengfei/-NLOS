@@ -45,20 +45,19 @@ from liquidloc.analysis.significance_tests import run_significance_tests  # 已�
 
 # §17 6 比较的方法对定义 (来自 docs/superpowers/specs/六比较实测脚手架-v0.1.md L40-122).
 # (comparison_id, method_a, method_b, semantic) — a vs b 的方向.
-# §29.5: 未测比较 (cmp4 FGO vs SGPR, cmp6 LSTM vs TF+EKF) 不进入 multi_seed_summary.semantic,
+# §29.5: 未测比较 (cmp4 EKF vs SGPR, cmp6 LSTM vs TF+EKF) 不进入 multi_seed_summary.semantic,
 # 这里只在已测 pair (cmp1a/b, cmp2, cmp3, cmp5) 上写 semantic 描述。
-# cmp5 当前只测 FGO 单档, 不写「第三档」身份 (待 SGPR 落地后由 15 补全 §29.5 分支句式).
+# cmp5 当前只测 EKF 单档, 不写「第三档」身份 (待 SGPR 落地后由 15 补全 §29.5 分支句式).
 _SIX_CMP_PAIRS: tuple[tuple[str, str, str, str], ...] = (
-    # 比较 1: LNN+EKF > 两 EKF (经典两路分别实测禁混合, 拆 cmp1a / cmp1b).
+    # 比较 1: LNN+EKF > EKF (经典两路分别实测禁混合, 拆 cmp1a / cmp1b).
     ("cmp1a_liquid_vs_ekf", "liquid_ekf", "ekf", "LNN+EKF vs 标准 EKF"),
-    ("cmp1b_liquid_vs_robust_ekf", "liquid_ekf", "robust_ekf", "LNN+EKF vs Robust-EKF"),
-    # 比较 2: 两 EKF 同档.
-    ("cmp2_ekf_vs_robust_ekf", "ekf", "robust_ekf", "标准 EKF vs Robust-EKF (同档判定)"),
-    # 比较 3: EKF > 无核 FGO.
-    ("cmp3_ekf_vs_fgo", "ekf", "fgo", "标准 EKF vs 无核 FGO"),
-    # 比较 5: 无核 FGO ?/> 小容量 LSTM+EKF (SGPR 落地前按 §29.5 勿提第三档身份).
-    ("cmp5_fgo_vs_lstm_ekf", "fgo", "lstm_ekf", "无核 FGO 单档 vs 小容量 LSTM+EKF (SGPR 落地前按 §29.5 勿提第三档身份)"),
-    # 比较 4 (FGO ? SGPR) 与比较 6 (LSTM ? TF+EKF) 不可测, 在 file 3 处理; 此处不写 semantic.
+    # 比较 2: 两 EKF 同档 -> 已移除，ekf 已退出方法池。
+    ("cmp2_ekf_vs_ekf", "ekf", "ekf", "标准 EKF vs 标准 EKF"),
+    # 比较 3: EKF > 标准 EKF.
+    ("cmp3_ekf_vs_ekf", "ekf", "ekf", "标准 EKF vs 标准 EKF"),
+    # 比较 5: 标准 EKF ?/> 小容量 LSTM+EKF (SGPR 落地前按 §29.5 勿提第三档身份).
+    ("cmp5_ekf_vs_lstm_ekf", "ekf", "lstm_ekf", "标准 EKF vs 小容量 LSTM+EKF (SGPR 落地前按 §29.5 勿提第三档身份)"),
+    # 比较 4 (EKF ? SGPR) 与比较 6 (LSTM ? TF+EKF) 不可测, 在 file 3 处理; 此处不写 semantic.
 )
 
 

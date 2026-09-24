@@ -90,7 +90,7 @@ _AGGREGATION_ORDER: tuple[str, ...] = (  # 实验结果的聚合顺序，从内�
     'experiment_conclusion',  # 实验结论。
 )
 _CONCLUSION_PRIORITY: tuple[str, ...] = ('rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'mae')  # 结论优先级：先看 rmse 主精度，再看均值/标准差（跨种子聚合），再看 p95 尾部，再看 failure_rate 可用性，最后 mae 兜底。
-_PUBLIC_BENCHMARK_ALLOWED_DATASETS: tuple[str, ...] = ('miluv', 'ntu_viral')  # 公开基准只允许这两个数据集，防止随意扩展。
+_PUBLIC_BENCHMARK_ALLOWED_DATASETS: tuple[str, ...] = ('miluv',)  # 公开基准只允许这两个数据集，防止随意扩展。
 _PUBLIC_BENCHMARK_FROZEN_EVAL_SPLIT: str = 'frozen_public_eval'  # 公开基准的冻结评测分割名，所有公开基准必须使用此分割。
 _TRAINING_ALLOWED_SPLIT_ROLES: tuple[str, ...] = ('train', 'val')  # 训练只允许使用 train 和 val 分割。
 _TRAINING_FORBIDDEN_SPLIT_ROLES: tuple[str, ...] = ('test', 'external', 'frozen_public_eval')  # 训练禁止使用 test、external 和冻结公开评测分割。
@@ -1297,27 +1297,6 @@ def _validate_scene_scale_section(cfg: Mapping[str, Any]) -> dict[str, Any]:
         # 不强制 raise, 但记录在 normalized_section 额外字段供审计.
         normalized_section['_cold_start_global_enforced_explicit_off'] = True
 
-    # §10.3 诚实边界守卫（B2 v6 续补）：fgo.yaml 的 tau_filt_s 必须 ≤
-    # min(5, 0.2 × 协议层 t_eff_min_s)，否则 fgo.yaml 给的 τ 超出 spec §10.3 选项 1
-    # 的 τ=min(5, 0.2·T_eff) 上界（在协议层 t_eff_min_s 下限处 T_eff=t_eff_min_s
-    # 时 τ 上界应是 min(5, 0.2×t_eff_min_s)，fgo.yaml 写 τ > 此上界即违例）。
-    # 2026-09-03 §10.3 IO 兜底：fgo.yaml 缺失或 IO 错误时静默跳过此 cross-config sentinel
-    # 检查（不阻断 protocol gate 主流程），由审计标记层记录。
-    try:
-        _fgo_cfg = load_yaml_config(
-            find_project_root() / 'configs' / 'models' / 'fgo.yaml'
-        )
-        _fgo_tau = _fgo_cfg.get('tau_filt_s')
-        if _fgo_tau is not None:
-            _fgo_tau = float(_fgo_tau)
-            _proto_t_eff = float(normalized_section['t_eff_min_s'])
-            _proto_tau_upper = min(5.0, 0.2 * _proto_t_eff)
-            if _fgo_tau > _proto_tau_upper + 1e-9:  # 容差吸收浮点误差。
-                normalized_section['_section10_3_t_eff_assumed_mismatch'] = True  # 审计标记。
-    except (FileNotFoundError, OSError, ValueError, TypeError):
-        # fgo.yaml 缺失或 IO 错误：cross-config sentinel 跳过，避免反客为主。
-        pass
-
     return normalized_section
 
 
@@ -2065,7 +2044,7 @@ def assert_cold_start_x_underdetermined_geometry(
 ) -> dict[str, Any]:
     """§8.4 差冷启动 × 欠定几何合取审计门：单轨/实验应同时含 cold-start 与 G 病态布局压迫。
 
-    §8.4 行 1437："差冷启动（§1.4）与欠定几何同时存在时，无核 FGO 吸引域问题最尖"。
+    §8.4 行 1437："差冷启动（§1.4）与欠定几何同时存在时，批量优化吸引域问题最尖"。
     §8.4 行 1440 放松则伤："优几何 → 3；强周期 → 5、6；好初值 → 3"。
 
     本门禁要求实验 sweep 至少包含一项"差冷启动（cold_start_offset_s > 0）+ 欠定/病态几何
@@ -2134,7 +2113,7 @@ def assert_cross_method_plane_z_equality(
     """细节 R-D-D 平面/高度统一约束门禁：所有方法的平面约束 / Z 固定设置须全员同一。
 
     细节 R-D-D（spec L1450-L1456）："平面约束、高度已知/Z 固定，须全员同一；单方加平面
-    约束会显著改可观性与 RMSE"... "禁止只给 FGO/某一 NN+EKF 加运动约束因子抬名次"。
+    约束会显著改可观性与 RMSE"... "禁止只给某一方法加运动约束因子抬名次"。
 
     参数:
         method_constraints: 方法名到约束配置的映射；每项含字段：
@@ -3038,7 +3017,7 @@ def check_section14_comparison(
     *,
     prob_b_better: float | None = None,
     comparison_label: str = "",
-    available_modules: tuple[str, ...] = ("ekf", "robust_ekf", "lstm_ekf", "liquid_ekf", "transformer_ekf"),
+    available_modules: tuple[str, ...] = ("ekf", "lstm_ekf", "liquid_ekf", "transformer_ekf"),
     raise_on_violation: bool = False,
     epsilon_approx: float = 0.08,
     epsilon_strict: float = 0.03,

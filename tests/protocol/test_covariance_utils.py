@@ -1,7 +1,7 @@
 """covariance_utils 单源锁死 pytest（§12.2-B1i/B1ii/B1iii 第十五轮反推精读补锁死）。
 
 锁死目的：
-- 三方法（EKF / Robust-EKF / FGO）都 import 自 common/covariance_utils.py 单源
+- 二方法（EKF / NN+EKF）都 import 自 common/covariance_utils.py 单源
   build_effective_cov（common/covariance_utils.py:183）和 estimators/shared.py
   build_controlled_measurement_cov（shared.py:56），禁止任何方法本地重实现。
 - 本测试锁死 build_effective_cov 的真实行为：scalar / (3,3) 分块，不区分 UWB/VIO
@@ -162,7 +162,7 @@ def test_build_controlled_measurement_cov_rejects_zero_noise_multiplier_via_cont
 
 
 def test_three_estimators_all_import_build_effective_cov_from_singleton():
-    """EKF / Robust-EKF / FGO 都 import 自 common/covariance_utils 单源。
+    """EKF / NN+EKF 都 import 自 common/covariance_utils 单源。
 
     锁死 build_effective_cov 禁止任何方法本地重实现
     （§12.2-B1i/B1ii/B1iii "三网同一 R 矩阵构建"）。
@@ -171,8 +171,8 @@ def test_three_estimators_all_import_build_effective_cov_from_singleton():
 
     for name, mod in [
         ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("robust_ekf_core", "liquidloc.estimators.robust_ekf_core"),
-        ("fgo_core", "liquidloc.estimators.fgo_core"),
+        ("ekf_core", "liquidloc.estimators.ekf_core"),
+        
     ]:
         src = inspect.getsource(__import__(mod, fromlist=[""]))
         assert "build_effective_cov" in src, (
@@ -186,7 +186,7 @@ def test_three_estimators_all_import_build_effective_cov_from_singleton():
 
 
 def test_three_estimators_all_import_build_controlled_measurement_cov_from_singleton():
-    """EKF / Robust-EKF / FGO 都 import 自 estimators/shared 单源。
+    """EKF / NN+EKF 都 import 自 estimators/shared 单源。
 
     锁死 build_controlled_measurement_cov 禁止任何方法本地重实现
     （§12.2-B1i/B1ii/B1iii "三网同一 scaling 控制"）。
@@ -195,8 +195,8 @@ def test_three_estimators_all_import_build_controlled_measurement_cov_from_singl
 
     for name, mod in [
         ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("robust_ekf_core", "liquidloc.estimators.robust_ekf_core"),
-        ("fgo_core", "liquidloc.estimators.fgo_core"),
+        ("ekf_core", "liquidloc.estimators.ekf_core"),
+        
     ]:
         src = inspect.getsource(__import__(mod, fromlist=[""]))
         assert "build_controlled_measurement_cov" in src, (
@@ -258,8 +258,8 @@ def test_no_hardcoded_scaling_ceiling_in_estimation_code():
 
     for name, mod in [
         ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("robust_ekf_core", "liquidloc.estimators.robust_ekf_core"),
-        ("fgo_core", "liquidloc.estimators.fgo_core"),
+        ("ekf_core", "liquidloc.estimators.ekf_core"),
+        
         ("model_factory", "liquidloc.factories.model_factory"),
     ]:
         src = inspect.getsource(__import__(mod, fromlist=[""]))

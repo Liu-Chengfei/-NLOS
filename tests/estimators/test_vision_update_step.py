@@ -900,7 +900,7 @@ def test_apply_vision_update_rejects_writable_measurement():
 
 
 # === §11.5 SPD 抖动注入锁死测试（spec L1745 协方差对称正定保护）===
-# 三个 estimator（EKF / Robust-EKF / FGO）创新协方差 Cholesky 必须共享同一 jitter 政策：
+# 两个 estimator（EKF / NN+EKF）创新协方差 Cholesky 必须共享同一 jitter 政策：
 # 第一次失败 → S += cov_jitter_eps * I 再重试；二次仍失败 → fail-loud。
 
 

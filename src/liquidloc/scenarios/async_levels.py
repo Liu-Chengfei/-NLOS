@@ -48,7 +48,7 @@
 
 §4.4 抖动真随机错位协议级护栏（前提指导.md:1028）：
   - jitter_seconds = random.Random(jitter_seed).gauss(0.0, jitter_sigma_s)（本文件 L478），
-    分布族固定为高斯，所有方法（EKF/robust_ekf/FGO/NN+EKF）共享同一分布族与同一 SHA-256 种子，
+    分布族固定为高斯，所有方法（EKF/ekf/NN+EKF）共享同一分布族与同一 SHA-256 种子，
     即"真随机错位、分布族全员同一"。
   - jitter_ms 协议层迭代验证（本文件 L368-395）：必须非负，A0=0/A1≈5ms/A2≈15ms/A3≈25ms 量级。
   - 不允许单方使用均匀分布/重尾分布替代高斯，否则违反 §4.4 "抖动分布族全员同一"。

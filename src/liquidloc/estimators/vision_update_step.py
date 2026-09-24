@@ -489,7 +489,7 @@ def _ensure_positive_definite_vio_innovation_covariance(
     当对称化 + 对角线阳性通过但 Cholesky 仍失败（病态条件数）时，
     先尝试 ``S += cov_jitter_eps * I`` 再重试 Cholesky；
     二次仍失败才 raise ValueError（fail-loud 路径保留）。
-    三个 estimator（EKF / Robust-EKF / FGO）同调本函数 → 全员同一 jitter 政策。
+    两个 estimator（EKF / NN+EKF）同调本函数 → 全员同一 jitter 政策。
     """
     from liquidloc.common.tee_logger import print_dict
     from liquidloc.protocol.bridge_thresholds import BRIDGE_THRESHOLDS

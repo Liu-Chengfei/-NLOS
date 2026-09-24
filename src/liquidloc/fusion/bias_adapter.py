@@ -71,7 +71,7 @@ def apply_bias(uwb_event, bias_value):  # 把偏置修正应用到单个 UWB 事
     .. note::
         本函数为 **z 侧重写**（subtractive）的旧接口。生产链路自 §3.0.2 / §3.1.2
         起，所有 NN bias 写入改为 h 侧（``predict_range(..., extra_bias=...)`` /
-        ``run_uwb_update(..., extra_bias=...)`` / FGO ``constraint["extra_bias"]`` /
+        ``run_uwb_update(..., extra_bias=...)`` /
         联合路径 ``step_joint(..., uwb_extra_biases=...)``）。本函数保留 z 侧语义
         仅为兼容历史调用方与离线测试，不得用于任何主路径（否则违反 §3.0.2 写入口边界
         与「残差定义在原始读数合同上」要求）。

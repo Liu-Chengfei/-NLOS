@@ -25,11 +25,9 @@ frozen_axes:
 
 # 参与比较的方法。# 这里仍然保留完整代表方法集合。
 # ekf：标准 EKF，无相位切换机制，状态切换时可能出现跳变。
-# robust_ekf：鲁棒 EKF，通过异常值抑制部分缓解切换时的跳变。
-# fgo：因子图优化，批量方法天然平滑，切换影响较小。
 # lstm_ekf：LSTM 增强 EKF，学习式方法可能学到切换模式。
 # liquid_ekf：液态网络增强 EKF，核心方法，期望在相位切换时保持平滑。
-methods: [ekf, robust_ekf, fgo, lstm_ekf, liquid_ekf]  # 所有主流方法参与比较。
+methods: [ekf, lstm_ekf, liquid_ekf]  # 所有主流方法参与比较。
 
 # quick/full 模式覆盖项。# 这里控制不同规模的实验重复和序列覆盖。
 mode_overrides:

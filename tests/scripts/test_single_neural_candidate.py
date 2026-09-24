@@ -241,8 +241,7 @@ def test_main_passes_paper_baseline_metrics_to_neural_candidate_and_summary(tmp_
             {
                 "selected_estimator_cfgs": {
                     "ekf": {"name": "ekf"},
-                    "robust_ekf": {"name": "robust_ekf"},
-                    "fgo": {"name": "fgo"},
+                    "ekf": {"name": "ekf"},
                 },
                 "ekf": {
                     "selected_metrics": {

@@ -3,7 +3,7 @@
 
 【文件职责】
 这个文件专门定义整条估计链共享的状态顺序、维度和索引映射。
-它是预测、UWB 更新、VIO 更新、EKF 核心和 FGO 核心共同依赖的状态契约源头。
+它是预测、UWB 更新、VIO 更新、EKF 核心共同依赖的状态契约源头。
 
 【本文件绝对不负责】
 不做预测，不做更新，不做优化，只提供状态定义和契约校验。
@@ -12,7 +12,7 @@
 configs/base/task.yaml、liquidloc.common.constants、liquidloc.protocol.task_contract。
 
 【下游调用者】
-predict_step.py、uwb_update_step.py、vision_update_step.py、ekf_core.py、fgo_core.py。
+predict_step.py、uwb_update_step.py、vision_update_step.py、ekf_core.py。
 
 【输入对象定义】
 - 无直接业务输入；它读取共享 task contract 并校验公共常量注册表。

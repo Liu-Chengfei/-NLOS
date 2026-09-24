@@ -26,9 +26,7 @@ frozen_axes:
 
 # 本实验要比较的方法列表。# 只保留传统基线方法，去掉学习式模型（lstm_ekf、liquid_ekf）。
 # ekf：标准扩展卡尔曼滤波，最基础的融合方法。
-# robust_ekf：鲁棒扩展卡尔曼滤波，在 EKF 基础上增加异常值抑制。
-# fgo：因子图优化，基于图优化的批量估计方法。
-methods: [ekf, robust_ekf, fgo]  # 只比较传统基线方法，去掉学习式模型。
+methods: [ekf]  # 只比较传统基线方法，去掉学习式模型。
 
 # quick/full 运行规模覆盖项。# 与 e0_safe_mode 一致，只是方法集合更窄。
 mode_overrides:

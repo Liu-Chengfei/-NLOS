@@ -174,7 +174,7 @@ def _get_official_public_datasets():
     if _OFFICIAL_PUBLIC_DATASETS is None:
         _OFFICIAL_PUBLIC_DATASETS = frozenset(get_public_benchmark_allowed_datasets())
     return _OFFICIAL_PUBLIC_DATASETS
-# 主表核心实验面：EKF 基线 + LSTM/Transformer/Liquid 神经网络增强 EKF（不含 FGO）。
+# 主表核心实验面：EKF 基线 + LSTM/Transformer/Liquid 神经网络增强 EKF。
 _ALL_MODEL_CORE_SURFACE = {"ekf", "lstm_ekf", "transformer_ekf", "liquid_ekf"}
 
 

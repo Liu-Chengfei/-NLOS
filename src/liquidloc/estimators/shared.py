@@ -11,8 +11,6 @@
 
 下游调用者：
 - liquidloc.estimators.ekf_core — EKF 核心估计器
-- liquidloc.estimators.fgo_core — FGO 核心估计器
-- liquidloc.estimators.robust_ekf_core — 鲁棒 EKF 核心估计器
 """
 
 from __future__ import annotations

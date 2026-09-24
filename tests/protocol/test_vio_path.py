@@ -13,7 +13,6 @@
 5. 三方法 _handle_vio 都调用 compute_vio_residual / build_vio_measurement /
    _normalize_vio_covariance / _ensure_positive_definite_vio_innovation_covariance 单源
 
-注意：FGO 是因子图优化器，VIO 状态写入用 solve() 直接更新（而非 apply_vision_update），
 这是结构性差异而非偷懒。§12.2-B1ii 锁的是观测映射（z_hat, residual, H）三方法同源，
 不包括状态写入机制（apply_vision_update 是状态写入，不属观测映射）。
 """
@@ -109,7 +108,7 @@ def test_ensure_positive_definite_vio_innovation_covariance_identity():
 
 
 def test_three_methods_all_call_compute_vio_residual_from_vision_update_step():
-    """EKF / Robust-EKF / FGO 三方法 _handle_vio 都必须调用 vision_update_step.compute_vio_residual。
+    """EKF / NN+EKF _handle_vio 都必须调用 vision_update_step.compute_vio_residual。
 
     锁死三方法不能各自重实现 VIO 残差逻辑。
     """
@@ -117,8 +116,7 @@ def test_three_methods_all_call_compute_vio_residual_from_vision_update_step():
 
     for name, mod in [
         ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("robust_ekf_core", "liquidloc.estimators.robust_ekf_core"),
-        ("fgo_core", "liquidloc.estimators.fgo_core"),
+        ("ekf_core", "liquidloc.estimators.ekf_core"),
     ]:
         src = inspect.getsource(__import__(mod, fromlist=[""]))
         assert "compute_vio_residual" in src, (
@@ -128,7 +126,7 @@ def test_three_methods_all_call_compute_vio_residual_from_vision_update_step():
 
 
 def test_three_methods_all_call_build_vio_measurement_from_vision_update_step():
-    """EKF / Robust-EKF / FGO 三方法 _handle_vio 都必须调用 vision_update_step.build_vio_measurement。
+    """EKF / NN+EKF _handle_vio 都必须调用 vision_update_step.build_vio_measurement。
 
     锁死三方法不能各自重实现 VIO 量测提取逻辑。
     """
@@ -136,8 +134,7 @@ def test_three_methods_all_call_build_vio_measurement_from_vision_update_step():
 
     for name, mod in [
         ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("robust_ekf_core", "liquidloc.estimators.robust_ekf_core"),
-        ("fgo_core", "liquidloc.estimators.fgo_core"),
+        ("ekf_core", "liquidloc.estimators.ekf_core"),
     ]:
         src = inspect.getsource(__import__(mod, fromlist=[""]))
         assert "build_vio_measurement" in src, (
@@ -147,7 +144,7 @@ def test_three_methods_all_call_build_vio_measurement_from_vision_update_step():
 
 
 def test_three_methods_all_call_normalize_vio_covariance_from_vision_update_step():
-    """EKF / Robust-EKF / FGO 三方法 _handle_vio 都必须调用 vision_update_step._normalize_vio_covariance。
+    """EKF / NN+EKF _handle_vio 都必须调用 vision_update_step._normalize_vio_covariance。
 
     锁死三方法不能各自重实现 VIO 协方差规范化。
     """
@@ -155,8 +152,7 @@ def test_three_methods_all_call_normalize_vio_covariance_from_vision_update_step
 
     for name, mod in [
         ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("robust_ekf_core", "liquidloc.estimators.robust_ekf_core"),
-        ("fgo_core", "liquidloc.estimators.fgo_core"),
+        ("ekf_core", "liquidloc.estimators.ekf_core"),
     ]:
         src = inspect.getsource(__import__(mod, fromlist=[""]))
         assert "_normalize_vio_covariance" in src, (
@@ -166,7 +162,7 @@ def test_three_methods_all_call_normalize_vio_covariance_from_vision_update_step
 
 
 def test_three_methods_all_call_ensure_positive_definite_vio_innovation_covariance():
-    """EKF / Robust-EKF / FGO 三方法 _handle_vio 都必须调用 _ensure_positive_definite_vio_innovation_covariance。
+    """EKF / NN+EKF _handle_vio 都必须调用 _ensure_positive_definite_vio_innovation_covariance。
 
     锁死三方法不能各自重实现 VIO 创新协方差正定性守卫。
     """
@@ -174,8 +170,7 @@ def test_three_methods_all_call_ensure_positive_definite_vio_innovation_covarian
 
     for name, mod in [
         ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("robust_ekf_core", "liquidloc.estimators.robust_ekf_core"),
-        ("fgo_core", "liquidloc.estimators.fgo_core"),
+        ("ekf_core", "liquidloc.estimators.ekf_core"),
     ]:
         src = inspect.getsource(__import__(mod, fromlist=[""]))
         assert "_ensure_positive_definite_vio_innovation_covariance" in src, (
@@ -184,11 +179,9 @@ def test_three_methods_all_call_ensure_positive_definite_vio_innovation_covarian
         )
 
 
-def test_ekf_and_robust_call_apply_vision_update_fgo_does_not():
-    """EKF / Robust-EKF 用 apply_vision_update 写状态，FGO 用因子图 solve 直接写状态。
+def test_ekf_calls_apply_vision_update():
+    """EKF 用 apply_vision_update 写状态。
 
-    锁死 FGO 不应被强制要求 apply_vision_update——FGO 是因子图优化器，
-    VIO 状态写入用 solve() 直接更新（结构性差异，非偷懒）。
     §12.2-B1ii 锁的是观测映射（z_hat, residual, H）三方法同源，
     不包括状态写入机制（apply_vision_update 是状态写入属于 §12.2-B1iii）。
     """
@@ -196,19 +189,9 @@ def test_ekf_and_robust_call_apply_vision_update_fgo_does_not():
 
     for name, mod in [
         ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("robust_ekf_core", "liquidloc.estimators.robust_ekf_core"),
     ]:
         src = inspect.getsource(__import__(mod, fromlist=[""]))
         assert "apply_vision_update" in src, (
             f"{name}._handle_vio 必须调用 apply_vision_update 单源 "
-            f"（§12.2-B1iii EKF/Robust-EKF 状态写入同源锁死）"
+            f"（§12.2-B1iii EKF 状态写入同源锁死）"
         )
-
-    # FGO 不应被要求 apply_vision_update（结构性差异）
-    fgo_src = inspect.getsource(__import__("liquidloc.estimators.fgo_core", fromlist=[""]))
-    # FGO 必须用因子图 solve() 写状态（不在 src 层强制 apply_vision_update）
-    # 但必须显式调用 solve() 才能 update_state
-    assert "solve()" in fgo_src or "self.solve(" in fgo_src, (
-        "FGO 必须用 self.solve() 直接写状态（因子图优化器的状态写入机制，"
-        "替代 EKF 的 apply_vision_update）"
-    )

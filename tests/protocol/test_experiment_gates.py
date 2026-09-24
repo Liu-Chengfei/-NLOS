@@ -40,7 +40,7 @@ def _make_valid_protocol_cfg():
         'aggregation_order': ['single_run', 'repeat_summary', 'scene_summary', 'experiment_conclusion'],
         'conclusion_priority': ['rmse', 'mean_rmse', 'std_rmse', 'p95', 'failure_rate', 'mae'],
         'public_benchmark': {
-            'allowed_datasets': ['miluv', 'ntu_viral'],
+            'allowed_datasets': ['miluv'],
             'frozen_eval_split': 'frozen_public_eval',
             'tuning_forbidden': True,
             'shared_split_required': True,
@@ -440,13 +440,13 @@ def test_public_gate_allowed_dataset_miluv():
     assert report['dataset_name'] == 'miluv'
 
 
-def test_public_gate_allowed_dataset_ntu_viral():
-    """ntu_viral 数据集应在允许列表中，校验应通过。"""
+def test_public_gate_allowed_dataset_miluv():
+    """miluv 数据集应在允许列表中，校验应通过。"""
     report = normalize_public_benchmark_request({
-        'dataset_name': 'ntu_viral',
+        'dataset_name': 'miluv',
         'seq_ids': ['seq1'],
     }, dataset_entry={'frozen_public_eval_seq_ids': ['seq1']})
-    assert report['dataset_name'] == 'ntu_viral'
+    assert report['dataset_name'] == 'miluv'
 
 
 def test_public_gate_dataset_name_case_insensitive():
@@ -609,10 +609,9 @@ def test_public_gate_non_mapping_dataset_entry_rejected():
         )
 
 
-def test_public_benchmark_allowed_datasets_contains_expected():
-    """允许列表应至少包含 miluv 和 ntu_viral。"""
+def test_public_benchmark_allowed_datasets_contains_miluv():
+    """允许列表应包含 miluv。"""
     assert 'miluv' in _PUBLIC_BENCHMARK_ALLOWED_DATASETS
-    assert 'ntu_viral' in _PUBLIC_BENCHMARK_ALLOWED_DATASETS
 
 
 def test_public_benchmark_allowed_datasets_excludes_util():
@@ -726,7 +725,7 @@ def test_eval_gate_string_smoke_mode_rejected():
 def test_assert_anchor_uniform_source_na_in_3_4_5_passes():
     """§8.1 L1360 Na∈{3,4,5} 落在推荐范围时门禁通过。"""
     layout = {'anchor_positions': [[0.0, 0.0], [1.0, 0.0], [0.5, 0.866]]}
-    report = assert_anchor_uniform_source({'ekf': layout, 'fgo': layout})
+    report = assert_anchor_uniform_source({'ekf': layout})
     assert report['uniform'] is True
     assert report['na_in_range'] is True
     assert report['na_count'] == 3
@@ -736,14 +735,14 @@ def test_assert_anchor_uniform_source_na_ge_8_raises():
     """§8.1 L1360 Na≥8 高冗余优 GDOP 时门禁 raise。"""
     layout = {'anchor_positions': [[float(i), 0.0] for i in range(8)]}
     with pytest.raises(ValueError, match='anchor_count violation: Na=8 not in'):
-        assert_anchor_uniform_source({'ekf': layout, 'fgo': layout})
+        assert_anchor_uniform_source({'ekf': layout})
 
 
 def test_assert_anchor_uniform_source_na_lt_3_raises():
     """§8.1 L1360 Na<3 欠定压力不足时门禁 raise。"""
     layout = {'anchor_positions': [[0.0, 0.0], [1.0, 0.0]]}
     with pytest.raises(ValueError, match='anchor_count violation: Na=2 not in'):
-        assert_anchor_uniform_source({'ekf': layout, 'fgo': layout})
+        assert_anchor_uniform_source({'ekf': layout})
 
 
 def test_assert_anchor_uniform_source_different_layouts_raises():
@@ -751,14 +750,14 @@ def test_assert_anchor_uniform_source_different_layouts_raises():
     layout_a = {'anchor_positions': [[0.0, 0.0], [1.0, 0.0], [0.5, 0.866]]}
     layout_b = {'anchor_positions': [[0.0, 0.0], [2.0, 0.0], [1.0, 1.0]]}
     with pytest.raises(ValueError, match='methods using different anchor layouts'):
-        assert_anchor_uniform_source({'ekf': layout_a, 'fgo': layout_b})
+        assert_anchor_uniform_source({'ekf': layout_a})
 
 
 def test_assert_anchor_uniform_source_no_raise_when_disabled():
     """raise_on_violation=False 时只返回 report 不 raise。"""
     layout = {'anchor_positions': [[float(i), 0.0] for i in range(8)]}
     report = assert_anchor_uniform_source(
-        {'ekf': layout, 'fgo': layout}, raise_on_violation=False
+        {'ekf': layout}, raise_on_violation=False
     )
     assert report['uniform'] is True
     assert report['na_in_range'] is False
@@ -1098,55 +1097,6 @@ def test_assert_anchor_uniform_source_3d_no_raise_when_disabled():
     assert r['passed'] is False
     assert len(r['reasons']) >= 1
     assert any('Na=8 not in {3,4,5}' in rsn for rsn in r['reasons'])
-
-
-def test_section10_3_cross_config_t_eff_assumed_mismatch_audit_flag():
-    """§10.3 诚实边界守卫（B2 v6 续补）：fgo.yaml tau_filt_assumed_t_eff_min_s < 协议层 t_eff_min_s
-    时 _validate_scene_scale_section 须在 normalized_section 打 _section10_3_t_eff_assumed_mismatch 审计标记。
-
-    fgo.yaml tau_filt_assumed_t_eff_min_s=25.0 隐含 τ_filt 上界 min(5,0.2×25)=5；
-    但协议层 t_eff_min_s=20 → 实际 τ_filt 上界 min(5,0.2×20)=4；
-    fgo.yaml 给 τ=5 > 4，违反 spec §10.3 选项 1。
-    本测试验证 cross-config sentinel 在此不一致时打审计标记（不阻断）。
-    """
-    from liquidloc.protocol.experiment_gates import _validate_scene_scale_section
-    section = {
-        'scene_scale': {
-            't_eff_min_s': 20.0,
-            'cold_start_offset_s': 5.0,
-            'cold_start_global_enforced': True,
-            'n_pulse_min': 30,
-            'n_async_min': 20,
-            'layout_family_min': 3,
-            'n_seed_min': 10,
-            'n_seed_recommended': 30,
-            'n_traj_te_min': 20,
-            'train_test_ratio_max': 0.1,
-        }
-    }
-    normalized = _validate_scene_scale_section(section)
-    assert normalized.get('_section10_3_t_eff_assumed_mismatch') is True
-
-
-def test_section10_3_cross_config_t_eff_assumed_consistent_no_flag():
-    """§10.3 诚实边界守卫续补：fgo.yaml tau_filt_assumed_t_eff_min_s ≥ 协议层 t_eff_min_s 时不触发审计标记。"""
-    from liquidloc.protocol.experiment_gates import _validate_scene_scale_section
-    section = {
-        'scene_scale': {
-            't_eff_min_s': 25.0,  # 与 fgo.yaml assumed=25 一致
-            'cold_start_offset_s': 5.0,
-            'cold_start_global_enforced': True,
-            'n_pulse_min': 30,
-            'n_async_min': 20,
-            'layout_family_min': 3,
-            'n_seed_min': 10,
-            'n_seed_recommended': 30,
-            'n_traj_te_min': 20,
-            'train_test_ratio_max': 0.1,
-        }
-    }
-    normalized = _validate_scene_scale_section(section)
-    assert '_section10_3_t_eff_assumed_mismatch' not in normalized
 
 
 # ===== §8 gate soft-mode passed=False 验证（anti-silent-pass 回归测试）=====

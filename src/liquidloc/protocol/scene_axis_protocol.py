@@ -495,7 +495,7 @@ def _validate_axis_param_semantic_range(axis: str, level: str, payload: Mapping[
                 )
         # §4.2.e 协议纪律（前提指导.md:897）：锚点坐标误差模型全员同一。
         # 本协议对 K 轴默认 anchor 坐标误差模型sigma_anchor_xy = 0.0m（即视为精确已知），
-        # 所有估计器（EKF / robust_ekf / FGO / NN+EKF）共享同一锚点几何，无单方私有误差模型。
+        # 所有估计器（EKF / ekf / NN+EKF）共享同一锚点几何，无单方私有误差模型。
         # 若需引入 anchor 坐标不确定性，必须在协议层登记（如新增 sigma_anchor_xy_m 字段）
         # 且由 predict_range / _coerce_anchor_xy 全员同一应用，禁止任一方法单方更"真"的锚。
         # 历史代码路径 grep `anchor.*sigma|anchor.*error|anchor.*noise` 在 src/ 下 0 命中。

@@ -12,7 +12,7 @@
 state_definition.py、sensors/imu_model.py、common/validation.py。
 
 【下游调用者】
-ekf_core.py、fgo_core.py。
+ekf_core.py。
 
 【输入对象定义】
 - x_prev: 上一时刻状态
@@ -30,8 +30,8 @@ ekf_core.py、fgo_core.py。
 - 只做几何预测和噪声传播，不引入别的业务语义。
 
 【前提指导 §5.1 — IMU 联合约束】
-本文件是五种实际实现的方法（ekf / robust_ekf / fgo / lstm_ekf / liquid_ekf）共享的预测核心。
-其中 ekf / robust_ekf / fgo 由 estimator_factory.create_estimator 直接构造（_SUPPORTED = {EKF, ROBUST_EKF, FGO}），
+本文件是实际实现的方法（ekf / lstm_ekf / liquid_ekf）共享的预测核心。
+其中 ekf 由 estimator_factory.create_estimator 直接构造（_SUPPORTED = {EKF}），
 lstm_ekf / liquid_ekf 复用 EKF 估计器外壳并在其上叠加测量侧 NN 控制（见 core_pipeline._NEURAL_METHODS）。
 为了让它们在 IMU 模态上做"同一物理叙事的不同推理形式"，必须满足：
 
@@ -42,8 +42,8 @@ lstm_ekf / liquid_ekf 复用 EKF 估计器外壳并在其上叠加测量侧 NN �
    ``yaw += (gz - bg) * dt`` 的偏置补偿，没有任何方法跳过这一步。
 3. 偏置随机游走强度 —— 由 ``predict_cfg.process_noise.accel_bias`` 与
    ``predict_cfg.process_noise.gyro_bias`` 提供（PSD 平方根，单位 state_unit/√s），
-   协方差离散化项是 ``σ_b² * dt``。`configs/models/{ekf,robust_ekf,fgo}.yaml` 三者值严格一致
-   （accel_bias=0.001，gyro_bias=0.001），五种方法共用同一噪声构造。
+   协方差离散化项是 ``σ_b² * dt``。`configs/models/ekf.yaml` 三方法值严格一致
+   （accel_bias=0.001，gyro_bias=0.001），三种方法共用同一噪声构造。
 4. 重力处理（前提指导 §5.1：全员同一）—— 本文件采用 2D 平面运动模型，
    ``ax``/``ay`` 已经在 sim_materializer.py（1691-1692 行的世界→机体旋转）中
    被定义为水平面（ENU 平面）上的比力分量，**不含重力投影**。

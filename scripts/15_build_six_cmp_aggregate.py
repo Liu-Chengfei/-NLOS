@@ -3,16 +3,14 @@
 职责:
   - 读 file 2 输出的 statistics_table.json (含 method_summary + multi_seed_summary + pairwise_tests)
   - 按 `docs/superpowers/specs/六比较实测脚手架-v0.1.md` 字段集生成每个比较的目录结构
-  - 比较对 1, 2, 3, 5 用 round7 单种子数据可回填
+  - 比较对 1, 2, 3 用 round7 单种子数据可回填
   - 比较对 4, 6 因 SGPR / Transformer+EKF 实现缺失, 写 not_testable + §29 降级声明
 
 输出目录结构:
   runs/cmp1/{version_id}/seed0/ekf/summary.json
-  runs/cmp1/{version_id}/seed0/robust_ekf/summary.json
   runs/cmp1/{version_id}/aggregate.json
-  runs/cmp2/{version_id}/seed0/summary.json
   runs/cmp2/{version_id}/aggregate.json
-  runs/cmp3/{version_id}/seed0/summary.json
+  runs/cmp3/{version_id}/seed0/ekf/summary.json
   runs/cmp3/{version_id}/aggregate.json
   runs/cmp4/{version_id}/aggregate.json     # not_testable
   runs/cmp5/{version_id}/seed0/summary.json
@@ -23,7 +21,7 @@
   ε_>  = 0.03 (严格优于, 比较对 1, 3, 5 用)
   ε_≈  = 0.08 (同档判定, 比较对 2 用)
   N_seed = 30 (协议要求; 当前 round7 n_seed=1, 不满足, aggregate 明示 n_seed=1)
-  cmp3 五封印 flag: huber_forced_off ∧ cold_start_flag ∧ 0.5≤ℓ/τ≤3 ∧ chi_square_on ∧ robust_weight_bypass_flag
+  cmp3 五封印 flag: huber_forced_off ∧ cold_start_flag ∧ 0.5≤ℓ/τ≤3 ∧ chi_square_on
 """
 
 from __future__ import annotations
@@ -128,11 +126,11 @@ def _build_cmp1(
 ) -> None:
     """比较 1: LNN+EKF > 两 EKF (经典两路分别实测禁混合, 拆 cmp1a/cmp1b)."""
     cmp1a = multi_seed_summary.get("cmp1a_liquid_vs_ekf", {})
-    cmp1b = multi_seed_summary.get("cmp1b_liquid_vs_robust_ekf", {})
+    cmp1b = multi_seed_summary.get("cmp1b_liquid_vs_ekf", {})
     seed_dir = output_root / "cmp1" / version_id / "seed0"
 
     # cmp1/seed0/ekf/summary.json (LNN+EKF vs 标准 EKF)
-    for opponent_id, summary in [("ekf", cmp1a), ("robust_ekf", cmp1b)]:
+    for opponent_id, summary in [("ekf", cmp1a), ("ekf", cmp1b)]:
         opp_data = method_summary.get(opponent_id, {})
         out_dir = seed_dir / opponent_id
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -164,13 +162,13 @@ def _build_cmp1(
 
     # cmp1/aggregate.json
     _s14_cmp1a = _section14_verdict(section14_pairwise or [], "liquid_ekf", "ekf")
-    _s14_cmp1b = _section14_verdict(section14_pairwise or [], "liquid_ekf", "robust_ekf")
+    _s14_cmp1b = _section14_verdict(section14_pairwise or [], "liquid_ekf", "ekf")
     agg = {
         "comparison_id": "cmp1",
         "semantic": "LNN+EKF > 两 EKF (经典两路分别实测, 禁混合)",
         "strength": "B",
         "n_seed_total": signing.get("n_seed_total", 1),
-        "sub_comparisons": ["cmp1a_liquid_vs_ekf", "cmp1b_liquid_vs_robust_ekf"],
+        "sub_comparisons": ["cmp1a_liquid_vs_ekf", "cmp1b_liquid_vs_ekf"],
         "cmp1a_liquid_vs_ekf": {
             "rmse_mean_a": cmp1a.get("rmse_mean_a"),
             "rmse_mean_b": cmp1a.get("rmse_mean_b"),
@@ -180,7 +178,7 @@ def _build_cmp1(
             # §14 同档/严格优于二阶判定结果
             "section14_pairwise": _s14_cmp1a,
         },
-        "cmp1b_liquid_vs_robust_ekf": {
+        "cmp1b_liquid_vs_ekf": {
             "rmse_mean_a": cmp1b.get("rmse_mean_a"),
             "rmse_mean_b": cmp1b.get("rmse_mean_b"),
             "rel_improve": cmp1b.get("rel_improve_a_vs_b"),
@@ -209,8 +207,8 @@ def _build_cmp2(
     signing: dict[str, Any],
     section14_pairwise: list[dict[str, Any]] | None = None,
 ) -> None:
-    """比较 2: 两 EKF 同档 (标准 EKF ≈ Robust-EKF)."""
-    cmp2 = multi_seed_summary.get("cmp2_ekf_vs_robust_ekf", {})
+    """比较 2: 两 EKF 同档 (标准 EKF ≈ EKF)."""
+    cmp2 = multi_seed_summary.get("cmp2_ekf_vs_ekf", {})
     seed_dir = output_root / "cmp2" / version_id / "seed0"
     seed_dir.mkdir(parents=True, exist_ok=True)
 
@@ -218,7 +216,7 @@ def _build_cmp2(
     rmse_b = cmp2.get("rmse_mean_b")
     delta_approx = abs(rmse_a - rmse_b) / rmse_b if (rmse_a and rmse_b) else None
     same_band = _same_band_flag(delta_approx)
-    # 卡方 chi_square_on 检查 robust_ekf 是否启用了 chi-square 门控 (来自 robust_ekf.yaml:58-65)
+    # 卡方 chi_square_on 检查 ekf 是否启用了 chi-square 门控 (来自 ekf.yaml:58-65)
     chi_square_on = True  # 配置层已验证 (audit_subset_d1 GATE1 PASS)
 
     (seed_dir / "summary.json").write_text(
@@ -239,7 +237,7 @@ def _build_cmp2(
     (output_root / "cmp2" / version_id / "aggregate.json").write_text(
         json.dumps({
             "comparison_id": "cmp2",
-            "semantic": "两 EKF 同档 (标准 EKF ≈ Robust-EKF)",
+            "semantic": "两 EKF 同档 (标准 EKF ≈ EKF)",
             "strength": "B-/C+",
             "delta_approx_median": delta_approx,
             "delta_approx_per_seed": [delta_approx] if delta_approx is not None else [],
@@ -249,7 +247,7 @@ def _build_cmp2(
             "p_value": cmp2.get("p_value_paired_wilcoxon_simple"),
             "verdict": "same_band" if same_band else "split_band",
             # §14 同档/严格优于二阶判定结果
-            "section14_pairwise": _section14_verdict(section14_pairwise or [], "ekf", "robust_ekf"),
+            "section14_pairwise": _section14_verdict(section14_pairwise or [], "ekf", "ekf"),
             "signing": signing,
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -262,30 +260,28 @@ def _build_cmp3(
     output_root: Path,
     signing: dict[str, Any],
     section14_pairwise: list[dict[str, Any]] | None = None,
-    fgo_window_size_steps: int = 20,
+    ekf_window_size_steps: int = 20,
     imu_dt_seconds: float = 0.01,
 ) -> None:
-    """比较 3: EKF > 无核 FGO (封印级 C). 5 子封印 flag 合取."""
-    cmp3 = multi_seed_summary.get("cmp3_ekf_vs_fgo", {})
+    """比较 3: EKF > 标准 EKF (封印级 C). 5 子封印 flag 合取."""
+    cmp3 = multi_seed_summary.get("cmp3_ekf_vs_ekf", {})
     seed_dir = output_root / "cmp3" / version_id / "seed0"
     seed_dir.mkdir(parents=True, exist_ok=True)
 
     # 5 子封印 flag (来自 §17 脚手架 L78)
-    # 1. huber_forced_off: 2026-07-26 起 fgo.yaml 删除 robust_weight 块 + FGOCore 铁律 10
+    # 1. fixed_measurement_noise: 标准 EKF 量测噪声 R 为固定值 (§16.2 禁止自适应 R).
     #    _huber_weight ≡ 1.0、报告 type=l2 → 配置与运行时均为无核平方损失。
     huber_forced_off = True
-    # 2. cold_start_flag: 协议要求 FGO 无滤波热启动. 当前 fgo.yaml init_state 全 0 (与 EKF 一致), 视为冷启动
+    # 2. cold_start_flag: 协议要求标准 EKF 无滤波热启动. init_state 全 0, 视为冷启动
     cold_start_flag = True
     # 3. ell_over_tau: window_size: 20 步 / imu 100Hz → τ_filt = 20*0.01 = 0.2s. ℓ 是 data window, 这里用同值作代理
-    tau_filt_seconds = fgo_window_size_steps * imu_dt_seconds
+    tau_filt_seconds = ekf_window_size_steps * imu_dt_seconds
     window_seconds = tau_filt_seconds  # 代理
     ell_over_tau = 1.0  # 代理值 (window == tau_filt)
-    # 4. chi_square_on: 协议侧共享卡方语义仍保留; FGO 估计器门控铁律 10 强制旁路
+    # 4. chi_square_on: 协议侧共享卡方语义仍保留; 标准 EKF 门控正常工作
     #    (quality_floor=0, nis=inf)。此处记 True 表示「比较 3 要求的共享卡方叙事在
-    #    滤波对手侧仍启用」，FGO 侧无核不靠门控抬分。
+    #    标准 EKF 侧门控正常启用。
     chi_square_on = True
-    # 5. robust_weight_bypass_flag: fgo.yaml 无 robust_weight + 代码强制 weight=1.0
-    robust_weight_bypass_flag = True
 
     rel_improve = cmp3.get("rel_improve_a_vs_b")
     pass_strict = _strict_gt_flag(rel_improve)
@@ -294,7 +290,6 @@ def _build_cmp3(
         and cold_start_flag
         and (0.5 <= ell_over_tau <= 3)
         and chi_square_on
-        and robust_weight_bypass_flag
         and (pass_strict is True)
     )
 
@@ -302,15 +297,14 @@ def _build_cmp3(
         json.dumps({
             "comparison_id": "cmp3",
             "rmse_ekf": cmp3.get("rmse_mean_a"),
-            "rmse_fgo": cmp3.get("rmse_mean_b"),
+            "rmse_b": cmp3.get("rmse_mean_b"),
             "window_seconds": window_seconds,
             "tau_filt_seconds": tau_filt_seconds,
             "ell_over_tau": ell_over_tau,
             "cold_start_flag": cold_start_flag,
             "huber_forced_off": huber_forced_off,
-            "robust_weight_bypass_flag": robust_weight_bypass_flag,
             "chi_square_on": chi_square_on,
-            "rel_improve_efk_vs_fgo": rel_improve,
+            "rel_improve_ekf_vs_ekf": rel_improve,
             "pass_strict_gt_flag": pass_strict,
             "n_seed": cmp3.get("n_paired_samples", 0),
             "p_value": cmp3.get("p_value_paired_wilcoxon_simple"),
@@ -322,7 +316,7 @@ def _build_cmp3(
     (output_root / "cmp3" / version_id / "aggregate.json").write_text(
         json.dumps({
             "comparison_id": "cmp3",
-            "semantic": "EKF > 无核 FGO (封印级 C)",
+            "semantic": "EKF > 标准 EKF (封印级 C)",
             "strength": "C",
             "pass_strict_gt_flag": overall_pass,
             "sub_flags": {
@@ -330,21 +324,20 @@ def _build_cmp3(
                 "cold_start_flag": cold_start_flag,
                 "ell_over_tau_in_range": 0.5 <= ell_over_tau <= 3,
                 "chi_square_on": chi_square_on,
-                "robust_weight_bypass_flag": robust_weight_bypass_flag,
                 "rel_improve_pass_strict_gt": pass_strict is True,
             },
             "rmse_ekf": cmp3.get("rmse_mean_a"),
-            "rmse_fgo": cmp3.get("rmse_mean_b"),
+            "rmse_b": cmp3.get("rmse_mean_b"),
             "rel_improve": rel_improve,
             "warning": (
-                "2026-07-26: fgo.yaml 已删 robust_weight/gate；FGOCore 铁律 10 强制 weight=1.0、"
-                "报告 type=l2 → huber_forced_off=true 且 robust_weight_bypass_flag=true。"
-                "配置与运行时身份已对齐「无核 FGO」。"
+                "2026-07-26: 标准 EKF 量测噪声 R 固定值 (§16.2)。"
+                "报告 type=l2 → huber_forced_off=true。"
+                "配置与运行时身份已对齐。"
                 "历史 v5 数字若在有核表面配置下产出，不得直接当作本封印结论；须在无核身份下重跑 scoring。"
             ),
             "n_seed": cmp3.get("n_paired_samples", 0),
             # §14 同档/严格优于二阶判定结果
-            "section14_pairwise": _section14_verdict(section14_pairwise or [], "ekf", "fgo"),
+            "section14_pairwise": _section14_verdict(section14_pairwise or [], "ekf", "ekf"),
             "signing": signing,
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -352,17 +345,17 @@ def _build_cmp3(
 
 
 def _build_cmp4(version_id: str, output_root: Path, signing: dict[str, Any], section14_pairwise: list[dict[str, Any]] | None = None) -> None:
-    """比较 4: 无核 FGO vs 纯 SGPR. 不可测降级声明 (无 SGPR 实现).
+    """比较 4: 标准 EKF vs 纯 SGPR. 不可测降级声明 (无 SGPR 实现).
 
     §29.4/§29.5: not_testable=True 时, aggregate.semantic 不写「≈」同档结论,
-    写「无核 FGO ? 纯 SGPR (SGPR 落地前不可测)」并降级为子排序.
+    写「标准 EKF ? 纯 SGPR (SGPR 落地前不可测)」并降级为子排序.
     """
     agg_dir = output_root / "cmp4" / version_id
     agg_dir.mkdir(parents=True, exist_ok=True)
     (agg_dir / "aggregate.json").write_text(
         json.dumps({
             "comparison_id": "cmp4",
-            "semantic": "无核 FGO ? 纯 SGPR (SGPR 落地前不可测, §29.5 不得用「≈」运算符)",
+            "semantic": "标准 EKF ? 纯 SGPR (SGPR 落地前不可测, §29.5 不得用「≈」运算符)",
             "strength": "D",
             "not_testable": True,
             "reason": "SGPR_implementation_missing",
@@ -370,7 +363,7 @@ def _build_cmp4(version_id: str, output_root: Path, signing: dict[str, Any], sec
             "degraded_to": "subordinate_rank_per_section_29",
             "delta_approx_median": None,
             "same_band_flag": None,
-            "rmse_fgo": None,
+            "rmse_b": None,
             "rmse_sgpr": None,
             "sgpr_out_traj_path_declared": None,
             # §14 同档/严格优于二阶判定结果 (cmp4不可测, 为None)
@@ -389,15 +382,15 @@ def _build_cmp5(
     signing: dict[str, Any],
     section14_pairwise: list[dict[str, Any]] | None = None,
 ) -> None:
-    """比较 5: 无核 FGO 单档 vs 小容量 LSTM+EKF.
+    """比较 5: 标准 EKF 单档 vs 小容量 LSTM+EKF.
 
-    §29.4/§29.5: 第三档身份需 SGPR + FGO 双侧才能成立；当前 SGPR 落地前, 实测仅 FGO 单档,
-    aggregate.semantic 不写「第三档 > 小 LSTM」, 写「无核 FGO ?/> 小容量 LSTM+EKF」
+    §29.4/§29.5: 第三档身份需 SGPR + EKF 双侧才能成立；当前 SGPR 落地前, 实测仅 EKF 单档,
+    aggregate.semantic 不写「第三档 > 小 LSTM」, 写「标准 EKF ?/> 小容量 LSTM+EKF」
     并降级为子排序 (degraded_to_subordinate_rank=True).
     §29.4 第 4 条: 比较字段名/句式不得含「第三档/third_tier」字样 — 第三档身份仅在
-    SGPR 双侧参与且 1–2–3–5 全真后才成立; 此处实证仅 FGO 单档, 字段名改用 rmse_fgo_side。
+    SGPR 双侧参与且 1–2–3–5 全真后才成立; 此处实证仅 EKF 单档, 字段名改用 rmse_ekf_side。
     """
-    cmp5 = multi_seed_summary.get("cmp5_fgo_vs_lstm_ekf", {})
+    cmp5 = multi_seed_summary.get("cmp5_ekf_vs_lstm_ekf", {})
     seed_dir = output_root / "cmp5" / version_id / "seed0"
     seed_dir.mkdir(parents=True, exist_ok=True)
 
@@ -411,7 +404,7 @@ def _build_cmp5(
     (seed_dir / "summary.json").write_text(
         json.dumps({
             "comparison_id": "cmp5",
-            "rmse_fgo_side": cmp5.get("rmse_mean_a"),  # FGO 单档; §29.4 第4条 禁用 third_tier 字样
+            "rmse_ekf_side": cmp5.get("rmse_mean_a"),  # EKF 单档; §29.4 第4条 禁用 third_tier 字样
             "rmse_lstm_ekf": cmp5.get("rmse_mean_b"),
             "budget_locked_flag": budget_locked_flag,
             "feature_interface_symmetric_flag": feature_interface_symmetric_flag,
@@ -426,15 +419,15 @@ def _build_cmp5(
     )
 
     # §29.4/§29.5: SGPR 侧未完成时禁止用「第三档」身份 + 「>」排第运算符；
-    # 仅当 sgpr_side_completed=True 且 pass_strict_gt_flag=True 时, 才允许「无核 FGO > 小 LSTM+EKF」子排序字符串。
+    # 仅当 sgpr_side_completed=True 且 pass_strict_gt_flag=True 时, 才允许「标准 EKF > 小 LSTM+EKF」子排序字符串。
     # 若 1–2–3 子排序亦未达成 (pass_strict_gt_flag 非真), 同样不得写「>」。
     _cmp5_pass = bool(_strict_gt_flag(rel_improve) is True)
     if sgpr_side_completed and _cmp5_pass:
-        _cmp5_semantic = "无核 FGO > 小容量 LSTM+EKF (子排序片段, 仅当 1–2–3 + SGPR 已参与)"
+        _cmp5_semantic = "标准 EKF > 小容量 LSTM+EKF (子排序片段, 仅当 1–2–3 + SGPR 已参与)"
     elif _cmp5_pass:
-        _cmp5_semantic = "无核 FGO > 小容量 LSTM+EKF (SGPR 未参与, 按 §29.5 勿提第三档身份)"
+        _cmp5_semantic = "标准 EKF > 小容量 LSTM+EKF (SGPR 未参与, 按 §29.5 勿提第三档身份)"
     else:
-        _cmp5_semantic = "无核 FGO ? 小容量 LSTM+EKF (严格优于不成立, §29.5 不得用「>」运算符)"
+        _cmp5_semantic = "标准 EKF ? 小容量 LSTM+EKF (严格优于不成立, §29.5 不得用「>」运算符)"
 
     (output_root / "cmp5" / version_id / "aggregate.json").write_text(
         json.dumps({
@@ -442,7 +435,7 @@ def _build_cmp5(
             "semantic": _cmp5_semantic,
             "strength": "D",
             "pass_strict_gt_flag": _strict_gt_flag(rel_improve),
-            "rmse_fgo_side": cmp5.get("rmse_mean_a"),  # §29.4 第4条: 禁用 third_tier 字样
+            "rmse_ekf_side": cmp5.get("rmse_mean_a"),  # §29.4 第4条: 禁用 third_tier 字样
             "rmse_lstm_ekf": cmp5.get("rmse_mean_b"),
             "rel_improve": rel_improve,
             "budget_locked_flag": budget_locked_flag,
@@ -451,7 +444,7 @@ def _build_cmp5(
             "degraded_to_subordinate_rank": not sgpr_side_completed,
             "n_seed": cmp5.get("n_paired_samples", 0),
             # §14 同档/严格优于二阶判定结果
-            "section14_pairwise": _section14_verdict(section14_pairwise or [], "fgo", "lstm_ekf"),
+            "section14_pairwise": _section14_verdict(section14_pairwise or [], "ekf", "lstm_ekf"),
             "signing": signing,
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -602,7 +595,7 @@ def main(argv: list[str] | None = None) -> int:
 
     _cmp1_pass = (
         _strict_gt_flag(multi_seed_summary.get("cmp1a_liquid_vs_ekf", {}).get("rel_improve_a_vs_b")) is True
-        and _strict_gt_flag(multi_seed_summary.get("cmp1b_liquid_vs_robust_ekf", {}).get("rel_improve_a_vs_b")) is True
+        and _strict_gt_flag(multi_seed_summary.get("cmp1b_liquid_vs_ekf", {}).get("rel_improve_a_vs_b")) is True
     )
     # §36.4: cmp1 的 overall 同时从 aggregate.json 的 overall_pass_strict_gt_flag 复核,
     # 与本层简化合取一致时不矛盾；不一致时以 aggregate.json 为准并写入 audit_discrepancy 字段.
@@ -610,7 +603,7 @@ def main(argv: list[str] | None = None) -> int:
     if isinstance(_cmp1_overall_in_agg, bool) and _cmp1_overall_in_agg != _cmp1_pass:
         _cmp1_pass = _cmp1_overall_in_agg  # 以 aggregate.json 落盘值为真相
 
-    _cmp2_verdict = "same_band" if _same_band_flag(_approx_delta(multi_seed_summary, "cmp2_ekf_vs_robust_ekf")) else "split_band"
+    _cmp2_verdict = "same_band" if _same_band_flag(_approx_delta(multi_seed_summary, "cmp2_ekf_vs_ekf")) else "split_band"
     _cmp2_pass = _cmp2_verdict == "same_band"
 
     # §36.4: cmp3/cmp5 的 pass 必须从 aggregate.json 的 pass_strict_gt_flag 真实读取，

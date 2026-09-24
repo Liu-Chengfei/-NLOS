@@ -25,11 +25,9 @@ frozen_axes:
 
 # 参与比较的方法。# 这里保留传统和学习式方法，便于看恢复机制差异。
 # ekf：标准 EKF，无模态恢复机制，模态缺失时直接用剩余观测。
-# robust_ekf：鲁棒 EKF，通过异常值抑制部分适应模态变化。
-# fgo：因子图优化，可通过因子激活/停用适应模态变化。
 # lstm_ekf：LSTM 增强 EKF，学习式方法可能学到模态恢复模式。
 # liquid_ekf：液态网络增强 EKF，核心方法，期望在模态恢复场景下表现最好。
-methods: [ekf, robust_ekf, fgo, lstm_ekf, liquid_ekf]  # 全方法集合参与对照。
+methods: [ekf, lstm_ekf, liquid_ekf]  # 全方法集合参与对照。
 
 # quick/full 模式覆盖项。# 这里控制最小和完整两种规模下的工作量。
 mode_overrides:

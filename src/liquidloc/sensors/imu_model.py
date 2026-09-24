@@ -20,10 +20,10 @@
     - 兼容 numpy 标量（np.float64 等），因为 isinstance(np.float64(1.0), Number) 为 True。
     - _as_imu_event_dict 对 dict 输入返回原引用（不做防御性拷贝），调用者不应修改返回值。
 
-【前提指导 §5.1 — 五方法同一 IMU 模型】
-本模块是所有融合方法（ekf / robust_ekf / fgo / lstm_ekf / liquid_ekf）拿到 IMU 测量的唯一入口，
-因此 ``ax``/``ay``/``gz`` 的语义、量纲、坐标系约定必须被全员共享，否则五方法做的是不同物理叙事。
-其中 ekf / robust_ekf / fgo 由 estimator_factory 直接构造；lstm_ekf / liquid_ekf 复用 EKF 估计器外壳
+【前提指导 §5.1 — 四方法同一 IMU 模型】
+本模块是所有融合方法（ekf / lstm_ekf / liquid_ekf）拿到 IMU 测量的唯一入口，
+因此 ``ax``/``ay``/``gz`` 的语义、量纲、坐标系约定必须被全员共享，否则三方法做的是不同物理叙事。
+其中 ekf 由 estimator_factory 直接构造；lstm_ekf / liquid_ekf 复用 EKF 估计器外壳
 并在其上叠加测量侧 NN 控制路径（不修改 IMU 比力/角速度叙事）。此入口对应 estimator_factory._SUPPORTED
 与 core_pipeline._NEURAL_METHODS 的并集，未列出的 lnn_ekf / tf_ekf / transformer_ekf 在当前实现中
 不存在（任何旧文档里出现这些名字均为遗留表述，以本节为准）。
@@ -40,7 +40,7 @@
       ``imu_payload.missing_mask`` 来跳过缺测分量的偏置补偿与过程噪声，调用者绕过
       ``extract_imu_measurement`` 直接取 ``missing_mask``，保持单入口约束。
 
-这一约定使所有五方法在重力处理（§5.1：减去/保留在模型中全员同一）上达成一致——
+这一约定使所有四方法在重力处理（§5.1：减去/保留在模型中全员同一）上达成一致——
 **没有方法做重力补偿，也没有方法把重力塞进 ax/ay**。
 """
 

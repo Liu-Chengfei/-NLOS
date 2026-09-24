@@ -4,13 +4,11 @@
 ----
 把外部传入的估计器名字和配置，转换成真正可用的估计器实例。
 作为上层 pipeline、脚本和测试的统一入口，避免调用方直接关心
-EKF、鲁棒 EKF 和 FGO 的具体类名。
+EKF 的具体类名。
 
 上游依赖
 --------
 - ``liquidloc.estimators.ekf_core.EKFCore``          — 标准 EKF 实现
-- ``liquidloc.estimators.robust_ekf_core.RobustEKFCore`` — 鲁棒 EKF 实现
-- ``liquidloc.estimators.fgo_core.FGOCore``           — 滑窗 FGO 实现
 - ``liquidloc.estimators.state_definition.state_items`` — 状态顺序定义
 
 下游调用者
@@ -34,12 +32,9 @@ from collections.abc import Mapping  # 用来判断配置是不是映射。
 from typing import Any  # 用于标注任意类型参数。
 
 from liquidloc.estimators.ekf_core import EKFCore  # 标准 EKF 的具体实现。
-from liquidloc.estimators.fgo_core import FGOCore  # 滑窗 FGO 的具体实现。
-from liquidloc.estimators.robust_ekf_core import RobustEKFCore  # 鲁棒 EKF 的具体实现。
 from liquidloc.estimators.state_definition import state_items  # 状态顺序定义，供初始状态校验使用。
 from liquidloc.common.constants import (  # D9 单源常量：估计器名、模态名、VIO 噪声键方案与方案名，禁止本地重复字面量。
     ESTIMATOR_NAME_EKF,
-    ESTIMATOR_NAME_ROBUST_EKF,
     ESTIMATOR_NAME_SGPR,
     MODALITY_VIO,
     VIO_NOISE_SCHEME_PER_AXIS,
@@ -48,11 +43,10 @@ from liquidloc.common.constants import (  # D9 单源常量：估计器名、模
 )
 from liquidloc.common.validation import coerce_finite_scalar, is_bool_like, is_integer, is_real  # 集中判断 bool / np.bool_ / 整数 / 实数类型，以及有限浮点转换。
 from liquidloc.interfaces.estimator_api import EstimatorAPI  # 估计器接口协议，作为 create_estimator 的返回类型注解。
-from liquidloc.protocol.task_contract import get_sensor_roles, get_vio_update_contract  # 从协议层读取传感器角色和 VIO 更新合同，用于校验量测噪声配置。
+from liquidloc.protocol.task_contract import get_sensor_roles, get_vio_update_contract  # 从协议层读取传感器角色和 VIO 更新合同，用于校验量测噪声配置.
 
 
-_SUPPORTED = {ESTIMATOR_NAME_EKF, ESTIMATOR_NAME_ROBUST_EKF}  # §16.1 封闭对手集：主表对手仅承认标准EKF、Robust-EKF（+NN 外壳方法由 model_factory 派发）。SGPR 当前尚未实现主体，不在封闭集内——调用 sgpr 会在工厂内主动 raise NotImplementedError（见下），防止误用占位。FGO 同样不在封闭集：FGOCore 本体存在（tests/estimators/test_fgo_core.py 直接测试），但不作为 create_estimator 可创建的主表对手身份。
-_ROBUST_EKF_REQUIRED_KEYS = ("robust_weight", "gate")  # 鲁棒 EKF 专属必填配置键，与 configs/models/robust_ekf.yaml 对齐。
+_SUPPORTED = {ESTIMATOR_NAME_EKF}  # §16.1 封闭对手集：主表对手仅承认标准EKF（+NN 外壳方法由 model_factory 派发）。SGPR 当前尚未实现主体，不在封闭集内——调用 sgpr 会在工厂内主动 raise NotImplementedError（见下），防止误用占位。
 # 过程噪声必须包含的键（前提指导 §1.1 主表 8 维 + §2.3 紧耦合扩维，全体同增至 10 维状态分组）。
 # 与 predict_step._PROCESS_NOISE_KEYS 严格对齐：uwb_clock_bias / vio_scale 必须显式提供，
 # 否则协方差预测时这两维不增长，更新步卡尔曼增益接近 0，等价于"未在线估"，违反 §2.3 钟差态前提。
@@ -60,9 +54,9 @@ _PROCESS_NOISE_KEYS = (
     "pos", "vel", "yaw", "accel_bias", "gyro_bias",
     "uwb_clock_bias", "vio_scale",
 )
-# §5.1 偏置随机游走强度全员同一护栏（五方法实现：ekf / robust_ekf / fgo / lstm_ekf / liquid_ekf）：
-# 任何 stagger 的 process_noise 值会摧毁"同一预测模型"前提，静默让 NN+EKF/Robust/FGO
-# 的偏置/钟差/尺度辨识变成"不同物理叙事"。这里钉死与 configs/models/{ekf,robust_ekf,fgo}.yaml
+# §5.1 偏置随机游走强度全员同一护栏（ekf / lstm_ekf / liquid_ekf）：
+# 任何 stagger 的 process_noise 值会摧毁"同一预测模型"前提，静默让 NN+EKF
+# 的偏置/钟差/尺度辨识变成"不同物理叙事"。这里钉死与 configs/models/ekf.yaml
 # 完全一致的值，_validate_process_noise 用它做数值等值断言；任何 YAML 漂移立即抛 ValueError，
 # 避免依赖外部跨-YAML 比对工具或人工复查。
 _CANONICAL_PROCESS_NOISE = {
@@ -121,7 +115,7 @@ def _require_mapping(value: Any, *, name: str) -> dict[str, Any]:  # 把输入�
     """
     if not isinstance(value, Mapping):  # 非映射说明调用方传错结构。
         raise TypeError(f"{name} must be a mapping, got {type(value).__name__}")
-    return dict(value)  # 复制一份，避免外部继续修改原对象。
+    return dict(value)  # 复制一份，避免外部继续修改原对象.
 
 
 def _require_numeric_scalar(value: Any, *, name: str, allow_negative: bool = True, inclusive: bool = True) -> float:  # 把输入规整为浮点数，并拒绝布尔值、非数字和复数。
@@ -276,7 +270,7 @@ def _validate_process_noise(process_noise_cfg: Any) -> None:  # 校验过程噪�
             raise ValueError(
                 f"estimator_cfg.process_noise.{noise_key}={normalized_value!r} violates §5.1 "
                 f"全员同一协议基线（canonical={canonical_value!r}）；"
-                f"五方法（ekf / robust_ekf / fgo / lstm_ekf / liquid_ekf）的 process_noise "
+                f"三方法（ekf / lstm_ekf / liquid_ekf）的 process_noise "
                 f"必须严格一致，详见 _CANONICAL_PROCESS_NOISE 注释。"
             )
 
@@ -432,33 +426,6 @@ def _validate_required_keys(cfg: dict[str, Any], *, estimator_name: str, require
         )
 
 
-def _assert_fixed_robust_kernel(robust_weight_cfg: Mapping[str, Any], estimator_name: str) -> None:  # §16.2 强制 Robust 核为固定 Huber，禁止可学习核。
-    """验证 Robust 核类型为固定 Huber，禁止可学习/自适应核。
-
-    §16.2「Robust 可学习核」退出名次语言：核类型必须为固定 Huber，
-    禁止 learnable/adaptive 核。
-
-    参数
-    ----------
-    robust_weight_cfg : Mapping[str, Any]
-        鲁棒权重配置映射。
-    estimator_name : str
-        估计器名字，用于错误消息。
-
-    异常
-    ------
-    ValueError
-        当核类型不是固定 Huber 时抛出。
-    """
-    kernel_type = robust_weight_cfg.get("type")
-    if kernel_type is not None and str(kernel_type).lower() != "huber":
-        raise ValueError(
-            f"§16.2 Robust 可学习核退出名次语言：{estimator_name!r} 的 "
-            f"robust_weight.type={kernel_type!r} 不是固定 Huber；"
-            f"可学习/自适应核违反 §16.2「标准EKF 自适应 R；Robust 可学习核」。"
-        )
-
-
 def _assert_fixed_measurement_noise(cfg: dict[str, Any], estimator_name: str) -> None:  # §16.2 强制标准EKF R为固定值，禁止自适应R。
     """验证标准 EKF 的量测噪声 R 为固定值，禁止自适应/可学习 R。
 
@@ -503,7 +470,7 @@ def _validate_estimator_cfg(estimator_name: str, cfg: dict[str, Any]) -> None:  
     ValueError
         当缺少通用必填配置键（由 ``_validate_required_keys`` 抛出）、缺少过程噪声/量测噪声模态键、
         ``init_state`` 缺少或多余状态键（由 ``_validate_init_state`` 抛出）、
-        或 ``fgo`` 的 ``window_size`` 不是正整数时抛出（值合同违例）。
+        或配置字段类型违例时抛出（值合同违例）。
     TypeError
         当配置值类型不正确时抛出。
     """
@@ -515,12 +482,6 @@ def _validate_estimator_cfg(estimator_name: str, cfg: dict[str, Any]) -> None:  
 
     if estimator_name == ESTIMATOR_NAME_EKF:  # 标准 EKF 量测噪声 R 必须为固定值。
         _assert_fixed_measurement_noise(cfg, estimator_name)  # §16.2 禁止自适应 R。
-    elif estimator_name == ESTIMATOR_NAME_ROBUST_EKF:  # 鲁棒 EKF 需要额外的鲁棒和门控配置。D9：引用单源常量，禁止硬编码字符串。
-        _validate_required_keys(cfg, estimator_name=estimator_name, required_keys=_ROBUST_EKF_REQUIRED_KEYS)  # 检查额外必填项。
-        _require_mapping(cfg["robust_weight"], name="estimator_cfg.robust_weight")  # 鲁棒权重必须是映射，用于 M 估计的权重函数配置。
-        _require_mapping(cfg["gate"], name="estimator_cfg.gate")  # gate 也必须是映射，用于新息门控阈值配置。
-        # §16.2「Robust 可学习核」退出名次语言：核类型必须为固定 Huber，禁止 learnable/adaptive 核。
-        _assert_fixed_robust_kernel(cfg["robust_weight"], estimator_name)
 
 
 def create_estimator(estimator_name: str, estimator_cfg: Mapping[str, Any] | None) -> EstimatorAPI:  # 根据估计器名字和配置创建对应实例。
@@ -530,14 +491,14 @@ def create_estimator(estimator_name: str, estimator_cfg: Mapping[str, Any] | Non
     ----------
     estimator_name : str
         估计器名字，必须在 ``_SUPPORTED`` 集合内
-        （``ESTIMATOR_NAME_EKF`` / ``ESTIMATOR_NAME_ROBUST_EKF``）。
+        （``ESTIMATOR_NAME_EKF``）。
     estimator_cfg : Mapping[str, Any] | None
         估计器配置映射，若为 ``None`` 则使用空字典。
 
     返回
     -------
     EstimatorAPI
-        对应估计器的实例（``EKFCore`` / ``RobustEKFCore``，均为 ``EstimatorAPI`` 子类）。
+        对应估计器的实例（``EKFCore`` 为 ``EstimatorAPI`` 子类）。
 
     异常
     ------
@@ -573,6 +534,4 @@ def create_estimator(estimator_name: str, estimator_cfg: Mapping[str, Any] | Non
     _validate_estimator_cfg(estimator_name, cfg)  # 先校验再实例化，确保配置完整且类型正确。
     if estimator_name == ESTIMATOR_NAME_EKF:  # 这里返回标准 EKF 实现。D9：引用单源常量，禁止硬编码字符串。
         return EKFCore(cfg)
-    elif estimator_name == ESTIMATOR_NAME_ROBUST_EKF:  # 这里返回鲁棒 EKF 实现，支持 M 估计和新息门控。D9：引用单源常量。
-        return RobustEKFCore(cfg)
-    raise ValueError(f"Unreachable: estimator {estimator_name!r} not dispatched")  # 防御性兜底：逻辑上不可达，防止 _SUPPORTED 集合被绕过后静默返回 None。
+    raise ValueError(f"Unreachable: estimator {estimator_name!r} not dispatched")  # 防御性兜底：逻辑上不可达，防止 _SUPPORTED 集合被绕过后静默返回 None.

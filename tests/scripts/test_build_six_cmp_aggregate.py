@@ -51,7 +51,7 @@ def _make_minimal_statistics_table(
             "p95": 1.0,
             "failure_rate": 0.05,
         },
-        "robust_ekf": {
+        "ekf": {
             "n_seed": 1,
             "rmse_mean": 0.55,
             "p95": 1.05,
@@ -198,7 +198,7 @@ def test_section9_n_seed_check_in_aggregate_json(tmp_path: Path):
                 "rmse_mean_a": 0.5,
                 "rmse_mean_b": 0.525,
             },
-            "cmp1b_liquid_vs_robust_ekf": {
+            "cmp1b_liquid_vs_ekf": {
                 "rel_improve_a_vs_b": -0.04,
                 "rmse_mean_a": 0.5,
                 "rmse_mean_b": 0.52,
@@ -448,10 +448,9 @@ def test_six_cmp_aggregate_verdict_section36_4_discipline(tmp_path: Path):
     payload = _make_minimal_statistics_table(
         method_summary={
             "ekf": {"n_seed": 1, "rmse_mean": 0.5},
-            "robust_ekf": {"n_seed": 1, "rmse_mean": 0.55},
+            "ekf": {"n_seed": 1, "rmse_mean": 0.55},
             "liquid_ekf": {"n_seed": 1, "rmse_mean": 0.40},
-            "fgo": {"n_seed": 1, "rmse_mean": 0.65},
-            "lstm_ekf": {"n_seed": 1, "rmse_mean": 0.55},
+                        "lstm_ekf": {"n_seed": 1, "rmse_mean": 0.55},
         },
         multi_seed_summary={
             "cmp1a_liquid_vs_ekf": {
@@ -459,12 +458,12 @@ def test_six_cmp_aggregate_verdict_section36_4_discipline(tmp_path: Path):
                 "rmse_mean_a": 0.40, "rmse_mean_b": 0.50,
                 "n_paired_samples": 1,
             },
-            "cmp1b_liquid_vs_robust_ekf": {
+            "cmp1b_liquid_vs_ekf": {
                 "rel_improve_a_vs_b": -0.25,
                 "rmse_mean_a": 0.40, "rmse_mean_b": 0.55,
                 "n_paired_samples": 1,
             },
-            "cmp2_ekf_vs_robust_ekf": {
+            "cmp2_ekf_vs_ekf": {
                 # rmse_a=0.50 / rmse_b=0.55 → delta=0.0909 → split_band (delta > 0.08)
                 # 这将走 no_total_order_testable_partial_pass 分支 (cmp2 失败).
                 # 修复本测试测「场景2 not_testable_no_strict_claim」, 不测场景1 全通过.
@@ -472,12 +471,12 @@ def test_six_cmp_aggregate_verdict_section36_4_discipline(tmp_path: Path):
                 "rmse_mean_a": 0.50, "rmse_mean_b": 0.55,
                 "n_paired_samples": 1,
             },
-            "cmp3_ekf_vs_fgo": {
+            "cmp3_ekf_vs_ekf": {
                 "rel_improve_a_vs_b": -0.10,
                 "rmse_mean_a": 0.50, "rmse_mean_b": 0.65,
                 "n_paired_samples": 1,
             },
-            "cmp5_fgo_vs_lstm_ekf": {
+            "cmp5_ekf_vs_lstm_ekf": {
                 "rel_improve_a_vs_b": -0.15,
                 "rmse_mean_a": 0.65, "rmse_mean_b": 0.80,
                 "n_paired_samples": 1,
@@ -514,7 +513,7 @@ def test_six_cmp_aggregate_verdict_section36_4_discipline(tmp_path: Path):
     # 本场景 cmp2 split_band (delta=0.0909 > 0.08), 故 cmp2 未通过,
     # 落入 no_total_order_testable_partial_pass 分支 (cmp1 真通过 + cmp2 失败 + cmp3/cmp5 真通过).
     # 但 cmp3/cmp5 pass_strict_gt_flag 来自 aggregate.json 真实读取:
-    #   cmp3 的 overall_pass 要求 huber/cold_start/ell/chi_square/robust_weight/pass_strict 全真,
+    #   cmp3 的 overall_pass 要求 huber/cold_start/ell/chi_square/pass_strict 全真,
     #   cmp3 rel_improve=-0.10 < -0.03 → pass_strict=True → cmp3 aggregate pass_strict_gt_flag=True
     #   cmp5 rel_improve=-0.15 < -0.03 → cmp5 aggregate pass_strict_gt_flag=True
     # 因此 verdict 应为 no_total_order_testable_partial_pass (cmp2 失败) 或 subordinate (cmp2 通过),
@@ -587,10 +586,9 @@ def test_six_cmp_aggregate_verdict_not_testable_when_agg_missing(tmp_path: Path)
     payload = _make_minimal_statistics_table(
         method_summary={
             "ekf": {"n_seed": 1, "rmse_mean": 0.5},
-            "robust_ekf": {"n_seed": 1, "rmse_mean": 0.55},
+            "ekf": {"n_seed": 1, "rmse_mean": 0.55},
             "liquid_ekf": {"n_seed": 1, "rmse_mean": 0.40},
-            "fgo": {"n_seed": 1, "rmse_mean": 0.65},
-            "lstm_ekf": {"n_seed": 1, "rmse_mean": 0.55},
+                        "lstm_ekf": {"n_seed": 1, "rmse_mean": 0.55},
         },
         multi_seed_summary={
             "cmp1a_liquid_vs_ekf": {
@@ -598,22 +596,22 @@ def test_six_cmp_aggregate_verdict_not_testable_when_agg_missing(tmp_path: Path)
                 "rmse_mean_a": 0.40, "rmse_mean_b": 0.50,
                 "n_paired_samples": 1,
             },
-            "cmp1b_liquid_vs_robust_ekf": {
+            "cmp1b_liquid_vs_ekf": {
                 "rel_improve_a_vs_b": -0.25,
                 "rmse_mean_a": 0.40, "rmse_mean_b": 0.55,
                 "n_paired_samples": 1,
             },
-            "cmp2_ekf_vs_robust_ekf": {
+            "cmp2_ekf_vs_ekf": {
                 "rel_improve_a_vs_b": -0.01,
                 "rmse_mean_a": 0.55, "rmse_mean_b": 0.55,  # delta=0 → same_band
                 "n_paired_samples": 1,
             },
             # cmp3/cmp5 缺 rel_improve_a_vs_b → aggregate pass_strict_gt_flag=None
-            "cmp3_ekf_vs_fgo": {
+            "cmp3_ekf_vs_ekf": {
                 "rmse_mean_a": 0.50, "rmse_mean_b": 0.65,
                 "n_paired_samples": 1,
             },
-            "cmp5_fgo_vs_lstm_ekf": {
+            "cmp5_ekf_vs_lstm_ekf": {
                 "rmse_mean_a": 0.65, "rmse_mean_b": 0.80,
                 "n_paired_samples": 1,
             },

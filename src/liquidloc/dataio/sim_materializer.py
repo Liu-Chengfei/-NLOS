@@ -322,7 +322,6 @@ class SimSequenceSpec:
     duration_s: float = 45.0
     workspace_span_m: float = 20.0
     envelope_profile: str = "main_table"  # main_table | smoke
-    allow_high_anchor_count: bool = False
 
     def __post_init__(self) -> None:
         # seq_id 作为输出子目录名，必须不含路径穿越字符（防止 ../ 逃逸 output_root）
@@ -399,11 +398,6 @@ class SimSequenceSpec:
             raise ValueError(
                 f"envelope_profile must be 'main_table' or 'smoke', got {self.envelope_profile!r}"
             )
-        if not is_bool_like(self.allow_high_anchor_count):
-            raise TypeError(
-                f"allow_high_anchor_count must be bool, got {type(self.allow_high_anchor_count).__name__}"
-            )
-        object.__setattr__(self, "allow_high_anchor_count", bool(self.allow_high_anchor_count))
         # v2 D-13: dt_imu_override / dt_uwb_override / dt_vio_override 校验.
         for field_name, field_value in (
             ("dt_imu_override", self.dt_imu_override),
@@ -691,8 +685,6 @@ def _build_default_sim_sequence_specs() -> tuple[SimSequenceSpec, ...]:
     lead_specs: list[SimSequenceSpec] = []
     for idx, (seq_id, base_id, dur, span) in enumerate(lead_meta):
         k_level = dict(k_pool[idx])["K"]
-        # 五轴档位协议 K 轴仅 K0/K1/K3，锚数全档固定 4——不再有"高锚数"档位。
-        high_k = False
         lead_specs.append(
             SimSequenceSpec(
                 seq_id,
@@ -705,7 +697,6 @@ def _build_default_sim_sequence_specs() -> tuple[SimSequenceSpec, ...]:
                 duration_s=float(dur),
                 workspace_span_m=float(span),
                 envelope_profile="main_table",
-                allow_high_anchor_count=high_k,
                 dt_imu_override=1/150,
                 dt_uwb_override=0.1,
                 dt_vio_override=0.1,
@@ -729,7 +720,6 @@ def _build_default_sim_sequence_specs() -> tuple[SimSequenceSpec, ...]:
                     duration_s=max(30.0, float(lead_spec.duration_s) + dur_delta),
                     workspace_span_m=float(lead_spec.workspace_span_m),
                     envelope_profile="main_table",
-                    allow_high_anchor_count=bool(lead_spec.allow_high_anchor_count),
                     dt_imu_override=lead_spec.dt_imu_override,
                     dt_uwb_override=lead_spec.dt_uwb_override,
                     dt_vio_override=lead_spec.dt_vio_override,
@@ -793,8 +783,6 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
     lead_specs: list[SimSequenceSpec] = []
     for idx, (seq_id, base_id, dur, span) in enumerate(lead_names):
         axes = axes_pool[idx % len(axes_pool)]
-        # 五轴档位协议 K 轴仅 K0/K1/K3，锚数全档固定 4——不再有高锚档位。
-        high_k = False
         dt = dt_pool[idx % len(dt_pool)]
         lead_specs.append(
             SimSequenceSpec(
@@ -811,7 +799,6 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
                 duration_s=float(dur),
                 workspace_span_m=float(span),
                 envelope_profile="main_table",
-                allow_high_anchor_count=high_k,
             )
         )
     sequence_specs = list(lead_specs)
@@ -838,7 +825,6 @@ def _build_sim_e9_only_compact_sequence_specs() -> tuple[SimSequenceSpec, ...]:
                     duration_s=float(lead_spec.duration_s) + dur_delta,  # 120 + {2,4,6,8,10,12} = 122..132s; 所有变体均 ≥ 120s 基准
                     workspace_span_m=float(lead_spec.workspace_span_m),
                     envelope_profile="main_table",
-                    allow_high_anchor_count=bool(lead_spec.allow_high_anchor_count),
                 )
             )
     return tuple(sequence_specs)
@@ -1745,7 +1731,7 @@ def _derive_imu_rows_from_normalized_gt(
         推导出的 IMU 行列表，每行包含 timestamp、ax、ay、gz。
 
     【前提指导 §5.1 — 重力处理（减去/保留在模型中）全员同一】
-    本函数是仿真层"五方法同一 IMU 物理"的源头（实际实现：ekf / robust_ekf / fgo /
+    本函数是仿真层"三方法同一 IMU 物理"的源头（实际实现：ekf /
     lstm_ekf / liquid_ekf，详见 sensors/imu_model.py §5.1 注释），约定如下：
 
     - 2D 平面 ENU 水平运动模型：GT 的 px/py 是水平面上位置，yaw 是绕垂直轴的航向；
@@ -2195,7 +2181,7 @@ def _materialize_vio_rows(
     V0 时所有退化触发分支都不激活——无 cycle 切换、无 vio_outage_segments 命中、
     vio_scale_drift_rate 标称、drift_bias_sigma_mps=0、vio_dx_std/dy_std/dyaw_std 低噪声、
     visual_levels.py 退化函数也都不触发——物化输出 dx/dy/dyaw = 几何增量 + 标称噪声。
-    三估计器 _handle_vio 成功路径 EKF L1188/RobustEKF L696/FGO L2224 同口径接受高置信更新。
+    三方法 _handle_vio 成功路径 EKF L1188 同口径接受高置信更新。
     与 §6.2 #5 退化段/#6 短时中断/#7 尺度漂移/#8 偏置型/#9 突发关联/#10 重定位跳变是
     "全部退化不触发"基线合取，故无 V0 专属代码块；标称物化路径即 #4 落点。
 
@@ -2220,7 +2206,7 @@ def _materialize_vio_rows(
     # VIO noise group (vio_dx_std/vio_dy_std/vio_dyaw_std/vio_scale_drift_rate)
     # 对应 fixture 观测字段 timestamp/dx/dy/dyaw/quality. 铁律 3 删除
     # tracked_features/reproj_err: 这些字段不再由 sim 输出, 下游若依赖需重写.
-    # TODO(STAGE-B/D): 下游 event_builder.py / field_mapper.py / ntu_viral_reader.py
+    # TODO(STAGE-B/D): 下游 event_builder.py / field_mapper.py
     # / feature_builder.py / model_factory.py 仍依赖 tracked_features/reproj_err
     # (grep "tracked_features|reproj_err" src/), 由 Stage B 子代理统一去除依赖.
     if tiled_vio_rows:
@@ -2298,8 +2284,8 @@ def _materialize_vio_rows(
             # 跟踪丢失若干间隔（vio_outage_segments），无增量输出，逼测「无视觉更新」全员一致。
             # 三估计器 _handle_vio vio_quality_zero 路径同口径跳过更新，与 §6.4 #20「不伪造增量」合取：
             # §6.4 #20 关键帧失效不伪造增量+全员同一「跳过视觉更新」硬子要求对应代码层落点——
-            # EKF ekf_core.py vio_quality_zero 拒绝路径 / RobustEKF robust_ekf_core.py vio_quality_zero
-            # 拒绝路径 / FGO fgo_core.py vio_quality_zero 拒绝路径 同口径跳过更新并重置参考位姿，无补增量。
+            # EKF ekf_core.py vio_quality_zero 拒绝路径
+            # 同口径跳过更新并重置参考位姿，无补增量。
             if _is_timestamp_in_outage(
                 coerce_finite_scalar(row["timestamp"], name="row.timestamp"),
                 noise.vio_outage_segments,
@@ -2341,7 +2327,7 @@ def _materialize_vio_rows(
             # 拒绝路径同口径处理低质量 VIO。
             # §6.2 #9 突发错误关联子机制对应代码层落点：
             # V2/V3 reproj_err_max=2/4 + blackout_prob=0.08/0.20 偶发触发 fixture 残差（L2320）
-            # 大跳变 + visual_levels blackout 整事件移除，测三估计器门控与信度。EKF/RobustEKF/FGO
+            # 大跳变 + visual_levels blackout 整事件移除，测二方法门控与信度。EKF
             # 三估计器拒绝路径均跳过更新并重置参考位姿（§6.4 #20 不伪造增量合取）。
             dx_noise = rng_vio_dx.gauss(0.0, noise.vio_dx_std) if rng_vio_dx is not None else 0.0
             dy_noise = rng_vio_dy.gauss(0.0, noise.vio_dy_std) if rng_vio_dy is not None else 0.0
@@ -2363,7 +2349,7 @@ def _materialize_vio_rows(
                     # 铁律 3: 删除 tracked_features / reproj_err 字段
                     # VIO 仅输出 dx/dy/dyaw/quality/valid (此模块无 valid 字段)
                     # TODO(STAGE-B/D): 下游 feature_builder / event_builder /
-                    # field_mapper / model_factory / ntu_viral_reader 仍依赖这两字段
+                    # field_mapper / model_factory 仍依赖这两字段
                     # (grep "tracked_features|reproj_err" src/), 由其他子代理统一去除.
                 }
             )
@@ -2820,7 +2806,6 @@ def materialize_sim_raw(
                 transformed_gt_rows,
                 transformed_anchor_layout,
                 profile=str(spec.envelope_profile),
-                allow_high_anchor_count=bool(spec.allow_high_anchor_count),
             )
         else:
             # 兼容旧 fixture 铺叠路径（smoke / 回归）。
@@ -2911,7 +2896,6 @@ def materialize_sim_raw(
                 transformed_gt_rows,
                 transformed_anchor_layout,
                 profile=str(spec.envelope_profile),
-                allow_high_anchor_count=bool(spec.allow_high_anchor_count),
             )
             envelope_report = dict(envelope_report)  # 不污染原报告
             envelope_report["trajectory_path"] = "legacy_fixture_tile"

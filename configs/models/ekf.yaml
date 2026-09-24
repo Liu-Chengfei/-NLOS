@@ -28,7 +28,7 @@ process_noise:
 # 配置值是标准差，代码中会平方为方差后使用。
 measurement_noise:
   # UWB 距离量测噪声标准差。# 数值越大表示越不信任 UWB 距离。
-  # P13 R/Q 真实标定 (2026-09-02 修复): sim_e9 LOS 段 σ≈0.6m（手册 S4 LOS 基准 σ0.6m），
+  # P13 R/Q 真实标定 (2026-09-02 修复): sim_e9 LOS 段 σ≈0.6m（S4 LOS 基准 σ0.6m），
   # 原 0.25m 偏低导致 EKF 过拟合 LOS 段；与 sim_materializer 注入噪声一致改 0.6m。
   uwb: 0.6   # UWB 测距噪声标准差（米），与 S4 LOS σ0.6m 对齐。
   # VIO 量测噪声块。# 位置和航向分别单独给出。
@@ -44,7 +44,7 @@ calibration_frozen: true
 
 # 初始状态默认放在原点附近。# 这样表示系统启动时不强行假设偏离很大。
 # 差冷启动（§1.4 / §8.4）：均值不给真值邻域热启动；P0 故意偏大。
-# 全员同一分布（EKF / Robust-EKF / FGO 同口径）。位置 σ≈5 m、航向 σ≈1 rad。
+# 全员同一分布（EKF 同口径）。位置 σ≈5 m、航向 σ≈1 rad。
 # §2.3 紧耦合扩维：uwb_clock_bias 初值 0.0（无钟差），vio_scale 初值 1.0（标准尺度）。
 init_state:
   px: 0.0
@@ -58,7 +58,7 @@ init_state:
   uwb_clock_bias: 0.0  # UWB 钟差初值（m），0.0 表示无初始钟差。
   vio_scale: 1.0  # VIO 尺度因子初值（无量纲），1.0 表示标准尺度（紧耦合 §2.3）。
 
-# 门控（B14）：标准 EKF 与 Robust-EKF **共享卡方**门槛；必须显式写 gate，
+# 门控（B14）：标准 EKF 必须显式写 gate，
 # 否则 _nis_threshold 在 gate 缺失时返回 inf → 永不拒识。
 # 协议 B14：uwb/vio 双侧卡方 0.95。
 # cmp2 同档前提：双方卡方开启且参数同源；差异只应来自「有无固定 Huber 核」。
@@ -67,10 +67,7 @@ gate:
     uwb: 3.841   # χ²(1, 0.95)；UWB 1-DoF
     vio: 7.815   # χ²(3, 0.95)；VIO 3-DoF
 
-# 标准 EKF 身份：禁止 robust_weight / Huber。
-# 有 robust_weight 会与 robust_ekf 实质同实现，cmp2「标准≈Robust」同档叙事破产。
-# ekf_core._huber_weight 在 robust_weight 缺失时强制返回 1.0（平方损失）。
-# Robust-EKF 见 robust_ekf.yaml 的 robust_weight 块。
+# 标准 EKF 身份：无 robust_weight 块。
 
 # 初始协方差与 state_items 顺序一一对应（10 维，§2.3 紧耦合扩维）。
 init_cov:

@@ -28,7 +28,7 @@ uwb_fields: [anchor_id, range, valid, quality]
 #   1. 主输入只有标量 range（ToA/TWR 类），不含差分距离/多普勒/载波相位/AOA/TDoA。
 #   2. 单一观测模型 h(·)：estimators/uwb_update_step.py:predict_range L367
 #      `z_pred = math.hypot(dx, dy) + uwb_clock_bias + extra_bias_value`，所有估计器
-#      （EKF / robust_ekf / FGO / NN+EKF）共享同一公式，无单方预处理。
+#      （EKF / NN+EKF）共享同一公式，无单方预处理。
 #   3. 单一有界偏置入口 `extra_bias`（默认 0.0），由 fusion 层 clip_uwb_bias
 #      （protocol/liquid_bridge_contract.py:754-780）做协议级截断，所有方法同一截断规则。
 #   4. 不存在单方天线延迟校准/电缆长度补偿/射频开关切换的私有路径
@@ -59,7 +59,7 @@ uwb_fields: [anchor_id, range, valid, quality]
 # quality : VIO 整体质量指标，数值越高表示本次 VIO 输出越可信。
 # 铁律 3 (Stage A1 下游修复, 2026-07-23): 删 tracked_features / reproj_err —
 # 紧耦合单目 VIO 仅输出位姿增量 (dx, dy, dyaw) 与 quality, 不再输出特征点跟踪数与重投影误差.
-# sim_materializer / event_builder / field_mapper / ntu_viral_reader / model_factory /
+# sim_materializer / event_builder / field_mapper / model_factory /
 # feature_builder 已同步移除此两字段的下游引用.
 vio_fields: [dx, dy, dyaw, quality]
 

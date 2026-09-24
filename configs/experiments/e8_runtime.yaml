@@ -23,13 +23,11 @@ frozen_axes:
   # 锚点数量直接影响计算量：锚点越多，每次更新的 UWB 观测越多，计算开销越大。
   K: [K0, K1, K3]
 
-# 参与比较的方法。# 覆盖传统、鲁棒和学习式方法，比较它们的运行时差异。
+# 参与比较的方法。# 覆盖传统和学习式方法，比较它们的运行时差异。
 # ekf：标准 EKF，计算量最小，作为速度基线。
-# robust_ekf：鲁棒 EKF，比标准 EKF 多一步异常值检测，略慢。
-# fgo：因子图优化，批量方法，通常比 EKF 慢但精度更高。
 # lstm_ekf：LSTM 增强 EKF，需要额外的前向推理时间。
 # liquid_ekf：液态网络增强 EKF，核心方法，关注其推理开销是否可接受。
-methods: [ekf, robust_ekf, lnn, lstm, transformer, liquid_ekf]  # 全 5 方法参与运行时画像。
+methods: [ekf, lstm, liquid_ekf]  # 全 3 方法参与运行时画像。
 
 # quick/full 下的规模控制。# 运行时实验更依赖重复次数来获得稳定的计时统计。
 mode_overrides:

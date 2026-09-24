@@ -19,13 +19,11 @@ frozen_axes:
   # 锚点数量固定为 K1（协议主档，4 锚等边矩形布局）。
   K: K1
 
-# 参与比较的方法。# 覆盖传统、鲁棒和学习式方法，便于观察 NLOS 对不同范式的影响。
+# 参与比较的方法。# 覆盖传统和学习式方法，便于观察 NLOS 对不同范式的影响。
 # ekf：标准扩展卡尔曼滤波，对 NLOS 无特殊处理。
-# robust_ekf：鲁棒 EKF，通过异常值抑制部分抵抗 NLOS。
-# fgo：因子图优化，可通过鲁棒核函数抵抗 NLOS。
 # lstm_ekf：LSTM 增强 EKF，学习式方法可能学到 NLOS 模式。
 # liquid_ekf：液态网络增强 EKF，核心方法，期望在 NLOS 下表现最好。
-methods: [ekf, robust_ekf, lnn, lstm, transformer, liquid_ekf]  # 全 5 方法参与 NLOS 扫描。
+methods: [ekf, lstm, liquid_ekf]  # 全 3 方法参与 NLOS 扫描。
 
 # quick/full 模式下的抽样和重复设置。# 这里按规模决定抽哪些 NLOS 等级。
 mode_overrides:

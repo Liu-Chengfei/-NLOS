@@ -693,8 +693,8 @@ class TestEKFCoreInitAndReset:
     # §11.1 silent-skip fail-loud 守卫（Hazard §11-1 修复回归锁）
     # 修复位置：src/liquidloc/estimators/ekf_core.py:404-409
     # ------------------------------------------------------------------
-    def test_nis_threshold_no_gate_falls_back_to_inf_for_fgo_bare(self):
-        """无 gate 块 → inf 兜底（与铁律10 FGO 裸跑向后兼容）。"""
+    def test_nis_threshold_no_gate_falls_back_to_inf(self):
+        """无 gate 块 → inf 兜底。"""
         ekf = EKFCore({})
         assert ekf._nis_threshold("uwb") == float("inf")
         assert ekf._nis_threshold("vio") == float("inf")
@@ -725,7 +725,7 @@ class TestEKFCoreInitAndReset:
             ekf._nis_threshold("uwb")
 
     def test_nis_threshold_valid_per_modality_mapping_returns_expected(self):
-        """合法 yaml 形态：按模态映射 → 正常返 3.841/7.815（不破坏既有 ekf.yaml/robust_ekf.yaml）。"""
+        """合法 yaml 形态：按模态映射 → 正常返 3.841/7.815（不破坏既有 ekf.yaml/ekf.yaml）。"""
         ekf = EKFCore({
             "gate": {
                 "mahalanobis_sq": {"uwb": 3.841, "vio": 7.815},
@@ -744,7 +744,7 @@ class TestEKFCoreInitAndReset:
 
 # ════════════════════════════════════════════════════════════
 #  §11.2 Q 固定：imu_missing_inflation 协议单源 + Predict 实际生效
-#  修复位置：src/liquidloc/estimators/ekf_core.py:767 / fgo_core.py:1736 /
+#  修复位置：src/liquidloc/estimators/ekf_core.py:767 /
 #           protocol/bridge_thresholds.py:102
 #  锁死：(a) step() 预测步真实读出协议常量并膨胀 process_noise；
 #       (b) 协议常量被改 → estimator 行为同步变（不是 estimator 私调）。
@@ -1764,8 +1764,8 @@ class TestUwbValidFlagRejectionEKF:
 
     spec L1734「无效标志 → 方法内部更新的串联顺序全员固定（先共享无效，再各自更新）」
     v9 audit 发现 v6/v8 漏审：EKF `_handle_uwb` L856 有 `valid=False` 检查，
-    Robust-EKF / FGO 缺此检查。本测试锁死 EKF 路径，与 Robust-EKF / FGO 同源测试
-    共同保证三方法拒识串项一致性，防今后单方泄漏。
+    EKF 缺此检查。本测试锁死 EKF 路径，
+    共同保证方法拒识串项一致性，防今后单方泄漏。
     """
 
     def test_uwb_valid_false_rejected_with_uwb_invalid_measurement_reason(self):
@@ -1781,7 +1781,7 @@ class TestUwbValidFlagRejectionEKF:
         assert result["update_applied"] is False, \
             "§11.3-d valid=False 事件必须被拒识，跳过更新链路"
         assert result.get("reason") == "uwb_invalid_measurement", \
-            "§11.3-d 拒识原因必须是 uwb_invalid_measurement，与 Robust-EKF / FGO 同源"
+            "§11.3-d 拒识原因必须是 uwb_invalid_measurement，与 EKF 同源"
 
     def test_uwb_valid_false_skips_before_quality_floor_check(self):
         """§11.3-d 串项顺序锁死：valid=False 必须在 quality_floor 之前触发。
@@ -1979,7 +1979,7 @@ class TestStepJointValidFlagRejectionEKF:
 
     v11 audit 发现：EKF `_handle_vio` L1047-1048 此前走捷径
     `float(vio_payload.get("quality", 1.0))` 绕过 `self._quality_value()`
-    规范化，与 Robust-EKF/FGO 不同源。v11 修复后走 `_quality_value`。
+    规范化，与 Robust 不同源。v11 修复后走 `_quality_value`。
     本测试锁死三方法同源规范化行为（含 np.bool_/NaN/>1.0 上界）。
     """
 
@@ -1988,7 +1988,7 @@ class TestStepJointValidFlagRejectionEKF:
 
         v11 audit：三方法 VIO quality<=0 协议级拒识同源规范化锁死。
         旧 EKF 走捷径 `float(quality)` 绕过 _quality_value 规范化，
-        v11 修复后与 Robust/FGO 同走 _quality_value 同源规范化。
+        v11 修复后与 Robust 同走 _quality_value 同源规范化。
         本测试用合法的 0.0 quality（不触发规范化异常路径）锁死
         三方法同源触发 vio_quality_zero 跳过行为。
         """
@@ -2015,7 +2015,7 @@ class TestStepJointValidFlagRejectionEKF:
         """Boolean quality 必须经 _quality_value 规范化抛 TypeError，与三方法同口径。
 
         v11 修复前 EKF _handle_vio 直接 float(False) = 0.0 触发 vio_quality_zero 跳过，
-        与 Robust/FGO 走 _quality_value 抛 TypeError 不同源。
+        与 Robust 走 _quality_value 抛 TypeError 不同源。
         v11 修复后 EKF 也走 _quality_value，对 bool 类 quality 同源抛 TypeError。
         本测试锁死三方法同源同口径规范化路径。
         """
@@ -2025,7 +2025,7 @@ class TestStepJointValidFlagRejectionEKF:
         ekf.step(_vio_event(t=0.3))  # 初始化参考位姿
         ref_before = ekf._last_vio_reference_pose
 
-        # bool 类 quality 必须经规范化抛 TypeError，与 Robust/FGO 同源
+        # bool 类 quality 必须经规范化抛 TypeError，与 Robust 同源
         with pytest.raises(TypeError, match="quality must be numeric"):
             ekf._handle_vio(
                 {"t": 0.4, "dt": 0.1, "modality": "vio",

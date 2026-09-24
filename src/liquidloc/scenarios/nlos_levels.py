@@ -98,18 +98,18 @@ bias_drift_mps 字段保留向后兼容但大脉冲模型下不再使用。
 - clip_uwb_bias（protocol/liquid_bridge_contract.py:754-780）协议级截断，raw_range ×
   _UWB_BIAS_MAX_RATIO 比例截断 + _UWB_BIAS_ABSOLUTE_MAX 绝对值截断，所有方法同一截断规则
 - 评价阶段截断误差同理禁止（§14）：metric_runner.py grep `clip|truncate` 0 命中，评估层无截断路径
-- 单方截断等效部分抗差，破坏比较 1、3：本仓库 EKF/robust_ekf/FGO/NN+EKF 均通过
+- 单方截断等效部分抗差，破坏比较 1、3：本仓库 EKF/ekf/NN+EKF 均通过
   clip_uwb_bias 单一入口，无单方私有截断路径
 
 §4.4 前置滤波与「干净距离」偷换协议级护栏（前提指导.md:1049-1063，极关键）：
 - 表 4 行禁区默认前端不对称：本仓库 grep `rolling_mean|sliding_median|exponential_smooth|
   moving_average|median_filter|outlier_clip|soft_clip|cir_corrected|peak_corrected|pre_ekf|
   clean_then_ekf` 在 src/ 下 0 命中，且 sensors.yaml 已显式声明默认关闭清单
-- L1060 允许的"全员同一、极轻物理层解码输出（仍保留脉冲形态）"：本仓库 EKF/robust_ekf/FGO
-  入口均直接 `raw_range = float(uwb_payload["range"])`（ekf_core.py:891 / robust_ekf_core.py:355 /
-  fgo_core.py:1796），不做任何中值/平滑/CIR 修正；bias_adapter.py 的 corrected_range 仅给
+- L1060 允许的"全员同一、极轻物理层解码输出（仍保留脉冲形态）"：本仓库 EKF/ekf
+  入口均直接 `raw_range = float(uwb_payload["range"])`（ekf_core.py:891 / ekf_core.py:355 /
+  ），不做任何中值/平滑/CIR 修正；bias_adapter.py 的 corrected_range 仅给
   历史调用方兼容输出，**不进 NN+EKF 主路径**（bias_adapter.py L3-6 deprecated 注释）
-- L1061 主叙事脉冲必须仍出现在估计器入口的 raw 距离上：ekf_core.py:890 / fgo_core.py:1794
+- L1061 主叙事脉冲必须仍出现在估计器入口的 raw 距离上：ekf_core.py:890
   "不再对 raw 距离做 subtractive 改写为 corrected_range；raw_range 直接作为 z" 显式锚定
 - L1062 允许的极轻物理层解码输出不存在；任何新增前置需全员同一且保留脉冲形态
 
@@ -176,7 +176,7 @@ bias_drift_mps 字段保留向后兼容但大脉冲模型下不再使用。
 - LOS↔NLOS 转移随几何/动态体：direction_hash 由 tag_yaw 12 桶派生（apply_nlos_level L509-511），
   不是与状态无关的独立抛硬币；同一 (scene_id, seq_id, nlos_level) 三元组的转移可复述。
 - 天线相位中心随角度、近场：默认忽略，全员同一忽略（grep `antenna_phase_center|near_field|
-  far_field` 在 src/ 下 0 命中）；EKF / robust_ekf / FGO / NN+EKF 同一距离预测公式。
+  far_field` 在 src/ 下 0 命中）；EKF / ekf / NN+EKF 同一距离预测公式。
 
 §4.4 CIR / 峰比 / PDP / 首径特征共享门边界（前提指导.md:1037-1045）：
 - 本仓库 UWB 测距主表只接受标量 range（sensors.yaml:24 uwb_fields），不接受 CIR / peak_ratio /

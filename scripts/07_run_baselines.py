@@ -36,7 +36,7 @@ _DEFAULT_RAW_ROOT = ROOT / "tests" / "fixtures" / "datasets" / "miluv"
 _DEFAULT_OUTPUT_ROOT = ROOT / "outputs" / "baseline_script_smoke"
 _SMOKE_SEQ_ID = "mini_seq"
 _SMOKE_SCENE_ID = "S(A3,N3,V2,K0,M0)"  # 五轴档位协议：G 已并入 K，K 轴仅 K0/K1/K3。
-_BASELINE_METHODS = ("ekf",)  # 基线：仅 EKF（无 FGO）。
+_BASELINE_METHODS = ("ekf",)  # 基线：仅 EKF。
 _MILUV_CONFIG = ROOT / "configs" / "datasets" / "miluv.yaml"
 _SIM_DEFAULT_PREPARE_ROOT = Path("outputs/prepare_sim_e9_main")
 

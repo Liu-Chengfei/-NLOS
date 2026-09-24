@@ -35,7 +35,7 @@ def test_parity_passes_when_lstm_liquid_share_default_window_size():
 def test_parity_silent_skip_classical_methods_without_window():
     """经典方法无 window 字段，watchdog 应跳过它们只看 NN。"""
     methods = [
-        "ekf", "robust_ekf", "fgo",  # 经典方法无 window。
+        "ekf", "ekf",  # 经典方法无 window。
         MODEL_NAME_LSTM, MODEL_NAME_LIQUID,  # 唯二 NN 方法。
     ]
     sizes = _enforce_window_size_parity_for_neural_methods(methods, cfg={})
@@ -210,34 +210,6 @@ def test_section10_2_unknown_nn_keyword_method_not_preempted_by_classical_guard(
     # lstm_ekf_xxx 不在 _NEURAL_METHODS 也不在 _CLASSICAL_METHODS
     with pytest.raises(ValueError, match="Unsupported method: lstm_ekf_xxx"):
         _resolve_method_route('lstm_ekf_xxx')
-
-
-def test_section10_3_cross_config_sentinel_io_safe_when_fgo_yaml_missing(monkeypatch):
-    """§10.3 cross-config sentinel IO 兜底测：fgo.yaml 路径不存在/IO 错误时，
-    _validate_scene_scale_section 不应 raise，应正常返回 normalized_section（无 _section10_3 标记）。
-    防止 cross-config sentinel 反客为主破坏 protocol gate 主流程。
-    """
-    from liquidloc.protocol import experiment_gates as _eg
-    from liquidloc.protocol.experiment_gates import _validate_scene_scale_section
-
-    # 让 load_yaml_config 抛 FileNotFoundError 模拟 fgo.yaml 缺失
-    def _boom(*args, **kwargs):
-        raise FileNotFoundError("simulated missing fgo.yaml")
-
-    monkeypatch.setattr(_eg, 'load_yaml_config', _boom)
-    section = {
-        'scene_scale': {
-            't_eff_min_s': 20.0,
-            'cold_start_offset_s': 5.0,
-            'cold_start_global_enforced': True,
-            'n_pulse_min': 30,
-            'n_async_min': 20,
-            'layout_family_min': 3,
-        }
-    }
-    normalized = _validate_scene_scale_section(section)  # 不应 raise
-    assert '_section10_3_t_eff_assumed_mismatch' not in normalized
-    assert normalized['t_eff_min_s'] == 20.0
 
 
 def test_section10_1_a_validate_event_sequence_rejects_out_of_order_timestamps():

@@ -21,13 +21,11 @@ frozen_axes:
   # 锚点数量固定为 K1（协议主档，4 锚等边矩形布局）。
   K: K1
 
-# 参与比较的方法。# 覆盖传统、鲁棒和学习式方法，便于观察视觉退化对不同范式的影响。
+# 参与比较的方法。# 覆盖传统和学习式方法，便于观察视觉退化对不同范式的影响。
 # ekf：标准 EKF，对 VIO 退化无特殊处理，容易受视觉噪声影响。
-# robust_ekf：鲁棒 EKF，通过异常值抑制部分抵抗视觉退化。
-# fgo：因子图优化，可通过鲁棒核函数抵抗视觉异常。
 # lstm_ekf：LSTM 增强 EKF，学习式方法可能学到视觉退化模式。
 # liquid_ekf：液态网络增强 EKF，核心方法，期望在 VIO 退化下表现最好。
-methods: [ekf, robust_ekf, lnn, lstm, transformer, liquid_ekf]  # 全 5 方法参与视觉退化扫描。
+methods: [ekf, lstm, liquid_ekf]  # 全 3 方法参与视觉退化扫描。
 
 # quick/full 的等级抽样和重复设置。# 这里按规模决定抽哪些视觉等级。
 mode_overrides:

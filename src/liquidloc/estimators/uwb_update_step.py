@@ -9,13 +9,13 @@
 （前提指导 §2.3 在线时间偏移与钟差态前提）。
 
 【本文件绝对不负责】
-不做风险加权（robust_ekf_core 负责），不做场景门控，不消费模型输出。
+不做风险加权（ekf_core 负责），不做场景门控，不消费模型输出。
 
 【上游依赖】
 state_definition.py、sensors/uwb_model.py、sensors/anchor_model.py。
 
 【下游调用者】
-ekf_core.py、fgo_core.py、fusion 相关流程。
+ekf_core.py、fusion 相关流程。
 
 【输入对象定义】
 - x_pred: 预测状态
@@ -194,7 +194,7 @@ def _coerce_covariance_matrix(
         np.linalg.cholesky(P_matrix)  # 协方差矩阵必须正定。
     except np.linalg.LinAlgError:
         # §11.5 抖动注入：第一次 Cholesky 失败 → P += cov_jitter_eps * I 再重试。
-        # 三方法（EKF / Robust-EKF / FGO）同调 uwb_update_step.run_uwb_update 系列函数，
+        # 二方法（EKF / NN+EKF）同调 uwb_update_step.run_uwb_update 系列函数，
         # 因此 UWB 路径的 jitter fallback 与 VIO 路径 (_ensure_positive_definite_vio_innovation_covariance)
         # 同口径同源 cov_jitter_eps（BRIDGE_THRESHOLDS["cov_jitter_eps"]）——
         # 满足 §11.5「SP 保护/抖动/发散判定全员同一规则」要求。
@@ -469,7 +469,7 @@ def run_uwb_update(
         ``extra_bias`` 进入，残差仍在原始读数合同上定义。
     R_range : float | int
         测距测量噪声方差，必须非负有限。
-        上游（ekf_core / fgo_core）已将配置中的标准差平方为方差后传入。
+        上游（ekf_core）已将配置中的标准差平方为方差后传入。
     extra_bias:
         观测侧有界偏置修正（默认 0.0）。该值进入 h(·) 而非改写 z；
         雅可比对它偏导恒为 +1，但因其为外部「常量」注入（不入状态），
@@ -519,7 +519,7 @@ def run_uwb_update(
     residual = z_range_value - z_pred  # 观测残差（残差定义在原始 z 上，bias 进 h(·)）。
     H = build_uwb_jacobian(x_vector, anchor_pos)  # 观测雅可比。
 
-    S = coerce_finite_scalar(float((H @ P_matrix @ H.T)[0, 0] + R_range_value), name="S")  # NaN/Inf 会绕过 S<=0 检查（NaN<=0.0 为 False），必须显式拒绝，与 robust_ekf_core/fgo_core 对齐。
+    S = coerce_finite_scalar(float((H @ P_matrix @ H.T)[0, 0] + R_range_value), name="S")  # NaN/Inf 会绕过 S<=0 检查（NaN<=0.0 为 False），必须显式拒绝，与 ekf_core 对齐。
     if S <= 0.0:  # 创新协方差必须正。
         raise ValueError(f"S must be positive, got {S}")  # 直接报错。
 

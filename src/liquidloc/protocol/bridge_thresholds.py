@@ -17,7 +17,6 @@
     - liquidloc.models.liquid.inference          — Liquid 推理风险映射
     - liquidloc.models.lstm.inference            — LSTM 推理风险映射
     - liquidloc.models.features.normalization    — 缩放归一化
-    - liquidloc.estimators.fgo_core              — FGO 质量门槛
     - liquidloc.sensors.vision_model             — VIO 航向范围校验
 
 核心变量：

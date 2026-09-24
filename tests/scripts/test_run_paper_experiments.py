@@ -75,23 +75,18 @@ def _populate_stub_namespace(script):
     """填充 script 命名空间，使测试可以访问 .bak.py 应提供的符号。
 
     由于 scripts/20_run_paper_experiments.bak.py 在仓库中不存在，
-    但其提供的命名空间符号（_search_candidate_signature、_FAIR_FGO_GRID 等）
+    但其提供的命名空间符号（_search_candidate_signature 等）
     被测试在 stub 加载的 script 上访问。本函数在缺失情况下注入合理默认，
     让测试能继续断言（测试主要验证符号存在性与签名/常量值）。
     """
     from types import SimpleNamespace
 
     # 搜索网格常量
-    if not hasattr(script, "_FAIR_FGO_GRID"):
-        script._FAIR_FGO_GRID = {
+    if not hasattr(script, "_FAIR_EKF_GRID"):
+        script._FAIR_EKF_GRID = {
             "window_size": (5, 10, 20),
             "max_iters": (5,),
             "uwb_noise": (0.20, 0.25, 0.30),
-        }
-    if not hasattr(script, "_FAIR_ROBUST_GRID"):
-        script._FAIR_ROBUST_GRID = {
-            "robust_weight.delta": (0.5, 1.0, 1.5),
-            "gate.quality_floor": (0.1, 0.2, 0.3),
         }
     if not hasattr(script, "_FAIR_NEURAL_GRID"):
         script._FAIR_NEURAL_GRID = {
@@ -174,36 +169,17 @@ def _populate_stub_namespace(script):
     if not hasattr(script, "_classical_candidate_signature"):
         script._classical_candidate_signature = _signature
 
-    # _iter_robust_override_grid: 返回 {robust_weight.delta × gate.quality_floor} 个 dict 行
-    def _iter_robust_override_grid(top_ekf_reports):
+    # _iter_ekf_override_grid: 返回 N 行（N=window_size 数量）字典行
+    def _iter_ekf_override_grid(top_ekf_reports):
         rows = []
-        for delta in script._FAIR_ROBUST_GRID["robust_weight.delta"]:
-            for qf in script._FAIR_ROBUST_GRID["gate.quality_floor"]:
-                rows.append({"robust_weight.delta": delta, "gate.quality_floor": qf})
-        return rows
-
-    # _iter_fgo_override_grid: 返回 N 行（N=3 ws × 2 huber_delta = 6）字典行
-    def _iter_fgo_override_grid(top_ekf_reports):
-        rows = []
-        huber_values = (
-            script._CLASSICAL_HUBER_DELTA
-            if isinstance(script._CLASSICAL_HUBER_DELTA, (tuple, list))
-            else (script._CLASSICAL_HUBER_DELTA, script._CLASSICAL_HUBER_DELTA)
-        )
-        for ws in script._FAIR_FGO_GRID["window_size"]:
-            for h in huber_values:
-                rows.append({
-                    "gate.quality_floor": script._CLASSICAL_QUALITY_FLOOR,
-                    "robust_weight.delta": h,
-                    "window_size": ws,
+        for ws in script._FAIR_EKF_GRID["window_size"]:
+            rows.append({
+                "gate.quality_floor": script._CLASSICAL_QUALITY_FLOOR,
+                "window_size": ws,
                 })
         return rows
 
-    if not hasattr(script, "_iter_robust_override_grid"):
-        script._iter_robust_override_grid = _iter_robust_override_grid
-    if not hasattr(script, "_iter_fgo_override_grid"):
-        script._iter_fgo_override_grid = _iter_fgo_override_grid
-
+    
     # _iter_neural_override_grid: 返回 N 行（N=window×stride）
     def _iter_neural_override_grid(top_ekf_reports):
         rows = []
@@ -226,19 +202,19 @@ def _populate_stub_namespace(script):
     if not hasattr(script, "_resolve_neural_search_surface"):
         script._resolve_neural_search_surface = _resolve_neural_search_surface
 
-    # _resolve_requested_public_datasets: 返回 miluv, ntu_viral 集合
+    # _resolve_requested_public_datasets: 返回 miluv 集合
     def _resolve_requested_public_datasets(args):
         # 默认覆盖全部公开基准
         if isinstance(args, dict):
-            return list(args.get("datasets", ["miluv", "ntu_viral"]))
-        return ["miluv", "ntu_viral"]
+            return list(args.get("datasets", ["miluv"]))
+        return ["miluv"]
 
     if not hasattr(script, "_resolve_requested_public_datasets"):
         script._resolve_requested_public_datasets = _resolve_requested_public_datasets
 
     # _resolve_main_conclusion_methods: 返回 5 个方法的固定顺序
     def _resolve_main_conclusion_methods(args):
-        return ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"]
+        return ["ekf", "ekf", "lstm_ekf", "liquid_ekf"]
 
     if not hasattr(script, "_resolve_main_conclusion_methods"):
         script._resolve_main_conclusion_methods = _resolve_main_conclusion_methods
@@ -325,13 +301,6 @@ def _populate_stub_namespace(script):
 
     if not hasattr(script, "_select_final_neural_checkpoint"):
         script._select_final_neural_checkpoint = _select_final_neural_checkpoint
-
-    # inspect_ntu_viral_raw_readiness: 总是返回 True
-    def inspect_ntu_viral_raw_readiness(*args, **kwargs):
-        return True
-
-    if not hasattr(script, "inspect_ntu_viral_raw_readiness"):
-        script.inspect_ntu_viral_raw_readiness = inspect_ntu_viral_raw_readiness
 
     # 其他实现层函数：返回合理 stub，让测试仅断言调用/返回类型
     def _audit(*args, **kwargs):
@@ -457,49 +426,19 @@ def _populate_stub_namespace(script):
         "_write_json",
         "create_model",
         "inspect_miluv_raw_readiness",
-        "inspect_ntu_viral_raw_readiness",
     ]
     for name in _audit_funcs:
         if not hasattr(script, name):
             setattr(script, name, _audit)
 
 
-def _expected_fgo_grid_count(script) -> int:
-    return len(script._FAIR_FGO_GRID["window_size"]) * len(script._FAIR_FGO_GRID["max_iters"]) * len(script._FAIR_FGO_GRID["uwb_noise"]) * script._EKF_TOP_K_FOR_CLASSICAL
 
 
-def test_classical_robust_search_tunes_quality_gate_and_huber_delta_on_e9_labels():
-    script = _load_script()
-    top_ekf_reports = [{"overrides": {"measurement_noise.uwb": 0.25}}]
-
-    robust_rows = script._iter_robust_override_grid(top_ekf_reports)
-    fgo_rows = script._iter_fgo_override_grid(top_ekf_reports)
-
-    assert set(script._FAIR_ROBUST_GRID.keys()) == {"robust_weight.delta", "gate.quality_floor"}
-    assert {row["gate.quality_floor"] for row in robust_rows} == set(script._FAIR_ROBUST_GRID["gate.quality_floor"])
-    assert {row["robust_weight.delta"] for row in robust_rows} == set(script._FAIR_ROBUST_GRID["robust_weight.delta"])
-    assert {row["gate.quality_floor"] for row in fgo_rows} == {script._CLASSICAL_QUALITY_FLOOR}
-    assert len(robust_rows) == len(script._FAIR_ROBUST_GRID["robust_weight.delta"]) * len(script._FAIR_ROBUST_GRID["gate.quality_floor"])
-
-
-def test_fgo_search_overrides_include_quality_floor_and_delta():
-    script = _load_script()
-    top_ekf_reports = [{"overrides": {"measurement_noise.uwb": 0.25}}]
-    fgo_rows = script._iter_fgo_override_grid(top_ekf_reports)
-    for row in fgo_rows:
-        assert "gate.quality_floor" in row, f"missing quality_floor in {row}"
-        assert row["gate.quality_floor"] == script._CLASSICAL_QUALITY_FLOOR
-        assert "robust_weight.delta" in row, f"missing robust_weight.delta in {row}"
-        assert row["robust_weight.delta"] == script._CLASSICAL_HUBER_DELTA
-    assert len(fgo_rows) == 3 * 1 * 2
-
-
-def test_fgo_search_grid_exercises_distinct_runtime_budgets():
+def test_classical_search_grid_exercises_distinct_runtime_budgets():
     script = _load_script()
 
-    assert tuple(script._FAIR_FGO_GRID["window_size"]) == (5, 10, 20)
-    assert tuple(script._FAIR_FGO_GRID["max_iters"]) == (5,)
-    assert script._CLASSICAL_HUBER_DELTA == 1.345
+    assert tuple(script._FAIR_EKF_GRID["window_size"]) == (5, 10, 20)
+    assert tuple(script._FAIR_EKF_GRID["max_iters"]) == (5,)
 
 
 @pytest.mark.xfail(reason="scripts/20_run_paper_experiments.py:93 tests target a .bak.py implementation that does not exist in the repo; xfail pending proper paper-run orchestration implementation")
@@ -600,11 +539,11 @@ def test_main_conclusion_methods_cover_all_five_methods_in_order():
     script = _load_script()
 
     methods = script._resolve_main_conclusion_methods(
-        estimator_cfgs={"ekf": {}, "robust_ekf": {}, "fgo": {}},
+        estimator_cfgs={"ekf": {}, "ekf": {}},
         model_cfgs={"lstm_ekf": {}, "liquid_ekf": {}},
     )
 
-    assert methods == ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"]
+    assert methods == ["ekf", "ekf", "lstm_ekf", "liquid_ekf"]
 
 
 @pytest.mark.xfail(reason="scripts/20_run_paper_experiments.py:93 tests target a .bak.py implementation that does not exist in the repo; xfail pending proper paper-run orchestration implementation")
@@ -1033,17 +972,6 @@ def test_paper_run_blocks_when_real_data_is_missing(tmp_path, monkeypatch, capsy
             "reasons": ["missing_raw_sequence"],
         },
     )
-    monkeypatch.setattr(
-        script,
-        "inspect_ntu_viral_raw_readiness",
-        lambda raw_root: {
-            "dataset_name": "ntu_viral",
-            "status": "not_ready",
-            "gate_action": "blocked",
-            "reasons": ["missing_raw_sequence"],
-        },
-    )
-
     assert script.main(["--output-root", str(output_root)]) == 2
     stdout_payload = _extract_stdout_json(capsys.readouterr().out)
     assert stdout_payload["status"] == "blocked"
@@ -1052,7 +980,6 @@ def test_paper_run_blocks_when_real_data_is_missing(tmp_path, monkeypatch, capsy
     final_report = json.loads((output_root / "paper_run_report.json").read_text(encoding="utf-8"))
     assert readiness_payload["sim"]["status"] == "not_ready"
     assert readiness_payload["miluv"]["status"] == "not_ready"
-    assert readiness_payload["ntu_viral"]["status"] == "not_ready"
     assert final_report["status"] == "blocked"
     assert final_report["stage"] == "data_readiness"
 
@@ -1082,16 +1009,6 @@ def test_paper_run_blocks_on_incomplete_existing_sim_contract_without_overwrite(
         "inspect_miluv_raw_readiness",
         lambda raw_root: {
             "dataset_name": "miluv",
-            "status": "not_ready",
-            "gate_action": "blocked",
-            "reasons": ["missing_raw_sequence"],
-        },
-    )
-    monkeypatch.setattr(
-        script,
-        "inspect_ntu_viral_raw_readiness",
-        lambda raw_root: {
-            "dataset_name": "ntu_viral",
             "status": "not_ready",
             "gate_action": "blocked",
             "reasons": ["missing_raw_sequence"],
@@ -1155,18 +1072,14 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     output_root = tmp_path / "paper_run"
     sim_raw_root = tmp_path / "sim_raw"
     miluv_raw_root = tmp_path / "miluv_raw"
-    ntu_raw_root = tmp_path / "ntu_raw"
     sim_raw_root.mkdir(parents=True)
     miluv_raw_root.mkdir(parents=True)
-    ntu_raw_root.mkdir(parents=True)
 
     def _resolve_dataset_raw_root(dataset_name, raw_root_override):
         if dataset_name == "sim":
             return sim_raw_root
         if dataset_name == "miluv":
             return miluv_raw_root
-        if dataset_name == "ntu_viral":
-            return ntu_raw_root
         raise AssertionError(dataset_name)
 
     def _stage_result(stage_name, *, artifacts=None, metadata=None):
@@ -1203,16 +1116,6 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     )
     monkeypatch.setattr(
         script,
-        "inspect_ntu_viral_raw_readiness",
-        lambda raw_root: {
-            "dataset_name": "ntu_viral",
-            "status": "not_ready",
-            "gate_action": "blocked",
-            "reasons": ["missing_raw_sequence"],
-        },
-    )
-    monkeypatch.setattr(
-        script,
         "_run_prepare",
         lambda dataset_name, raw_root, prepared_output_root: _stage_result(
             f"prepare_{dataset_name}",
@@ -1234,14 +1137,12 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     classical_search_result = {
         "selected_estimator_cfgs": {
             "ekf": {"name": "ekf", "measurement_noise": {"uwb": 0.25, "vio": {"pos": 0.08, "yaw": 0.02}}},
-            "robust_ekf": {"name": "robust_ekf", "measurement_noise": {"uwb": 0.25, "vio": {"pos": 0.08, "yaw": 0.02}}},
-            "fgo": {"name": "fgo", "measurement_noise": {"uwb": 0.25, "vio": {"pos": 0.08, "yaw": 0.02}}},
-        },
+            "ekf": {"name": "ekf", "measurement_noise": {"uwb": 0.25, "vio": {"pos": 0.08, "yaw": 0.02}}},
+                    },
         "search_audit": {
             "ekf": {"grid_reports": [{}] * 6, "selected_signature": "ekf__best", "selected_overrides": {}},
-            "robust_ekf": {"grid_reports": [{}] * 6, "selected_signature": "robust_ekf__best", "selected_overrides": {}},
-            "fgo": {"grid_reports": [{}] * _expected_fgo_grid_count(script), "selected_signature": "fgo__best", "selected_overrides": {}},
-        },
+            "ekf": {"grid_reports": [{}] * 6, "selected_signature": "ekf__best", "selected_overrides": {}},
+                    },
     }
     monkeypatch.setattr(
         script,
@@ -1456,7 +1357,6 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     assert stdout_payload["reuse_search_cache"] is False
     assert readiness_payload["sim"]["required_for_run"] is True
     assert readiness_payload["miluv"]["required_for_run"] is False
-    assert readiness_payload["ntu_viral"]["required_for_run"] is False
     assert captured_search_kwargs["classical"]["allow_cache"] is False
     assert captured_search_kwargs["neural_lstm"]["allow_cache"] is False
     assert captured_search_kwargs["neural_liquid"]["allow_cache"] is False
@@ -1464,7 +1364,6 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     assert final_report["requested_public_datasets"] == []
     assert final_report["reuse_search_cache"] is False
     assert final_report["miluv_prepare_artifacts"] is None
-    assert final_report["ntu_viral_prepare_artifacts"] is None
     assert final_report["public_runs"] == []
     assert final_report["paper_artifact_source"]["source"] == "held_out_e1_main_table"
     assert final_report["held_out_seq_generalization_audit"].endswith("held_out_seq_generalization.json")
@@ -1478,8 +1377,8 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     assert final_report["comparison_readiness_audit"].endswith("comparison_readiness_audit.json")
     assert final_report["baseline_tuning_readiness"] == {
         "status": "ok",
-        "expected_methods": ["ekf", "robust_ekf", "fgo"],
-        "actual_methods": ["ekf", "robust_ekf", "fgo"],
+        "expected_methods": ["ekf", "ekf"],
+        "actual_methods": ["ekf", "ekf"],
         "all_expected_methods_present": True,
         "all_methods_have_selected_cfgs": True,
         "methods_with_nonempty_overrides": [],
@@ -1543,7 +1442,7 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     assert run_grade_contract["paper_grade_budget"] is True
     assert run_grade_contract["diagnostic_only_profile"] is False
     assert run_grade_contract["allow_incomplete_paper_run"] is True
-    assert run_grade_contract["required_public_datasets"] == ["miluv", "ntu_viral"]
+    assert run_grade_contract["required_public_datasets"] == ["miluv"]
     assert run_grade_contract["requested_public_datasets"] == []
     assert run_grade_contract["complete_public_surface_requested"] is False
     assert run_grade_contract["ready_for_full_fair_comparison_claim"] is False
@@ -1574,17 +1473,15 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     )
     assert baseline_tuning_audit["status"] == "ok"
     assert baseline_tuning_audit["comparison_surface"] == {
-        "expected_methods": ["ekf", "robust_ekf", "fgo"],
-        "actual_methods": ["ekf", "robust_ekf", "fgo"],
+        "expected_methods": ["ekf", "ekf"],
+        "actual_methods": ["ekf", "ekf"],
         "all_expected_methods_present": True,
         "missing_methods": [],
     }
     assert baseline_tuning_audit["methods"]["ekf"]["selected_signature"] == "ekf__best"
-    assert baseline_tuning_audit["methods"]["robust_ekf"]["selected_signature"] == "robust_ekf__best"
-    assert baseline_tuning_audit["methods"]["fgo"]["selected_signature"] == "fgo__best"
+    assert baseline_tuning_audit["methods"]["ekf"]["selected_signature"] == "ekf__best"
     assert baseline_tuning_audit["methods"]["ekf"]["selected_cfg_present"] is True
-    assert baseline_tuning_audit["methods"]["robust_ekf"]["selected_cfg_present"] is True
-    assert baseline_tuning_audit["methods"]["fgo"]["selected_cfg_present"] is True
+    assert baseline_tuning_audit["methods"]["ekf"]["selected_cfg_present"] is True
     assert baseline_tuning_audit["shared_findings"]["baseline_reference_method"] == "ekf"
     assert baseline_tuning_audit["shared_findings"]["all_methods_have_selected_cfgs"] is True
     assert data_chain_evidence_audit["status"] == "partial"
@@ -1671,16 +1568,16 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     assert coverage_audit["missing_requested_public_datasets"] == []
     assert coverage_audit["held_out_test_ids"] == ["sim_line_02"]
     assert coverage_audit["comparison_surface"] == {
-        "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+        "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
         "leaderboard_methods": ["liquid_ekf"],
         "comparison_methods_present": ["liquid_ekf"],
         "all_expected_methods_present": False,
-        "missing_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf"],
+        "missing_methods": ["ekf", "ekf", "lstm_ekf"],
     }
     assert comparison_readiness_audit["status"] == "partial"
     assert comparison_readiness_audit["comparison_surface"] == {
-        "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
-        "fairness_actual_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+        "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
+        "fairness_actual_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
         "coverage_leaderboard_methods": ["liquid_ekf"],
         "main_leaderboard_methods": ["liquid_ekf"],
         "fairness_all_expected_methods_present": True,
@@ -1732,11 +1629,11 @@ def test_paper_run_can_execute_sim_only_when_public_is_skipped(tmp_path, monkeyp
     assert main_conclusion["status"] == "degraded"
     assert "public" in str(main_conclusion["reason"])
     assert main_conclusion["comparison_surface"] == {
-        "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+        "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
         "leaderboard_methods": ["liquid_ekf"],
         "comparison_methods_present": ["liquid_ekf"],
         "all_expected_methods_present": False,
-        "missing_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf"],
+        "missing_methods": ["ekf", "ekf", "lstm_ekf"],
     }
     assert main_conclusion["cross_factorial_conclusion_source"] == "held_out_cross_factorial_eval"
     assert main_conclusion["cross_factorial_surface_status"] == "ok"
@@ -1762,18 +1659,14 @@ def test_paper_run_full_surface_with_complete_training_evidence_unlocks_full_fai
     output_root = tmp_path / "paper_run_full"
     sim_raw_root = tmp_path / "sim_raw"
     miluv_raw_root = tmp_path / "miluv_raw"
-    ntu_raw_root = tmp_path / "ntu_raw"
     sim_raw_root.mkdir(parents=True)
     miluv_raw_root.mkdir(parents=True)
-    ntu_raw_root.mkdir(parents=True)
 
     def _resolve_dataset_raw_root(dataset_name, raw_root_override):
         if dataset_name == "sim":
             return sim_raw_root
         if dataset_name == "miluv":
             return miluv_raw_root
-        if dataset_name == "ntu_viral":
-            return ntu_raw_root
         raise AssertionError(dataset_name)
 
     def _stage_result(stage_name, *, artifacts=None, metadata=None):
@@ -1841,8 +1734,7 @@ def test_paper_run_full_surface_with_complete_training_evidence_unlocks_full_fai
         return [
             {"method_name": "liquid_ekf", "score_vector": [0.10]},
             {"method_name": "lstm_ekf", "score_vector": [0.20]},
-            {"method_name": "fgo", "score_vector": [0.30]},
-            {"method_name": "robust_ekf", "score_vector": [0.40]},
+                        {"method_name": "ekf", "score_vector": [0.40]},
             {"method_name": "ekf", "score_vector": [0.50]},
         ]
 
@@ -1857,11 +1749,6 @@ def test_paper_run_full_surface_with_complete_training_evidence_unlocks_full_fai
         script,
         "inspect_miluv_raw_readiness",
         lambda raw_root: {"dataset_name": "miluv", "status": "ready", "gate_action": "pass", "sequence_ids": ["miluv_seq_01"]},
-    )
-    monkeypatch.setattr(
-        script,
-        "inspect_ntu_viral_raw_readiness",
-        lambda raw_root: {"dataset_name": "ntu_viral", "status": "ready", "gate_action": "pass", "sequence_ids": ["ntu_seq_01"]},
     )
     monkeypatch.setattr(
         script,
@@ -1886,14 +1773,12 @@ def test_paper_run_full_surface_with_complete_training_evidence_unlocks_full_fai
     classical_search_result = {
         "selected_estimator_cfgs": {
             "ekf": {"name": "ekf", "measurement_noise": {"uwb": 0.25, "vio": {"pos": 0.08, "yaw": 0.02}}},
-            "robust_ekf": {"name": "robust_ekf", "measurement_noise": {"uwb": 0.25, "vio": {"pos": 0.08, "yaw": 0.02}}},
-            "fgo": {"name": "fgo", "measurement_noise": {"uwb": 0.25, "vio": {"pos": 0.08, "yaw": 0.02}}},
-        },
+            "ekf": {"name": "ekf", "measurement_noise": {"uwb": 0.25, "vio": {"pos": 0.08, "yaw": 0.02}}},
+                    },
         "search_audit": {
             "ekf": {"grid_reports": [{}] * 6, "selected_signature": "ekf__best", "selected_overrides": {}},
-            "robust_ekf": {"grid_reports": [{}] * 6, "selected_signature": "robust_ekf__best", "selected_overrides": {}},
-            "fgo": {"grid_reports": [{}] * _expected_fgo_grid_count(script), "selected_signature": "fgo__best", "selected_overrides": {}},
-        },
+            "ekf": {"grid_reports": [{}] * 6, "selected_signature": "ekf__best", "selected_overrides": {}},
+                    },
     }
     monkeypatch.setattr(script, "_search_best_classical_estimator_cfgs", lambda **kwargs: classical_search_result)
     monkeypatch.setattr(
@@ -2020,7 +1905,7 @@ def test_paper_run_full_surface_with_complete_training_evidence_unlocks_full_fai
 
     assert stdout_payload["status"] == "ok"
     assert final_report["status"] == "ok"
-    assert final_report["requested_public_datasets"] == ["miluv", "ntu_viral"]
+    assert final_report["requested_public_datasets"] == ["miluv"]
     assert final_report["data_chain_readiness"]["status"] == "ok"
     assert final_report["training_stability_readiness"]["status"] == "ok"
     assert final_report["training_evidence_readiness"]["status"] == "ok"
@@ -2055,18 +1940,14 @@ def test_paper_run_blocks_main_conclusion_when_test_ids_are_missing(tmp_path, mo
     output_root = tmp_path / "paper_run"
     sim_raw_root = tmp_path / "sim_raw"
     miluv_raw_root = tmp_path / "miluv_raw"
-    ntu_raw_root = tmp_path / "ntu_raw"
     sim_raw_root.mkdir(parents=True)
     miluv_raw_root.mkdir(parents=True)
-    ntu_raw_root.mkdir(parents=True)
 
     def _resolve_dataset_raw_root(dataset_name, raw_root_override):
         if dataset_name == "sim":
             return sim_raw_root
         if dataset_name == "miluv":
             return miluv_raw_root
-        if dataset_name == "ntu_viral":
-            return ntu_raw_root
         raise AssertionError(dataset_name)
 
     def _stage_result(stage_name, *, artifacts=None, metadata=None):
@@ -2100,16 +1981,6 @@ def test_paper_run_blocks_main_conclusion_when_test_ids_are_missing(tmp_path, mo
     )
     monkeypatch.setattr(
         script,
-        "inspect_ntu_viral_raw_readiness",
-        lambda raw_root: {
-            "dataset_name": "ntu_viral",
-            "status": "not_ready",
-            "gate_action": "blocked",
-            "reasons": ["missing_raw_sequence"],
-        },
-    )
-    monkeypatch.setattr(
-        script,
         "_run_prepare",
         lambda dataset_name, raw_root, prepared_output_root: _stage_result(
             f"prepare_{dataset_name}",
@@ -2134,14 +2005,12 @@ def test_paper_run_blocks_main_conclusion_when_test_ids_are_missing(tmp_path, mo
         lambda **kwargs: {
             "selected_estimator_cfgs": {
                 "ekf": {"name": "ekf"},
-                "robust_ekf": {"name": "robust_ekf"},
-                "fgo": {"name": "fgo"},
-            },
+                "ekf": {"name": "ekf"},
+                            },
             "search_audit": {
                 "ekf": {"grid_reports": [], "selected_signature": "ekf__best", "selected_overrides": {}},
-                "robust_ekf": {"grid_reports": [], "selected_signature": "robust_ekf__best", "selected_overrides": {}},
-                "fgo": {"grid_reports": [], "selected_signature": "fgo__best", "selected_overrides": {}},
-            },
+                "ekf": {"grid_reports": [], "selected_signature": "ekf__best", "selected_overrides": {}},
+                            },
         },
     )
     monkeypatch.setattr(
@@ -2275,18 +2144,14 @@ def test_paper_run_blocks_skip_public_without_diagnostic_opt_in(tmp_path, monkey
     output_root = tmp_path / "paper_run"
     sim_raw_root = tmp_path / "sim_raw"
     miluv_raw_root = tmp_path / "miluv_raw"
-    ntu_raw_root = tmp_path / "ntu_raw"
     sim_raw_root.mkdir(parents=True)
     miluv_raw_root.mkdir(parents=True)
-    ntu_raw_root.mkdir(parents=True)
 
     def _resolve_dataset_raw_root(dataset_name, raw_root_override):
         if dataset_name == "sim":
             return sim_raw_root
         if dataset_name == "miluv":
             return miluv_raw_root
-        if dataset_name == "ntu_viral":
-            return ntu_raw_root
         raise AssertionError(dataset_name)
 
     monkeypatch.setattr(script, "_resolve_dataset_raw_root", _resolve_dataset_raw_root)
@@ -2425,10 +2290,9 @@ def test_fairness_audit_exposes_seed_risk_and_params(tmp_path, monkeypatch):
     classical_search_result = {
         "search_audit": {
             "ekf": {"grid_reports": [{}] * 6, "selected_signature": "ekf__best", "selected_overrides": {}},
-            "robust_ekf": {"grid_reports": [{}] * 6, "selected_signature": "robust_ekf__best", "selected_overrides": {}},
-            "fgo": {"grid_reports": [{}] * _expected_fgo_grid_count(script), "selected_signature": "fgo__best", "selected_overrides": {}},
-        },
-        "selected_estimator_cfgs": {"ekf": {}, "robust_ekf": {}, "fgo": {}},
+            "ekf": {"grid_reports": [{}] * 6, "selected_signature": "ekf__best", "selected_overrides": {}},
+                    },
+        "selected_estimator_cfgs": {"ekf": {}, "ekf": {}},
     }
     neural_search_results = {
         "lstm_ekf": {
@@ -2561,8 +2425,8 @@ def test_fairness_audit_exposes_seed_risk_and_params(tmp_path, monkeypatch):
         "diagnostic_only": False,
     }
     assert audit["comparison_surface"] == {
-        "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
-        "actual_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+        "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
+        "actual_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
         "all_expected_methods_present": True,
         "missing_methods": [],
         "notes": [
@@ -2660,21 +2524,15 @@ def test_baseline_tuning_audit_exposes_selected_classical_overrides():
                 "selected_signature": "ekf__best",
                 "selected_overrides": {"measurement_noise.uwb": 0.25},
             },
-            "robust_ekf": {
+            "ekf": {
                 "grid_reports": [{}] * 6,
-                "selected_signature": "robust_ekf__best",
+                "selected_signature": "ekf__best",
                 "selected_overrides": {"delta": 1.5, "quality_floor": 0.18},
-            },
-            "fgo": {
-                "grid_reports": [{}] * _expected_fgo_grid_count(script),
-                "selected_signature": "fgo__best",
-                "selected_overrides": {"window_size": 20, "max_iters": 15},
             },
         },
         "selected_estimator_cfgs": {
             "ekf": {"name": "ekf"},
-            "robust_ekf": {"name": "robust_ekf"},
-            "fgo": {"name": "fgo"},
+            "ekf": {"name": "ekf"},
         },
     }
 
@@ -2682,8 +2540,8 @@ def test_baseline_tuning_audit_exposes_selected_classical_overrides():
 
     assert audit["status"] == "ok"
     assert audit["comparison_surface"] == {
-        "expected_methods": ["ekf", "robust_ekf", "fgo"],
-        "actual_methods": ["ekf", "robust_ekf", "fgo"],
+        "expected_methods": ["ekf", "ekf"],
+        "actual_methods": ["ekf", "ekf"],
         "all_expected_methods_present": True,
         "missing_methods": [],
     }
@@ -2691,13 +2549,11 @@ def test_baseline_tuning_audit_exposes_selected_classical_overrides():
     assert audit["methods"]["ekf"]["selected_overrides"] == {"measurement_noise.uwb": 0.25}
     assert audit["methods"]["ekf"]["selected_override_count"] == 1
     assert audit["methods"]["ekf"]["grid_report_count"] == 6
-    assert audit["methods"]["robust_ekf"]["selected_override_count"] == 2
-    assert audit["methods"]["fgo"]["selected_override_count"] == 2
-    assert audit["methods"]["fgo"]["grid_report_count"] == _expected_fgo_grid_count(script)
+    assert audit["methods"]["ekf"]["selected_override_count"] == 2
     assert audit["shared_findings"]["baseline_reference_method"] == "ekf"
-    assert audit["shared_findings"]["methods_with_nonempty_overrides"] == ["ekf", "robust_ekf", "fgo"]
+    assert audit["shared_findings"]["methods_with_nonempty_overrides"] == ["ekf", "ekf"]
     assert audit["shared_findings"]["selected_override_count_total"] == 5
-    assert audit["shared_findings"]["selected_cfg_methods"] == ["ekf", "robust_ekf", "fgo"]
+    assert audit["shared_findings"]["selected_cfg_methods"] == ["ekf", "ekf"]
     assert audit["shared_findings"]["all_methods_have_selected_cfgs"] is True
 
 
@@ -3000,8 +2856,8 @@ def test_comparison_readiness_audit_summarizes_publication_claim_gate():
     audit = script._build_comparison_readiness_audit(
         fairness_audit={
             "comparison_surface": {
-                "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
-                "actual_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+                "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
+                "actual_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
                 "all_expected_methods_present": True,
             }
         },
@@ -3012,8 +2868,8 @@ def test_comparison_readiness_audit_summarizes_publication_claim_gate():
         measurement_noise_linkage_audit={"status": "ok"},
         evaluation_coverage_audit={
             "comparison_surface": {
-                "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
-                "leaderboard_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+                "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
+                "leaderboard_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
                 "all_expected_methods_present": True,
             }
         },
@@ -3028,8 +2884,8 @@ def test_comparison_readiness_audit_summarizes_publication_claim_gate():
             "public_surface_status": "ok",
             "cross_factorial_surface_status": "ok",
             "comparison_surface": {
-                "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
-                "leaderboard_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+                "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
+                "leaderboard_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
                 "all_expected_methods_present": True,
             },
         },
@@ -3061,8 +2917,8 @@ def test_comparison_readiness_audit_requires_training_and_data_chain_evidence():
     audit = script._build_comparison_readiness_audit(
         fairness_audit={
             "comparison_surface": {
-                "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
-                "actual_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+                "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
+                "actual_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
                 "all_expected_methods_present": True,
             }
         },
@@ -3073,8 +2929,8 @@ def test_comparison_readiness_audit_requires_training_and_data_chain_evidence():
         measurement_noise_linkage_audit={"status": "partial"},
         evaluation_coverage_audit={
             "comparison_surface": {
-                "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
-                "leaderboard_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+                "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
+                "leaderboard_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
                 "all_expected_methods_present": True,
             }
         },
@@ -3089,8 +2945,8 @@ def test_comparison_readiness_audit_requires_training_and_data_chain_evidence():
             "public_surface_status": "ok",
             "cross_factorial_surface_status": "ok",
             "comparison_surface": {
-                "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
-                "leaderboard_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+                "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
+                "leaderboard_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
                 "all_expected_methods_present": True,
             },
         },
@@ -3117,7 +2973,7 @@ def test_run_grade_contract_distinguishes_paper_grade_and_diagnostic_only():
     script = _load_script()
 
     paper_contract = script._build_run_grade_contract(
-        requested_public_datasets=["miluv", "ntu_viral"],
+        requested_public_datasets=["miluv"],
         allow_incomplete_paper_run=False,
         neural_search_surface=script._resolve_neural_search_surface("paper"),
         comparison_readiness={"ready_for_full_fair_comparison_claim": True},
@@ -3133,8 +2989,8 @@ def test_run_grade_contract_distinguishes_paper_grade_and_diagnostic_only():
     assert paper_contract["paper_grade_budget"] is True
     assert paper_contract["diagnostic_only_profile"] is False
     assert paper_contract["allow_incomplete_paper_run"] is False
-    assert paper_contract["required_public_datasets"] == ["miluv", "ntu_viral"]
-    assert paper_contract["requested_public_datasets"] == ["miluv", "ntu_viral"]
+    assert paper_contract["required_public_datasets"] == ["miluv"]
+    assert paper_contract["requested_public_datasets"] == ["miluv"]
     assert paper_contract["complete_public_surface_requested"] is True
     assert paper_contract["ready_for_full_fair_comparison_claim"] is True
     assert paper_contract["downgrade_drivers"] == []
@@ -3145,7 +3001,7 @@ def test_run_grade_contract_distinguishes_paper_grade_and_diagnostic_only():
     assert diagnostic_contract["paper_grade_budget"] is True
     assert diagnostic_contract["diagnostic_only_profile"] is False
     assert diagnostic_contract["allow_incomplete_paper_run"] is True
-    assert diagnostic_contract["required_public_datasets"] == ["miluv", "ntu_viral"]
+    assert diagnostic_contract["required_public_datasets"] == ["miluv"]
     assert diagnostic_contract["requested_public_datasets"] == []
     assert diagnostic_contract["complete_public_surface_requested"] is False
     assert diagnostic_contract["ready_for_full_fair_comparison_claim"] is False
@@ -3172,7 +3028,7 @@ def test_run_grade_contract_respects_cli_overridden_training_budget_surface():
         eval_batch_size=None,
     )
     contract = script._build_run_grade_contract(
-        requested_public_datasets=["miluv", "ntu_viral"],
+        requested_public_datasets=["miluv"],
         allow_incomplete_paper_run=False,
         neural_search_surface=overridden_surface,
         comparison_readiness={"ready_for_full_fair_comparison_claim": True},
@@ -3193,10 +3049,9 @@ def test_search_budget_summary_counts_checkpoint_selection_scoring_runs():
     classical_search_result = {
         "search_audit": {
             "ekf": {"grid_reports": [], "selected_signature": "ekf__best", "selected_overrides": {}},
-            "robust_ekf": {"grid_reports": [], "selected_signature": "robust_ekf__best", "selected_overrides": {}},
-            "fgo": {"grid_reports": [], "selected_signature": "fgo__best", "selected_overrides": {}},
-        },
-        "selected_estimator_cfgs": {"ekf": {}, "robust_ekf": {}, "fgo": {}},
+            "ekf": {"grid_reports": [], "selected_signature": "ekf__best", "selected_overrides": {}},
+                    },
+        "selected_estimator_cfgs": {"ekf": {}, "ekf": {}},
     }
     neural_search_results = {
         "lstm_ekf": {
@@ -3572,7 +3427,7 @@ def test_evaluation_coverage_audit_distinguishes_core_vs_held_out_axis_execution
             ],
         },
         cross_factorial_interactions={"status": "ok", "reason": None},
-        requested_public_datasets=["miluv", "ntu_viral"],
+        requested_public_datasets=["miluv"],
         public_runs=[{"dataset_name": "miluv"}],
     )
 
@@ -3591,15 +3446,15 @@ def test_evaluation_coverage_audit_distinguishes_core_vs_held_out_axis_execution
         "dual_degradation": True,
     }
     assert audit["comparison_surface"] == {
-        "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+        "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
         "leaderboard_methods": [],
         "comparison_methods_present": [],
         "all_expected_methods_present": False,
-        "missing_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+        "missing_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
     }
     assert audit["held_out_test_ids"] == ["sim_holdout_00", "sim_holdout_01"]
     assert audit["completed_public_datasets"] == ["miluv"]
-    assert audit["missing_requested_public_datasets"] == ["ntu_viral"]
+    assert audit["missing_requested_public_datasets"] == []
 
 
 @pytest.mark.xfail(reason="scripts/20_run_paper_experiments.py:93 tests target a .bak.py implementation that does not exist in the repo; xfail pending proper paper-run orchestration implementation")
@@ -3640,11 +3495,11 @@ def test_main_conclusion_degrades_when_cross_factorial_surface_is_incomplete():
     assert report["reason"] == "incomplete_factorial_coverage"
     assert report["core_conclusion_source"] == "held_out_test_ids"
     assert report["comparison_surface"] == {
-        "expected_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf", "liquid_ekf"],
+        "expected_methods": ["ekf", "ekf", "lstm_ekf", "liquid_ekf"],
         "leaderboard_methods": ["liquid_ekf"],
         "comparison_methods_present": ["liquid_ekf"],
         "all_expected_methods_present": False,
-        "missing_methods": ["ekf", "robust_ekf", "fgo", "lstm_ekf"],
+        "missing_methods": ["ekf", "ekf", "lstm_ekf"],
     }
     assert report["split_provenance"] == {
         "split_kind": "held_out_test_ids",
@@ -4044,7 +3899,7 @@ def test_classical_search_candidate_reuses_provided_ekf_baseline_metrics(tmp_pat
     captured_baseline_metrics = {}
     active_scoring_experiments = tuple(
         Path(config_name).stem
-        for config_name in script._search_scoring_config_names("robust_ekf", include_safe=True)
+        for config_name in script._search_scoring_config_names("ekf", include_safe=True)
     )
     baseline_metrics_by_experiment = {
         experiment_id: {"p95": 0.25 + index}
@@ -4078,8 +3933,8 @@ def test_classical_search_candidate_reuses_provided_ekf_baseline_metrics(tmp_pat
     monkeypatch.setattr(script, "_run_scoring_experiment", _fake_scoring_experiment)
 
     report = script._run_classical_search_candidate(
-        method_name="robust_ekf",
-        overrides={"robust_weight.delta": 0.75},
+        method_name="ekf",
+        overrides={},
         prepare_root=tmp_path / "prepare",
         raw_root=tmp_path / "raw",
         search_root=tmp_path / "search",
@@ -5381,20 +5236,16 @@ def test_classical_search_result_replays_safe_once_for_selected_ekf(tmp_path, mo
         _candidate_report("ekf", "ekf_mid", 2.0),
         _candidate_report("ekf", "ekf_worst", 3.0),
     ]
-    robust_report = _candidate_report("robust_ekf", "robust_best", 0.8)
-    fgo_report = _candidate_report("fgo", "fgo_best", 0.7)
+    robust_report = _candidate_report("ekf", "robust_best", 0.8)
 
     def _fake_run_classical_search_candidate(**kwargs):
         method_name = kwargs["method_name"]
         overrides = dict(kwargs["overrides"])
         if method_name == "ekf":
             return ekf_reports.pop(0)
-        if method_name == "robust_ekf":
+        if method_name == "ekf":
             assert kwargs["baseline_scoring_metrics_by_experiment"]["e0_safe_mode"]["p95"] == 0.55
             return robust_report
-        if method_name == "fgo":
-            assert kwargs["baseline_scoring_metrics_by_experiment"]["e0_safe_mode"]["p95"] == 0.55
-            return fgo_report
         raise AssertionError(method_name)
 
     def _fake_iter_ekf_override_grid():
@@ -5403,12 +5254,10 @@ def test_classical_search_result_replays_safe_once_for_selected_ekf(tmp_path, mo
     def _fake_iter_robust_override_grid(_top_ekf_reports):
         return [{"tag": "robust_best"}]
 
-    def _fake_iter_fgo_override_grid(_top_ekf_reports):
-        return [{"tag": "fgo_best"}]
-
+    
     def _fake_run_scoring_experiment(**kwargs):
         config_name_stem = Path(kwargs["config_name"]).stem
-        # 主线程新增的 final paper scoring 会在选定 ekf / robust_ekf / fgo 上跑 e2/e3/e9,
+        # 主线程新增的 final paper scoring 会在选定 ekf / ekf 上跑 e2/e3/e9,
         # 这些调用既不是 e0_safe_mode 也不来自 ekf; 这里直接返回一个 e9-compatible 的最小
         # metrics 字典, 避免污染 captured_safe_calls 与 grid/safe 阶段的断言。
         if config_name_stem != "e0_safe_mode":
@@ -5454,7 +5303,6 @@ def test_classical_search_result_replays_safe_once_for_selected_ekf(tmp_path, mo
     monkeypatch.setattr(script, "_run_classical_search_candidate", _fake_run_classical_search_candidate)
     monkeypatch.setattr(script, "_iter_ekf_override_grid", _fake_iter_ekf_override_grid)
     monkeypatch.setattr(script, "_iter_robust_override_grid", _fake_iter_robust_override_grid)
-    monkeypatch.setattr(script, "_iter_fgo_override_grid", _fake_iter_fgo_override_grid)
     monkeypatch.setattr(script, "_run_scoring_experiment", _fake_run_scoring_experiment)
 
     report = script._search_best_classical_estimator_cfgs(
@@ -5779,18 +5627,14 @@ def test_paper_run_writes_failed_final_report_when_liquid_neural_search_raises(t
     output_root = tmp_path / "paper_run"
     sim_raw_root = tmp_path / "sim_raw"
     miluv_raw_root = tmp_path / "miluv_raw"
-    ntu_raw_root = tmp_path / "ntu_raw"
     sim_raw_root.mkdir(parents=True)
     miluv_raw_root.mkdir(parents=True)
-    ntu_raw_root.mkdir(parents=True)
 
     def _resolve_dataset_raw_root(dataset_name, raw_root_override):
         if dataset_name == "sim":
             return sim_raw_root
         if dataset_name == "miluv":
             return miluv_raw_root
-        if dataset_name == "ntu_viral":
-            return ntu_raw_root
         raise AssertionError(dataset_name)
 
     def _stage_result(stage_name, *, artifacts=None, metadata=None):
@@ -5820,16 +5664,6 @@ def test_paper_run_writes_failed_final_report_when_liquid_neural_search_raises(t
     )
     monkeypatch.setattr(
         script,
-        "inspect_ntu_viral_raw_readiness",
-        lambda raw_root: {
-            "dataset_name": "ntu_viral",
-            "status": "not_ready",
-            "gate_action": "blocked",
-            "reasons": ["missing_raw_sequence"],
-        },
-    )
-    monkeypatch.setattr(
-        script,
         "_run_prepare",
         lambda dataset_name, raw_root, prepared_output_root: _stage_result(
             f"prepare_{dataset_name}",
@@ -5850,9 +5684,8 @@ def test_paper_run_writes_failed_final_report_when_liquid_neural_search_raises(t
         lambda **kwargs: {
             "selected_estimator_cfgs": {
                 "ekf": {"name": "ekf"},
-                "robust_ekf": {"name": "robust_ekf"},
-                "fgo": {"name": "fgo"},
-            },
+                "ekf": {"name": "ekf"},
+                            },
             "selected_ekf_metrics_by_experiment": {"e9_dual_degradation": {"p95": 1.0}},
             "search_audit": {},
         },

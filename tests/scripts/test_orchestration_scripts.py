@@ -237,7 +237,7 @@ def test_quick_geometry_remap_prefers_source_t_for_a3_shifted_uwb():
 
 def test_baseline_script_main(tmp_path):
     module = _load_module("07_run_baselines.py", "baseline_script")
-    # 显式指定 --config：baseline 脚本仅支持 ekf/robust_ekf 估计器（不在 estimator_factory._SUPPORTED 中）
+    # 显式指定 --config：baseline 脚本仅支持 ekf/ekf 估计器（不在 estimator_factory._SUPPORTED 中）
     config_path = tmp_path / "baseline_main.yaml"
     config_path.write_text(
         "\n".join(
@@ -250,7 +250,7 @@ def test_baseline_script_main(tmp_path):
                 "  V: V2",
                 "  K: K1",
                 "  M: M0",
-                "methods: [ekf, robust_ekf]",
+                "methods: [ekf, ekf]",
             ]
         ),
         encoding="utf-8",
@@ -261,7 +261,7 @@ def test_baseline_script_main(tmp_path):
         (output_root / "audits" / "prediction_index.json").read_text(encoding="utf-8")
     )
     assert len(prediction_index) == 2
-    assert {entry["method_name"] for entry in prediction_index} == {"ekf", "robust_ekf"}
+    assert {entry["method_name"] for entry in prediction_index} == {"ekf", "ekf"}
     assert {entry["task_id"] for entry in prediction_index} == {"scene_00"}
     assert {entry["scene_id"] for entry in prediction_index} == {"S(A3,N3,V2,K1,M0)"}
 
@@ -310,7 +310,7 @@ def test_baseline_script_filters_methods_in_config(tmp_path, monkeypatch):
         "primary_axis: target_degradation_bundle\n"
         "frozen_axes:\n"
         "  A: A3\n  N: N3\n  V: V2\n  K: K1\n  M: M0\n"
-        "methods: [ekf, robust_ekf]\n",
+        "methods: [ekf, ekf]\n",
         encoding="utf-8",
     )
     captured = []
@@ -335,8 +335,8 @@ def test_baseline_script_filters_methods_in_config(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "_load_real_smoke_events", lambda raw_root, scene_id, **kwargs: [])
 
     assert module.main(["--config", str(config_path), "--scene-id", "S(A3,N3,V2,K1,M0)", "--output-root", str(tmp_path / "baseline_filtered")]) == 0
-    assert captured[0]["methods"] == ["ekf", "robust_ekf"]
-    assert captured[0]["experiment_cfg"]["methods"] == ["ekf", "robust_ekf"]
+    assert captured[0]["methods"] == ["ekf", "ekf"]
+    assert captured[0]["experiment_cfg"]["methods"] == ["ekf", "ekf"]
     assert captured[0]["scene_tasks"][0]["seq_id"] == "mini_seq"
 
 
@@ -350,7 +350,7 @@ def test_baseline_script_normalizes_smoke_task_bookkeeping(tmp_path, monkeypatch
         "primary_axis: target_degradation_bundle\n"
         "frozen_axes:\n"
         "  A: A3\n  N: N3\n  V: V2\n  K: K1\n  M: M0\n"
-        "methods: [ekf, robust_ekf]\n",
+        "methods: [ekf, ekf]\n",
         encoding="utf-8",
     )
     captured = []
@@ -406,7 +406,7 @@ def test_baseline_script_main_with_nonmatching_config(tmp_path, monkeypatch):
                 "  V: V1",
                 "  K: K1",
                 "  M: M0",
-                "methods: [ekf, robust_ekf]",
+                "methods: [ekf, ekf]",
             ]
         ),
         encoding="utf-8",
@@ -1887,7 +1887,7 @@ def test_extended_script_main_core_and_public_routes(tmp_path, monkeypatch, caps
     ) == 0
     core_stdout = _extract_stdout_json(capsys.readouterr().out)
     assert len(core_calls) == 1
-    # 5 个方法 (ekf, robust_ekf, fgo, lstm_ekf, liquid_ekf) → 5 个 bundle
+    # 4 个方法 (ekf, ekf, lstm_ekf, liquid_ekf) → 4 个 bundle
     assert core_stdout == {
         "route": "core",
         "stage_name": "core_pipeline",
@@ -1968,25 +1968,25 @@ def test_extended_script_main_core_and_public_routes(tmp_path, monkeypatch, caps
     assert public_calls[-1]["dataset_name"] == "miluv"
 
 
-def test_extended_script_rejects_all_model_without_fgo(tmp_path, monkeypatch):
+def test_extended_script_allows_missing_classical_method(tmp_path, monkeypatch):
     """拒绝测试：extended script。\n\n验证被测功能对 extended script 的拒绝行为，\n确保不合法输入被正确拦截。
 
-    原测试期望「all-model core runs must include fgo」错误。当前脚本已移除该强制
+    原测试期望「all-model core runs must include classical method」错误。当前脚本已移除该强制
     校验（各实验 config 自行决定 methods）。本测试改为验证：当 methods 列表为
-    非默认设置时，脚本不会因 all-model 缺失 fgo 而崩溃，并能正常进入 core 路线。
+    非默认设置时，脚本不会因 all-model 缺失经典方法而崩溃，并能正常进入 core 路线。
     """
-    module = _load_module("09_run_extended_experiments.py", "extended_script_missing_fgo")
-    config_path = tmp_path / "missing_fgo.yaml"
+    module = _load_module("09_run_extended_experiments.py", "extended_script_missing_method")
+    config_path = tmp_path / "missing_method.yaml"
     config_path.write_text(
-        "experiment_id: missing_fgo\n"
+        "experiment_id: missing_method\n"
         "primary_axis: target_degradation_bundle\n"
         "frozen_axes:\n"
         "  A: A2\n  N: N2\n  V: V2\n  K: K3\n  M: M0\n"
-        "methods: [ekf, robust_ekf, lstm_ekf, liquid_ekf]\n",
+        "methods: [ekf, ekf, lstm_ekf, liquid_ekf]\n",
         encoding="utf-8",
     )
 
-    # 当前实现不再校验 fgo 必含；仅验证不抛 ValueError 即可。
+    # 当前实现不再校验经典方法必含；仅验证不抛 ValueError 即可。
     class _FakeCorePipeline:
         def run(self, payload):
             return type(
@@ -2006,9 +2006,9 @@ def test_extended_script_rejects_all_model_without_fgo(tmp_path, monkeypatch):
 
     monkeypatch.setattr(module, "CorePipeline", lambda: _FakeCorePipeline())
     # 脚本会因 _load_default_geometry_inputs 找不到 fixture 而报错，但已经过 validation 阶段。
-    # 这里只验证校验逻辑不再拒绝「无 fgo」配置。
+    # 这里只验证校验逻辑不再拒绝「无经典方法」配置。
     try:
-        module.main(["--config", str(config_path), "--output-root", str(tmp_path / "extended_missing_fgo")])
+        module.main(["--config", str(config_path), "--output-root", str(tmp_path / "extended_missing_method")])
     except ValueError as exc:
         if "all-model" in str(exc):
             raise
@@ -2023,7 +2023,7 @@ def test_extended_script_fails_when_requested_method_surface_drops_method(tmp_pa
         "primary_axis: target_degradation_bundle\n"
         "frozen_axes:\n"
         "  A: A2\n  N: N2\n  V: V2\n  K: K3\n  M: M0\n"
-        "methods: [ekf, robust_ekf, fgo]\n",
+        "methods: [ekf, ekf]\n",
         encoding="utf-8",
     )
 
@@ -2043,7 +2043,7 @@ def test_extended_script_fails_when_requested_method_surface_drops_method(tmp_pa
 
     monkeypatch.setattr(module, "CorePipeline", lambda: _FakeCorePipeline())
 
-    with pytest.raises(ValueError, match=r"requested methods disappeared from prediction surface: fgo, robust_ekf"):
+    with pytest.raises(ValueError, match=r"requested methods disappeared from prediction surface: ekf"):
         module.main(["--config", str(config_path), "--output-root", str(tmp_path / "extended_surface_drop")])
 
 
@@ -3185,37 +3185,37 @@ def test_high_level_consumer_script_main(tmp_path, capsys, monkeypatch):
         "\n".join(
             [
                 "case_ref,seq_id,scene_id,method_name,metric,value",
-                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,K3)",robust_ekf,risk_error_corr,0.40',
-                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,K3)",robust_ekf,coverage,0.85',
-                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,K3)",robust_ekf,bias_alignment,0.30',
-                'scene_00::robust_ekf,scene_00,"S(A2,N2,V2,K3)",robust_ekf,corr_scaling_error,0.25',
+                'scene_00::ekf,scene_00,"S(A2,N2,V2,K3)",ekf,risk_error_corr,0.40',
+                'scene_00::ekf,scene_00,"S(A2,N2,V2,K3)",ekf,coverage,0.85',
+                'scene_00::ekf,scene_00,"S(A2,N2,V2,K3)",ekf,bias_alignment,0.30',
+                'scene_00::ekf,scene_00,"S(A2,N2,V2,K3)",ekf,corr_scaling_error,0.25',
             ]
         ),
         encoding="utf-8",
     )
     (statistics_root / "statistics_table.json").write_text(
-        json.dumps({"method_summary": {"robust_ekf": {"rmse": 0.1}}, "pairwise_tests": []}),
+        json.dumps({"method_summary": {"ekf": {"rmse": 0.1}}, "pairwise_tests": []}),
         encoding="utf-8",
     )
     (cases_root / "selected_cases.json").write_text(
         json.dumps(
             {
-                "main_cases": [{"case_ref": "scene_00::robust_ekf"}],
-                "failure_cases": [{"case_ref": "scene_03::robust_ekf"}],
-                "boundary_cases": [{"case_ref": "scene_02::robust_ekf"}],
+                "main_cases": [{"case_ref": "scene_00::ekf"}],
+                "failure_cases": [{"case_ref": "scene_03::ekf"}],
+                "boundary_cases": [{"case_ref": "scene_02::ekf"}],
             }
         ),
         encoding="utf-8",
     )
     (plotting_inputs_root / "main_table.json").write_text(
-        json.dumps([{"case_ref": "scene_00::robust_ekf", "method_name": "robust_ekf", "rmse": 0.1}]),
+        json.dumps([{"case_ref": "scene_00::ekf", "method_name": "ekf", "rmse": 0.1}]),
         encoding="utf-8",
     )
     (plotting_inputs_root / "runtime_table.json").write_text(
         json.dumps(
             [
                 {
-                    "case_ref": "scene_00::robust_ekf",
+                    "case_ref": "scene_00::ekf",
                     "latency_mean": 1.0,
                     "latency_p50": 0.9,
                     "latency_p95": 1.1,
@@ -3260,9 +3260,9 @@ def test_high_level_consumer_script_main(tmp_path, capsys, monkeypatch):
         },
         "summary": {
             "case_refs": [
-                "scene_00::robust_ekf",
-                "scene_03::robust_ekf",
-                "scene_02::robust_ekf",
+                "scene_00::ekf",
+                "scene_03::ekf",
+                "scene_02::ekf",
             ],
             "summary_stats_keys": ["main_table_ref", "statistics_ref"],
         },
