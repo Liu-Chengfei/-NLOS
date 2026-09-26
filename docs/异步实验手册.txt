@@ -1,35 +1,45 @@
-异步实验手册（最终版 v3）
+异步实验手册（最终版 v5）
 主线 A：LNN RMSE 显著低于误差预算上界（= 纯 UWB 三边测量 RMSE），无 >10m 爆炸行。 主线 B：LNN 为四方法最低，且与最佳基线配对 Wilcoxon（Holm 校正后）显著。
 
-0. 判定契约（code freeze 前落盘，禁止事后修改）
+0. 判定契约（code freeze 前落盘；pilot 校准项冻结，正式实验开始后禁止修改）
 字段	值/方法
 error_budget_upper_m	纯 UWB 三边测量 RMSE（4 锚测距解算，不融合；同批测试轨迹、同时间戳、warm-up 剔除后、2D 轨迹级）
 error_budget_check	每条测试轨迹算 RMSE，LNN vs 上界单侧配对检验
 error_budget_alpha	0.05
 error_budget_unit	trajectory-level
+noise_level_m	同方法跨 seed 轨迹级 RMSE 的合并标准差（pooled SD）；pilot 估定写 manifest 并冻结；用于 comparison_weak / borderline 判定
 primary_method	LNN
 primary_comparison_set	[LNN, LSTM, Transformer, EKF]
 primary_metric	2D_RMSE（主判定只用它）
 secondary_metric	3D_RMSE（辅助报告）
 m_axis_fixed	M1
-diag_pair	(A2N2, A3N3)
+diag_pair	(A2N2, A3N3)；运行期断言各 ≥250 轨迹级样本
 holm_family_size	6
-sesoi_delta_rmse_m	相对提升 15%，等效边界 ±7.5%；补 sesoi_absolute_m
+sesoi_delta_rmse_m	SESOI = 相对提升 15%（下限）；等效边界 = SESOI × (1±50%) = 7.5%–22.5%；90% CI 完全落在边界内 → 等效；补 sesoi_absolute_m
+advantage_m	优势 = LNN 与次低者（按平均轨迹级 RMSE 均值排名第二）的平均轨迹级 RMSE 之差
+best_baseline	除 LNN 外按全部轨迹级 RMSE 均值排名最低者；排名表写 manifest
+lr_search_space	LNN = 1e-4–2e-2（覆盖 LTC 原文 0.001–0.02）；LSTM/Transformer = 1e-4–1e-3；分方法写 manifest
 mainline_a_decision / mainline_b_decision	pass / fail / borderline → manifest
-主线 B 三段判定：① LNN 最低；② LNN vs 最佳基线配对 Wilcoxon（Holm 后 p<0.05）；③ 效应量 + 95% BCa CI 不跨 0。三段全过才 pass。
+pilot 与冻结规则：pilot 必须在正式训练前完成；noise_level_m、sesoi_delta_rmse_m、sesoi_absolute_m、advantage_m 由 pilot 数据校准后写入 manifest 并冻结；正式实验开始后不得再改。
 
+主线 B 三段判定（三段全过才 pass，否则输出卡在哪一段）：
+
+段 1：LNN 按均值排名为四方法最低；若最低但 advantage_m < noise_level_m → mainline_b_borderline=1，不直接 pass
+段 2：LNN vs 最佳基线（按均值排名除 LNN 外最低者）配对 Wilcoxon，Holm 校正后 p < 0.05
+段 3：效应量 + 95% BCa CI 不跨 0
 [1] 档位协议与实验矩阵
 A 轴档位表：A0/A1/A2/A3——UWB 时钟偏移 0/5–20/20–50/100–200 ms；UWB 往返延迟 0/20–40/40–80/120–250 ms；IMU 时钟偏移 0/1–5/5–15/20–50 ms；IMU 采样抖动 0/±1/±3/±10 ms；VIO 时钟偏移 0/5–20/20–50/100–200 ms；VIO 处理延迟 0/10–30/30–80/150–300 ms
 N 轴档位表：N0/N1/N2/N3——ρ 0–5%/10–15%/25–30%/35–40%；μ ~0/0.5–1/2–3/4–6 m；σ —/0.3/0.8/1.5 m；全档固定 4 锚、可解率 100%
 V 轴档位表：V0 健康（特征>50/frame、σ=0.01–0.03 m/步、帧有效 100%）/ V1 黑屏（增量置零、每序列 1–2 次、0.5–2 s、占 5–10%）/ V2 特征丢失（特征 10–20/frame、噪声×5、占 20–40%、scaling→0.3–0.7）/ V3 关键帧中断（每序列 2–4 次、间隙 0.5–3 s、占 10–20%、恢复跳变 0.3–1 m）
 K 轴档位表：K0（4 锚对称，GDOP 1.5–2.5）/ K1（4 锚非对称欠定，GDOP 3–5）/ K3（4 锚近共线退化，GDOP 8–15+）；锚数全档固定 4
 M 轴档位表：M0 0% / M1 UWB 5% 成簇丢包（长间隙 0.3–2 s）/ M2 UWB 15%+VIO 15% / M3 UWB 30%+VIO 30%（IMU ≤5%）
-运行期断言：m_axis_fixed = M1（背景噪声，不参与因子设计；可解率 100% ⇒ 不可解帧=0）
-四组合 A2/A3 × N2/N3 各 25%；运行期断言四组合占比均为 25%±容差
-样本量：每组合 ≥25 条测试 × 10 seed = 每组合 ≥250 轨迹级样本，总 ≥1000；训练 12–15 条/seed，seed=10，120s
+运行期断言 m_axis_fixed = M1；可解率 100% ⇒ 不可解帧=0
+四组合 A2/A3 × N2/N3 各 25%；运行期断言四组合占比 25%±容差
+样本量：每组合 ≥25 条测试 × 10 seed = 每组合 ≥250 轨迹级样本，总 ≥1000；运行期断言 diag_pair（A2N2、A3N3）各 ≥250；训练 12–15 条/seed，seed=10，120s
+组合不足处理：运行期检查每组合实际测试轨迹数，不足自动补生成；补后仍不足 → 停止并报错
 单元齐全性：10 seed × 4 方法 = 40 单元（EKF 无训练，训练型 3×10=30），运行期断言全单元有结果文件
-primary_metric=2D_RMSE 写入实验记录；diag_pair=(A2N2, A3N3) 写入实验记录
-YAML 档位矩阵与 manifest 交叉核对（含 M1、error_budget_upper_m、primary_metric）
+primary_metric=2D_RMSE、diag_pair=(A2N2, A3N3) 写入实验记录
+YAML 档位矩阵与 manifest 交叉核对（含 M1、error_budget_upper_m、primary_metric、noise_level_m、lr_search_space、sesoi）
 [2] 传感器契约与定位输入
 UWB：DW1000 级，10 Hz，uwb_ranges（N×4）+ uwb_valid（N×4）
 IMU：150 Hz 原生不降采样，imu（N_imu×6）+ imu_t（N_imu×1）
@@ -48,26 +58,25 @@ A 轴按 A 轴档位表静态注入，不引入线性漂移
 运行期断言 rho_spread_check：逐条轨迹 ρ 有散布，非全同值
 运行期断言 mu_sigma_actual_check：N 轴实际 μ/σ 与档位区间一致，超区间重生成
 行数边界：120s 下 UWB=1201、IMU=18001；闭区间 [t0,t1]；运行期断言不用 rows==duration×rate 精确判定
-四组合全部进训练，漏组合补生成
+四组合全部进训练，漏组合补生成；补后仍不足 → 停止
 训练/测试 ρ/μ/σ 覆盖偏差 ≤10%；ρ 分布直方图写 manifest
 A 轴实际注入统计写 manifest（a_axis_actual_stats：均值±std、max，超区间重生成）
 每 seed 独立生成，禁冒烟/上轮数据凑数；布局轨迹重新生成，禁复用主场景或换标签
 缓存/mmap/archive 与 manifest 同源同批次
 确定性：同 rand_root+同档位，两次 npz 逐字节一致；gen_version 写 npz 与 manifest，版本不一致报错停止
-目录物理隔离，禁止跨体系读写
-生成-训练流水线重叠；CPU 多核并行（核数=本机核数−另一体系估算占用）；DataLoader 多 worker+prefetch；提速不改口径
+目录物理隔离，禁止跨体系读写；生成-训练流水线重叠；CPU 多核并行；DataLoader 多 worker+prefetch；提速不改口径
 [4] 数据划分与防泄漏
 划分先于窗口化；测试轨迹不参与训练滑窗；窗口不跨序列边界；按整条序列划分
 运行期断言 valid_seq_ids ∩ test_seq_ids = ∅
-归一化统计量只用训练集；norm_stats_from_train_only：归一化函数带 dataset_split，测试/验证集加载训练集统计量，违规 fail-fast
+归一化统计量只用训练集；norm_stats_from_train_only：归一化函数带 dataset_split，违规 fail-fast
 运行期断言 window_no_cross_seq：滑窗不跨序列边界
 valid_seq_ids 写每 seed manifest；四方法共用同一验证集；EKF 验证仅用于超参选择
 [5] 模型架构
 LSTM/Transformer 与 LNN 共享完全相同 4 个头，只换骨干
 液态骨干：连续时间循环单元，状态方程 ẋ=f(x,I(t),θ) 按实际时间间隔离散化（非固定步长）；LTC 或 CfC 二选一写 manifest（liquid_cell_type）
-τ 输入依赖可学习量，范围 1.0–20.0；tau_range_assert、liquid_tau_std_assert（std>0 冒烟断言）
+τ 输入依赖可学习量，范围 1.0–20.0；tau_range_assert、liquid_tau_std_assert（std>0 冒烟断言）；tau_std_manifest：训练后 τ 的 std 写 manifest，作为液态骨干未退化证据
 运行期断言禁止退化为固定时间常数 LSTM 变体
-risk 头双通道监督：nl_flag 软标签 BCE（平滑 0.1）+ UWB 残差滑动窗口自监督（秩相关 ≥0.3）
+risk 头双通道监督：nl_flag 软标签 BCE（平滑 0.1）+ UWB 残差滑动窗口自监督一致性（秩相关 ≥0.3）；自监督一致性为训练损失项；训练后脚本检查实际秩相关 ≥0.3，未达标标记 risk_weak 写 manifest
 risk_loss_coupling_assert：risk 输出与损失耦合，禁止 detach/解耦
 协方差门控：R_uwb_eff = R_uwb × (1+α·r)，α=10 写 cov_gate_alpha；cov_gate_monotonic_assert（r↑→R_eff↑）；禁止 risk 直接乘残差
 Δt 序列分路计算，经可学习时间编码层（正弦/相对二选一，写 ts_encoding）拼接进骨干；ts_detach_assert（时间偏移 detach，时间间隔参与前向）
@@ -76,8 +85,7 @@ baseline_postprocess（none/de-drift）统一设置写 manifest
 EKF 基线：紧耦合（输入契约同模型）；固定协议 R/Q；观测按到达序排队；新息 3σ 拒斥；缺失段 skip 计数写 ekf_innov_stats；条件数 ≤1e8、Cholesky 正定；更新顺序固定 ekf_update_order
 [6] 训练公平与超参
 四方法同数据、同 seed、同优化器、同 epoch、同 batch=16、同三段式 lr 形态、同 best-val 早停
-per-method tuning：每方法 ≤3 轮；tuning_search_space 显式写 manifest
-lr_range = 1e-4–5e-3（LNN 参考 LTC 0.001–0.02，搜索空间写 manifest）
+per-method tuning：每方法 ≤3 轮；tuning_search_space 分方法显式写 manifest：LNN = 1e-4–2e-2（覆盖 LTC 原文 0.001–0.02）、LSTM/Transformer = 1e-4–1e-3；禁止跨空间挪用
 early_stop_patience 统一写 manifest
 三网络统一取 best-val checkpoint，收敛即存
 capacity_table：参数量、FLOPs@batch=16/W=128、延迟@RTX5060，与 RMSE 联表；可选 capacity_normalized_rmse
@@ -94,8 +102,9 @@ GPU 默认 RTX 5060；gpu_deterministic：CUDA 确定性模式断言
 CPU 仅承接 GPU 排满后剩余单元，口径不变；每单元 device 写 manifest
 评估并行：轨迹独立并行，轨迹内窗口 batch=16，轨迹间不混批
 [8] 训练精度与安全闸门
-TF32 显式设置写 manifest；AMP 默认启用（FP16 前向/反向 + FP32 主权重 + loss scaling）
-amp_ablation：1 seed 冒烟对比 AMP on/off 对 LNN 收敛；若 AMP 明显劣化 LNN → 全体统一关 AMP（写 manifest），不允许单独回退
+TF32 显式设置写 manifest；tf32_consistency_check：TF32 开/关状态在训练脚本与 manifest 中一致断言
+AMP 默认启用（FP16 前向/反向 + FP32 主权重 + loss scaling）
+amp_ablation（1 seed 冒烟，量化标准）：AMP on 时验证集 best-val RMSE 比 off 恶化 >5%，或 NaN/发散次数 >1，或收敛 epoch 数增加 >50% —— 任一成立判定 AMP 劣化 → 全体统一回退 FP32（写 manifest），不允许单方法单独回退
 三网络与 EKF 共用同一精度设置；tf32_amp_manifest
 fail_stop_save：NaN/Inf/梯度爆炸 → 保存 checkpoint+日志 → 立即止损
 初始化禁止加载旧权重/预训练/迁移权重；load_state_dict 白名单外 fail-fast
@@ -107,22 +116,26 @@ warmup_exclude：前 10s 剔除断言
 轨迹级 RMSE = sqrt(mean((x̂−x)²+(ŷ−y)²))，先逐帧平方误差 → 轨迹内均值 → 开方
 四方法评估输入同一批测试轨迹（配对）；RMSE 口径一致
 [10] 统计报告与判定链
-轨迹级分析单位（每 seed 每轨迹一个 RMSE；每方法 ≥1000 样本、四组合每组合 ≥250）
+轨迹级分析单位（每 seed 每轨迹一个 RMSE；每方法 ≥1000 样本、四组合每组合 ≥250、diag_pair 各 ≥250）
 10 seed 配对、配对 Wilcoxon；holm_family_size=6
-主判定对：主线 A = LNN vs 纯 UWB 三边测量；主线 B = LNN vs 最佳基线；逐对报告 6 对全做
+最佳基线排名依据：按全部轨迹级 RMSE 的均值排名，取除 LNN 外最低者为最佳基线；排名表写 manifest
+主判定对：主线 A = LNN vs 纯 UWB 三边测量；主线 B = LNN vs 最佳基线（基线值写实际最佳基线的绝对值，不预设 EKF）；逐对报告 6 对全做
+噪声水平：noise_level_m（同方法跨 seed 轨迹级 RMSE 合并标准差）；优势 = LNN 与次低者（均值排名第二）的平均轨迹级 RMSE 之差
 效应量（Cohen's d / rank-biserial）+ 95% BCa CI（B≥2000，轨迹级配对重抽样），写 stat_summary
-脚本输出：每个比较的校正后 p、效应量、CI；指标字段 mean±std/P95/P50/Δ/Wilcoxon p/CI，无 NaN/Inf
-脚本输出：绝对差（m）、基线值、百分比、95%CI（相对提升报告用）
+脚本输出：校正后 p、效应量、CI；指标字段 mean±std/P95/P50/Δ/Wilcoxon p/CI，无 NaN/Inf
+脚本输出：绝对差（m）、实际最佳基线绝对值、百分比、95%CI
 脚本输出：离群计数与离群比例（P95 外），不自动剔除
 脚本不计算事后功效（禁止项）
-脚本检查数据生成版本与当前批次一致，否则报错停止（替代"不沿用旧输出"）
-sesoi_delta_rmse_m（15%±7.5%）+ sesoi_absolute_m 从 manifest 读取；TOST 判定：90% CI 在边界内 → "等效"；BF 敏感性补充；禁止事后补设，读值失败拒绝输出"等效"
+脚本检查数据生成版本与当前批次一致，否则报错停止
+主判定报告强制引用 capacity_table（避免"大模型赢小模型"误读）
+sesoi_delta_rmse_m（SESOI = 15% 相对提升下限；等效边界 = 7.5%–22.5%；90% CI 完全落在边界内 → 等效）+ sesoi_absolute_m 从 manifest 读取；TOST 判定；BF 敏感性补充；禁止事后补设，读值失败拒绝输出"等效"
+主判定段 1：LNN 最低但 advantage_m < noise_level_m → mainline_b_borderline=1，不直接 pass
 mainline_a_decision / mainline_b_decision（pass/fail/borderline）写 manifest
 四组合切片统计（各组合均差±std、P50/P95）；2×2 ANOVA（A×N 交互）；A2N2 vs A3N3 对角配对 Wilcoxon
 Spearman 异步偏差-时间相关性诊断输出 results
 统计脚本对已落盘指标并行重算，不重训
 [11] 敏感性、诊断与多样性
-sensitivity_grid 显式列出（A 轴注入方式、N 轴 ±20%、risk 监督权重、超参 ±1 档）
+sensitivity_grid 显式列出（A 轴注入方式、N 轴 ±20%、risk 监督权重、协方差门控 α、超参 ±1 档）
 扫描脚本遍历网格，输出 RMSE/Δ 到 results/sensitivity（档位标签/参数值/指标列）
 sensitivity_isolated：与主实验 checkpoint 分离；写 sensitivity_summary
 轨迹多样性输出：方位角直方图、速度分布（0.5–1.5 m/s 覆盖、占比与训练一致）
@@ -133,27 +146,11 @@ feature_drift：训练/测试关键特征 P5/P50/P95 对比，超阈告警写 ma
 checkpoint 原子写入（权重+config_hash+epoch+metric，先写临时文件再改名）；断点续跑只认磁盘本批记录
 checkpoint 文件名含 config_hash；加载时校验与 manifest 一致，否则禁用
 环境与设备留痕：Python/PyTorch/依赖锁、nvidia-smi 输出写 manifest
-mainline_decision_manifest、error_budget_manifest、primary_metric_manifest
+mainline_decision_manifest、error_budget_manifest、primary_metric_manifest、noise_level_manifest
 组件级单测（数据生成器/评估对齐/统计脚本，黄金测试构造数据）；冒烟跑 full（1 seed）全链路可运行
-13. 五道诊断门禁（写 manifest）
-预训练门禁：1 seed 冒烟后，检查 LNN 在验证集是否已低于最佳基线（尤其 EKF）；否则先诊断，不进全量
-训练中门禁：每 seed 训练后，验证集 LNN vs 最佳基线差距写 manifest；LNN 未最低 → mainline_b_risk=high
-统计前门禁：全量评估后先算轨迹级 RMSE 最低者；不是 LNN → 直接输出失败诊断，不做选择性统计
-误差预算门禁：LNN 轨迹级 RMSE vs error_budget_upper_m → mainline_a_decision
-方法对比门禁：LNN vs 各方法 Δ 写 manifest；与最佳基线差距 < 噪声水平 → comparison_weak
-
-结构摘除：某输出分支从计算图彻底移除，参数量减少等于移除模块参数量。
-置中性值冻结：分支仍存在，输出固定中性值，不参与梯度，参数量不变。
-可解率 100%：所有帧都能解算，不可解帧数为零。
-成簇丢包：数据缺失连续成段，长间隙 0.3–2 s，非均匀随机。
-前 10 秒剔除：评估跳过开头 10 s 帧，不计入指标，数据不删除。
-轨迹级 RMSE：每条轨迹先算一个 RMSE，再以轨迹为统计单位。
-最近邻对齐：取时间上最近的另一路值，不做线性/样条插值。
-A 轴注入在重采样前：先注入异步偏移，再统一重采样。
-输入依赖时间常数 τ：τ 由输入决定的可学习量，非固定值。
-AMP：自动混合精度（FP16 前向/反向 + FP32 主权重）。
-TF32：TensorFloat-32 GPU 精度设置。
-EKF 更新顺序固定：每次各观测更新顺序固定，不随机。
-条件数 ≤1e8：协方差矩阵条件数上限，防数值病态。
-Cholesky 正定：协方差矩阵正定，可做 Cholesky 分解。
-结构摘除 vs 置中性：二选一必须全变体统一并写 manifest，禁止混用。
+13. 五道诊断门禁（写 manifest + 诊断输出）
+预训练门禁（三分支）：1 seed 冒烟后，检查 LNN 验证集轨迹级 RMSE vs 最佳基线——低于且差距 ≥ noise_level_m → 通过，进全量；低于但差距 < noise_level_m → pretrain_weak=1，仍进全量但训练中门禁加密监控；未低于但 |差距| < noise_level_m → pretrain_weak=1，同上；未低于且差距 ≥ noise_level_m → 先诊断，不进全量。失败输出：LNN vs 最佳基线逐组合、逐轨迹、逐时间段差距表，写 results/diagnosis
+训练中门禁：每 seed 训练后，验证集 LNN vs 最佳基线差距写 manifest；LNN 未最低 → mainline_b_risk=high。失败输出：每 seed 验证集曲线、最佳基线 vs LNN 差距曲线，写 manifest
+统计前门禁：全量评估后先算轨迹级 RMSE 均值最低者；不是 LNN → 直接输出失败诊断，统计脚本仍输出全部比较、不跳过。失败输出：轨迹级 RMSE 最低者排名表，写 manifest
+误差预算门禁：LNN 轨迹级 RMSE vs error_budget_upper_m → mainline_a_decision。失败输出：LNN 轨迹级 RMSE 与预算上界分布对比，写 results
+方法对比门禁：LNN vs 各方法 Δ 写 manifest；与最佳基线差距 < noise_level_m → comparison_weak=1，并输出该基线在哪些组合/轨迹/时间段与 LNN 接近（定位表写 manifest）

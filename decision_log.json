@@ -1,0 +1,16 @@
+{
+  "governance_clauses": {
+    "p1_governance_carrier_check": {"status": "done"},
+    "p2_governance_carrier_stub": {"status": "done"},
+    "p3_state_only_disk": {"status": "done"},
+    "p4_compliance_report_format_stub": {"status": "done"},
+    "p5_dependency_declaration": {"status": "done"},
+    "p6_redundancy_governance": {"status": "done"}
+  },
+  "clear_workspace": {
+    "checkpoints_dir": "cleared",
+    "data_temp_files": "none",
+    "timestamp": "2026-09-26T13:52:00Z"
+  },
+  "stage": "1"
+}
