@@ -1,18 +1,16 @@
 """Paper 2000-seq 推理（无 subprocess 依赖）：直接 CorePipeline.run。
 
 策略：
-  1. 手动把 configs/models/{lstm,liquid,transformer}_ekf.yaml 的 checkpoint_path
-     指向 outputs/train_paper_main/seed0/<model>/checkpoints/<best.pt>
-  2. 直接调 CorePipeline.run（跳过 25_fix_yaml subprocess）
+  1. 从训练产物解析 checkpoint，并作为 ``model_cfgs`` 内存覆盖传给流水线
+  2. 直接调 CorePipeline.run（不修改 configs/models/*.yaml）
   3. 写完 metric_table.csv
-  4. 恢复 yaml checkpoint_path 为空（finally）
+  4. 共享配置文件保持不变，checkpoint 只在本次运行内存中生效
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import json
-import os
 import pickle
 import sys
 import time
@@ -20,24 +18,23 @@ import gzip
 from collections import defaultdict
 from pathlib import Path
 
-PROJECT_ROOT = Path(os.getcwd())  # forward slash
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+PROJECT_ROOT = _LAYOUT.root
+
+try:
+    from scripts._paper_inference import resolve_checkpoint_overrides
+except ModuleNotFoundError:
+    from _paper_inference import resolve_checkpoint_overrides
 
 
 def _safe_path(rel: str) -> Path:
     posix = (PROJECT_ROOT.as_posix().rstrip("/") + "/" + rel.lstrip("/")).replace("\\", "/")
     return Path(posix)
-
-
-CHECKPOINT_FILE = {
-    "lstm_ekf": "lstm_ekf_best_checkpoint.pt",
-    "liquid_ekf": "liquid_ekf_resume_checkpoint.pt",
-    "transformer_ekf": "transformer_ekf_best_checkpoint.pt",
-}
-MODEL_YAML = {
-    "lstm_ekf": "configs/models/lstm_ekf.yaml",
-    "liquid_ekf": "configs/models/liquid_ekf.yaml",
-    "transformer_ekf": "configs/models/transformer_ekf.yaml",
-}
 
 
 def parse_args():
@@ -52,57 +49,16 @@ def parse_args():
     return parser.parse_args()
 
 
-def _set_yaml_checkpoint(yaml_path: Path, ckpt_path: Path) -> None:
-    """直接修改 yaml 写 checkpoint_path 字段。"""
-    import yaml as _yaml
-    cfg = _yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    cfg["checkpoint_path"] = str(ckpt_path).replace("\\", "/")
-    yaml_path.write_text(
-        _yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False, default_flow_style=False),
-        encoding="utf-8",
-    )
-
-
-def _clear_yaml_checkpoint(yaml_path: Path) -> None:
-    import yaml as _yaml
-    cfg = _yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    cfg["checkpoint_path"] = ""
-    yaml_path.write_text(
-        _yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False, default_flow_style=False),
-        encoding="utf-8",
-    )
-
-
 def main() -> int:
     args = parse_args()
-    sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
     prepare_root = _safe_path(args.events_root)
     raw_root = _safe_path(args.raw_root)
     train_root = _safe_path(args.train_root)
     output_root = _safe_path(args.output_root)
     output_root.mkdir(parents=True, exist_ok=True)
 
-    # 1. 改 yaml checkpoint_path 直接指向 full 训练产物
-    yaml_backups = {}
-    for method, yaml_rel in MODEL_YAML.items():
-        if method not in args.methods:
-            continue
-        yaml_path = PROJECT_ROOT / yaml_rel
-        yaml_backups[yaml_path] = yaml_path.read_text(encoding="utf-8")
-        ckpt_name = CHECKPOINT_FILE[method]
-        # 优先 seed0 best/，fallback epoch_
-        ckpt_path = train_root / f"seed{args.seed}" / method / "checkpoints" / ckpt_name
-        if not ckpt_path.exists():
-            # fallback: latest epoch_*
-            epoch_ckpts = sorted((train_root / f"seed{args.seed}" / method / "checkpoints").glob(f"{method}_epoch_*.pt"))
-            if epoch_ckpts:
-                ckpt_path = epoch_ckpts[-1]
-            else:
-                print(f"[24_direct] WARN: no checkpoint for {method} (train still running)")
-                continue
-        _set_yaml_checkpoint(yaml_path, ckpt_path)
-        print(f"[24_direct] set {yaml_rel} -> {ckpt_path.name}")
+    # 1. 仅在内存中构造 checkpoint 覆盖，保持 configs/models/*.yaml 不可变。
+    model_cfgs = resolve_checkpoint_overrides(args.methods, train_root, seed=args.seed)
 
     try:
         # 2. 收集 seq_ids
@@ -164,6 +120,7 @@ def main() -> int:
             "ground_truth_by_seq_id": gt_by_seq,
             "source_report_by_seq_id": {},
             "methods": args.methods,
+            "model_cfgs": model_cfgs,
             "output_root": str(core_output),
         })
         print(f"[24_direct] CorePipeline run done in {time.time()-t0:.1f}s")
@@ -227,12 +184,9 @@ def main() -> int:
                     fail = sum(agg[(method, "failure_rate")]) / n
                     print(f"{method:<20} {n:>8d} {rmse:>10.3f} {p95:>10.3f} {fail:>10.3f}")
         return 0
-    finally:
-        # 恢复 yaml
-        for yaml_path, content in yaml_backups.items():
-            yaml_path.write_text(content, encoding="utf-8")
-            print(f"[24_direct] restore {yaml_path.name}")
-
+    except Exception as exc:
+        print(f"[24_direct] inference failed: {type(exc).__name__}: {exc}")
+        return 1
 
 if __name__ == "__main__":
     sys.exit(main())

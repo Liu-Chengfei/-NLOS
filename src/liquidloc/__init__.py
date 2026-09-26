@@ -1,33 +1,42 @@
-"""LiquidLoc 包入口。
+"""Top-level package exports with lazy loading for startup isolation."""
 
-本模块是 liquidloc 顶层包的 __init__.py，负责导出核心公共类型。
-这些类型是跨模块交互的基础数据结构，下游 pipeline、metrics、analysis 等模块均依赖它们。
+from __future__ import annotations
 
-导出类型说明：
-    MeasurementControl : 量测控制信号，学习前端输出给后端 EKF 的调节量。
-    MetricRow          : 指标行，单次评估结果的一行指标数据。
-    ModelIntermediate  : 模型中间结果，训练/推理过程中前端网络的中间输出。
-    PredictionBundle   : 预测包，包含状态估计、协方差等完整预测结果。
-    StageResult        : 阶段结果，单阶段（训练/评估/推理）的完整产出。
-    StateEstimate      : 状态估计，单个时刻的滤波器状态和协方差。
-"""
+from typing import TYPE_CHECKING, Any
 
-# 从 common.types 导出核心公共类型，供外部和跨模块使用。
-from liquidloc.common.types import (
-    MeasurementControl,  # 量测控制信号：学习前端输出给后端 EKF 的调节量。
-    MetricRow,           # 指标行：单次评估结果的一行指标数据。
-    ModelIntermediate,   # 模型中间结果：训练/推理过程中前端网络的中间输出。
-    PredictionBundle,    # 预测包：包含状态估计、协方差等完整预测结果。
-    StageResult,         # 阶段结果：单阶段（训练/评估/推理）的完整产出。
-    StateEstimate,       # 状态估计：单个时刻的滤波器状态和协方差。
-)
-
-# __all__ 显式声明公开 API，防止内部符号被 from liquidloc import * 泄露。
-__all__ = (
+_TYPE_EXPORTS = {
     "MeasurementControl",
     "MetricRow",
     "ModelIntermediate",
     "PredictionBundle",
     "StageResult",
     "StateEstimate",
-)
+}
+
+if TYPE_CHECKING:
+    from liquidloc.common.types import (
+        MeasurementControl as MeasurementControl,
+        MetricRow as MetricRow,
+        ModelIntermediate as ModelIntermediate,
+        PredictionBundle as PredictionBundle,
+        StageResult as StageResult,
+        StateEstimate as StateEstimate,
+    )
+
+
+def __getattr__(name: str) -> Any:
+    """Load public data contracts only when callers request them."""
+    if name not in _TYPE_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from liquidloc.common import types as common_types
+
+    value = getattr(common_types, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted((*globals(), *_TYPE_EXPORTS))
+
+
+__all__ = tuple(sorted(_TYPE_EXPORTS))

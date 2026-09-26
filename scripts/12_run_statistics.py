@@ -14,10 +14,14 @@ from collections.abc import Mapping  # 判断映射类型。
 from pathlib import Path  # 处理文件路径。
 from typing import Any  # 标注任意 JSON 风格结构。
 
-ROOT = Path(__file__).resolve().parents[1]  # 仓库根目录。
-SRC = ROOT / "src"  # 源码目录。
-if str(SRC) not in sys.path:  # 确保脚本能直接导入项目代码。
-    sys.path.insert(0, str(SRC))  # 把源码目录放到导入路径最前面。
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 
 from liquidloc.common.io_utils import dumps_json_text, read_json, write_json  # 严格 JSON 读写。
 from liquidloc.analysis.significance_tests import run_significance_tests  # 真正执行显著性检验的函数。

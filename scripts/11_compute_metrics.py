@@ -9,15 +9,18 @@ from __future__ import annotations  # 允许在类型注解里直接引用当前
 
 import argparse  # 负责解析命令行参数。
 import json  # 负责读取和写出 JSON。
-import sys  # 负责调整解释器导入路径。
 from collections.abc import Mapping, Sequence  # 用来判断映射和序列类型。
 from pathlib import Path  # 用来表示和规整文件路径。
 from typing import Any  # 用来标注任意 JSON 风格对象。
 
-ROOT = Path(__file__).resolve().parents[1]  # 从脚本文件位置反推仓库根目录。
-SRC = ROOT / "src"  # 显式保存源码目录，后面要把它加到导入路径里。
-if str(SRC) not in sys.path:  # 如果源码目录还没有被解释器搜索到。
-    sys.path.insert(0, str(SRC))  # 把源码目录插到最前面，保证优先导入仓库代码。
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 
 from liquidloc.metrics.metric_runner import compute_metrics  # 真正执行指标计算的入口函数。
 from liquidloc.protocol.metric_schema import get_metric_order  # 读取指标顺序，用于输出摘要中的计数。

@@ -750,7 +750,7 @@ def test_assert_anchor_uniform_source_different_layouts_raises():
     layout_a = {'anchor_positions': [[0.0, 0.0], [1.0, 0.0], [0.5, 0.866]]}
     layout_b = {'anchor_positions': [[0.0, 0.0], [2.0, 0.0], [1.0, 1.0]]}
     with pytest.raises(ValueError, match='methods using different anchor layouts'):
-        assert_anchor_uniform_source({'ekf': layout_a})
+        assert_anchor_uniform_source({'ekf': layout_a, 'robust_ekf': layout_b})
 
 
 def test_assert_anchor_uniform_source_no_raise_when_disabled():

@@ -5,13 +5,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 
 # 与 05_train_lstm.py 同口径修复 (2026-08-17): alignment_risk 标签默认失败阈值 1.0m,
 # sim_e9 跨度 ~25m 场景下 pose_error 几乎永远 > 1m, risk 标签 saturated 到 1.0,

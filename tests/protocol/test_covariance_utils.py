@@ -161,51 +161,32 @@ def test_build_controlled_measurement_cov_rejects_zero_noise_multiplier_via_cont
 # ---------------------------------------------------------------------------
 
 
-def test_three_estimators_all_import_build_effective_cov_from_singleton():
-    """EKF / NN+EKF 都 import 自 common/covariance_utils 单源。
+def test_estimators_share_build_effective_cov_singleton():
+    """所有估计器协方差路径最终引用 common 层同一个构造器。
 
-    锁死 build_effective_cov 禁止任何方法本地重实现
-    （§12.2-B1i/B1ii/B1iii "三网同一 R 矩阵构建"）。
+    EKF 通过 ``estimators.shared`` 间接消费构造器；鲁棒估计器还会直接
+    使用它做二次协方差膨胀。按对象 identity 校验真实依赖关系，避免要求
+    EKF 保留一个未使用的直接 import，也避免源码字符串检查被别名绕过。
     """
-    import inspect
+    from liquidloc.estimators import fgo_core, robust_ekf_core, shared
 
-    for name, mod in [
-        ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("ekf_core", "liquidloc.estimators.ekf_core"),
-        
-    ]:
-        src = inspect.getsource(__import__(mod, fromlist=[""]))
-        assert "build_effective_cov" in src, (
-            f"{name} 必须 import build_effective_cov 单源 "
-            f"（§12.2-B1i/B1ii/B1iii 三网同一 R 矩阵构建锁死）"
-        )
-        assert "from liquidloc.common.covariance_utils import build_effective_cov" in src, (
-            f"{name} 必须从 liquidloc.common.covariance_utils 单源 import "
-            f"build_effective_cov（禁止本地重实现）"
-        )
+    assert shared.build_effective_cov is build_effective_cov
+    assert robust_ekf_core.build_effective_cov is build_effective_cov
+    assert fgo_core.build_effective_cov is build_effective_cov
 
 
-def test_three_estimators_all_import_build_controlled_measurement_cov_from_singleton():
-    """EKF / NN+EKF 都 import 自 estimators/shared 单源。
+def test_three_estimators_share_controlled_measurement_cov_singleton():
+    """EKF / Robust-EKF / FGO 都引用 estimators/shared 单源。
 
     锁死 build_controlled_measurement_cov 禁止任何方法本地重实现
     （§12.2-B1i/B1ii/B1iii "三网同一 scaling 控制"）。
     """
-    import inspect
+    from liquidloc.estimators import ekf_core, fgo_core, robust_ekf_core, shared
 
-    for name, mod in [
-        ("ekf_core", "liquidloc.estimators.ekf_core"),
-        ("ekf_core", "liquidloc.estimators.ekf_core"),
-        
-    ]:
-        src = inspect.getsource(__import__(mod, fromlist=[""]))
-        assert "build_controlled_measurement_cov" in src, (
-            f"{name} 必须 import build_controlled_measurement_cov 单源 "
-            f"（§12.2-B1i/B1ii/B1iii 三网同一 scaling 控制锁死）"
-        )
-        assert "from liquidloc.estimators.shared import build_controlled_measurement_cov" in src, (
-            f"{name} 必须从 liquidloc.estimators.shared 单源 import "
-            f"build_controlled_measurement_cov（禁止本地重实现）"
+    for module in (ekf_core, robust_ekf_core, fgo_core):
+        assert (
+            module.build_controlled_measurement_cov
+            is shared.build_controlled_measurement_cov
         )
 
 # ---------------------------------------------------------------------------

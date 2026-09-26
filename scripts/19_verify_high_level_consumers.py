@@ -21,8 +21,14 @@ from collections.abc import Mapping  # 判断映射类型。
 from pathlib import Path  # 统一处理文件路径。
 from typing import Any  # 标注任意 JSON 风格结构。
 
-ROOT = Path(__file__).resolve().parents[1]  # 从脚本位置反推仓库根目录。
-SRC = ROOT / "src"  # 保存源码目录。
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 LOCAL_PY_DEPS = ROOT / "outputs" / ".python-deps"  # 本地 Python 依赖目录，某些环境下需要从这里导入包。
 for candidate in (LOCAL_PY_DEPS, SRC):  # 依次检查两个候选目录。
     if candidate.is_dir():  # 只有目录存在才加入导入路径。

@@ -29,10 +29,9 @@ from liquidloc.common.constants import (
     MODEL_INTERMEDIATE_KEYS,
     MODALITY_UWB,
     MODALITY_VIO,
-    RISK_PRIOR_LOGIT,
 )
-from liquidloc.common.validation import coerce_finite_scalar, is_bool_like, is_integer, is_real, is_string_like
-from liquidloc.factories.model_factory import LiquidOutputHeadLinear  # D7 公平性：Transformer 共享 LNN 头类，参数结构一致 (Item 14/35)。
+from liquidloc.common.validation import coerce_finite_scalar, is_integer, is_string_like
+from liquidloc.models.liquid.output_head import LiquidOutputHeadLinear  # D7 公平性：Transformer 共享 LNN 头类，参数结构一致 (Item 14/35)。
 
 _OUTPUT_KEYS = MODEL_INTERMEDIATE_KEYS
 _VALID_MODALITIES = frozenset({MODALITY_UWB, MODALITY_VIO})

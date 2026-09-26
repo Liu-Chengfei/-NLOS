@@ -21,10 +21,14 @@ import sys
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 
 from liquidloc.common.config_utils import load_yaml_config
 from liquidloc.common.io_utils import dumps_json_text, loads_json_text, read_json, write_json

@@ -40,6 +40,7 @@ from liquidloc.common.constants import (  # 导出跨模块共享的模态名、
     PRIMARY_KEYS,  # 主键注册表。
 )  # 常量导入结束。
 from liquidloc.common.paths import build_output_path, get_project_root, get_standard_dirs, resolve_output_root  # 导出路径相关工具。
+from liquidloc.project_layout import PROJECT_MARKERS, ProjectLayout
 from liquidloc.common.types import (  # 导出常用类型别名和协议容器类型。
     MeasurementControl,  # 观测控制类型。
     MetricDirection,  # 指标方向类型。
@@ -131,6 +132,8 @@ __all__ = (  # 明确 common 子包对外允许导出的名字。
     "PredictionBundle",  # 预测包类型。
     "PRIMARY_EVENT_KEYS",  # 主事件键。
     "PRIMARY_KEYS",  # 主键注册表。
+    "PROJECT_MARKERS",  # 项目根目录标记。
+    "ProjectLayout",  # 不可变项目目录布局。
     "quality_below_floor",  # 质量门槛比较函数。
     "require_in_range",  # 范围校验函数。
     "require_iterable",  # 可迭代校验函数。

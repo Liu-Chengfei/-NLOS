@@ -31,6 +31,8 @@ from copy import deepcopy  # 用于深拷贝配置值，避免合并结果与输
 from pathlib import Path  # 用 Path 统一处理文件路径。
 from typing import Any  # 这里只用于类型注解，不参与运行逻辑。
 
+from liquidloc.project_layout import find_project_root
+
 try:  # 优先使用成熟的 PyYAML 实现。
     import yaml as _yaml  # 如果成功导入，就直接用它做 YAML 解析。
 except ModuleNotFoundError:  # 环境里没有 PyYAML 时走回退逻辑。
@@ -421,35 +423,6 @@ def _safe_load_yaml(text: str) -> Any:  # 先尝试 PyYAML，不行就用回退�
     if next_index != len(raw_lines):  # 如果还有没消费完的行。
         raise ValueError(f'YAML fallback parser did not consume the full document, {len(raw_lines) - next_index} line(s) remaining starting at: {raw_lines[next_index][1]!r}')  # 说明结构里有解析器不支持的内容。
     return payload  # 返回解析结果。
-
-
-def find_project_root() -> Path:
-    """向上逐级查找项目根目录，基于 marker 文件而非硬编码目录层级。
-
-    从当前文件位置向上搜索，找到包含 pyproject.toml 或 .git 目录的
-    最近祖先目录作为项目根。比 ``Path(__file__).resolve().parents[N]``
-    更健壮——包结构变化时不需要手动调整 N。
-
-    限制：当本包通过 pip install 安装到 site-packages 后，
-    ``__file__`` 指向 site-packages 路径，可能找不到项目根目录
-    （除非 site-packages 内存在 pyproject.toml 或 .git）。
-    此函数设计用于开发模式运行，生产部署应使用配置文件显式指定路径。
-
-    返回：
-        Path: 项目根目录。
-
-    异常：
-        RuntimeError: 找不到 marker 文件时抛出。
-    """
-    _MARKERS = ("pyproject.toml", ".git")
-    current = Path(__file__).resolve()
-    for parent in current.parents:
-        if any((parent / marker).exists() for marker in _MARKERS):
-            return parent
-    raise RuntimeError(
-        f"Cannot find project root (looked for {_MARKERS}) "
-        f"starting from {current}"
-    )
 
 
 def load_yaml_config(config_path: str | Path) -> dict[str, Any]:  # 读取单个 YAML 文件并保证返回字典。

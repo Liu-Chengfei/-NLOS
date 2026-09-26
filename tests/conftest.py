@@ -12,17 +12,26 @@
 from __future__ import annotations
 
 import gc
+import sys
+from pathlib import Path
 
 import pytest
+
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_SCRIPTS_ROOT = str(_PROJECT_ROOT / "scripts")
+if _SCRIPTS_ROOT not in sys.path:
+    sys.path.insert(0, _SCRIPTS_ROOT)
 
 
 @pytest.fixture(autouse=True)
 def _release_memory_after_test():
     yield  # 先运行测试本身。
+    if "torch" not in sys.modules:
+        return  # 纯 Python 测试不需要导入 PyTorch 或触发全局 GC。
     gc.collect()  # 断开张量/fixture 引用环，交还堆内存。
     try:  # CUDA 缓存属于进程级预留，测试结束后显式释放。
-        import torch
-
+        torch = sys.modules["torch"]
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     except Exception:  # torch 未安装或 CUDA 初始化失败时静默跳过。

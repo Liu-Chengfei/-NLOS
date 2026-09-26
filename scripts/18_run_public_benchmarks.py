@@ -7,10 +7,14 @@ import json  # 负责输出结果摘要和就绪报告。
 import sys  # 负责调整解释器导入路径。
 from pathlib import Path  # 负责表示和规整文件路径。
 
-ROOT = Path(__file__).resolve().parents[1]  # 从脚本位置反推仓库根目录。
-SRC = ROOT / "src"  # 保存源码目录，后面要加到导入路径里。
-if str(SRC) not in sys.path:  # 如果源码目录还没有进入搜索路径。
-    sys.path.insert(0, str(SRC))  # 把源码目录插到最前面，优先导入仓库代码。
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 
 from liquidloc.common.config_utils import load_yaml_config  # 读取 YAML 配置。
 from liquidloc.common.io_utils import dumps_json_text, write_json  # 严格 JSON 读写，拒绝 NaN/Infinity。

@@ -6,15 +6,18 @@ import argparse  # 解析命令行参数。
 import copy  # 复制配置和任务对象，避免共享可变引用。
 import json  # 输出摘要报告。
 import os  # 文件系统路径判断。
-import sys  # 调整导入路径。
 from pathlib import Path  # 处理路径。
 from typing import Any  # 标注嵌套结构。
 from collections.abc import Mapping  # 阶段 12 全面审计修复 (2026-09-06): BUG-011 Mapping 未导入导致 L122 isinstance 失败.
 
-ROOT = Path(__file__).resolve().parents[1]  # 仓库根目录。
-SRC = ROOT / "src"  # 项目源码目录。
-if str(SRC) not in sys.path:  # 如果源码目录还没加进来。
-    sys.path.insert(0, str(SRC))  # 把源码目录插到前面。
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 
 # 在所有导入之前清除协议快照缓存，确保 YAML 修改后立即生效。
 from liquidloc.protocol.scene_axis_protocol import _load_frozen_scene_axis_protocol_snapshot

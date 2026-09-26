@@ -24,6 +24,7 @@ from pathlib import Path  # 用 Path 统一处理路径对象。
 from typing import Any  # 用于类型注解。
 
 from liquidloc.common.constants import DEFAULT_OUTPUT_DIRS  # 复用默认输出目录列表。
+from liquidloc.project_layout import ProjectLayout, find_project_root
 from liquidloc.common.validation import is_string_like  # 复用统一字符串类型校验。
 from liquidloc.common.validation import validate_path_component  # 复用路径组件穿越校验。
 
@@ -51,8 +52,6 @@ def _resolve_project_root_arg(project_root: str | Path | None = None) -> Path | 
         ValueError: 当 project_root 是空字符串或空白 Path 时抛出。
         TypeError: 当 project_root 不是 str/Path/None 类型时抛出。
     """
-    from liquidloc.common.tee_logger import print_dict
-    print_dict({"project_root": str(project_root) if project_root is not None else None}, "_resolve_project_root_arg 入口参数")
     if project_root is None:  # 如果调用方没有传，就让上层自己推导。
         return None  # 返回 None 交给 get_project_root 兜底。
     if not isinstance(project_root, (str, Path)):  # 前置类型检查，拒绝非法类型。
@@ -81,12 +80,9 @@ def get_project_root(project_root: str | Path | None = None) -> Path:  # 返回�
     Returns:
         Path: 项目根目录的绝对路径。
     """
-    from liquidloc.common.tee_logger import print_dict
-    print_dict({"project_root": str(project_root) if project_root is not None else None}, "get_project_root 入口参数")
     resolved_root = _resolve_project_root_arg(project_root)  # 先看调用方有没有显式给根目录。
     if resolved_root is not None:  # 传了就直接用。
         return resolved_root  # 返回外部指定的根目录。
-    from liquidloc.common.config_utils import find_project_root  # 延迟导入避免循环依赖。
     return find_project_root()  # 基于 marker 文件查找项目根，比 parents[N] 更健壮。
 
 
@@ -108,19 +104,12 @@ def get_standard_dirs(project_root: str | Path | None = None) -> dict[str, Any]:
             - output_subdirs (dict[str, Path]): 输出子目录映射，
               键名来自 DEFAULT_OUTPUT_DIRS。
     """
-    from liquidloc.common.tee_logger import print_dict
-    print_dict({"project_root": str(project_root) if project_root is not None else None}, "get_standard_dirs 入口参数")
     root = get_project_root(project_root)  # 先拿到项目根目录。
-    outputs_dir = root / "outputs"  # outputs 是统一的运行产物根目录。
-    dirs_map = {  # 先准备标准目录映射。
-        "project_root": root,  # 项目根目录。
-        "configs": root / "configs",  # 配置目录。
-        "data": root / "data",  # 数据目录。
-        "outputs": outputs_dir,  # 输出目录。
-        "src": root / "src",  # 源码目录。
-        "tests": root / "tests",  # 测试目录。
-    }  # 基础映射结束。
-    dirs_map["output_subdirs"] = {name: outputs_dir / name for name in DEFAULT_OUTPUT_DIRS}  # 再补上常用输出子目录。
+    layout = ProjectLayout.from_root(root)
+    dirs_map: dict[str, Any] = layout.as_dict()
+    dirs_map["output_subdirs"] = {
+        name: layout.outputs / name for name in DEFAULT_OUTPUT_DIRS
+    }
     return dirs_map  # 返回目录映射。
 
 
@@ -143,8 +132,6 @@ def build_output_path(*parts: str, project_root: str | Path | None = None) -> Pa
     Raises:
         ValueError: 当 path part 包含 ``..``、``/``、``\\`` 或 null 字节时抛出。
     """
-    from liquidloc.common.tee_logger import print_dict
-    print_dict({"parts": parts, "project_root": str(project_root) if project_root is not None else None}, "build_output_path 入口参数")
     dirs = get_standard_dirs(project_root)  # 先拿到标准目录映射。
     for p in parts:  # 校验每个路径片段，防止穿越和绝对路径注入。
         validate_path_component(str(p), name="path part")
@@ -166,8 +153,6 @@ def resolve_output_root(cfg: dict[str, Any], default_name: str) -> Path:  # 统�
     Raises:
         ValueError: 当 output_root 为空白字符串、空白 Path 或 Path(".") 时。
     """
-    from liquidloc.common.tee_logger import print_dict
-    print_dict({"cfg": cfg, "default_name": default_name}, "resolve_output_root 入口参数")
     dirs = get_standard_dirs(cfg.get('project_root'))  # 先解析标准目录。
     raw_output_root = cfg.get('output_root')  # 读取显式输出根目录。
     if raw_output_root is None:  # 没指定时使用默认目录。

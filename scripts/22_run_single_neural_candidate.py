@@ -6,8 +6,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 if str(SRC) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(SRC))
 

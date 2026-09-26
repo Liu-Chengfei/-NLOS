@@ -322,6 +322,10 @@ class SimSequenceSpec:
     duration_s: float = 45.0
     workspace_span_m: float = 20.0
     envelope_profile: str = "main_table"  # main_table | smoke
+    # Compatibility switch for fixture-based smoke sequences whose source layout may
+    # carry more anchors than the paper protocol geometry.  The protocol path ignores
+    # this flag; the legacy path uses it to preserve the fixture layout contract.
+    allow_high_anchor_count: bool = False
 
     def __post_init__(self) -> None:
         # seq_id 作为输出子目录名，必须不含路径穿越字符（防止 ../ 逃逸 output_root）
@@ -380,6 +384,11 @@ class SimSequenceSpec:
                 f"use_protocol_trajectory must be bool, got {type(self.use_protocol_trajectory).__name__}"
             )
         object.__setattr__(self, "use_protocol_trajectory", bool(self.use_protocol_trajectory))
+        if not is_bool_like(self.allow_high_anchor_count):
+            raise TypeError(
+                f"allow_high_anchor_count must be bool, got {type(self.allow_high_anchor_count).__name__}"
+            )
+        object.__setattr__(self, "allow_high_anchor_count", bool(self.allow_high_anchor_count))
         object.__setattr__(
             self,
             "duration_s",
@@ -1559,8 +1568,11 @@ def _transform_anchor_layout(anchor_layout: dict[str, Any], spec: SimSequenceSpe
                 reference_spec,
             )
             reference_positions.append([_round_normalize(px), _round_normalize(py)])
+        source_layout = paper_anchor_layout
+        if spec.allow_high_anchor_count and len(anchor_layout.get("anchor_ids") or []) > anchor_count:
+            source_layout = anchor_layout
         projected_layout = project_anchor_layout_to_reference(
-            paper_anchor_layout,
+            source_layout,
             {
                 "anchor_ids": deepcopy(anchor_layout["anchor_ids"]),
                 "anchor_positions": reference_positions,
@@ -2737,7 +2749,7 @@ def materialize_sim_raw(
                 seed=int(noise.base_seed),
                 duration_s=float(spec.duration_s),
                 workspace_span_m=float(spec.workspace_span_m),
-                dt_s=0.1,  # GT 与 UWB/VIO 同 10Hz 公共轴（条款 [11] 双速率契约）
+                dt_s=0.05,  # GT 公共真值轴固定 20Hz；UWB/VIO 仍按各自 dt 重采样。
             )
             transformed_anchor_layout = _transform_anchor_layout(bundle["anchor_layout"], spec)
             dt_imu = float(spec.dt_imu_override or 1/150)

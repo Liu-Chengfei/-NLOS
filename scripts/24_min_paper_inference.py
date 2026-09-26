@@ -6,21 +6,32 @@
   - ground_truth_by_seq_id: 从 data/raw/paper_main_v1_quick/seed0 读
   - source_report_by_seq_id: 从 prepare_manifest 读 anchor_layout
   - scene_tasks: 简单构造，每条 seq × 每个 method
+
+checkpoint 通过 ``model_cfgs`` 作为内存覆盖传入，不改写共享 YAML。
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import json
-import math
-import os
 import pickle
 import sys
 import gzip
 from collections import defaultdict
 from pathlib import Path
 
-PROJECT_ROOT = Path(os.getcwd())  # forward slash
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+PROJECT_ROOT = _LAYOUT.root
+
+try:
+    from scripts._paper_inference import resolve_checkpoint_overrides
+except ModuleNotFoundError:
+    from _paper_inference import resolve_checkpoint_overrides
 
 # 防 escape：所有 path 走 forward slash
 def _safe_path(rel: str) -> Path:
@@ -43,19 +54,13 @@ def parse_args():
 
 def main() -> int:
     args = parse_args()
-    sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
+    train_root = _safe_path(args.train_root)
+    model_cfgs = resolve_checkpoint_overrides(args.methods, train_root)
     # 1. 加载 events
     prepare_root = _safe_path(args.events_root)
     raw_root = _safe_path(args.raw_root)
     output_root = _safe_path(args.output_root)
     output_root.mkdir(parents=True, exist_ok=True)
-
-    # 1.1 改 yaml checkpoint_path
-    import subprocess
-    fix_cmd = [sys.executable, "scripts/25_fix_yaml.py", "--train-root", args.train_root, "--seed", "0"]
-    print(f"[24_min] running: {' '.join(fix_cmd)}")
-    subprocess.call(fix_cmd, cwd=str(PROJECT_ROOT))
 
     try:
         # 2. 收集 seq_ids
@@ -113,6 +118,7 @@ def main() -> int:
             "ground_truth_by_seq_id": gt_by_seq,
             "source_report_by_seq_id": {},
             "methods": args.methods,
+            "model_cfgs": model_cfgs,
             "output_root": str(core_output),
         })
         # CorePipeline 把 bundle 写到 core_output/predictions/<task_id>__<method>.json
@@ -168,9 +174,9 @@ def main() -> int:
                     fail = sum(agg[(method, "failure_rate")]) / len(agg[(method, "failure_rate")]) if agg[(method, "failure_rate")] else 0
                     print(f"{method:<20} {rmse:>10.3f} {p95:>10.3f} {fail:>10.3f}")
         return 0
-    finally:
-        # 还原 yaml
-        subprocess.call([sys.executable, "scripts/25_fix_yaml.py", "--restore"], cwd=str(PROJECT_ROOT))
+    except Exception as exc:
+        print(f"[24_min] inference failed: {type(exc).__name__}: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

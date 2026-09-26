@@ -7,7 +7,7 @@
   4. compute_metrics() 得到 RMSE / P95 / failure_rate
   5. 写入 metric_table.csv
 
-本脚本依赖 scripts/25_fix_yaml.py 来修改 model yaml 的 checkpoint_path（不动 yaml 之外）。
+checkpoint 通过 ``model_cfgs`` 作为内存覆盖传入，不改写共享模型 YAML。
 """
 from __future__ import annotations
 
@@ -19,10 +19,20 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-PROJECT_ROOT = Path(os.getcwd())  # 直接 cwd（用 forward slash 形式），不 resolve
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+PROJECT_ROOT = _LAYOUT.root
+
+try:
+    from scripts._paper_inference import resolve_checkpoint_overrides
+except ModuleNotFoundError:
+    from _paper_inference import resolve_checkpoint_overrides
 # 防 escape：所有 path 构造走 as_posix + 字符串拼接 + 最后 Path()
 PROJECT_ROOT_POSIX = PROJECT_ROOT.as_posix()  # 'E:/Q4 - 副本'
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -44,51 +54,11 @@ def main() -> int:
     print(f"[24] os.getcwd(): {os.getcwd()}")
     print(f"[24] __file__: {__file__}")
     print(f"[24] PROJECT_ROOT: {PROJECT_ROOT}")
-    sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
-    # 1. 改 yaml checkpoint_path
-    import subprocess
-    fix_cmd = [sys.executable, "scripts/25_fix_yaml.py", "--train-root", args.train_root, "--seed", str(args.seed)]
-    print(f"[24] running: {' '.join(fix_cmd)}")
-    rc = subprocess.call(fix_cmd, cwd=str(PROJECT_ROOT))
-    if rc != 0:
-        print(f"[24] 25_fix_yaml failed: rc={rc}")
-        return rc
+    # 1. 仅在内存中覆盖 checkpoint，保持 configs/models/*.yaml 不变。
+    train_root = Path(PROJECT_ROOT) / args.train_root
+    model_cfgs = resolve_checkpoint_overrides(args.methods, train_root, seed=args.seed)
 
     try:
-        # 1. inline 改 yaml checkpoint_path（避免 subprocess 路径 + 中文 path bug）
-        import yaml as _yaml
-        CHECKPOINT_FILE = {
-            "lstm_ekf": "lstm_ekf_best_checkpoint.pt",
-            "liquid_ekf": "liquid_ekf_resume_checkpoint.pt",
-            "transformer_ekf": "transformer_ekf_best_checkpoint.pt",
-        }
-        MODEL_YAML = {
-            "lstm_ekf": "configs/models/lstm_ekf.yaml",
-            "liquid_ekf": "configs/models/liquid_ekf.yaml",
-            "transformer_ekf": "configs/models/transformer_ekf.yaml",
-        }
-        yaml_backups = {}
-        for method, yaml_rel in MODEL_YAML.items():
-            if method not in args.methods:
-                continue
-            yaml_path = Path(PROJECT_ROOT) / yaml_rel
-            yaml_backups[yaml_path] = yaml_path.read_text(encoding="utf-8")
-            ckpt_name = CHECKPOINT_FILE[method]
-            ckpt = Path(PROJECT_ROOT) / args.train_root / f"seed{args.seed}" / method / "checkpoints" / ckpt_name
-            if not ckpt.exists():
-                # fallback: 任一可用的 best/resume ckpt
-                alts = sorted((Path(PROJECT_ROOT) / args.train_root / f"seed{args.seed}" / method / "checkpoints").glob("*.pt"))
-                if alts:
-                    ckpt = alts[-1]
-            cfg = _yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-            cfg["checkpoint_path"] = str(ckpt).replace("\\", "/")
-            yaml_path.write_text(
-                _yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False, default_flow_style=False),
-                encoding="utf-8",
-            )
-            print(f"[24] set {yaml_rel} -> {ckpt.name}")
-
         # 防 escape：所有 path 走 forward slash 拼接
         def _safe_path(rel: str) -> Path:
             base = PROJECT_ROOT.as_posix().rstrip("/")
@@ -183,6 +153,7 @@ def main() -> int:
                     "ground_truth_by_seq_id": gt_by_seq,
                     "source_report_by_seq_id": src_by_seq,
                     "methods": args.methods,
+                    "model_cfgs": model_cfgs,
                     "output_root": str(core_output),
                 })
                 bundles = core_result.metadata.get("prediction_bundles") or []
@@ -247,10 +218,7 @@ def main() -> int:
                     print(f"{method:<20} {rmse:>10.3f} {p95:>10.3f} {fail:>10.3f}")
         return 0
     finally:
-        # inline 恢复 yaml（避免 subprocess 路径 bug）
-        for yaml_path, original_text in yaml_backups.items():
-            yaml_path.write_text(original_text, encoding="utf-8")
-        print("[24] yaml restored")
+        pass
 
 
 if __name__ == "__main__":

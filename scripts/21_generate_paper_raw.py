@@ -19,10 +19,14 @@ from pathlib import Path
 # 加进 sys.path 无法让 import liquidloc 命中本仓代码；而用户 site-packages 里存在
 # 一条 __editable__ .pth 指向 E:\消融实验\src，会把 import liquidloc 抢解析到另一个
 # 项目。这里把 src/ 显式置顶，保证本仓代码优先。
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SRC_ROOT = PROJECT_ROOT / "src"
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+PROJECT_ROOT = _LAYOUT.root
+SRC_ROOT = _LAYOUT.src
 
 from liquidloc.dataio.paper_materializer import (  # noqa: E402
     load_paper_spec,

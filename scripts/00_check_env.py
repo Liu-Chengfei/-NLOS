@@ -16,10 +16,14 @@ except ModuleNotFoundError:  # Python 3.10 没有 tomllib, 用 tomli 作为等�
     import tomli as tomllib  # type: ignore[no-redef]
 from pathlib import Path  # 统一处理文件路径。
 
-ROOT = Path(__file__).resolve().parents[1]  # 仓库根目录。
-SRC = ROOT / "src"  # 源码目录。
-if str(SRC) not in sys.path:  # 如果还没加入导入路径就补进去。
-    sys.path.insert(0, str(SRC))  # 把源码目录放到最前面，便于脚本直接运行。
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 
 from liquidloc.common.io_utils import dumps_json_text, write_json  # 严格 JSON helper。
 from liquidloc.common.paths import get_standard_dirs  # 统一获取项目标准目录结构。

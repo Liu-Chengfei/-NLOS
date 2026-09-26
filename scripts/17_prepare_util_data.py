@@ -3,14 +3,17 @@
 from __future__ import annotations  # 允许在类型注解里直接引用后面定义的类型。
 
 import argparse  # 解析命令行参数。
-import sys  # 调整导入路径。
 from pathlib import Path  # 处理路径。
 from typing import Any  # 标注任意 JSON 结构。
 
-ROOT = Path(__file__).resolve().parents[1]  # 仓库根目录。
-SRC = ROOT / "src"  # 项目源码目录。
-if str(SRC) not in sys.path:  # 如果源码目录还没进导入路径。
-    sys.path.insert(0, str(SRC))  # 把源码目录插到前面。
+try:
+    from scripts._bootstrap import bootstrap_project
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_project
+
+_LAYOUT = bootstrap_project(__file__)
+ROOT = _LAYOUT.root
+SRC = _LAYOUT.src
 
 from liquidloc.common.config_utils import load_yaml_config  # 读取 YAML 配置。
 from liquidloc.common.io_utils import dumps_json_text, write_json  # 严格 JSON helper。

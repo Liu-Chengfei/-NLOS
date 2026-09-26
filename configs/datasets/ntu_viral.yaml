@@ -1,0 +1,63 @@
+# 文件职责：定义 NTU VIRAL 数据集的入口配置，包括原始数据、中间产物和最终处理结果的目录约定及字段映射关系。
+# 本文件结构上和 MILUV 类似，但数据来源和资产组织是独立的；保证 prepare 和 benchmark 看到同一套字段约定。
+
+# 数据集在本仓库里的统一名称，供 registry 和脚本路由使用。
+dataset_name: ntu_viral  # NTU VIRAL 公开数据集。
+
+# 原始数据落地目录，下载或手工导入后落在这里。
+raw_root: data/raw/ntu_viral  # 原始数据所在目录。
+
+# 中间产物目录，供清洗、切片和格式转换复用。
+interim_root: data/interim/ntu_viral  # 中间产物所在目录。
+
+# 处理后数据目录，供训练与评估统一读取。
+processed_root: data/processed  # 最终处理后目录。
+
+# 原始字段到统一 schema 的映射，定义的是"统一后怎么读"，不是"原始文件长什么样"。
+field_mapping:
+  # IMU 模态字段映射，直接影响状态传播和短时连续性。
+  imu:
+    # 时间戳字段，用于模态对齐和排序。
+    timestamp: timestamp  # 时间戳字段。
+    # x 轴加速度，进入平面传播模型。
+    ax: ax  # x 轴加速度。
+    # y 轴加速度，进入平面传播模型。
+    ay: ay  # y 轴加速度。
+    # z 轴角速度，进入航向传播模型。
+    gz: gz  # z 轴角速度。
+  # UWB 模态字段映射，用于构造距离约束。
+  uwb:
+    # 时间戳字段，用于把测距事件挂到统一时间线上。
+    timestamp: timestamp  # 时间戳字段。
+    # 锚点编号，区分不同固定基站。
+    anchor_id: anchor_id  # 锚点编号。
+    # 测距值，是 UWB 观测的主值。
+    range: range  # 测距值。
+    # 是否有效，用于过滤无效观测。
+    valid: valid  # 有效性标记。
+    # 质量值，用于排序、加权或统计分析。
+    quality: quality  # 质量值。
+  # VIO 模态字段映射，表达相对运动和视觉质量。
+  # 紧耦合仅声明 4 字段（dx/dy/dyaw/quality），与 sensors.yaml / event_schema.py /
+  # extract_vio_measurement 三处一致（铁律 3 后，Stage A1 下游修复）。
+  vio:
+    # 时间戳字段，用于对齐视觉更新时刻。
+    timestamp: timestamp  # 时间戳字段。
+    # x 方向相对位移，表示局部平移增量。
+    dx: dx  # x 方向相对位移。
+    # y 方向相对位移，表示局部平移增量。
+    dy: dy  # y 方向相对位移。
+    # 航向增量，表示局部旋转变化。单位：rad，与 task.yaml 中 dyaw 定义一致。
+    dyaw: dyaw  # 航向增量 (rad)。
+    # 视觉质量值，用于判断更新是否可信。
+    quality: quality  # 视觉质量值。
+  # 真值字段映射，只用于监督和评估，不参与在线融合输入。
+  gt:
+    # 时间戳字段，用于和观测序列对齐。
+    timestamp: timestamp  # 时间戳字段。
+    # x 位置真值，用于位置误差计算。
+    px: px  # x 位置真值。
+    # y 位置真值，用于位置误差计算。
+    py: py  # y 位置真值。
+    # 航向真值，用于姿态误差计算。单位：rad，与 task.yaml 中 yaw 定义一致。
+    yaw: yaw  # 航向真值 (rad)。

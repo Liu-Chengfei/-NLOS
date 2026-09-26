@@ -30,3 +30,17 @@ NH
 # Smoke-test / scratch logs and backups
 *.log
 *.bak
+
+# Mimosa security scan artifacts
+.mimosa/
+
+# Python build artifacts
+*.egg-info/
+*.pyc
+dist/
+build/
+
+# Temporary/runtime artifacts
+.tmp_liquid_failure.txt
+rq_calib.json
+checkpoints/

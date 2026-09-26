@@ -588,9 +588,9 @@ def sample_scenes(experiment_cfg: dict[str, Any], sweep_cfgs: dict[str, Any] | N
         ]
         return _apply_mode_limits(scene_tasks, mode_cfg, allow_repeats=False)  # 公开模式不支持重复。
 
-    # ---- 安全模式：单任务模式 ----
-    if primary_axis == 'safe_mode_behavior':
-        # 该模式只生成一个场景任务，轴参数全部冻结。
+    # ---- 安全模式/消融：单任务模式 ----
+    if primary_axis in ('safe_mode_behavior', 'ablation_variant'):
+        # 这些模式只生成一个场景任务，轴参数全部冻结。
         base_axes = _resolve_base_axes(frozen_axes, protocol_cfg)
         return _apply_mode_limits(
             [_single_task(base_axes, index=0, protocol_cfg=protocol_cfg)],
